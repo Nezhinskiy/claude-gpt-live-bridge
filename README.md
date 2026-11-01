@@ -95,7 +95,7 @@ last summary, Start sends that one again instead of asking the model for another
 call talks to another session, the band shows **Talk here** beside Stop. Start stays disabled
 in the popover until a session has joined; until then the popover has **Copy /live on**, to
 paste into a session. The
-popover lists the joined sessions (click one to make it the target; its × asks first, then
+popover lists the joined sessions, five at a time with the rest scrolling (click one to make it the target; its × asks first, then
 removes it and erases its conversation, and `/live on` in that session joins it again), shows
 the last lines of the conversation (each cut to four lines) and the context line exactly as it
 was sent, and has **Load context** (it waits, as **Loading context…**, until the target's summary

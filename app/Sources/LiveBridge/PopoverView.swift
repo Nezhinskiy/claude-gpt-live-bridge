@@ -3,10 +3,11 @@ import SwiftUI
 
 /// The menu bar popover: the call, the sessions, the target's context line and last lines (each
 /// session has its own conversation with the voice), the minutes, and the app's own settings.
-/// Liquid Glass on macOS 26 and later, materials before. It never grows past the screen's
-/// visible height (a taller menu bar window leaves a transparent band at its top): the sessions,
-/// the last lines and what was sent scroll inside their own caps, and past the screen the whole
-/// popover scrolls.
+/// Liquid Glass on macOS 26 and later, materials before. Like macOS's own menu bar modules, the
+/// window has one translucent background with large corners, and the cards inside are subtle
+/// fills concentric with it. It never grows past the screen's visible height (a taller menu bar
+/// window leaves a transparent band at its top): the sessions (five rows), the last lines and
+/// what was sent scroll inside their own caps, and past the screen the whole popover scrolls.
 struct PopoverView: View {
   @Bindable var model: AppModel
   @State private var showContext = false
@@ -15,6 +16,10 @@ struct PopoverView: View {
   @State private var showHelp = false
   /// The popover's own height, which its window is fitted to.
   @State private var height = 0.0
+  /// The tallest session row, measured; the list shows five of them.
+  @State private var rowHeight = 0.0
+  /// The window's own background was found and reshaped; otherwise the popover draws one.
+  @State private var systemBackground = true
   @Environment(\.openSettings) private var openSettings
 
   /// Opens Settings in front: the app is activated first, as a menu bar app is not active.
@@ -32,12 +37,18 @@ struct PopoverView: View {
       CappedScroll(cap: layout.maxHeight) { content }
     }
     .frame(width: 340)
+    .background {
+      if !systemBackground { PopoverBackground(radius: popoverCorners.window) }
+    }
+    .clipShape(.rect(cornerRadius: popoverCorners.window, style: .circular))
     .onGeometryChange(for: Double.self) {
       Double($0.size.height)
     } action: {
       height = $0
     }
     .background(WindowFitter(height: height))
+    .background(
+      WindowStyler(radius: popoverCorners.window, foundSystemBackground: $systemBackground))
   }
 
   private var content: some View {
@@ -129,7 +140,7 @@ struct PopoverView: View {
           .help("Copy \(StatusPresentation.joinCommand), then run it in a Claude Code session")
         }
       }
-      CappedScroll(cap: layout.sessions) {
+      CappedScroll(cap: PopoverLayout.sessionsCap(rowHeight: rowHeight, spacing: 4)) {
         VStack(alignment: .leading, spacing: 4) {
           ForEach(shown.rows) { row in
             HStack(spacing: 4) {
@@ -144,6 +155,11 @@ struct PopoverView: View {
               .buttonStyle(.plain)
               .help("Remove from LiveBridge and erase its conversation; /live on joins it again")
               .accessibilityLabel("Remove \(row.label) from LiveBridge")
+            }
+            .onGeometryChange(for: Double.self) {
+              Double($0.size.height)
+            } action: {
+              if $0 > rowHeight { rowHeight = $0 }
             }
           }
         }
@@ -296,8 +312,121 @@ private struct WindowFitter: NSViewRepresentable {
           x: content.minX, y: content.maxY - height, width: content.width, height: height))
       frame.origin.y = window.frame.maxY - frame.height
       window.setFrame(frame, display: true)
+      window.invalidateShadow()  // the shadow follows the rounded background's new height
     }
   }
+}
+
+/// The corners of the popover's window and of its cards (`PopoverCorners`).
+@MainActor private let popoverCorners = PopoverCorners(glass: hasLiquidGlass)
+
+@MainActor private var hasLiquidGlass: Bool {
+  #if compiler(>=6.2)
+    if #available(macOS 26, *) { return true }
+  #endif
+  return false
+}
+
+/// Gives the menu bar window the shape of macOS's own menu bar modules: a transparent window
+/// whose one background is the system's own, reshaped to `radius`, with a shadow that follows it.
+/// MenuBarExtra draws that background as an `NSVisualEffectView` (or, with Liquid Glass, an
+/// `NSGlassEffectView`) behind the popover: an effect view gets a rounded mask, a glass view
+/// the radius. When neither is found, `foundSystemBackground` turns false and the popover draws
+/// its own (`PopoverBackground`).
+private struct WindowStyler: NSViewRepresentable {
+  let radius: Double
+  @Binding var foundSystemBackground: Bool
+
+  func makeNSView(context: Context) -> NSView { NSView() }
+
+  func updateNSView(_ view: NSView, context: Context) {
+    let radius = radius
+    let found = $foundSystemBackground
+    DispatchQueue.main.async {  // the view joins its window after this update
+      guard let window = view.window else { return }
+      window.isOpaque = false
+      window.backgroundColor = .clear
+      window.hasShadow = true
+      let reshaped = Self.reshapeBackgrounds(of: window, around: view, radius: radius)
+      if reshaped != found.wrappedValue { found.wrappedValue = reshaped }
+      window.invalidateShadow()
+    }
+  }
+
+  /// The window's own background views: those around the popover's hosting view, not the
+  /// popover's own effects inside it. Returns whether any was found.
+  private static func reshapeBackgrounds(of window: NSWindow, around view: NSView, radius: Double)
+    -> Bool
+  {
+    var ancestors: [NSView] = []
+    var next = view.superview
+    while let current = next {
+      ancestors.append(current)
+      next = current.superview
+    }
+    guard let hosting = ancestors.last(where: { $0.className.contains("HostingView") }),
+      let root = ancestors.last
+    else { return false }
+    var found = false
+    var queue = [root]
+    while let current = queue.popLast() {
+      guard current !== hosting else { continue }  // the popover's own views are left alone
+      found = reshape(current, radius: radius) || found
+      queue += current.subviews
+    }
+    return found
+  }
+
+  private static func reshape(_ view: NSView, radius: Double) -> Bool {
+    #if compiler(>=6.2)
+      if #available(macOS 26, *), let glass = view as? NSGlassEffectView {
+        if glass.cornerRadius != radius { glass.cornerRadius = radius }
+        return true
+      }
+    #endif
+    guard let effect = view as? NSVisualEffectView else { return false }
+    if effect.maskImage?.capInsets.top != CGFloat(radius) {
+      effect.maskImage = roundedMask(radius: radius)
+    }
+    return true
+  }
+
+  /// A stretchable rounded rectangle for `NSVisualEffectView.maskImage`.
+  static func roundedMask(radius: Double) -> NSImage {
+    let edge = radius * 2 + 1
+    let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+      NSColor.black.setFill()
+      NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+      return true
+    }
+    image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+    image.resizingMode = .stretch
+    return image
+  }
+}
+
+/// The popover's own background, used only when the window's could not be found: Liquid Glass
+/// where the system has it, the popover material before, both rounded to `radius`.
+private struct PopoverBackground: NSViewRepresentable {
+  let radius: Double
+
+  func makeNSView(context: Context) -> NSView {
+    #if compiler(>=6.2)
+      if #available(macOS 26, *) {
+        let glass = NSGlassEffectView()
+        glass.cornerRadius = radius
+        return glass
+      }
+    #endif
+    let effect = NSVisualEffectView()
+    effect.material = .popover
+    effect.blendingMode = .behindWindow
+    effect.state = .active
+    effect.maskImage = WindowStyler.roundedMask(radius: radius)
+    return effect
+  }
+
+  func updateNSView(_ view: NSView, context: Context) {}
 }
 
 /// A vertical scroll view as tall as its content, up to `cap` points; past it, it scrolls. A
@@ -336,17 +465,11 @@ private struct GlassGroup<Content: View>: View {
 }
 
 extension View {
-  @ViewBuilder fileprivate func card() -> some View {
-    let padded = frame(maxWidth: .infinity, alignment: .leading).padding(10)
-    #if compiler(>=6.2)
-      if #available(macOS 26, *) {
-        padded.glassEffect(.regular, in: .rect(cornerRadius: 16))
-      } else {
-        padded.background(.regularMaterial, in: .rect(cornerRadius: 16))
-      }
-    #else
-      padded.background(.regularMaterial, in: .rect(cornerRadius: 16))
-    #endif
+  /// A section, as Control Center's modules draw theirs: a subtle fill on the window's one
+  /// background, its corners concentric with the window's.
+  @MainActor fileprivate func card() -> some View {
+    frame(maxWidth: .infinity, alignment: .leading).padding(10)
+      .background(.fill.tertiary, in: .rect(cornerRadius: popoverCorners.card, style: .circular))
   }
 
   @ViewBuilder fileprivate func capsule(prominent: Bool) -> some View {
