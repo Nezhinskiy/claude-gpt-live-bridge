@@ -173,7 +173,7 @@ public actor Bridge: Router {
     let before = machine.phase
     let effects = machine.handle(event)
     let now = time.now  // read before any await, so an interleaved event cannot shift it
-    if machine.pending.isEmpty { unheard = [] }
+    unheard.removeAll { !machine.pending.contains($0.text) }
     if before != .live, machine.phase == .live { await meter.opened(at: now) }
     if before == .live, machine.phase != .live { await meter.closed(at: now) }
     for effect in effects { await run(effect) }
@@ -258,7 +258,7 @@ public actor Bridge: Router {
       await send(.userTranscribed)
     case .assistantUtterance(let text):
       record(.assistant, text)
-      await send(.assistantFinishedSpeaking)
+      await send(.assistantFinishedSpeaking(text))
     case .assistantSpeaking: await send(.assistantSpeaking)
     case .closed(let reason):
       opening += 1

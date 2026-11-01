@@ -105,8 +105,8 @@ talking:
   handoff. Sound without words (music, a TV) closes it after 90 seconds.
 - A result that arrives while the line is closed plays a chime and waits: the band and the
   popover show it as unheard, and the voice tells you when you next speak. A result counts as
-  heard only once the voice has replied after it; if the line closes first, it chimes and waits
-  again.
+  heard only once a reply the voice began after it names its session or repeats its words; if
+  the line closes first, it chimes and waits again.
 - The conversation is carried over to the next session, and across Stop and Start, so the voice
   remembers what you said a minute ago.
 - The popover shows the minutes the line was open, as measured by the app; how your plan meters

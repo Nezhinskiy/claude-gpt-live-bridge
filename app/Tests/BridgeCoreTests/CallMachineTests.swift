@@ -19,6 +19,10 @@ struct CallMachineTests {
   static let unheard: [CallEvent] = [.start, .deliver("a"), .speechStarted]
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
+  static let result = "[RESULT] Alpha · 0a1b: The build passes on main."
+  /// A result given to the open line, then the voice's next reply under way.
+  static let told: [CallEvent] = live + [.deliver(result), .assistantSpeaking]
+  static func said(_ text: String) -> CallEvent { .assistantFinishedSpeaking(text) }
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
@@ -57,9 +61,23 @@ struct CallMachineTests {
     row(
       "deliverWhileLiveIsAddedAndReArmsSilence", live, .deliver("a"), .live,
       [.addContext("a"), arm], pending: ["a"]),
+    row("replyNamingTheSessionMarksItHeard", told, said("Alpha is green."), .live, [arm]),
+    row("replySayingTheResultMarksItHeard", told, said("The BUILD pässes."), .live, [arm]),
     row(
-      "replyAfterAResultMarksItHeard", live + [.deliver("a")], .assistantFinishedSpeaking, .live,
-      [arm]),
+      "oneSharedWordKeepsTheResult", told, said("The build is next."), .live, [arm],
+      pending: [result]),
+    row("cutOffReplyKeepsTheResult", told, said("I"), .live, [arm], pending: [result]),
+    row(
+      "replyUnderWayWhenTheResultArrivesKeepsIt",
+      live + [.assistantSpeaking, .deliver(result)], said("Alpha: the build passes."), .live,
+      [arm], pending: [result]),
+    row(
+      "theReplyAfterThatHearsIt",
+      live + [.assistantSpeaking, .deliver(result), said("Sure."), .assistantSpeaking],
+      said("Alpha passes."), .live, [arm]),
+    row(
+      "ackSayingTheResultKeepsIt", told + [.handedOff, .speechStarted, .assistantSpeaking],
+      said("On it, Alpha."), .live, [cap], pending: [result]),
     row(
       "silenceAfterUnspokenResultReturnsItToPending", live + [.deliver("a")], .silenceElapsed,
       .listening, [.closeRealtime, .chime], pending: ["a"]),
@@ -75,18 +93,18 @@ struct CallMachineTests {
     row(
       "noiseWithoutWordsHangsUp", live + [.speechStarted], .silenceElapsed, .listening,
       [.closeRealtime, .problem(CallMachine.noiseSentence)]),
-    row("replyArmsTheSilenceTimer", live, .assistantFinishedSpeaking, .live, [arm]),
+    row("replyArmsTheSilenceTimer", live, said("Hello."), .live, [arm]),
     row("speakingVoiceReArmsTheTimer", live, .assistantSpeaking, .live, [arm]),
     row("handoffAwaitsTheAck", live, .handedOff, .live, []),
     row(
-      "handoffWaitsForAckThenHangsUp", live + [.handedOff], .assistantFinishedSpeaking,
+      "handoffWaitsForAckThenHangsUp", live + [.handedOff], said("On it."),
       .listening, [.closeRealtime]),
     row(
       "deliverDuringAckKeepsTheLineOpen", live + [.handedOff, .deliver("a")],
-      .assistantFinishedSpeaking, .live, [arm], pending: ["a"]),
+      said("On it."), .live, [arm], pending: ["a"]),
     row(
       "speechDuringAckKeepsTheLineOpen", live + [.handedOff, .speechStarted],
-      .assistantFinishedSpeaking, .live, [cap]),
+      said("On it."), .live, [cap]),
     row("silenceHangsUp", live, .silenceElapsed, .listening, [.closeRealtime]),
     row(
       "lostAckStillHangsUpOnSilence", live + [.handedOff], .silenceElapsed, .listening,

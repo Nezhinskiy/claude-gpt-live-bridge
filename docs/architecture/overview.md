@@ -143,7 +143,7 @@ sequenceDiagram
 ### A result while the line is closed
 
 A result that arrives while the line is closed does not reopen it. It chimes and waits; the
-voice gets it when the owner next speaks and says it in its next reply.
+voice gets it when the owner next speaks and says it in a reply.
 
 ```mermaid
 sequenceDiagram
@@ -163,9 +163,11 @@ sequenceDiagram
   Codex-->>Owner: reply to the owner, then the result (unheard 0)
 ```
 
-A result stays unheard until the voice has finished a reply after it, the handoff's own
-acknowledgement aside. If the line closes first, the result chimes and waits again: it may be
-said twice, but it is never lost.
+A result stays unheard until the voice finishes a reply that it began after the result and
+that mentions it: the session's label, or two of the result's words of four letters or more.
+The handoff's own acknowledgement never counts, nor does a reply the owner cut off before it
+got there. If the line closes first, the result chimes and waits again: it may be said twice,
+but it is never lost.
 
 A newer request to the same session withdraws its older unheard result, so the voice never reads
 an answer that has been superseded.

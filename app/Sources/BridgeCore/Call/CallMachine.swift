@@ -1,8 +1,12 @@
+import Foundation
+
 /// What happens to the call: owner actions, local voice detection, the realtime session, timers.
 public enum CallEvent: Equatable, Sendable {
   case start, stop, speechStarted, speechEnded, connected
   case connectFailed(String)
-  case assistantFinishedSpeaking, silenceElapsed, handedOff
+  /// The voice finished a reply; the text is its transcript.
+  case assistantFinishedSpeaking(String)
+  case silenceElapsed, handedOff
   /// The voice is saying something (a transcript delta); the owner's words were recognised.
   case assistantSpeaking, userTranscribed
   case deliver(String)
@@ -28,9 +32,11 @@ public struct CallMachine: Sendable {
   public static let noiseSentence =
     "The voice hung up: the microphone heard sound but no words for 90 seconds."
   public private(set) var phase: CallPhase = .off
-  /// Results the voice has not replied after: waiting for the owner to speak, or given to the
-  /// open session. A hang-up keeps them, so none is lost; one may be spoken twice.
+  /// Results the voice has not said yet: waiting for the owner to speak, or given to the open
+  /// session. A hang-up keeps them, so none is lost; one may be spoken twice.
   public private(set) var pending: [String] = []
+  /// The results given before the voice's current reply began; only that reply can say them.
+  private var replyCanSay: [String]?
   /// The line closes once the voice's acknowledgement of a handoff ends, unless a result or the
   /// owner's speech came after the handoff. The silence timer stays armed meanwhile.
   public private(set) var awaitingAck = false
@@ -90,15 +96,20 @@ public struct CallMachine: Sendable {
       isSoundOn = true
       awaitingAck = false
       return [armSilence]
-    case (.live, .assistantSpeaking), (.live, .userTranscribed):
+    case (.live, .assistantSpeaking):
+      replyCanSay = replyCanSay ?? pending
+      return [armSilence]
+    case (.live, .userTranscribed):
       return [armSilence]
     case (.live, .handedOff):
       awaitingAck = true
       isAckUnfinished = true
       return []
-    case (.live, .assistantFinishedSpeaking):
+    case (.live, .assistantFinishedSpeaking(let text)):
+      let canSay = replyCanSay ?? []
+      replyCanSay = nil
       if !isAckUnfinished {
-        pending = []
+        pending.removeAll { canSay.contains($0) && Self.says(text, $0) }
       } else if awaitingAck {
         return [.closeRealtime] + hangUp()
       }
@@ -122,6 +133,7 @@ public struct CallMachine: Sendable {
       phase = .listening
       awaitingAck = false
       isAckUnfinished = false
+      replyCanSay = nil
     }
     return phase == .live && !pending.isEmpty ? [.chime] : []
   }
@@ -129,5 +141,26 @@ public struct CallMachine: Sendable {
   private mutating func end(with effects: [CallEffect]) -> [CallEffect] {
     self = CallMachine(silenceSeconds: silenceSeconds, noiseCapSeconds: noiseCapSeconds)
     return effects
+  }
+
+  /// Whether a reply's transcript mentions a `[TAG] label: body` result: the label without its
+  /// ` · id` suffix, or two of the body's words of four letters or more. Case and diacritics
+  /// are ignored, and the tag is not a word of the result.
+  static func says(_ transcript: String, _ result: String) -> Bool {
+    let said = words(transcript)
+    let line = result.trimmingPrefix(#/\[[^\]]*\] /#)
+    let colon = line.firstRange(of: ": ")
+    let head = line[..<(colon?.lowerBound ?? line.startIndex)]
+    let label = words(head.split(separator: " · ").first.map(String.init) ?? "")
+    if !label.isEmpty, said.indices.contains(where: { said[$0...].starts(with: label) }) {
+      return true
+    }
+    let body = words(String(line[(colon?.upperBound ?? line.startIndex)...]))
+    return Set(body.filter { $0.count >= 4 }).intersection(said).count >= 2
+  }
+
+  private static func words(_ text: String) -> [String] {
+    text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+      .split(whereSeparator: { !$0.isLetter }).map(String.init)
   }
 }

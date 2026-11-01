@@ -48,7 +48,7 @@ export type StatusReply = {
   problem?: string;
   lastContext?: string;
   recentTranscript: string[];
-  /** Results the voice has not replied after yet. */
+  /** Results the voice has not said yet. */
   unheard: number;
 };
 

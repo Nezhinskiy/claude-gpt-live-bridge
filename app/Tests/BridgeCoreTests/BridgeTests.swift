@@ -189,7 +189,10 @@ struct BridgeTests {
     #expect(await bridge.status.unheard == 1)
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.added == ["[RESULT] Alpha: Done."])
-    #expect(await bridge.status.unheard == 1)  // until the voice has replied after it
+    #expect(await bridge.status.unheard == 1)  // until the voice has said it
+    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantUtterance("I"))  // cut off by the owner
+    voice.emit(.assistantSpeaking)
     voice.emit(.assistantUtterance("Alpha is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
   }

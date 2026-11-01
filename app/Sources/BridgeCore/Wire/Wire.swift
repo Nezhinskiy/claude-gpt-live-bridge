@@ -138,8 +138,8 @@ public struct StatusReply: Codable, Sendable, Equatable {
   public var lastContext: String?
   /// The last three lines of the conversation.
   public var recentTranscript: [String]
-  /// Results the voice has not replied after yet: waiting for the owner to speak, or just given
-  /// to the open session.
+  /// Results the voice has not said yet: waiting for the owner to speak, or given to the open
+  /// session.
   public var unheard: Int
 }
 
