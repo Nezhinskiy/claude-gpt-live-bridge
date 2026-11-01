@@ -1,0 +1,13 @@
+{
+  "name": "claude-gpt-live-bridge-mod",
+  "private": true,
+  "type": "module",
+  "description": "Development scripts for the claude-gpt-live-bridge Claude Code mod; the mod itself has no dependencies.",
+  "scripts": {
+    "test:unit": "node --test \"tests/unit/*.unit.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}
