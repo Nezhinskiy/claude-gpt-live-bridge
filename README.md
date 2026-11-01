@@ -128,7 +128,10 @@ session:
   answer in a later turn started by a background task's notification, for up to 10 minutes
   after a voice request and until any other turn starts in the session;
 - a session's context summary when you load it (at most 1,500 characters, redacted the same
-  way). The popover shows exactly what was sent.
+  way). The popover shows exactly what was sent;
+- with every line above, its session's label: the Claude Code session title, or the session
+  folder's name when it has none;
+- the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
 
 The codex thread that carries the voice is ephemeral and read-only, with every codex tool and
 MCP server turned off; it can only talk. Claude's work goes to Anthropic as your Claude Code

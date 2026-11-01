@@ -80,7 +80,9 @@ Through codex's realtime session, to OpenAI: microphone audio while the line is 
 before speech starts until it closes), the voice's instructions, the recent conversation (up to
 24 lines), the briefs of requests still open, each result, question, update and approval notice
 (at most 2,000 characters, code blocks and tables removed), and a session's context summary when
-you load it (at most 1,500 characters). Results and summaries pass through a redactor of known
+you load it (at most 1,500 characters), each line with its session's label (the session title,
+or its folder's name), and the WebRTC offer with the Mac's local addresses as connection
+candidates. Results and summaries pass through a redactor of known
 credential shapes first (private keys, JWTs, common API tokens, URL passwords, `password=`-style
 fields). It is a list of patterns, not a guarantee. Nothing is sent while the line is closed:
 voice detection runs on the Mac.
