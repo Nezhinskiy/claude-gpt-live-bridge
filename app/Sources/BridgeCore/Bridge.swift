@@ -75,12 +75,13 @@ public actor Bridge: Router {
     switch action {
     case .start:
       guard machine.phase == .off, !starting else { return }
+      starting = true  // before any await, so a second Start meanwhile does nothing
       guard await registry.target != nil else {
+        starting = false
         problem = Self.noSession
         await changed()
         return
       }
-      starting = true
       do { _ = try await controller() } catch is CancellationError {
         return  // a Stop came first
       } catch {
@@ -226,7 +227,11 @@ public actor Bridge: Router {
   private func controller() async throws -> any RealtimeControlling {
     if let realtime { return realtime }
     let generation = controllers
-    let made = try await makeRealtime()
+    let made: any RealtimeControlling
+    do { made = try await makeRealtime() } catch {
+      // A launch that fails after a Stop is the Stop's business, not a problem to show.
+      throw generation == controllers ? error : CancellationError()
+    }
     guard generation == controllers else {
       await made.shutdown()
       throw CancellationError()
