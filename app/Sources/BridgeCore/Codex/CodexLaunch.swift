@@ -20,7 +20,9 @@ public enum CodexProblem: Error, Equatable, Sendable {
     case .mcpNotDisabled(let names):
       "Codex MCP servers could not be turned off for the voice: \(names.joined(separator: ", "))."
     case .protocolMismatch(let detail): "Codex did not answer as expected (\(detail))."
-    case .exited(let status): "Codex stopped unexpectedly (exit status \(status))."
+    case .exited(let status):
+      status < 0
+        ? "Codex stopped unexpectedly." : "Codex stopped unexpectedly (exit status \(status))."
     case .realtimeError(let message): "Realtime voice failed: \(message)"
     }
   }
