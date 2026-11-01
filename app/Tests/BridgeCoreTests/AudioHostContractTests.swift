@@ -5,19 +5,13 @@ import Testing
 
 struct AudioHostContractTests {
   @Test func pageMessagesDecode() {
-    #expect(PageMessage(body: ["type": "speechStarted"]) == .speechStarted)
-    #expect(PageMessage(body: ["type": "speechEnded"]) == .speechEnded)
-    #expect(PageMessage(body: ["type": "level", "value": 0.25]) == .level(0.25))
-    #expect(PageMessage(body: ["type": "audioFailed", "reason": "r"]) == .audioFailed("r"))
-    #expect(PageMessage(body: ["type": "unknown"]) == nil)
-    #expect(PageMessage(body: "speechStarted") == nil)
-  }
-
-  /// Review Focus 5: a lost microphone or peer reaches the call as `failed` with its sentence.
-  @Test func audioFailedMessageBecomesAudioEvent() {
-    #expect(PageMessage.audioFailed("No microphone.").audioEvent == .failed("No microphone."))
-    #expect(PageMessage(body: ["type": "audioFailed"])?.audioEvent != nil)
-    #expect(PageMessage.level(0.5).audioEvent == nil)
+    #expect(AudioEvent(body: ["type": "speechStarted"]) == .speechStarted)
+    #expect(AudioEvent(body: ["type": "speechEnded"]) == .speechEnded)
+    #expect(AudioEvent(body: ["type": "level", "value": 0.25]) == .level(0.25))
+    #expect(AudioEvent(body: ["type": "audioFailed", "reason": "r"]) == .failed("r"))
+    #expect(AudioEvent(body: ["type": "audioFailed"]) != nil)  // a failure without a reason
+    #expect(AudioEvent(body: ["type": "unknown"]) == nil)
+    #expect(AudioEvent(body: "speechStarted") == nil)
   }
 
   @Test func navigationPolicyAllowsOnlyTheAppPage() {

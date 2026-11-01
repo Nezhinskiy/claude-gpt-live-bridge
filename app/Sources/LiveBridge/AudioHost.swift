@@ -16,6 +16,8 @@ final class AudioHost: NSObject, AudioSide {
     contentRect: NSRect(x: -10_000, y: -10_000, width: 1, height: 1), styleMask: .borderless,
     backing: .buffered, defer: true)
   private let fakeMic: URL?
+  /// The page's own load; a navigation the lock cancels is not it.
+  private var navigation: WKNavigation?
   private var loaded = false
   private var waiting: [CheckedContinuation<Void, Never>] = []
 
@@ -32,8 +34,10 @@ final class AudioHost: NSObject, AudioSide {
     webView.navigationDelegate = self
     webView.uiDelegate = self
     window.contentView = webView
-    webView.load(URLRequest(url: AudioPage.url))
+    load()
   }
+
+  private func load() { navigation = webView.load(URLRequest(url: AudioPage.url)) }
 
   // MARK: AudioSide
 
@@ -65,10 +69,12 @@ final class AudioHost: NSObject, AudioSide {
   // MARK: The page
 
   /// Runs `body` as an async function in the page once it has loaded; a rejected promise
-  /// throws its message.
+  /// throws its message, and a page that failed to load throws (and loads again next time).
   @discardableResult
   private func call(_ body: String, _ arguments: [String: Any] = [:]) async throws -> Any? {
+    if !loaded, navigation == nil { load() }
     if !loaded { await withCheckedContinuation { waiting.append($0) } }
+    guard loaded else { throw PageError(message: "The audio page did not load.") }
     do {
       return try await webView.callAsyncJavaScript(body, arguments: arguments, contentWorld: .page)
     } catch {
@@ -93,11 +99,10 @@ extension AudioHost: WKScriptMessageHandler {
   func userContentController(
     _ controller: WKUserContentController, didReceive message: WKScriptMessage
   ) {
-    guard message.frameInfo.isMainFrame, let decoded = PageMessage(body: message.body) else {
+    guard message.frameInfo.isMainFrame, let event = AudioEvent(body: message.body) else {
       return
     }
-    if case .level(let value) = decoded { onLevel(value) }
-    if let event = decoded.audioEvent { onEvent(event) }
+    if case .level(let value) = event { onLevel(value) } else { onEvent(event) }
   }
 }
 
@@ -111,7 +116,23 @@ extension AudioHost: WKNavigationDelegate, WKUIDelegate {
   }
 
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    loaded = true
+    settle(navigation, loaded: true)
+  }
+
+  func webView(
+    _ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error
+  ) { settle(navigation, loaded: false) }
+
+  func webView(
+    _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+    withError error: any Error
+  ) { settle(navigation, loaded: false) }
+
+  /// The page's load ended: whoever waits for it goes on, and fails if it did not load.
+  private func settle(_ ended: WKNavigation?, loaded: Bool) {
+    guard ended === navigation else { return }
+    navigation = nil
+    self.loaded = loaded
     for continuation in waiting { continuation.resume() }
     waiting = []
   }
@@ -120,7 +141,7 @@ extension AudioHost: WKNavigationDelegate, WKUIDelegate {
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
     loaded = false
     onEvent(.failed("The audio page stopped unexpectedly. Start again."))
-    webView.load(URLRequest(url: AudioPage.url))
+    load()
   }
 
   func webView(

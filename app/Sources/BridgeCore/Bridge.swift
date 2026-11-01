@@ -1,26 +1,5 @@
 import Foundation
 
-/// What the audio page reports: local voice detection and failures.
-public enum AudioEvent: Sendable, Equatable {
-  case speechStarted, speechEnded
-  /// The microphone or the peer connection failed; the sentence is shown to the owner.
-  case failed(String)
-}
-
-/// The audio page: microphone, voice detection, pre-roll and the WebRTC peer.
-public protocol AudioSide: Sendable {
-  func startListening() async
-  func stopListening() async
-  func makeOffer() async throws -> String
-  /// Applies the answer SDP and returns once the session is ready (the data channel's
-  /// `session.started`, ADR 0001 (d)).
-  func applyAnswer(_ sdp: String) async throws
-  func flushPreroll() async
-  func closePeer() async
-  /// The short sound for a result that waits until the owner next speaks.
-  func chime() async
-}
-
 /// The bridge: serves the mod's routes, runs the call machine's effects in order, and routes
 /// handoffs to sessions and their answers back to the voice.
 public actor Bridge: Router {
@@ -140,6 +119,7 @@ public actor Bridge: Router {
     switch event {
     case .speechStarted: await send(.speechStarted)
     case .speechEnded: await send(.speechEnded)
+    case .level: break
     case .failed(let reason):
       await send(.audioFailed(reason))
       await endCodex()
