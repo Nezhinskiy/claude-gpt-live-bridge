@@ -134,7 +134,7 @@ public struct StatusReply: Codable, Sendable, Equatable {
   public var minutesThisCall: Double
   /// One sentence on why the call cannot start or just stopped.
   public var problem: String?
-  /// The context summary last given to the voice, shown exactly as sent.
+  /// The `[CONTEXT]` line last given to the voice, exactly as sent; kept across restarts.
   public var lastContext: String?
   /// The last three lines of the conversation.
   public var recentTranscript: [String]

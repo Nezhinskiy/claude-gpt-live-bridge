@@ -47,7 +47,6 @@ public actor Bridge: Router {
   private var silenceTimer = 0
   private var continuity: Continuity
   private var problem: String?
-  private var lastContext: String?
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
   private var callStart: Date?
@@ -84,7 +83,7 @@ public actor Bridge: Router {
       return StatusReply(
         call: machine.phase, sessions: await registry.rows(),
         minutesToday: await meter.minutesToday(), minutesThisCall: minutesThisCall,
-        problem: problem, lastContext: lastContext,
+        problem: problem, lastContext: continuity.context,
         recentTranscript: continuity.utterances.suffix(3).map {
           ($0.role == .user ? "You: " : "Voice: ") + $0.text
         }, unheard: machine.pending.count)
@@ -133,7 +132,6 @@ public actor Bridge: Router {
   /// Forgets the conversation; the next realtime session starts fresh.
   public func newConversation() async {
     continuity = Continuity()
-    lastContext = nil
     save()
     await changed()
   }
@@ -341,15 +339,14 @@ public actor Bridge: Router {
     }
   }
 
-  /// A session's summary is redacted and capped, shown as it is, and kept for later sessions;
-  /// a live voice gets it at once, and it does not hold the line open.
+  /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
+  /// it is and kept for later sessions; a live voice gets it at once, and it does not hold the
+  /// line open.
   private func context(_ body: ContextBody) async throws {
     let row = try await label(of: body.sessionId)
-    let summary = AnswerShaper.cap(
-      Redaction.redact(AnswerShaper.normalized(body.summary)), to: Self.maxContext)
-    let line = AnswerShaper.line(tag: "CONTEXT", label: row.label, body: summary)
-    lastContext = summary
-    continuity.setContext(line)
+    let line = AnswerShaper.line(
+      tag: "CONTEXT", label: row.label, body: body.summary, limit: Self.maxContext)
+    continuity.context = line
     save()
     if machine.phase == .live { try? await realtime?.addContext(line) }
   }

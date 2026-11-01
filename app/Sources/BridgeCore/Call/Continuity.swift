@@ -13,16 +13,14 @@ public struct Continuity: Codable, Sendable, Equatable {
   public static let maxTokens = 8_192
 
   public private(set) var utterances: [Utterance] = []
-  public private(set) var context: String?
+  /// The `[CONTEXT]` line of the session last summarised, as the voice gets it.
+  public var context: String?
 
   public init() {}
 
   public mutating func record(_ utterance: Utterance) {
     utterances = Array((utterances + [utterance]).suffix(Self.keptUtterances))
   }
-
-  /// The session's context summary, or `nil` once it is no longer loaded.
-  public mutating func setContext(_ summary: String?) { context = summary }
 
   /// The loaded context and the open task lines, then the newest utterances that fit codex's
   /// limits. Notes go in as `user` lines, data with the rank of the owner's words and no more,

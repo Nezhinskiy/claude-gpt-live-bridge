@@ -7,42 +7,44 @@ public enum AnswerShaper {
     let prose = text.replacing(/```[\s\S]*?(```|\z)/, with: "\n")
       .split(whereSeparator: \.isNewline).filter { !$0.trimmingPrefix(/\s*/).hasPrefix("|") }
       .joined(separator: " ")
-    var body = Redaction.redact(normalized(prose))
-    if body.allSatisfy(\.isWhitespace) {
-      body = "the answer is code or a table only; it is in the session."
-    }
-    let tag = tags[status] ?? "RESULT"
+    let tag =
+      switch status {
+      case .ok: "RESULT"
+      case .failed: "FAILED"
+      case .question: "QUESTION"
+      case .update: "UPDATE"
+      }
     return line(
-      tag: tag, label: label, body: cap(body, to: maxCharacters - tag.count - label.count - 4))
+      tag: tag, label: label,
+      body: prose.allSatisfy(\.isWhitespace)
+        ? "the answer is code or a table only; it is in the session." : prose)
   }
 
-  /// `[TAG] label: body` as exactly one line, so a session's text cannot pose as another
-  /// delivery: after `normalized`, every opening or closing bracket of any script becomes `(`
-  /// or `)`, and every line break a space.
-  public static func line(tag: String, label: String, body: String) -> String {
-    let flat = { (text: String) in
-      String(
-        String.UnicodeScalarView(
-          normalized(text).unicodeScalars.map {
-            switch $0.properties.generalCategory {
-            case .openPunctuation: "("
-            case .closePunctuation: ")"
-            default: $0
-            }
-          })
-      ).split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    }
-    return "[\(tag)] \(flat(label)): \(flat(body))"
+  /// `[TAG] label: body` as exactly one line of at most `limit` characters, the body redacted,
+  /// so a session's text cannot pose as another delivery: every opening or closing bracket of
+  /// any script becomes `(` or `)`, and every line break a space.
+  public static func line(
+    tag: String, label: String, body: String, limit: Int = maxCharacters
+  ) -> String {
+    let head = "[\(tag)] \(flat(label)): "
+    return head + cap(Redaction.redact(flat(body)), to: limit - head.count)
   }
 
-  /// NFKC with format characters (zero-width and the like) removed; run before redaction, so
-  /// such a character inside a token cannot hide it.
-  public static func normalized(_ text: String) -> String {
+  /// NFKC with format characters (zero-width and the like) removed, so redaction sees a token
+  /// whole; brackets made plain and whitespace runs one space.
+  static func flat(_ text: String) -> String {
     String(
       String.UnicodeScalarView(
-        text.precomposedStringWithCompatibilityMapping.unicodeScalars.filter {
-          $0.properties.generalCategory != .format
-        }))
+        text.precomposedStringWithCompatibilityMapping.unicodeScalars.compactMap {
+          scalar -> Unicode.Scalar? in
+          switch scalar.properties.generalCategory {
+          case .format: nil
+          case .openPunctuation: "("
+          case .closePunctuation: ")"
+          default: scalar
+          }
+        })
+    ).split(whereSeparator: \.isWhitespace).joined(separator: " ")
   }
 
   /// `text` cut to `limit` characters after its last whole sentence, else with an ellipsis.
@@ -55,8 +57,4 @@ public enum AnswerShaper {
     guard let end = ends.last else { return String(text.prefix(limit - 1)) + "…" }
     return String(head[...end])
   }
-
-  static let tags: [AnswerStatus: String] = [
-    .ok: "RESULT", .failed: "FAILED", .question: "QUESTION", .update: "UPDATE",
-  ]
 }

@@ -18,7 +18,7 @@ struct ContinuityTests {
     var continuity = Continuity()
     continuity.record(Utterance(role: .user, text: "hi"))
     continuity.record(Utterance(role: .assistant, text: "hello"))
-    continuity.setContext("context")
+    continuity.context = "context"
     #expect(
       continuity.initialItems(tasks: ["task"]) == [
         InitialItem(role: .user, text: "context"), InitialItem(role: .user, text: "task"),
@@ -29,7 +29,7 @@ struct ContinuityTests {
   @Test func roundTripsThroughJSON() throws {
     var continuity = Continuity()
     continuity.record(Utterance(role: .user, text: "hi"))
-    continuity.setContext("context")
+    continuity.context = "context"
     let json = try JSONEncoder().encode(continuity)
     #expect(try JSONDecoder().decode(Continuity.self, from: json) == continuity)
   }

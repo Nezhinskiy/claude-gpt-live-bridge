@@ -14,6 +14,18 @@ struct AnswerShaperTests {
     #expect(voice.hasPrefix("[RESULT] Example session: Done. This sentence"))
   }
 
+  /// No line is longer than the limit, also when the body has no sentence end to cut at and
+  /// characters that NFKC expands (the ellipsis, ligatures).
+  @Test(arguments: [
+    String(repeating: "word ", count: 600), String(repeating: "\u{FB01}", count: 1500),
+    String(repeating: "x", count: 1994) + "\u{2026}\u{2026}\u{2026}",
+  ])
+  func linesStayWithinTheLimit(text: String) {
+    let voice = AnswerShaper.forVoice(text, status: .ok, label: "Example session")
+    #expect(voice.count <= AnswerShaper.maxCharacters, "\(voice.count)")
+    #expect(voice.hasPrefix("[RESULT] Example session: "))
+  }
+
   @Test func redactsSecretsInAnswers() {
     let voice = AnswerShaper.forVoice(
       "Use sk-abcdefghijklmnopqrstuvwx now.", status: .ok, label: "Example session")

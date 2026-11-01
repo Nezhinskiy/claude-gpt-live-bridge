@@ -74,11 +74,12 @@ struct BridgeTests {
   let audio: FakeAudio
   let registry: SessionRegistry
   let bridge: Bridge
+  let dir: URL
   let a = SessionID("00000000-0000-0000-0000-000000000001")
   let b = SessionID("11111111-0000-0000-0000-000000000002")
 
   init(realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil) throws {
-    let dir = try temporaryDirectory()
+    dir = try temporaryDirectory()
     registry = SessionRegistry(time: time)
     audio = FakeAudio(time: time)
     bridge = Bridge(
@@ -352,6 +353,7 @@ struct BridgeTests {
     #expect(await bridge.status.problem?.contains("ChatGPT plan") == true)
   }
 
+  /// The context line is shown exactly as the voice gets it, also after the app restarts.
   @Test func contextIsRedactedCappedAndShown() async throws {
     try await join(a, "Alpha")
     let summary =
@@ -360,11 +362,15 @@ struct BridgeTests {
     try await post("/v1/context", ContextBody(sessionId: a, summary: summary))
     let shown = try #require(await bridge.status.lastContext)
     #expect(!shown.contains("hunter2") && !shown.contains("abcdefghij"))
-    #expect(shown.count <= 1500 && shown.hasSuffix("."))
+    #expect(shown.count <= Bridge.maxContext && shown.hasSuffix("."))
+    #expect(shown.hasPrefix("[CONTEXT] Alpha: The password"))
     await live()
-    #expect(
-      await voice.opens.first?.first
-        == InitialItem(role: .user, text: "[CONTEXT] Alpha: \(shown)"))
+    #expect(await voice.opens.first?.first == InitialItem(role: .user, text: shown))
+    let restarted = Bridge(
+      registry: SessionRegistry(time: time), realtime: { [voice] in voice }, audio: audio,
+      meter: UsageMeterStore(file: dir.appending(path: "usage.json"), time: time),
+      continuityFile: dir.appending(path: "continuity.json"), time: time)
+    #expect(await restarted.status.lastContext == shown)
   }
 
   @Test func autoContextOnTargetSwitch() async throws {
