@@ -26,6 +26,17 @@ struct SessionRegistryTests {
     AnswerBody(sessionId: session ?? a, id: request.id, status: status, text: "done", reason: nil)
   }
 
+  /// Sweeps once a second for `seconds` while `a` and `b` poll; what the sweeps delivered.
+  func run(_ seconds: Int) async -> [Delivery] {
+    var deliveries: [Delivery] = []
+    for _ in 0..<seconds {
+      time.advance(by: .seconds(1))
+      for id in [a, b] { _ = try? await registry.poll(id) }
+      deliveries += await registry.sweep()
+    }
+    return deliveries
+  }
+
   @Test func firstJoinBecomesTarget() async {
     await join(a, "Alpha")
     await join(b, "Beta")
@@ -112,19 +123,40 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(1), for: a)
     try await registry.enqueue(request(2), for: a)
     _ = try await registry.poll(a)
-    time.advance(by: .seconds(599))
-    _ = try await registry.poll(a)
-    #expect(await registry.sweep() == [])
-    time.advance(by: .seconds(1))
-    _ = try await registry.poll(a)
-    #expect(await registry.sweep() == [])  // request 1 was superseded by request 2
+    #expect(await run(600) == [])  // request 1 was superseded by request 2
     #expect(try await registry.poll(a) == .request(request(2)))
-    time.advance(by: .seconds(600))
+    #expect(await run(599) == [])
+    #expect(await run(1) == [Self.timedOut])
+  }
+
+  static let timedOut = Delivery(label: "Example session", status: .failed, text: "timed out")
+
+  /// The Mac slept: no mod polled and no sweep ran, which is not a session going quiet.
+  @Test func sleepNeitherExpiresSessionsNorFailsRequests() async throws {
+    await join(a)
+    await join(b, "Other session")
+    try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    #expect(
-      await registry.sweep() == [
-        Delivery(label: "Example session", status: .failed, text: "timed out")
-      ])
+    _ = try await registry.poll(b)
+    #expect(await run(590) == [])
+    time.advance(by: .seconds(3600))
+    #expect(await registry.sweep() == [])
+    #expect(await registry.rows().map(\.sessionId) == [a, b])
+    #expect(await run(9) == [])
+    #expect(await run(1) == [Self.timedOut])  // ten minutes awake in all
+  }
+
+  /// `/clear` gives the session a new id: it keeps its place, the target and its request.
+  @Test func joinReplacingAnIdMovesTheSession() async throws {
+    await join(a, "Alpha")
+    await join(b, "Beta")
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.join(JoinBody(sessionId: c, title: "Alpha", autoContext: false, replaces: a))
+    #expect(await registry.target == c)
+    #expect(await registry.rows().map(\.sessionId) == [c, b])
+    let delivery = try await registry.complete(answer(request(1), from: c))
+    #expect(delivery == Delivery(label: "Alpha", status: .ok, text: "done"))
   }
 
   @Test func leavingWithAnOpenRequestFailsIt() async throws {

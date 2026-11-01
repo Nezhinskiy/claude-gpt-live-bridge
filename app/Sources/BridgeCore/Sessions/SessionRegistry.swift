@@ -56,6 +56,9 @@ public actor SessionRegistry {
   private let requestTimeout: TimeInterval
   private var sessions: [SessionID: Session] = [:]
   private var joins = 0
+  private var lastSweep: Date?
+  /// A longer gap between sweeps means the Mac slept, not that every mod went quiet.
+  private static let sleepGap: TimeInterval = 3
   public private(set) var target: SessionID?
 
   public init(
@@ -67,9 +70,13 @@ public actor SessionRegistry {
     self.requestTimeout = requestTimeout.timeInterval
   }
 
-  /// Adds the session, or renames it and refreshes its liveness if it already joined.
+  /// Adds the session, or renames it and refreshes its liveness if it already joined. A session
+  /// that `replaces` an id takes over that id's place, target and requests.
   public func join(_ body: JoinBody) {
-    var session = sessions[body.sessionId] ?? Session(joinOrder: joins, lastPoll: time.now)
+    let replaced = body.replaces.flatMap { sessions.removeValue(forKey: $0) }
+    if replaced != nil, target == body.replaces { target = body.sessionId }
+    var session =
+      sessions[body.sessionId] ?? replaced ?? Session(joinOrder: joins, lastPoll: time.now)
     joins += 1
     session.title = body.title
     session.autoContext = body.autoContext
@@ -136,9 +143,18 @@ public actor SessionRegistry {
 
   public func setActivity(_ body: ActivityBody) { sessions[body.sessionId]?.activity = body.state }
 
-  /// Drops sessions that stopped polling and fails requests in flight too long. Run every second.
+  /// Drops sessions that stopped polling and fails requests in flight too long. Run every second;
+  /// after a sleep, liveness starts again and request clocks skip the time asleep.
   public func sweep() -> [Delivery] {
     let now = time.now
+    defer { lastSweep = now }
+    if let lastSweep, case let gap = now.timeIntervalSince(lastSweep), gap > Self.sleepGap {
+      for id in sessions.keys {
+        sessions[id]?.lastPoll = now
+        sessions[id]?.inFlight?.since += gap
+      }
+      return []
+    }
     let labels = labels()
     var deliveries: [Delivery] = []
     for (id, session) in ordered() {

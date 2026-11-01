@@ -40,7 +40,8 @@ export class BridgeLink {
 
   /** Joins, or joins again under a new id or title; true when the app took it. */
   async join(body: JoinBody): Promise<boolean> {
-    this.#joined = body
+    const { replaces: _, ...kept } = body  // a later join (after an app restart) replaces nothing
+    this.#joined = kept
     this.#isKnown = (await this.#send('join', body))?.ok === true
     return this.#isKnown
   }

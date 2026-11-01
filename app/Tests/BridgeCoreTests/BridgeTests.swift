@@ -24,6 +24,15 @@ actor FakeVoice: RealtimeControlling {
   nonisolated func emit(_ event: RealtimeEvent) { emitter.yield(event) }
 }
 
+/// A fresh voice for each controller, as the app makes after Stop.
+actor FakeVoices {
+  private(set) var made: [FakeVoice] = []
+  func make() -> FakeVoice {
+    made.append(FakeVoice())
+    return made[made.count - 1]
+  }
+}
+
 actor FakeAudio: AudioSide {
   var calls: [String] = []
   /// Connecting takes a second, which the meter must not count.
@@ -138,6 +147,25 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(b) == .request(request(2)) })
     voice.emit(.handoff(request(3)))  // the route is used once
     #expect(try await eventually { try await registry.poll(a) == .request(request(3)) })
+  }
+
+  /// A question asked before Stop, or before the owner picked a target, routes nothing later.
+  @Test func questionRouteEndsWithTheCallAndATargetChoice() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    try await test.answer(request(1), from: b, .question, "Which branch?")
+    await test.bridge.perform(.stop)
+    await test.live()
+    await voices.made.last?.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(a) == .request(request(2)) })
+    try await test.answer(request(3), from: b, .question, "Which file?")
+    await test.bridge.setTarget(a)
+    await voices.made.last?.emit(.handoff(request(4)))
+    let task = "[TASK] Alpha: Example request 4"
+    #expect(await eventually { await test.registry.openTasks().contains(task) })
   }
 
   @Test func deliveryWhileLiveIsAddedAsContext() async throws {

@@ -70,6 +70,8 @@ public struct JoinBody: Codable, Sendable, Equatable {
   public var title: String
   /// Load the session's context summary whenever it becomes the target.
   public var autoContext: Bool
+  /// The id the session had before `/clear`: its place, target and requests move to the new id.
+  public var replaces: SessionID?
 }
 
 /// `POST /v1/leave`.

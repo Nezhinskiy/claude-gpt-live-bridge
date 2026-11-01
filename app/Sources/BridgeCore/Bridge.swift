@@ -98,6 +98,7 @@ public actor Bridge: Router {
       callStart = time.now
       await send(.start)
     case .stop:
+      questionRoute = nil
       await send(.stop)
       await endCodex()
     }
@@ -108,8 +109,10 @@ public actor Bridge: Router {
     if let target = await registry.target { await registry.requestContext(for: target) }
   }
 
-  /// The popover's choice of target; a session that left is ignored.
+  /// The popover's choice of target, which also ends a question's route; a session that left is
+  /// ignored.
   public func setTarget(_ id: SessionID) async {
+    questionRoute = nil
     try? await registry.setTarget(id)
     await changed()
   }

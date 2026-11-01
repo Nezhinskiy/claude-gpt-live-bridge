@@ -51,7 +51,7 @@ const SHAPES: Record<string, Shape> = {
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop'] } }),
   'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
   'error': fields<Wire.ErrorReply>({ error: S }),
-  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, autoContext: 'boolean' }),
+  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, autoContext: 'boolean', replaces: optional(S) }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
   'target': fields<Wire.TargetBody>({ sessionId: S }),
@@ -82,7 +82,7 @@ function mismatches(value: unknown, shape: Shape, at: string): string[] {
 test('everyWireFixtureParsesIntoItsType', () => {
   const dir = `${import.meta.dirname}/../../../wire/fixtures`
   const names = readdirSync(dir).filter(name => name.endsWith('.json'))
-  assert.ok(names.length >= 12)
+  assert.ok(names.length >= 13)
   for (const name of names) {
     const shape = SHAPES[name.replace(/(-[a-z]+)?\.json$/, '')]
     assert.ok(shape, `${name}: no wire type for this fixture`)

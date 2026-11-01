@@ -67,6 +67,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     const body = e.init.body === undefined ? undefined : JSON.parse(e.init.body)
     world.calls.push({ route, body })
     if (route === 'join') world.joined.add(body.sessionId)
+    if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
     if (route === 'leave') world.joined.delete(body.sessionId)
     const reply = route !== 'next'
       ? {}

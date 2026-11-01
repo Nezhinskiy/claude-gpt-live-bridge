@@ -22,9 +22,12 @@ test('clearRejoinsWithNewId', async ($, on) => {
   await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
   world.sessionId = OTHER
   await world.clock.advance(1000)
-  expect(world.take('leave')).toEqual([{ sessionId: ID }])
-  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', autoContext: false }])
+  // One join that replaces the old id, so the app keeps the target and any open request.
+  expect(world.take('leave')).toEqual([])
+  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', autoContext: false, replaces: ID }])
   expect(world.joined).toEqual(new Set([OTHER]))
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([])
 })
 
 test('renameRejoins', async ($, on) => {

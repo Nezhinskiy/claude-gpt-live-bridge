@@ -16,8 +16,11 @@ export type Utterance = { role: Role; text: string };
 export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance[] };
 export type Work = ({ kind: 'request' } & VoiceRequest) | { kind: 'context' };
 
-/** Joining again renames the session and refreshes its liveness. */
-export type JoinBody = { sessionId: SessionId; title: string; autoContext: boolean };
+/**
+ * Joining again renames the session and refreshes its liveness. `replaces` is the id the
+ * session had before `/clear`: its place, target and requests move to the new id.
+ */
+export type JoinBody = { sessionId: SessionId; title: string; autoContext: boolean; replaces?: SessionId };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 

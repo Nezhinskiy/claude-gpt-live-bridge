@@ -67,7 +67,10 @@ async function turnOff($: EngineInterface): Promise<void> {
   await setBand($, null)
 }
 
-/** Joins again when /clear gave the session a new id or, when asked, its title changed. */
+/**
+ * Joins again when, when asked, its title changed, or when /clear gave the session a new id:
+ * that join replaces the old id, so the app keeps the target and the request in flight.
+ */
 async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void> {
   const joined = link?.session
   if (!link || !joined) return
@@ -76,12 +79,8 @@ async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void
   if (!isNewId && !isTitleChecked) return
   const title = await readTitle($, sessionId)
   if (!isNewId && title === joined.title) return
-  if (isNewId) {
-    await $.store.delete(joinedKey(joined.sessionId))
-    await link.leave()
-    tracker = new TurnTracker()
-  }
-  await link.join({ ...joined, sessionId, title })
+  if (isNewId) await $.store.delete(joinedKey(joined.sessionId))
+  await link.join({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
   await save($)
 }
 
