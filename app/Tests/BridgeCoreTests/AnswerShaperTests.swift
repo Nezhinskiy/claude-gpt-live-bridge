@@ -20,6 +20,12 @@ struct AnswerShaperTests {
     #expect(voice == "[RESULT] Example session: Use (redacted) now.")
   }
 
+  @Test func zeroWidthCharactersCannotHideASecret() {
+    let voice = AnswerShaper.forVoice(
+      "Use sk-\u{200B}abcdefghijklmnopqrstuvwx now.", status: .ok, label: "Example session")
+    #expect(voice == "[RESULT] Example session: Use (redacted) now.")
+  }
+
   @Test(arguments: [
     (AnswerStatus.ok, "[RESULT]"), (.failed, "[FAILED]"), (.question, "[QUESTION]"),
     (.update, "[UPDATE]"),

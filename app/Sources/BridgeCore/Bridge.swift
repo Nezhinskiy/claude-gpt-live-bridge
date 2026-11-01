@@ -308,7 +308,8 @@ public actor Bridge: Router {
   /// a live voice gets it at once, and it does not hold the line open.
   private func context(_ body: ContextBody) async throws {
     let row = try await label(of: body.sessionId)
-    let summary = AnswerShaper.cap(Redaction.redact(body.summary), to: Self.maxContext)
+    let summary = AnswerShaper.cap(
+      Redaction.redact(AnswerShaper.normalized(body.summary)), to: Self.maxContext)
     let line = AnswerShaper.line(tag: "CONTEXT", label: row.label, body: summary)
     lastContext = summary
     continuity.setContext(line)

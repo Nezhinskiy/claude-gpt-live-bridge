@@ -182,10 +182,12 @@ struct BridgeTests {
   @Test func contextIsRedactedCappedAndShown() async throws {
     try await join(a, "Alpha")
     let summary =
-      "The password: hunter2 is set. " + String(repeating: "More detail here. ", count: 100)
+      "The password: hunter2 is set. Key sk-\u{200B}abcdefghijklmnopqrst. "
+      + String(repeating: "More detail here. ", count: 100)
     try await post("/v1/context", ContextBody(sessionId: a, summary: summary))
     let shown = try #require(await bridge.status.lastContext)
-    #expect(!shown.contains("hunter2") && shown.count <= 1500 && shown.hasSuffix("."))
+    #expect(!shown.contains("hunter2") && !shown.contains("abcdefghij"))
+    #expect(shown.count <= 1500 && shown.hasSuffix("."))
     await live()
     #expect(
       await voice.opens.first?.first
