@@ -76,6 +76,9 @@ function parseRecord(text: string): unknown {
 
 async function turnOn($: EngineInterface): Promise<boolean> {
   generation += 1
+  // What the last join learnt about the app is stale: the owner may have opened or installed it.
+  offlineSince = null
+  note = null
   const sessionId = await $.session.id()
   const autoContext = (await $.store.get(AUTO_CONTEXT)) === true
   const isJoined = (await link?.join({ sessionId, title: await readTitle($, sessionId), autoContext })) === true

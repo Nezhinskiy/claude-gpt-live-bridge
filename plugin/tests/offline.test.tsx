@@ -25,3 +25,20 @@ test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   expect(await band.find({ type: 'Text', text: /Voice off/ })).toBeDefined()
   await band.unmount()
 })
+
+test('joiningAgainOpensTheAppAgain', async ($, on) => {
+  // Off, then install or quit the app, then on: the next join tries to open it afresh.
+  const world = fakeWorld(on)
+  world.isAppUp = false
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await world.clock.advance(11_000)
+  const opened = world.launches.length
+  await $.command.run({ ...VOICEMOD, args: 'off' })
+  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await world.clock.advance(1000)
+  expect(world.launches.length).toBeGreaterThan(opened)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeUndefined()
+  await band.unmount()
+})
