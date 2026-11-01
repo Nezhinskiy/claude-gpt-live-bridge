@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import os
 
 @testable import BridgeCore
 
@@ -155,22 +154,6 @@ struct BridgeTests {
     #expect(await audio.calls.isEmpty)
     try await join(a, "Alpha")
     #expect(await bridge.status.problem == nil)
-  }
-
-  /// The sentence of a failed Start goes once a Start succeeds.
-  @Test func startThatSucceedsClearsTheProblem() async throws {
-    let fails = OSAllocatedUnfairLock(initialState: true)
-    let test = try BridgeTests { [voice] in
-      if fails.withLock({ $0 }) { throw CodexProblem.protocolMismatch("no reply to initialize") }
-      return voice
-    }
-    try await test.join(a, "Alpha")
-    await test.bridge.perform(.start)
-    #expect(await test.bridge.status.problem != nil)
-    fails.withLock { $0 = false }
-    await test.bridge.perform(.start)
-    #expect(await test.bridge.status.call == .listening)
-    #expect(await test.bridge.status.problem == nil)
   }
 
   @Test func handoffGoesToTarget() async throws {

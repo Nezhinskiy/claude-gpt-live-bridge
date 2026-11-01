@@ -130,7 +130,7 @@ extension AudioHost: WKNavigationDelegate, WKUIDelegate {
 
   /// The page's load ended: whoever waits for it goes on, and fails if it did not load.
   private func settle(_ ended: WKNavigation?, loaded: Bool) {
-    guard ended === navigation else { return }
+    guard let ended, ended === navigation else { return }
     navigation = nil
     self.loaded = loaded
     for continuation in waiting { continuation.resume() }
