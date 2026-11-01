@@ -128,7 +128,7 @@ session:
 - the voice's instructions;
 - the target session's recent conversation (up to the last 24 lines) to continue it in a new
   realtime session;
-- the requests still open, as their one-line briefs;
+- the target session's requests still open, as their one-line briefs;
 - each result, question, update and approval notice, as one line of at most 2,000 characters,
   with code blocks and tables removed. An update is Claude's answer in a later turn started by a
   background task's notification, for up to 10 minutes after a voice request and until any other

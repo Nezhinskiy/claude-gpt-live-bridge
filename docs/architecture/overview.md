@@ -46,9 +46,9 @@ microphone or Claude:
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`.
 - `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
   (the owner's, the voice's and the lines the session sent the voice) and the context loaded
-  from it. Each new realtime session is seeded with the target's (`initialItems`), so the voice
-  does not notice it was replaced and never mixes two sessions' conversations; a new target
-  closes an open line. A result from another session is spoken in the open line and kept in its
+  from it. Each new realtime session is seeded with the target's conversation and only the
+  target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
+  mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
   own session's conversation. New conversation forgets the target's, removing a session forgets
   its own, and only the 20 conversations used last are kept.
 - `RealtimeSession`: one ephemeral, read-only codex thread per realtime session; it refuses to go

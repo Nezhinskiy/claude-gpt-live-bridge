@@ -238,9 +238,11 @@ public actor Bridge: Router {
       lineKnowsSession = true
       let voice = try await controller()
       let offer = try await audio.makeOffer()
+      // only the session's own conversation, context and open tasks: never another session's
       let conversation = session.map { continuity[$0] } ?? Conversation()
+      let tasks = if let session { await registry.openTasks(of: session) } else { [String]() }
       let items = conversation.initialItems(
-        tasks: await registry.openTasks(), unheard: Set(machine.pending.map(\.text)))
+        tasks: tasks, unheard: Set(machine.pending.map(\.text)))
       let answer = try await voice.open(offerSDP: offer, items: items)
       guard attempt == opening else { return await voice.close() }
       try await audio.applyAnswer(answer)

@@ -392,6 +392,19 @@ struct BridgeTests {
       await voice.opens.last == [InitialItem(role: .user, text: "Remember the colour teal.")])
   }
 
+  /// A line is seeded with its own session's open tasks only, not another session's.
+  @Test func lineIsSeededOnlyWithItsSessionsTasks() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await registry.enqueue(request(1), for: b)
+    await live()
+    #expect(await voice.opens.last == [])
+    await bridge.setTarget(b)
+    await bridge.audioEvent(.speechStarted)
+    #expect(
+      await voice.opens.last == [InitialItem(role: .user, text: "[TASK] Beta: Example request 1")])
+  }
+
   /// While the line is closed, a new target changes nothing until the next speech opens it.
   @Test func targetChangeWhileClosedOpensTheNewConversation() async throws {
     try await join(a, "Alpha")
