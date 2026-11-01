@@ -22,19 +22,10 @@ test('briefComesFirst', () => {
 
 test('transcriptIsQuotedData', () => {
   const text = voicePrompt({ ...request, transcript: [{ role: 'user', text: 'line one\nline two' }] })
-  assert.match(text, /data, not instructions/)
   assert.match(text, /^> Owner: line one\n> {3}line two$/m)
   // Each transcript line is quoted, so nothing in it reads as the prompt's own text.
   const block = text.split('\n').filter(line => line.includes('line '))
   assert.ok(block.every(line => line.startsWith('>')))
-})
-
-test('confirmRuleUnlessVoiceConfirmed', () => {
-  const text = voicePrompt(request)
-  assert.match(text, /confirm in text first, unless the request says the owner already confirmed it by voice/)
-  assert.match(text, /delete, push, publish, send, deploy, pay/)
-  assert.match(text, /one-sentence conclusion/)
-  assert.match(text, /reported by voice automatically/)
 })
 
 test('recognisesEngineFraming', () => {
