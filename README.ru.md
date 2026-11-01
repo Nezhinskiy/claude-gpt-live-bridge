@@ -22,9 +22,14 @@
 
 - macOS 14 или новее на Apple Silicon.
 - Claude Code 2.1.289 или новее (моды).
-- [Codex CLI](https://github.com/openai/codex) (`codex`, проверено с 0.166.0) в `PATH` вашей
-  login-оболочки, с входом через `codex login` в план ChatGPT, в который входит realtime-голос.
-- Для сборки приложения: Xcode со Swift 6 (проверено с Xcode 27 и Swift 6.4).
+- [Codex CLI](https://github.com/openai/codex) (`codex`, проверено с 0.166.0), установленный через
+  Homebrew или npm, в `PATH`, который ваша оболочка задаёт в окне Terminal, с входом через `codex
+  login` в план ChatGPT, в который входит realtime-голос. LiveBridge не запускает codex, чей
+  `codex features list` он не может прочитать, поэтому другая версия может не запуститься, пока
+  LiveBridge не обновят.
+- Для сборки приложения: Xcode 16 или новее (Swift 6). Проверено с Xcode 27 и Swift 6.4; для
+  Liquid Glass нужен Xcode 26 или новее, а более старый Xcode собирает то же окно с материалами.
+  Собранное приложение работает на macOS 14 или новее.
 
 ## Установка
 

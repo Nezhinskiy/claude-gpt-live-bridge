@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check CI runs. Later changes append their own checks below.
+# Every check CI runs.
 set -eu
 cd "$(dirname "$0")/.."
 

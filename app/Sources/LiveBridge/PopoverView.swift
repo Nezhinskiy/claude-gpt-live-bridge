@@ -142,30 +142,43 @@ struct PopoverView: View {
   }
 }
 
-/// Liquid Glass where the system has it (macOS 26 and later), materials before.
+/// Liquid Glass where the system has it (macOS 26 and later), materials before. Its symbols
+/// exist only in the macOS 26 SDK (Swift 6.2, Xcode 26), so an older Xcode builds the materials.
 private struct GlassGroup<Content: View>: View {
   @ViewBuilder var content: Content
 
   var body: some View {
-    if #available(macOS 26, *) { GlassEffectContainer(spacing: 10) { content } } else { content }
+    #if compiler(>=6.2)
+      if #available(macOS 26, *) { GlassEffectContainer(spacing: 10) { content } } else { content }
+    #else
+      content
+    #endif
   }
 }
 
 extension View {
   @ViewBuilder fileprivate func card() -> some View {
     let padded = frame(maxWidth: .infinity, alignment: .leading).padding(10)
-    if #available(macOS 26, *) {
-      padded.glassEffect(.regular, in: .rect(cornerRadius: 16))
-    } else {
+    #if compiler(>=6.2)
+      if #available(macOS 26, *) {
+        padded.glassEffect(.regular, in: .rect(cornerRadius: 16))
+      } else {
+        padded.background(.regularMaterial, in: .rect(cornerRadius: 16))
+      }
+    #else
       padded.background(.regularMaterial, in: .rect(cornerRadius: 16))
-    }
+    #endif
   }
 
   @ViewBuilder fileprivate func capsule(prominent: Bool) -> some View {
-    if #available(macOS 26, *) {
-      if prominent { buttonStyle(.glassProminent) } else { buttonStyle(.glass) }
-    } else {
+    #if compiler(>=6.2)
+      if #available(macOS 26, *) {
+        if prominent { buttonStyle(.glassProminent) } else { buttonStyle(.glass) }
+      } else {
+        buttonStyle(.bordered).buttonBorderShape(.capsule)
+      }
+    #else
       buttonStyle(.bordered).buttonBorderShape(.capsule)
-    }
+    #endif
   }
 }

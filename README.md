@@ -21,9 +21,14 @@ tools and permission mode, and the voice tells you the result.
 
 - macOS 14 or later on Apple Silicon.
 - Claude Code 2.1.289 or later (mods).
-- [Codex CLI](https://github.com/openai/codex) (`codex`, tested with 0.166.0) on your login
-  shell's `PATH`, signed in with `codex login` to a ChatGPT plan that includes realtime voice.
-- To build the app: Xcode with Swift 6 (tested with Xcode 27 and Swift 6.4).
+- [Codex CLI](https://github.com/openai/codex) (`codex`, tested with 0.166.0), installed with
+  Homebrew or npm, on the `PATH` your shell sets in a Terminal window, and signed in with `codex
+  login` to a ChatGPT plan that includes realtime voice. LiveBridge refuses a codex whose
+  `codex features list` it cannot read, so another version may not start until LiveBridge is
+  updated.
+- To build the app: Xcode 16 or later (Swift 6). Tested with Xcode 27 and Swift 6.4; Xcode 26
+  or later is needed for Liquid Glass, and an older Xcode builds the same popover with
+  materials. The built app runs on macOS 14 or later.
 
 ## Install
 
