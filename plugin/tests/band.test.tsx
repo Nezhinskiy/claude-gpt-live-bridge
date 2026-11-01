@@ -36,7 +36,7 @@ test('theBandIsOneRowWithItsButtonsApart', async ($, on) => {
     const actions = holding(root, 'Button')!
     expect(actions).not.toBe(row)
     expect(actions.props.columnGap).toBeDefined()
-    expect(kids(actions).map(button => button.props.label)).toEqual(['Stop', 'Load context'])
+    expect(kids(actions).map(button => button.props.label)).toEqual(['Stop'])
     expect((await band.find({ key: 'call' }))?.props.variant).toBe('primary')
     await band.unmount()
   }
@@ -88,7 +88,7 @@ test('startMakesThisSessionTheTargetThenStarts', async ($, on) => {
     world.calls = []
     const band = await $.ui.mount({ ...BAND, surface })
     const root = await band.drawn() as Node
-    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Start', 'Load context'])
+    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Start'])
     await band.press({ key: 'call' })
     const routes = world.calls.map(call => call.route).filter(route => route === 'target' || route === 'call')
     expect(routes).toEqual(['target', 'call'])
@@ -105,7 +105,7 @@ test('talkHereShowsOnlyWhileTheCallTalksToAnotherSession', async ($, on) => {
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
     const root = await band.drawn() as Node
-    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Stop', 'Talk here', 'Load context'])
+    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Stop', 'Talk here'])
     await band.press({ key: 'target' })
     expect(world.take('target')).toEqual([{ sessionId: ID }])
     expect(world.take('call')).toEqual([])

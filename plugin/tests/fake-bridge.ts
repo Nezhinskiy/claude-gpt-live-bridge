@@ -44,6 +44,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isForkFailing: false,
     logs: [] as string[],
     summary: 'Goal: tidy the example project.',
+    /** How many prompts the session has had; 0 is a new session with nothing to summarise. */
+    turns: 1,
+    /** How many summaries the session's model was asked for. */
+    forks: 0,
+    /** How long the session's model takes over a summary, on the mocked clock. */
+    forkMs: 0,
     joined: new Set<string>(),
     /** Sessions the owner removed in the popover; joining again clears the mark. */
     removed: new Set<string>(),
@@ -69,6 +75,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('session.id', () => ({ value: world.sessionId }))
+  on('session.turns', () => ({ value: world.turns }))
   on('session.cwd', () => ({ value: '/Users/example/Dev/example-project' }))
   on('command.register', (_, e) => {
     if (world.isCommandRefused) return { deny: `"/${e.name}" refused: it is the built-in /${e.name}` }
@@ -128,12 +135,16 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     world.logs.push(e.text)
     return { value: undefined }
   })
-  on('model.fork', () => world.isForkFailing ? { deny: 'the model is unavailable' } : ({
-    value: {
-      isAnswered: true, text: world.summary,
-      usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
-    },
-  }))
+  on('model.fork', async () => {
+    world.forks += 1
+    if (world.forkMs > 0) await world.clock.sleep(world.forkMs)
+    return world.isForkFailing ? { deny: 'the model is unavailable' } : ({
+      value: {
+        isAnswered: true, text: world.summary,
+        usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+      },
+    })
+  })
   on('tool.check', () => ({ decision: 'ask' }))
   on('classic.PermissionRequest', () => ({}))
   on('classic.PostToolUse', () => ({}))

@@ -88,8 +88,9 @@ export class BridgeLink {
     await this.#forSession('activity', { state })
   }
 
-  async context(summary: string): Promise<void> {
-    await this.#forSession('context', { summary })
+  /** Posts the session's summary; false when the app did not take it. */
+  async context(summary: string): Promise<boolean> {
+    return (await this.#forSession('context', { summary }))?.ok === true
   }
 
   async target(): Promise<void> {

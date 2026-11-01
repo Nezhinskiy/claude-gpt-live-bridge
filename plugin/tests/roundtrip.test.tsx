@@ -99,8 +99,6 @@ test('bandShowsTheCallAndStartsIt', async ($, on) => {
     expect(await band.find({ key: 'target' })).toBeUndefined()
     await band.press({ key: 'call' })
     expect(world.take('call')).toEqual([{ action: 'stop' }])
-    await band.press({ key: 'context' })
-    expect(world.take('context')).toEqual([{ sessionId: ID, summary: 'Goal: tidy the example project.' }])
     await band.unmount()
   }
 })
