@@ -104,3 +104,16 @@ test('bandShowsTheCallAndStartsIt', async ($, on) => {
     await band.unmount()
   }
 })
+
+test('aFailedSummaryIsReportedNotThrown', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...VOICEMOD, args: 'on' })
+  world.isForkFailing = true
+  expect((await $.command.run({ ...VOICEMOD, args: 'context' })).text).toContain('could not summarise')
+  world.work.push({ kind: 'context' })
+  await world.clock.advance(1000)
+  expect(world.take('context')).toEqual([])
+  expect(world.logs.some(line => line.includes('could not summarise'))).toBe(true)
+  expect(world.logs.some(line => line.includes('poll failed'))).toBe(false)
+})

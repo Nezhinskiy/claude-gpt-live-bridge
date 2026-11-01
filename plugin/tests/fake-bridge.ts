@@ -32,6 +32,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
     isSubmitRefused: false,
+    /** The session's model fails the summary request. */
+    isForkFailing: false,
+    logs: [] as string[],
     joined: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
     work: [] as Work[],
@@ -100,7 +103,11 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
   })
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
-  on('model.fork', () => ({
+  on('ui.log', (_, e) => {
+    world.logs.push(e.text)
+    return { value: undefined }
+  })
+  on('model.fork', () => world.isForkFailing ? { deny: 'the model is unavailable' } : ({
     value: {
       isAnswered: true, text: 'Goal: tidy the example project.',
       usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },

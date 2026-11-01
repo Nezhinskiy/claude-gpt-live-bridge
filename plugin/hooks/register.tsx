@@ -18,6 +18,7 @@ const OPEN_APP = 'Open LiveBridge from the menu bar.'
 const ANSWER_LIMIT = 32_000
 const AUTO_CONTEXT = 'autoContext'
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
+const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const USAGE = 'Usage: /voicemod on | off | target | status | context [auto|manual]'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
@@ -142,7 +143,7 @@ async function tick($: EngineInterface): Promise<void> {
     const id = reply.work.id
     void $.prompt.submit({ text: voicePrompt(reply.work) }).catch(() => refused($, id))
   } else if (reply.work?.kind === 'context') {
-    void sendContext($)
+    void contextAsked($)
   }
 }
 
@@ -153,10 +154,21 @@ async function refused($: EngineInterface, id: string): Promise<void> {
   await link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' })
 }
 
-async function sendContext($: EngineInterface): Promise<boolean> {
-  const summary = await summarize($)
-  if (summary !== '') await link?.context(summary)
-  return summary !== ''
+/** Sends the session's summary to the app; says what happened and never rejects. */
+async function sendContext($: EngineInterface): Promise<'sent' | 'empty' | 'failed'> {
+  try {
+    const summary = await summarize($)
+    if (summary === '') return 'empty'
+    await link?.context(summary)
+    return 'sent'
+  } catch {
+    return 'failed'
+  }
+}
+
+/** The summary asked for by the app or the band, which have no reply line of their own. */
+async function contextAsked($: EngineInterface): Promise<void> {
+  if ((await sendContext($)) === 'failed') $.ui.log(NO_SUMMARY)
 }
 
 async function statusText($: EngineInterface): Promise<string> {
@@ -196,7 +208,8 @@ async function voicemod($: EngineInterface, args: string): Promise<string> {
     await link?.target()
     return 'This session is now the voice target.'
   }
-  return (await sendContext($)) ? 'Sent a summary of this session to LiveBridge.' : 'Nothing to summarise yet.'
+  const sent = await sendContext($)
+  return sent === 'sent' ? 'Sent a summary of this session to LiveBridge.' : sent === 'empty' ? 'Nothing to summarise yet.' : NO_SUMMARY
 }
 
 /** Whether a tool's run, failure or denial settles the permission request being reported. */
@@ -289,7 +302,7 @@ export const register: Register = on => {
     return drawBand($, e, state, {
       call: action => void link?.call(action),
       target: () => void link?.target(),
-      loadContext: () => void sendContext($),
+      loadContext: () => void contextAsked($),
     })
   })
 }
