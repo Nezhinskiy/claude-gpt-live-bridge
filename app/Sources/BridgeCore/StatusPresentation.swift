@@ -37,6 +37,8 @@ public struct StatusPresentation: Sendable, Equatable {
   public let canAct: Bool
   public let rows: [SessionRowPresentation]
   public let problem: String?
+  /// The problem is the microphone's refusal: the popover offers to open that setting.
+  public let opensMicrophoneSettings: Bool
   public let unheard: Int
   public let minutes: String
 
@@ -46,6 +48,7 @@ public struct StatusPresentation: Sendable, Equatable {
     let activities = Set(s.sessions.map(\.activity))
     bars = s.call
     problem = s.problem
+    opensMicrophoneSettings = s.problem == MicrophoneAccess.deniedSentence
     unheard = s.unheard
     badge =
       if s.problem != nil { .problem } else if activities.contains(.approval) {

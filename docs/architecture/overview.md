@@ -15,7 +15,7 @@ flowchart LR
       Bridge["Bridge actor<br/>call machine, session registry,<br/>continuity, usage meter"]
       Server["HTTP on a Unix socket<br/>(0700 run directory)"]
       Codex["RealtimeSession + JSON-RPC client"]
-      Audio["Hidden WKWebView<br/>mic, voice detection, pre-roll, WebRTC"]
+      Audio["Invisible WKWebView<br/>mic, voice detection, pre-roll, WebRTC"]
     end
     CodexProc["codex app-server<br/>(read-only, tools off)"]
     subgraph Engine["Claude Code session"]
@@ -55,8 +55,11 @@ microphone or Claude:
 - `UnixHTTPServer` and `Wire`: the mod's routes (below).
 
 **`LiveBridge`** (the app target) wires `BridgeCore` to the menu bar, to `SMAppService` for Open at
-login, and to `AudioHost`: one `WKWebView` in a window that is never shown, serving the bundled
-audio page under its own URL scheme. The page owns the microphone, a voice detector (−45 dBFS
+login, and to `AudioHost`: one `WKWebView` in an invisible window (one point, fully transparent,
+click-through, ordered in on every Space, because WebKit holds back the microphone of a page it
+does not consider visible), serving the bundled audio page under its own URL scheme. Before the
+page opens the microphone, the app asks macOS for it itself (WebKit's request never shows the
+prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
 for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
 queued audio into the peer, dropping silence until it has caught up.
 
@@ -272,7 +275,9 @@ sequenceDiagram
 - **Codex exits under the app:** the next speech reports it once, and the speech after that
   starts a fresh codex.
 - **The microphone is denied, missing, busy or lost:** the call goes to `off` with the reason.
-  Busy means it could not be opened, perhaps because another app holds it. When the
+  Denied says where to allow it, and the popover offers to open that setting. Busy means it
+  could not be opened, perhaps because another app holds it; a request still pending after
+  10 s fails with its own sentence instead of listening to nothing. When the
   default input changes mid-call, the page takes the new one and keeps the peer.
 - **Local Network access blocked:** with no ICE candidate within 2 s, the call goes to `off` with a
   sentence naming the setting.

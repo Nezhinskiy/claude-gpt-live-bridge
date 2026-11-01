@@ -12,7 +12,9 @@ struct PopoverView: View {
       VStack(alignment: .leading, spacing: 10) {
         if let shown = model.presentation {
           call(shown)
-          if let problem = model.problem { problemBanner(problem) }
+          if let problem = model.problem {
+            problemBanner(problem, opensSettings: shown.opensMicrophoneSettings)
+          }
           sessions(shown)
           context
           if !(model.status?.recentTranscript.isEmpty ?? true) { lastLines }
@@ -50,10 +52,18 @@ struct PopoverView: View {
     .card()
   }
 
-  private func problemBanner(_ problem: String) -> some View {
-    Label(problem, systemImage: "exclamationmark.triangle.fill")
-      .font(.callout).symbolRenderingMode(.multicolor)
-      .card()
+  private func problemBanner(_ problem: String, opensSettings: Bool = false) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label(problem, systemImage: "exclamationmark.triangle.fill")
+        .font(.callout).symbolRenderingMode(.multicolor)
+      if opensSettings {
+        Button("Open Microphone Settings", systemImage: "mic") {
+          NSWorkspace.shared.open(MicrophoneAccess.settingsURL)
+        }
+        .capsule(prominent: false)
+      }
+    }
+    .card()
   }
 
   private func sessions(_ shown: StatusPresentation) -> some View {

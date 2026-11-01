@@ -7,7 +7,7 @@ an issue first so we can agree on the shape.
 
 | Path | What it is |
 |---|---|
-| `app/` | The SwiftPM package: `BridgeCore` (pure logic, tested without codex, a microphone or Claude) and `LiveBridge` (the menu bar app and its hidden audio page). |
+| `app/` | The SwiftPM package: `BridgeCore` (pure logic, tested without codex, a microphone or Claude) and `LiveBridge` (the menu bar app and its invisible audio page). |
 | `plugin/` | The Claude Code mod `livebridge`. `hooks/register.tsx` is wiring only; the other `hooks/*.ts` modules are pure. |
 | `wire/fixtures/` | One JSON file per message between the mod and the app: the shared oracle both sides test against. |
 | `scripts/` | `check.sh` (every check CI runs), `build-app.sh` (build, install, uninstall), `smoke.sh` (end to end). |

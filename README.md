@@ -51,9 +51,12 @@ asks for the microphone again after each upgrade. To keep the permission, run
 `scripts/build-app.sh --make-signing-identity` once: it asks first, then creates a self-signed
 code-signing certificate in your login keychain, and later release builds are signed with it.
 
-On the first call macOS asks for the microphone, and may ask whether LiveBridge may find devices
-on your local network. The voice line needs that second permission too; without it the call
-stops with a sentence that says where to allow it.
+The first Start asks macOS for the microphone. If it was refused, the call stops with a
+sentence and the popover's **Open Microphone Settings** opens Privacy & Security > Microphone,
+where you allow LiveBridge. With the ad hoc signature macOS asks again after every upgrade (see
+above). macOS may also ask whether LiveBridge may find devices on your local network. The voice
+line needs that second permission too; without it the call stops with a sentence that says where
+to allow it.
 
 To remove everything the app keeps: `scripts/build-app.sh --uninstall`. It removes the app, its
 login item and its files, and prints the two commands it leaves to you: `tccutil reset

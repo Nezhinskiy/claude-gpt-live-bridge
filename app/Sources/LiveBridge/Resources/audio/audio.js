@@ -1,4 +1,4 @@
-// The audio side of a LiveBridge call, run in a hidden WKWebView. The app calls `LB.*` and
+// The audio side of a LiveBridge call, run in an invisible WKWebView. The app calls `LB.*` and
 // awaits the returned promises; the page posts `speechStarted`, `speechEnded`, `level` and
 // `audioFailed` to `window.webkit.messageHandlers.bridge`.
 //
@@ -11,11 +11,16 @@
 
 import { createVad, dbfs, rms } from './vad.js';
 import { createCatchUp, createPreroll } from './preroll.js';
+import { within } from './deadline.js';
 
 const FRAME = 1024;
+/** A microphone request still pending after this fails, so the call never listens to nothing. */
+const MIC_DEADLINE_MS = 10000;
 const say = {
   denied:
-    'LiveBridge cannot use the microphone. Allow it in System Settings > Privacy & Security > Microphone.',
+    'LiveBridge cannot use the microphone. Allow LiveBridge in System Settings > Privacy & Security > Microphone, then start again.',
+  micTimeout:
+    'The microphone did not start within 10 seconds. Check System Settings > Privacy & Security > Microphone, then start again.',
   noDevice: 'No microphone is connected.',
   busy: 'The microphone could not be opened; another app may be using it.',
   lost: 'The microphone stopped and no other input was found.',
@@ -78,9 +83,12 @@ async function attachInput(fake) {
     if (ctx !== mine) return false;
     node.start();
   } else {
-    const next = await navigator.mediaDevices.getUserMedia({
+    const asked = navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
+    const next = await within(asked, MIC_DEADLINE_MS, micLate, (late) =>
+      late.getTracks().forEach((track) => track.stop()),
+    );
     if (ctx !== mine) {
       next.getTracks().forEach((track) => track.stop());
       return false;
@@ -94,6 +102,12 @@ async function attachInput(fake) {
   input = node;
   input.connect(pump);
   return true;
+}
+
+function micLate() {
+  const error = new Error(say.micTimeout);
+  error.name = 'MicTimeoutError';
+  return error;
 }
 
 /** The input device changed or went away: take the new default and keep the peer. */
@@ -119,7 +133,8 @@ async function listen(fake) {
   } catch (error) {
     if (ctx !== mine) return;
     stop();
-    fail({ NotAllowedError: say.denied, NotFoundError: say.noDevice }[error?.name] ?? say.busy);
+    const reasons = { NotAllowedError: say.denied, NotFoundError: say.noDevice, MicTimeoutError: say.micTimeout };
+    fail(reasons[error?.name] ?? say.busy);
     return;
   }
   if (ctx === mine && !fake) navigator.mediaDevices.ondevicechange = reacquire;

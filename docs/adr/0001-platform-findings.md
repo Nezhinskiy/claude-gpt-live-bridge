@@ -82,6 +82,12 @@ microphone grant is still pending.** Observed in 14 sessions.
 - Microphone: `getUserMedia({audio:{echoCancellation:true}})` stayed pending for 8 s, twice; the
   `WKUIDelegate` capture-permission callback was not reached, meaning WebKit was waiting on the
   macOS microphone permission for the app. The grant was left to the user, not worked around.
+  Found in the owner's first run with a real microphone: WebKit's request never reaches macOS
+  for this app (no prompt, no entry under Privacy > Microphone), so the app asks itself with
+  `AVCaptureDevice.requestAccess(for: .audio)` before the page opens the microphone. Granted,
+  `getUserMedia` still stayed pending while `document.visibilityState` was `hidden`; with the
+  window ordered in at one point, alpha 0 and click-through, the page was `visible` and capture
+  started.
 
 **(c) Catch-up after the pre-roll: drop silent frames in the page; `appendAudio` is not usable.**
 Observed.

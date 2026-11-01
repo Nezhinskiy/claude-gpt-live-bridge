@@ -1,11 +1,14 @@
+import AVFoundation
 import AppKit
 import BridgeCore
 import WebKit
 
-/// The audio side of the call: one `WKWebView` in a window that is never shown, owning the
-/// microphone, local voice detection, the pre-roll and the WebRTC peer (ADR 0001 (a), (c)).
-/// The page is the bundled `audio/index.html`, served under its own scheme; it may not navigate
-/// anywhere else, and only its main frame may capture the microphone.
+/// The audio side of the call: one `WKWebView` owning the microphone, local voice detection, the
+/// pre-roll and the WebRTC peer (ADR 0001 (a), (c)). Its window is on screen but invisible (one
+/// point, fully transparent, click-through, on every Space): WebKit holds back the microphone of
+/// a page whose view is not visible. The page is the bundled `audio/index.html`, served under its
+/// own scheme; it may not navigate anywhere else, and only its main frame may capture the
+/// microphone.
 @MainActor
 final class AudioHost: NSObject, AudioSide {
   var onEvent: (AudioEvent) -> Void = { _ in }
@@ -13,8 +16,8 @@ final class AudioHost: NSObject, AudioSide {
   var onLevel: (Double) -> Void = { _ in }
   private let webView: WKWebView
   private let window = NSWindow(
-    contentRect: NSRect(x: -10_000, y: -10_000, width: 1, height: 1), styleMask: .borderless,
-    backing: .buffered, defer: true)
+    contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: .borderless,
+    backing: .buffered, defer: false)
   private let fakeMic: URL?
   /// The page's own load; a navigation the lock cancels is not it.
   private var navigation: WKNavigation?
@@ -34,6 +37,11 @@ final class AudioHost: NSObject, AudioSide {
     webView.navigationDelegate = self
     webView.uiDelegate = self
     window.contentView = webView
+    window.isReleasedWhenClosed = false
+    window.alphaValue = 0
+    window.ignoresMouseEvents = true
+    window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+    window.orderFrontRegardless()
     load()
   }
 
@@ -42,6 +50,9 @@ final class AudioHost: NSObject, AudioSide {
   // MARK: AudioSide
 
   func startListening() async {
+    if fakeMic == nil, let problem = await Self.askForMicrophone() {
+      return onEvent(.failed(problem))
+    }
     do { try await call("return await LB.listen(fake)", ["fake": fakeMic != nil]) } catch {
       onEvent(.failed("The audio page did not start: \(Self.message(error))"))
     }
@@ -65,6 +76,22 @@ final class AudioHost: NSObject, AudioSide {
   func closePeer() async { _ = try? await call("LB.closePeer()") }
 
   func chime() async { NSSound(named: "Glass")?.play() }
+
+  /// macOS's answer for the microphone, asking it first if it never was (its prompt then
+  /// shows); nil when the page may open the microphone.
+  private static func askForMicrophone() async -> String? {
+    var access: MicrophoneAccess =
+      switch AVCaptureDevice.authorizationStatus(for: .audio) {
+      case .authorized: .granted
+      case .notDetermined: .undetermined
+      case .restricted: .restricted
+      default: .denied
+      }
+    if access.mustAsk {
+      access = MicrophoneAccess(asked: await AVCaptureDevice.requestAccess(for: .audio))
+    }
+    return access.problem
+  }
 
   // MARK: The page
 
