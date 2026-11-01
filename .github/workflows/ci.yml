@@ -1,0 +1,37 @@
+# Runs scripts/check.sh on every push and pull request. The Claude Code engine is not on the
+# runner, so check.sh skips `claude plugin validate` and `claude plugin test` by itself.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # The Xcode 27 image (macOS 27, arm64; a public preview in actions/runner-images).
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      - name: Select Xcode 27.2
+        run: sudo xcode-select -s /Applications/Xcode_27.2.app
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+          node --version
+      - name: Check
+        run: scripts/check.sh

@@ -4,8 +4,21 @@ import Observation
 import SwiftUI
 import os
 
-/// LiveBridge.app: a menu bar app with no Dock icon (`LSUIElement`).
+/// The entry point. `--unregister-login-item` (run by `build-app.sh --uninstall`) removes the
+/// app's login item and exits before anything else starts.
 @main
+enum Main {
+  static func main() {
+    guard CommandLine.arguments.contains("--unregister-login-item") else {
+      return LiveBridgeApp.main()
+    }
+    let wasEnabled = LoginItem.isEnabled
+    try? LoginItem.set(false)
+    print(wasEnabled ? "removed the login item" : "no login item was registered")
+  }
+}
+
+/// LiveBridge.app: a menu bar app with no Dock icon (`LSUIElement`).
 struct LiveBridgeApp: App {
   @State private var model = AppModel()
 

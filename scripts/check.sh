@@ -5,6 +5,8 @@ cd "$(dirname "$0")/.."
 
 swift format lint --strict -r app
 (cd app && swift build && swift test)
+# build-app.sh --uninstall removes exactly what the app keeps.
+sh scripts/tests/uninstall.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
 node --test app/Tests/AudioJSTests
 
