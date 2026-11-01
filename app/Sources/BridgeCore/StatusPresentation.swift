@@ -41,6 +41,10 @@ public struct StatusPresentation: Sendable, Equatable {
   public let opensMicrophoneSettings: Bool
   public let unheard: Int
   public let minutes: String
+  /// No session has joined: the popover offers `joinCommand` to copy.
+  public let offersJoinCommand: Bool
+  /// What joins a Claude Code session.
+  public static let joinCommand = "/live on"
 
   /// A problem outranks everything; then a session waiting for approval, results the owner has
   /// not heard, and a session at work.
@@ -77,6 +81,7 @@ public struct StatusPresentation: Sendable, Equatable {
       case .connecting: ("Connecting…", "Opening the voice line.")
       case .live: ("Live", target.map { "Talking to \($0)" } ?? "No session has joined yet.")
       }
+    offersJoinCommand = s.sessions.isEmpty
     rows = s.sessions.map {
       SessionRowPresentation(
         id: $0.sessionId, label: $0.label, detail: Self.text(of: $0.activity),
