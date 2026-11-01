@@ -42,7 +42,7 @@ actor FakeVoices {
   var waiting: Int { launches.count }
   func finishLaunch() {
     slow = false
-    launches.forEach { $0.resume() }
+    for launch in launches { launch.resume() }
     launches = []
   }
 }
@@ -100,7 +100,8 @@ struct BridgeTests {
   }
 
   func request(_ n: Int) -> VoiceRequest {
-    VoiceRequest(id: RequestID(rawValue: "request-\(n)"), brief: "Example request \(n)", transcript: [])
+    VoiceRequest(
+      id: RequestID(rawValue: "request-\(n)"), brief: "Example request \(n)", transcript: [])
   }
 
   /// Hands `request` to `session` and posts its answer.

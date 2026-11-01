@@ -17,7 +17,8 @@ struct SessionRegistryTests {
   }
 
   func request(_ n: Int) -> VoiceRequest {
-    VoiceRequest(id: RequestID(rawValue: "request-\(n)"), brief: "Example request \(n)", transcript: [])
+    VoiceRequest(
+      id: RequestID(rawValue: "request-\(n)"), brief: "Example request \(n)", transcript: [])
   }
 
   func answer(

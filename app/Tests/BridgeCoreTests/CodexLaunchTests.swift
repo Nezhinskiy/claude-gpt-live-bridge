@@ -23,7 +23,8 @@ struct CodexLaunchTests {
   /// Every feature codex lists is turned off but the allowed ones, also one this app has
   /// never heard of; a `removed` one is left alone, as `--disable` no longer changes it.
   @Test func argvDisablesEveryListedFeatureButTheAllowed() throws {
-    let listed = try features() + "brand_new_tool                           stable             true\n"
+    let listed =
+      try features() + "brand_new_tool                           stable             true\n"
     let present = try CodexLaunch.presentFeatures(featuresListOutput: listed)
     #expect(present.isSuperset(of: ["instant_interrupt", "web_search_cached", "brand_new_tool"]))
     #expect(present.isDisjoint(with: ["js_repl", "realtime_conversation"]))
@@ -70,7 +71,8 @@ struct CodexLaunchTests {
     try fake.write("features.hang", "")
     let start = ContinuousClock.now
     await #expect(throws: CodexProblem.self) {
-      try await CodexLaunch.launch(codex: fake.codex, cwd: fake.dir, probeTimeout: .milliseconds(300))
+      try await CodexLaunch.launch(
+        codex: fake.codex, cwd: fake.dir, probeTimeout: .milliseconds(300))
     }
     #expect(ContinuousClock.now - start < .seconds(5))
   }
