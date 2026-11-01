@@ -271,9 +271,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
-      // `answer` per this build's types; the ADR 0001 fixture recorded `text`, so read either.
-      const answer = e.answer ?? (e as { text?: string }).text ?? ''
-      const post = tracker.turnCompleted(e.turnId, answer, e.reason)
+      const post = tracker.turnCompleted(e.turnId, e.answer, e.reason)
       approval = null
       await save($)
       if (post && !(await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) })) && post.status !== 'update') {
