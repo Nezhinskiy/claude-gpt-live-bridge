@@ -13,6 +13,8 @@ struct PopoverView: View {
   /// The command just copied, which its button says for two seconds.
   @State private var copied: String?
   @State private var showHelp = false
+  /// The popover's own height, which its window is fitted to.
+  @State private var height = 0.0
   @Environment(\.openSettings) private var openSettings
 
   /// Opens Settings in front: the app is activated first, as a menu bar app is not active.
@@ -30,6 +32,12 @@ struct PopoverView: View {
       CappedScroll(cap: layout.maxHeight) { content }
     }
     .frame(width: 340)
+    .onGeometryChange(for: Double.self) {
+      Double($0.size.height)
+    } action: {
+      height = $0
+    }
+    .background(WindowFitter(height: height))
   }
 
   private var content: some View {
@@ -265,6 +273,29 @@ struct PopoverView: View {
     case .active: .teal
     case .attention: .orange
     case .problem: .red
+    }
+  }
+}
+
+/// Fits the menu bar window to the popover's height, keeping its top edge under the menu bar.
+/// A MenuBarExtra window grows with its content but never shrinks: after a session is removed
+/// it keeps its old height, and the popover sits in its middle between transparent bands.
+private struct WindowFitter: NSViewRepresentable {
+  let height: Double
+
+  func makeNSView(context: Context) -> NSView { NSView() }
+
+  func updateNSView(_ view: NSView, context: Context) {
+    let height = height
+    DispatchQueue.main.async {  // the view joins its window after this update
+      guard let window = view.window, height > 0 else { return }
+      let content = window.contentRect(forFrameRect: window.frame)
+      guard abs(content.height - height) > 0.5 else { return }
+      var frame = window.frameRect(
+        forContentRect: NSRect(
+          x: content.minX, y: content.maxY - height, width: content.width, height: height))
+      frame.origin.y = window.frame.maxY - frame.height
+      window.setFrame(frame, display: true)
     }
   }
 }

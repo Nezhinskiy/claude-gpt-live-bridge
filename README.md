@@ -109,7 +109,7 @@ steps, and a button that copies the command to run in Terminal.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it", or "2 sessions have new results"), never the result itself. A newer one
-  replaces the last, and clicking it opens the popover. macOS asks for permission the first time
+  replaces the last; open the popover from the menu bar to see who answered. macOS asks for permission the first time
   a notification is posted; if it is refused, Settings says so and opens the Notifications
   settings.
 - **Open at login** (off by default).

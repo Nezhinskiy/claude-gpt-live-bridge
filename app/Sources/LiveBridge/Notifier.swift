@@ -61,27 +61,7 @@ final class Notifier: NSObject, ResultNotifying, UNUserNotificationCenterDelegat
   func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
   ) async {
-    await MenuBarOpener.open()
-  }
-}
-
-/// Opens the menu bar popover. MenuBarExtra has no API for it, so this clicks the status item's
-/// button; when that button cannot be found, nothing happens.
-@MainActor
-enum MenuBarOpener {
-  static func open() {
-    NSApp.activate()
-    for window in NSApp.windows where window.className.contains("NSStatusBarWindow") {
-      if let button = statusButton(in: window.contentView) {
-        button.performClick(nil)
-        return
-      }
-    }
-  }
-
-  private static func statusButton(in view: NSView?) -> NSStatusBarButton? {
-    guard let view else { return nil }
-    if let button = view as? NSStatusBarButton { return button }
-    return view.subviews.lazy.compactMap { statusButton(in: $0) }.first
+    // MenuBarExtra has no API to open its popover, and a click sent to its button is ignored.
+    await MainActor.run { NSApp.activate() }
   }
 }
