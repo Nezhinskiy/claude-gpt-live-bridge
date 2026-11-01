@@ -119,7 +119,9 @@ session:
 - the recent conversation (up to the last 24 lines) to continue it in a new session;
 - the requests still open, as their one-line briefs;
 - each result, question, update and approval notice, as one line of at most 2,000 characters
-  with code blocks and tables removed and recognised credentials redacted;
+  with code blocks and tables removed and recognised credentials redacted. An update is Claude's
+  answer in a later turn started by a background task's notification, for up to 10 minutes
+  after a voice request and until any other turn starts in the session;
 - a session's context summary when you load it (at most 1,500 characters, redacted the same
   way). The popover shows exactly what was sent.
 

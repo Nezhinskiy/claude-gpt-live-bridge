@@ -31,6 +31,23 @@ test('roundtrip', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
 })
 
+/** The app restarted mid-request and forgot it: the answer stays in the session, and the band says so. */
+test('rejectedAnswerIsShownNotDropped', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('Joined')
+  expect((await $.command.run({ ...VOICEMOD, args: 'status' })).text).toContain('joining')
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  world.answerStatus = 409
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Three files.' })
+  await world.clock.advance(1000)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await band.find({ type: 'Text', text: /did not get/ }))?.text).toContain('it is in this session')
+  await band.unmount()
+})
+
 test('approvalIsReported', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })

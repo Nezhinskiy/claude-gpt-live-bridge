@@ -66,8 +66,11 @@ export class BridgeLink {
     return reply?.status === 404 && retry ? this.next(false) : null
   }
 
-  async answer(post: Omit<AnswerBody, 'sessionId'>): Promise<void> {
-    await this.#forSession('answer', post)
+  /** Posts an answer; false when the app did not take it (out of reach, restarted, or ended). */
+  async answer(post: Omit<AnswerBody, 'sessionId'>): Promise<boolean> {
+    const reply = await this.#forSession('answer', post)
+    if (reply?.status === 404) this.#isKnown = false
+    return reply?.ok === true
   }
 
   async activity(state: SessionActivity): Promise<void> {
@@ -111,8 +114,8 @@ export class BridgeLink {
     this.#timer = null
   }
 
-  async #forSession(route: string, body: object): Promise<void> {
-    if (this.#joined !== null) await this.#send(route, { sessionId: this.#joined.sessionId, ...body })
+  async #forSession(route: string, body: object) {
+    return this.#joined === null ? null : this.#send(route, { sessionId: this.#joined.sessionId, ...body })
   }
 
   /** A POST with a JSON body, or a GET without one; null when the socket is out of reach. */

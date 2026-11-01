@@ -28,6 +28,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     sessionId: ID,
     title: 'Example session',
     isAppUp: true,
+    /** The status the app answers an answer with (409: it restarted and forgot the request). */
+    answerStatus: 200,
     joined: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
     work: [] as Work[],
@@ -69,6 +71,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     if (route === 'join') world.joined.add(body.sessionId)
     if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
     if (route === 'leave') world.joined.delete(body.sessionId)
+    if (route === 'answer' && world.answerStatus !== 200) {
+      return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
+    }
     const reply = route !== 'next'
       ? {}
       : world.joined.has(new URL(e.url).searchParams.get('sessionId') ?? '')

@@ -195,9 +195,11 @@ sequenceDiagram
 
 ### Later update
 
-Work Claude starts from a voice request can finish in a later turn, such as a background task's
-notification. Until the owner types in the session, each such turn's answer is posted as an
-update to the last voice request.
+Work Claude starts from a voice request can finish in a later turn started by a background
+task's notification (a returning background agent included). For 10 minutes after the voice
+request, and until any other turn starts, each such turn's answer is posted as an update to that
+request. A turn of any other origin, one the mod does not know or does not see included, closes
+the window and is never sent to the voice.
 
 ```mermaid
 sequenceDiagram

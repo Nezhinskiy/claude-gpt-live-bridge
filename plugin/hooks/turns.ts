@@ -3,6 +3,9 @@
 import { voiceRequestId } from './prompt.ts'
 import type { AnswerStatus, RequestId } from './wire.ts'
 
+/** How long after a voice request its background work still reports to the voice. */
+export const FOLLOW_UP_MS = 10 * 60_000
+
 export type TurnOrigin = 'voice' | 'typed' | 'background'
 export type TurnOutcome = 'answer' | 'aborted' | 'refusal' | 'error'
 export type Post = { id: RequestId; status: AnswerStatus; text: string; reason?: string }
@@ -10,13 +13,18 @@ export type Post = { id: RequestId; status: AnswerStatus; text: string; reason?:
 /** What the tracker keeps across a reload of the mod (JSON data). */
 export type TurnSnapshot = {
   pending: RequestId | null
-  followUp: RequestId | null
+  followUp: FollowUp | null
   turns: [string, Tracked][]
 }
+type FollowUp = { id: RequestId; until: number }
 type Tracked = { id: RequestId; isVoice: boolean }
 
-/** Origins a person stands behind; every other kind is background work. */
-const TYPED = new Set(['composer', 'bridge', 'sdk', 'slack-ping'])
+/**
+ * Background work a voice request may have started (a background task's notification, a
+ * returning background agent included). Every other origin, one this list does not know too,
+ * counts as typed: its answer is never sent to the voice.
+ */
+const BACKGROUND = new Set(['task-notification'])
 const FAILURE: Record<Exclude<TurnOutcome, 'answer'>, string> = {
   aborted: 'the turn was interrupted',
   refusal: 'the model refused the request',
@@ -26,16 +34,17 @@ const FAILURE: Record<Exclude<TurnOutcome, 'answer'>, string> = {
 /** A turn's origin from the `origin` of the `prompt.submit` before it (ADR 0001, item m). */
 export function originOf(origin: { kind: string; name?: string }, self: string): TurnOrigin {
   if (origin.kind === 'plugin' && origin.name === self) return 'voice'
-  return TYPED.has(origin.kind) ? 'typed' : 'background'
+  return BACKGROUND.has(origin.kind) ? 'background' : 'typed'
 }
 
 /**
- * Follows the voice request in flight and the follow-up window after it: until a typed turn,
- * each background turn's answer is a later update to the last voice request.
+ * Follows the voice request in flight and the follow-up window after it: for `FOLLOW_UP_MS`
+ * and until any other turn, each background turn's answer is a later update to the last voice
+ * request.
  */
 export class TurnTracker {
   #pending: RequestId | null
-  #followUp: RequestId | null
+  #followUp: FollowUp | null
   #turns: Map<string, Tracked>
 
   constructor(saved?: TurnSnapshot) {
@@ -55,17 +64,17 @@ export class TurnTracker {
     this.#pending = id
   }
 
-  /** A main-loop turn started. Its prompt names the voice request it answers, if any. */
-  turnStarted(turnId: string, text: string, origin: TurnOrigin): void {
+  /** A main-loop turn started at `now` (ms). Its prompt names the voice request it answers, if any. */
+  turnStarted(turnId: string, text: string, origin: TurnOrigin, now: number): void {
     const id = voiceRequestId(text)
     if (id !== null) {
       this.#turns.set(turnId, { id, isVoice: true })
-      this.#followUp = id
+      this.#followUp = { id, until: now + FOLLOW_UP_MS }
       if (this.#pending === id) this.#pending = null
-    } else if (origin === 'typed') {
+    } else if (origin === 'background' && this.#followUp !== null && now < this.#followUp.until) {
+      this.#turns.set(turnId, { id: this.#followUp.id, isVoice: false })
+    } else {
       this.#followUp = null
-    } else if (this.#followUp !== null) {
-      this.#turns.set(turnId, { id: this.#followUp, isVoice: false })
     }
   }
 

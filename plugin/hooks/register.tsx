@@ -17,6 +17,7 @@ const OPEN_APP = 'Open LiveBridge from the menu bar.'
 /** Well under the app's 131,072-byte body limit; the app shortens answers for speech itself. */
 const ANSWER_LIMIT = 32_000
 const AUTO_CONTEXT = 'autoContext'
+const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const USAGE = 'Usage: /voicemod on | off | target | status | context [auto|manual]'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
@@ -31,6 +32,8 @@ let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
 let approval: { tool: string; agent: string | undefined } | null = null
 let offlineSince: number | null = null
+/** The mod's own sentence while online; it lasts until the next voice request. */
+let note: string | null = null
 
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
@@ -99,7 +102,8 @@ async function tick($: EngineInterface): Promise<void> {
   }
   offlineSince = null
   const self = link?.session?.sessionId ?? ''
-  await update($, band, () => ({ isOffline: false, status: bandStatus(reply.status, self) }))
+  if (reply.work?.kind === 'request') note = null
+  await update($, band, () => ({ isOffline: false, status: bandStatus(reply.status, self), ...(note && { problem: note }) }))
   if (reply.work?.kind === 'request') {
     tracker.submitted(reply.work.id)
     await save($)
@@ -120,6 +124,7 @@ async function statusText($: EngineInterface): Promise<string> {
   const state = await read($, band)
   if (state === null) return 'Voice is off for this session. /voicemod on joins LiveBridge.'
   const status = state.status
+  if (!state.isOffline && status === undefined) return 'LiveBridge: joining…'
   if (state.isOffline || status === undefined) return `LiveBridge is not reachable. ${state.problem ?? ''}`.trim()
   return `LiveBridge: ${status.call}; target: ${status.target}; ${status.unheard} unheard; ` +
     `${Math.round(status.minutesToday)} min today.${status.problem ? ` ${status.problem}` : ''}`
@@ -194,7 +199,8 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'background')
+      // A turn with no origin seen is treated as typed: its answer never reaches the voice.
+      tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'typed', await $.clock.now())
       lastOrigin = null
       await follow($, true)
       await save($)
@@ -210,7 +216,10 @@ export const register: Register = on => {
       const post = tracker.turnCompleted(e.turnId, answer, e.reason)
       approval = null
       await save($)
-      if (post) await link?.answer({ ...post, text: post.text.slice(0, ANSWER_LIMIT) })
+      if (post && !(await link?.answer({ ...post, text: post.text.slice(0, ANSWER_LIMIT) })) && post.status !== 'update') {
+        note = LOST_ANSWER  // an update to a request a newer one replaced is refused by design
+        $.ui.log(LOST_ANSWER)
+      }
       await link?.activity('idle')
     }
     return next(e)
