@@ -50,7 +50,8 @@ microphone or Claude:
   on unless codex reports every MCP server disabled, interrupts every codex turn and declines
   every request codex sends.
 - `AnswerShaper` and `Redaction`: each delivery to the voice becomes one line, `[TAG] label:
-  text`, of at most 2,000 characters, without code blocks or tables, with credentials redacted.
+  text`, of at most 2,000 characters, with the label cut to 120 characters, without code blocks
+  or tables, and with credentials redacted.
 - `UnixHTTPServer` and `Wire`: the mod's routes (below).
 
 **`LiveBridge`** (the app target) wires `BridgeCore` to the menu bar, to `SMAppService` for Open at
@@ -59,16 +60,20 @@ audio page under its own URL scheme. The page owns the microphone, a voice detec
 for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
 queued audio into the peer, dropping silence until it has caught up.
 
-**The mod** (`plugin/`) joins the bridge under the session's title, polls it once a second,
-submits each voice request to the session as a prompt, and posts the turn's answer back. It
-tells voice turns from typed and background ones by the request marker on the prompt's last line
-and by the `prompt.submit` origin. It draws a band above the prompt with the call's phase, the
-target and Start/Stop, and opens the app with `open -g -b` when the socket does not answer.
+**The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title, polls it
+once a second, submits each voice request to the session as a prompt, and posts the turn's
+answer back. It tells voice turns from typed and background ones by the request marker on the
+prompt's last line and by the `prompt.submit` origin. It draws a band above the prompt with the
+call's phase, the target, the unheard count and the buttons Start/Stop, Make target and Load
+context, with the problem sentence on a row of its own. When the socket does not answer, it opens
+`~/Applications/LiveBridge.app` with `open -g`, and falls back to `open -g -b <bundle id>`.
 
 ## The wire
 
 HTTP/1.1 over `~/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock`, JSON
-bodies, no other access control than the run directory's mode. `Wire.swift` and
+bodies, no other access control than the run directory's mode. The app finds that folder through
+Foundation, which honours `CFFIXED_USER_HOME`; the mod builds the path from `CFFIXED_USER_HOME`
+when it is set, else from `HOME`. `Wire.swift` and
 `plugin/hooks/wire.ts` mirror each other, and `wire/fixtures/` holds one example of every message
 that both test suites parse.
 
@@ -79,7 +84,7 @@ that both test suites parse.
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
 | `POST /v1/activity` | `idle`, `working` or `approval` |
-| `POST /v1/context` | the session's summary, at most 1,500 characters after redaction |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
 Every reply carries the status: phase, target, sessions with labels (`Title · ab12` when two
@@ -102,6 +107,7 @@ sequenceDiagram
   participant Mod
   participant Claude
   Owner->>Page: speech
+  Note over Page: holds the pre-roll and every new frame from here
   Page->>Bridge: speechStarted (listening → connecting)
   Bridge->>Page: makeOffer
   Bridge->>Codex: thread/start, MCP check, thread/realtime/start (initialItems)
@@ -164,13 +170,18 @@ sequenceDiagram
 ```
 
 A result stays unheard until the voice finishes a reply that it began after the result and
-that mentions it: the session's label, or two of the result's words of four letters or more.
-The handoff's own acknowledgement never counts, nor does a reply the owner cut off before it
-got there. If the line closes first, the result chimes and waits again: it may be said twice,
-but it is never lost.
+that says it. A word counts when it has four letters or more and is not in a short list of
+common words (English and Russian only). The reply must say two of the result's words, or the
+session's label together with one of them. The label alone counts only for a result that has no
+such word, which could not be heard otherwise. The handoff's own acknowledgement never counts,
+nor does a reply the owner cut off before it got there. If the line closes first, the result
+chimes and waits again: it may be said twice, but it is never lost.
 
-A newer request to the same session withdraws its older unheard result, so the voice never reads
-an answer that has been superseded.
+This is the one description of the rule; the README links here.
+
+A newer request to the same session withdraws its older unheard result, a timed-out one
+included, so the voice never reads an answer that has been superseded. An `[APPROVAL]` notice is
+withdrawn once the approval is settled.
 
 ### Question loop
 
@@ -243,8 +254,12 @@ sequenceDiagram
 
 ## Failure behaviour
 
+- **No session joined:** Start is disabled in the popover. From the band or the socket, Start
+  does nothing but report "No Claude Code session has joined: run /live on in a session, then
+  start."; the sentence goes when a session joins.
 - **Codex missing or signed out:** Start reports why in one sentence, in the popover and the
-  band, and the call stays off.
+  band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
+  gives no answer within 10 s.
 - **A plan without realtime voice, or any realtime error:** the first connect reports codex's
   own words in one sentence, with a hint when they name sign-in or the plan, and the call goes
   back to `listening`.
@@ -256,7 +271,8 @@ sequenceDiagram
   starts off.
 - **Codex exits under the app:** the next speech reports it once, and the speech after that
   starts a fresh codex.
-- **The microphone is denied, missing or lost:** the call goes to `off` with the reason. When the
+- **The microphone is denied, missing, busy or lost:** the call goes to `off` with the reason.
+  Busy means it could not be opened, perhaps because another app holds it. When the
   default input changes mid-call, the page takes the new one and keeps the peer.
 - **Local Network access blocked:** with no ICE candidate within 2 s, the call goes to `off` with a
   sentence naming the setting.
