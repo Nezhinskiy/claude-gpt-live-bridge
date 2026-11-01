@@ -80,6 +80,11 @@ public struct CallMachine: Sendable {
     }
   }
 
+  /// Drops waiting results, such as one a newer request to the same session superseded.
+  public mutating func withdraw(where isSuperseded: (String) -> Bool) {
+    pending.removeAll(where: isSuperseded)
+  }
+
   /// Back to local listening; `pending` is kept.
   private mutating func hangUp() {
     phase = .listening

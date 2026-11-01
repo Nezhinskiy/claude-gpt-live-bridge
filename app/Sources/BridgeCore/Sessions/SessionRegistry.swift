@@ -12,6 +12,13 @@ public enum RegistryError: Error, Equatable {
   /// The id is not this session's open request (or, for an `update`, its latest one).
   case unknownRequest(RequestID)
 
+  public var message: String {
+    switch self {
+    case .unknownSession: "unknown session"
+    case .unknownRequest: "unknown or stale request id"
+    }
+  }
+
   /// The status the HTTP route answers with.
   public var httpStatus: Int {
     switch self {
@@ -36,7 +43,7 @@ public actor SessionRegistry {
     var lastPoll: Date
     var activity = SessionActivity.idle
     var queued: [VoiceRequest] = []
-    var inFlight: (id: RequestID, since: Date)?
+    var inFlight: (id: RequestID, brief: String, since: Date)?
     /// The newest request enqueued; only its answers are delivered.
     var latest: RequestID?
     var wantsContext = false
@@ -95,7 +102,7 @@ public actor SessionRegistry {
       session.lastPoll = now
       if session.inFlight == nil, !session.queued.isEmpty {
         let request = session.queued.removeFirst()
-        session.inFlight = (request.id, now)
+        session.inFlight = (request.id, request.brief, now)
         return .request(request)
       }
       guard session.wantsContext else { return nil }
@@ -147,6 +154,18 @@ public actor SessionRegistry {
       }
     }
     return deliveries
+  }
+
+  /// The requests not answered yet, as `[TASK] <label>: <brief>` lines for the voice; an
+  /// older request a newer one superseded is left out.
+  public func openTasks() -> [String] {
+    let labels = labels()
+    return ordered().flatMap { id, session in
+      let briefs =
+        (session.inFlight.map { $0.id == session.latest ? [$0.brief] : [] } ?? [])
+        + session.queued.map(\.brief)
+      return briefs.map { AnswerShaper.line(tag: "TASK", label: labels[id] ?? "", body: $0) }
+    }
   }
 
   /// The sessions in the order they joined.

@@ -50,13 +50,14 @@ public actor UsageMeterStore {
     meter.openedAt = nil  // a session never outlives the process that opened it
   }
 
-  public func opened() {
-    meter.opened(at: time.now)
+  /// `date` is when the session opened, if the caller read the clock before reaching the store.
+  public func opened(at date: Date? = nil) {
+    meter.opened(at: date ?? time.now)
     save()
   }
 
-  public func closed() {
-    meter.closed(at: time.now)
+  public func closed(at date: Date? = nil) {
+    meter.closed(at: date ?? time.now)
     meter.forget(endedBefore: time.now.addingTimeInterval(-31 * 86_400))
     save()
   }
