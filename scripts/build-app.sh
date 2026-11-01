@@ -12,6 +12,7 @@
 # --fake-mic (debug builds only) plays WAV as the microphone. If CFFIXED_USER_HOME is set, the
 # app keeps its files under that directory instead of your home folder.
 set -eu
+: "${HOME:?HOME is not set}" # an empty HOME would aim every path below at the system's folders
 cd "$(dirname "$0")/.."
 
 BUNDLE_ID=io.github.nezhinskiy.livebridge

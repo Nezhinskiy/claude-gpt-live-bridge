@@ -32,6 +32,10 @@ done
 out=$(HOME="$home" scripts/build-app.sh --uninstall)
 
 fail=0
+if HOME='' scripts/build-app.sh --uninstall 2>/dev/null; then
+  echo "ran with an empty HOME"
+  fail=1
+fi
 echo "$ours" | while IFS= read -r path; do
   [ ! -e "$path" ] || { echo "not removed: $path"; exit 1; }
 done || fail=1
