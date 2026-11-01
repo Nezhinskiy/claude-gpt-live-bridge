@@ -7,10 +7,13 @@ public struct Settings: Codable, Sendable, Equatable {
   public var voice: String?
   /// Ask a session for its context summary whenever it becomes the target.
   public var autoContext: Bool
+  /// Post a notification with the chime for a result waiting while the line is closed.
+  public var notifyResults: Bool
 
-  public init(voice: String? = nil, autoContext: Bool = false) {
+  public init(voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true) {
     self.voice = voice
     self.autoContext = autoContext
+    self.notifyResults = notifyResults
   }
 
   /// A field the file lacks keeps its default, so an older file still reads.
@@ -18,6 +21,7 @@ public struct Settings: Codable, Sendable, Equatable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     voice = try container.decodeIfPresent(String.self, forKey: .voice)
     autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? false
+    notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
   }
 }
 

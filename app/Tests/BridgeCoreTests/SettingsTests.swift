@@ -7,7 +7,7 @@ struct SettingsStoreTests {
   @Test func defaultsUntilChanged() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     let store = SettingsStore(file: file)
-    #expect(store.current == Settings(voice: nil, autoContext: false))
+    #expect(store.current == Settings(voice: nil, autoContext: false, notifyResults: true))
   }
 
   @Test func changesAreKeptAcrossRestarts() throws {
@@ -15,8 +15,11 @@ struct SettingsStoreTests {
     SettingsStore(file: file).update {
       $0.voice = "cedar"
       $0.autoContext = true
+      $0.notifyResults = false
     }
-    #expect(SettingsStore(file: file).current == Settings(voice: "cedar", autoContext: true))
+    #expect(
+      SettingsStore(file: file).current
+        == Settings(voice: "cedar", autoContext: true, notifyResults: false))
     SettingsStore(file: file).update { $0.voice = nil }
     #expect(SettingsStore(file: file).current.voice == nil)
   }
@@ -27,7 +30,9 @@ struct SettingsStoreTests {
     try Data("not json".utf8).write(to: file)
     #expect(SettingsStore(file: file).current == Settings())
     try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
-    #expect(SettingsStore(file: file).current == Settings(voice: "marin", autoContext: false))
+    #expect(
+      SettingsStore(file: file).current
+        == Settings(voice: "marin", autoContext: false, notifyResults: true))
   }
 }
 

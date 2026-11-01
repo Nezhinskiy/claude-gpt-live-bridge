@@ -66,11 +66,18 @@ actor FakeAudio: AudioSide {
   func chime() { calls.append("chime") }
 }
 
+/// Records the notices the bridge posts.
+actor FakeNotifier: ResultNotifying {
+  var posted: [ResultNotice] = []
+  func post(_ notice: ResultNotice) { posted.append(notice) }
+}
+
 @Suite(.timeLimit(.minutes(1)))
 struct BridgeTests {
   let time: TestTime
   let voice = FakeVoice()
   let audio: FakeAudio
+  let notifier = FakeNotifier()
   let registry: SessionRegistry
   let bridge: Bridge
   let dir: URL
@@ -89,7 +96,8 @@ struct BridgeTests {
     bridge = Bridge(
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
-      continuityFile: self.dir.appending(path: "continuity.json"), time: time)
+      continuityFile: self.dir.appending(path: "continuity.json"), time: time,
+      notifier: notifier)
   }
 
   @discardableResult
@@ -297,6 +305,37 @@ struct BridgeTests {
     voice.emit(.assistantSpeaking)
     voice.emit(.assistantUtterance("Alpha is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
+  }
+
+  /// Each chime for a waiting result posts one notice, naming the sessions with results waiting.
+  @Test func aWaitingResultChimesWithANotice() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    try await answer(request(1), from: a)
+    #expect(await notifier.posted.map(\.body) == ["Alpha has a new result — speak to hear it."])
+    try await answer(request(2), from: b)
+    #expect(
+      await notifier.posted.map(\.body).last
+        == "2 sessions have new results — speak to hear them.")
+    let chimes = await audio.calls.filter { $0 == "chime" }.count
+    #expect(await notifier.posted.count == chimes)
+  }
+
+  /// A result the open line is given needs no notice.
+  @Test func aResultOnTheOpenLinePostsNoNotice() async throws {
+    await live()
+    try await answer(request(1), from: a)
+    #expect(await notifier.posted.isEmpty)
+  }
+
+  @Test func noticesCanBeTurnedOff() async throws {
+    await bridge.setNotifies(false)
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    try await answer(request(1), from: a)
+    #expect(await audio.calls.contains("chime"))
+    #expect(await notifier.posted.isEmpty)
   }
 
   /// With no session joined, the failure arrives with the handoff; the ack must not hang up on it.
