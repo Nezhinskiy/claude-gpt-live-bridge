@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
+import type { StatusReply } from '../hooks/wire.ts'
 import { BAND, fakeWorld, ID, LIVE } from './fake-bridge.ts'
 
 type Node = { type: string; props: Record<string, unknown>; children?: unknown[] }
@@ -65,6 +66,49 @@ test('beforeTheFirstReplyTheBandSaysItIsJoining', async ($, on) => {
     const band = await $.ui.mount({ ...BAND, surface })
     expect(await band.find({ type: 'Text', text: /joining/ })).toBeDefined()
     expect(await band.findAll({ type: 'Button' })).toEqual([])
+    await band.unmount()
+  }
+})
+
+const OTHER = '11111111-0000-0000-0000-000000000002'
+const elsewhere = (call: 'off' | 'listening'): StatusReply => ({
+  call, unheard: 0, minutesToday: 0, minutesThisCall: 0, recentTranscript: [],
+  sessions: [
+    { sessionId: OTHER, label: 'Other session', activity: 'idle', isTarget: true },
+    { sessionId: ID, label: 'Example session', activity: 'idle', isTarget: false },
+  ],
+})
+
+test('startMakesThisSessionTheTargetThenStarts', async ($, on) => {
+  // Starting from a session means talking to it: one press, no separate "Make target".
+  const world = await joined($, on)
+  world.status = elsewhere('off')
+  await world.clock.advance(1000)
+  for (const surface of SURFACES) {
+    world.calls = []
+    const band = await $.ui.mount({ ...BAND, surface })
+    const root = await band.drawn() as Node
+    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Start', 'Load context'])
+    await band.press({ key: 'call' })
+    const routes = world.calls.map(call => call.route).filter(route => route === 'target' || route === 'call')
+    expect(routes).toEqual(['target', 'call'])
+    expect(world.take('target')).toEqual([{ sessionId: ID }])
+    expect(world.take('call')).toEqual([{ action: 'start' }])
+    await band.unmount()
+  }
+})
+
+test('talkHereShowsOnlyWhileTheCallTalksToAnotherSession', async ($, on) => {
+  const world = await joined($, on)
+  world.status = elsewhere('listening')
+  await world.clock.advance(1000)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    const root = await band.drawn() as Node
+    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Stop', 'Talk here', 'Load context'])
+    await band.press({ key: 'target' })
+    expect(world.take('target')).toEqual([{ sessionId: ID }])
+    expect(world.take('call')).toEqual([])
     await band.unmount()
   }
 })

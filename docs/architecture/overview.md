@@ -67,8 +67,10 @@ queued audio into the peer, dropping silence until it has caught up.
 once a second, submits each voice request to the session as a prompt, and posts the turn's
 answer back. It tells voice turns from typed and background ones by the request marker on the
 prompt's last line and by the `prompt.submit` origin. It draws a band above the prompt with the
-call's phase, the target, the unheard count and the buttons Start/Stop, Make target and Load
-context, with the problem sentence on a row of its own. When the socket does not answer, it opens
+call's phase, the target, the unheard count and the buttons Start/Stop, Talk here and Load
+context, with the problem sentence on a row of its own. Start makes the session the target
+first; Talk here shows only while the call talks to another session, and moves it here. When
+the socket does not answer, it opens
 `~/Applications/LiveBridge.app` with `open -g`, and falls back to `open -g -b <bundle id>`.
 
 ## The wire

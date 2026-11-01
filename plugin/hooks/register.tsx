@@ -216,6 +216,12 @@ async function live($: EngineInterface, args: string): Promise<string> {
   return sent === 'sent' ? 'Sent a summary of this session to LiveBridge.' : sent === 'empty' ? 'Nothing to summarise yet.' : NO_SUMMARY
 }
 
+/** The band's Start: a call started from a session talks to that session. */
+async function startHere(): Promise<void> {
+  await link?.target()
+  await link?.call('start')
+}
+
 /** Whether a tool's run, failure or denial settles the permission request being reported. */
 function settles(e: { tool_name: string; agent_id?: string }): boolean {
   if (approval?.tool !== e.tool_name || approval.agent !== e.agent_id) return false
@@ -327,7 +333,8 @@ export const register: Register = on => {
     const state = await read($, band)
     if (state === null || e.props.hasSurvey || !link?.session) return next(e)
     return drawBand($, e, state, {
-      call: action => void link?.call(action),
+      start: () => void startHere(),
+      stop: () => void link?.call('stop'),
       target: () => void link?.target(),
       loadContext: () => void contextAsked($),
     })

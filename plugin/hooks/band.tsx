@@ -1,11 +1,13 @@
 // The band above the prompt: one row with the call's phase, the voice target and unheard results
 // on the left and the actions on the right; what is wrong, when anything is, on a row below.
+// Start talks to this session; while the call talks to another one, "Talk here" moves it here.
 import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { Band, BandStatus } from '../types'
-import type { CallAction, CallPhase, SessionId, StatusReply } from './wire.ts'
+import type { CallPhase, SessionId, StatusReply } from './wire.ts'
 
-export type BandActions = { call(action: CallAction): void; target(): void; loadContext(): void }
+/** `start` makes this session the target first; `target` is the band's "Talk here". */
+export type BandActions = { start(): void; stop(): void; target(): void; loadContext(): void }
 
 /** What the band and `/live status` say before the app's first reply. */
 export const JOINING = 'LiveBridge: joining…'
@@ -55,9 +57,11 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, stat
               key="call"
               variant="primary"
               label={status.call === 'off' ? 'Start' : 'Stop'}
-              onPress={() => act.call(status.call === 'off' ? 'start' : 'stop')}
+              onPress={() => (status.call === 'off' ? act.start() : act.stop())}
             />
-            {!status.isTarget && <Button key="target" label="Make target" onPress={() => act.target()} />}
+            {status.call !== 'off' && !status.isTarget && (
+              <Button key="target" label="Talk here" onPress={() => act.target()} />
+            )}
             <Button key="context" label="Load context" onPress={() => act.loadContext()} />
           </Box>
         )}
