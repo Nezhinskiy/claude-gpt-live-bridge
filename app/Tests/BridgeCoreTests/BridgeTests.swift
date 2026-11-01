@@ -68,7 +68,7 @@ actor FakeAudio: AudioSide {
 
 @Suite(.timeLimit(.minutes(1)))
 struct BridgeTests {
-  let time = TestTime()
+  let time: TestTime
   let voice = FakeVoice()
   let audio: FakeAudio
   let registry: SessionRegistry
@@ -77,14 +77,19 @@ struct BridgeTests {
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
-  init(realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil) throws {
-    dir = try temporaryDirectory()
+  /// `dir` and `time` are given to restart the app on another test's data.
+  init(
+    realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
+    time: TestTime = TestTime()
+  ) throws {
+    self.time = time
+    self.dir = try dir ?? temporaryDirectory()
     registry = SessionRegistry(time: time)
     audio = FakeAudio(time: time)
     bridge = Bridge(
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
-      meter: UsageMeterStore(file: dir.appending(path: "usage.json"), time: time),
-      continuityFile: dir.appending(path: "continuity.json"), time: time)
+      meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
+      continuityFile: self.dir.appending(path: "continuity.json"), time: time)
   }
 
   @discardableResult
@@ -362,11 +367,181 @@ struct BridgeTests {
     #expect(shown.hasPrefix("[CONTEXT] Alpha: The password"))
     await live()
     #expect(await voice.opens.first?.first == InitialItem(role: .user, text: shown))
-    let restarted = Bridge(
-      registry: SessionRegistry(time: time), realtime: { [voice] in voice }, audio: audio,
-      meter: UsageMeterStore(file: dir.appending(path: "usage.json"), time: time),
-      continuityFile: dir.appending(path: "continuity.json"), time: time)
-    #expect(await restarted.status.lastContext == shown)
+    let restarted = try restart()
+    try await restarted.join(a, "Alpha")
+    #expect(await restarted.bridge.status.lastContext == shown)
+  }
+
+  /// The same app data after the app restarted: a fresh bridge and registry.
+  func restart() throws -> BridgeTests { try BridgeTests(dir: dir, time: time) }
+
+  // MARK: One conversation per session
+
+  /// Each session's conversation is its own: changing the target closes the open line, and the
+  /// next speech opens it with the new target's conversation.
+  @Test func targetChangeSwitchesTheConversation() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    voice.emit(.userUtterance("Remember the colour teal."))
+    #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
+    await bridge.setTarget(b)
+    #expect(await bridge.status.call == .listening)
+    #expect(await voice.closes == 1)
+    #expect(await bridge.status.recentTranscript.isEmpty)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.last == [])
+    voice.emit(.userUtterance("Remember the colour red."))
+    #expect(
+      await eventually {
+        await bridge.status.recentTranscript == ["You: Remember the colour red."]
+      })
+    try await post("/v1/target", TargetBody(sessionId: a))  // the band's way
+    #expect(await voice.closes == 2)
+    #expect(await bridge.status.recentTranscript == ["You: Remember the colour teal."])
+    await bridge.audioEvent(.speechStarted)
+    #expect(
+      await voice.opens.last == [InitialItem(role: .user, text: "Remember the colour teal.")])
+  }
+
+  /// A line is seeded with its own session's open tasks only, not another session's.
+  @Test func lineIsSeededOnlyWithItsSessionsTasks() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await registry.enqueue(request(1), for: b)
+    await live()
+    #expect(await voice.opens.last == [])
+    await bridge.setTarget(b)
+    await bridge.audioEvent(.speechStarted)
+    #expect(
+      await voice.opens.last == [InitialItem(role: .user, text: "[TASK] Beta: Example request 1")])
+  }
+
+  /// While the line is closed, a new target changes nothing until the next speech opens it.
+  @Test func targetChangeWhileClosedOpensTheNewConversation() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    voice.emit(.userUtterance("Remember the colour teal."))
+    #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
+    voice.emit(.closed("The voice session closed (example)."))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await bridge.setTarget(b)
+    #expect(await voice.closes == 0)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.last == [])
+  }
+
+  /// The target leaving is a target change too.
+  @Test func targetLeavingClosesTheLine() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await post("/v1/target", TargetBody(sessionId: b))
+    await live()
+    try await post("/v1/leave", LeaveBody(sessionId: b))
+    #expect(await bridge.status.call == .listening)
+    #expect(await voice.closes == 1)
+  }
+
+  /// A result from another session is spoken in the open line and kept in its own session's
+  /// conversation, not the target's.
+  @Test func resultIsKeptInItsSessionsConversation() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await answer(request(1), from: b)
+    #expect(await voice.added == ["[RESULT] Beta: Done."])
+    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantUtterance("Beta is done."))
+    #expect(await eventually { await bridge.status.unheard == 0 })
+    #expect(await bridge.status.recentTranscript == ["Voice: Beta is done."])
+    await bridge.setTarget(b)
+    #expect(await bridge.status.recentTranscript == ["Claude: [RESULT] Beta: Done."])
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.last == [InitialItem(role: .user, text: "[RESULT] Beta: Done.")])
+  }
+
+  /// A result not heard yet is given to the line once it opens, so it is not seeded too.
+  @Test func unheardResultIsNotSeededTwice() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    try await answer(request(1), from: a)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
+    #expect(
+      await bridge.status.recentTranscript == [
+        "Claude: [RESULT] Alpha: Done.",
+        "Claude: [APPROVAL] Alpha: Claude is waiting for your approval",
+      ])
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.last == [])
+    #expect(await voice.added.count == 2)
+  }
+
+  /// Each session keeps its own context line; one from a session other than the open line's
+  /// waits for that session's next line.
+  @Test func contextIsKeptPerSession() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    #expect(await voice.added.isEmpty)
+    #expect(await bridge.status.lastContext == nil)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    #expect(await voice.added == ["[CONTEXT] Alpha: Alpha's work."])
+    #expect(await bridge.status.lastContext == "[CONTEXT] Alpha: Alpha's work.")
+    await bridge.setTarget(b)
+    #expect(await bridge.status.lastContext == "[CONTEXT] Beta: Beta's work.")
+    await bridge.audioEvent(.speechStarted)
+    #expect(
+      await voice.opens.last == [InitialItem(role: .user, text: "[CONTEXT] Beta: Beta's work.")])
+  }
+
+  @Test func newConversationClearsOnlyTheTargets() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    await bridge.newConversation()
+    #expect(await bridge.status.lastContext == nil)
+    await bridge.setTarget(b)
+    #expect(await bridge.status.lastContext == "[CONTEXT] Beta: Beta's work.")
+  }
+
+  /// A session removed from the app (the popover's ×) loses its conversation, on disk too.
+  @Test func removedSessionLosesItsConversation() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    await bridge.remove(a)
+    #expect(await bridge.status.lastContext == nil)
+    let restarted = try restart()
+    try await restarted.join(a, "Alpha")
+    #expect(await restarted.bridge.status.lastContext == nil)
+  }
+
+  /// After `/clear` the session's new id keeps its conversation, and the open line stays open.
+  @Test func clearedSessionKeepsItsConversation() async throws {
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    await live()
+    voice.emit(.userUtterance("Remember the colour teal."))
+    #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
+    try await post(
+      "/v1/join", JoinBody(sessionId: cleared, title: "Alpha", autoContext: false, replaces: a))
+    #expect(await bridge.status.call == .live)
+    #expect(await bridge.status.recentTranscript == ["You: Remember the colour teal."])
+    voice.emit(.userUtterance("And blue."))
+    #expect(await eventually { await bridge.status.recentTranscript.count == 2 })
+  }
+
+  /// The single conversation an earlier build saved is discarded, not shown as anyone's.
+  @Test func singleConversationFileIsDiscarded() async throws {
+    let file = dir.appending(path: "continuity.json")
+    let old = #"{"utterances":[{"role":"user","text":"hi"}],"context":"[CONTEXT] Alpha: x"}"#
+    try Data(old.utf8).write(to: file)
+    let restarted = try restart()
+    try await restarted.join(a, "Alpha")
+    #expect(await restarted.bridge.status.lastContext == nil)
+    #expect(await restarted.bridge.status.recentTranscript.isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: file.path))
   }
 
   @Test func stopThenStartResumesConversation() async throws {

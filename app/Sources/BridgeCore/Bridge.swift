@@ -24,7 +24,13 @@ public actor Bridge: Router {
   /// Counts realtime opens and closes, so an open that a close overtook gives up.
   private var opening = 0
   private var silenceTimer = 0
+  /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
+  /// The session whose conversation the line last opened with; its transcripts are kept there.
+  private var lineSession: SessionID?
+  /// Whether `lineSession` is set for the line opening now; until then a target change cannot
+  /// be told from the target it will open with.
+  private var lineKnowsSession = false
   private var problem: String?
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
@@ -47,9 +53,18 @@ public actor Bridge: Router {
     self.meter = meter
     self.continuityFile = continuityFile
     self.time = time
-    continuity =
-      (try? JSONDecoder().decode(Continuity.self, from: Data(contentsOf: continuityFile)))
-      ?? Continuity()
+    // A file that does not decode, such as the single conversation an earlier build kept, is
+    // discarded rather than left on disk.
+    if let data = try? Data(contentsOf: continuityFile) {
+      if let saved = try? JSONDecoder().decode(Continuity.self, from: data) {
+        continuity = saved
+      } else {
+        try? FileManager.default.removeItem(at: continuityFile)
+        continuity = Continuity()
+      }
+    } else {
+      continuity = Continuity()
+    }
     (updates, publish) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
     Task { [weak self] in
       while (try? await time.sleep(for: .seconds(1))) != nil, let bridge = self {
@@ -61,13 +76,13 @@ public actor Bridge: Router {
   public var status: StatusReply {
     get async {
       let minutesThisCall = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
+      let shown = await registry.target.map { continuity[$0] } ?? Conversation()
       return StatusReply(
         call: machine.phase, sessions: await registry.rows(),
         minutesToday: await meter.minutesToday(), minutesThisCall: minutesThisCall,
-        problem: problem, lastContext: continuity.context,
-        recentTranscript: continuity.utterances.suffix(3).map {
-          ($0.role == .user ? "You: " : "Voice: ") + $0.text
-        }, unheard: machine.pending.count)
+        problem: problem, lastContext: shown.context,
+        recentTranscript: shown.lines.suffix(3).map { Self.speaker($0.speaker) + $0.text },
+        unheard: machine.pending.count)
     }
   }
 
@@ -113,18 +128,23 @@ public actor Bridge: Router {
     await changed()
   }
 
-  /// The popover's ×: forgets the session. Its open request fails as "session left", and its
-  /// next poll is told it was removed.
+  /// The popover's ×: forgets the session and its conversation. Its open request fails as
+  /// "session left", and its next poll is told it was removed.
   public func remove(_ id: SessionID) async {
     if questionRoute == id { questionRoute = nil }
     if let delivery = await registry.remove(id) { await deliver(delivery) }
-    // item 5 merge: await forgetConversation(of: id)
-    await changed()
+    await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
   }
 
-  /// Forgets the conversation; the next realtime session starts fresh.
+  /// Forgets the target's conversation; its next realtime session starts fresh.
   public func newConversation() async {
-    continuity = Continuity()
+    guard let target = await registry.target else { return }
+    await forgetConversation(of: target)
+  }
+
+  /// Forgets a session's conversation, as when the session is removed from the app.
+  public func forgetConversation(of id: SessionID) async {
+    continuity.forget(id)
     save()
     await changed()
   }
@@ -148,7 +168,13 @@ public actor Bridge: Router {
         let work = try await registry.poll(SessionID(rawValue: id))
         return .json(PollReply(status: await status, work: work))
       case ("POST", "/v1/join"):
-        await registry.join(try req.decodeBody(JoinBody.self))
+        let body = try req.decodeBody(JoinBody.self)
+        if let old = body.replaces, await registry.rows().contains(where: { $0.sessionId == old }) {
+          continuity.move(old, to: body.sessionId)  // after /clear: the same session, a new id
+          if lineSession == old { lineSession = body.sessionId }
+          save()
+        }
+        await registry.join(body)
         if problem == Self.noSession { problem = nil }
       case ("POST", "/v1/leave"):
         let delivery = await registry.leave(try req.decodeBody(LeaveBody.self).sessionId)
@@ -213,10 +239,18 @@ public actor Bridge: Router {
   private func openRealtime() async {
     opening += 1
     let attempt = opening
+    lineKnowsSession = false
     do {
+      let session = await registry.target
+      lineSession = session
+      lineKnowsSession = true
       let voice = try await controller()
       let offer = try await audio.makeOffer()
-      let items = continuity.initialItems(tasks: await registry.openTasks())
+      // only the session's own conversation, context and open tasks: never another session's
+      let conversation = session.map { continuity[$0] } ?? Conversation()
+      let tasks = if let session { await registry.openTasks(of: session) } else { [String]() }
+      let items = conversation.initialItems(
+        tasks: tasks, unheard: Set(machine.pending.map(\.text)))
       let answer = try await voice.open(offerSDP: offer, items: items)
       guard attempt == opening else { return await voice.close() }
       try await audio.applyAnswer(answer)
@@ -269,10 +303,10 @@ public actor Bridge: Router {
       await send(.handedOff)
       await route(request)
     case .userUtterance(let text):
-      record(.user, text)
+      record(.owner, text, in: lineSession)
       await send(.userTranscribed)
     case .assistantUtterance(let text):
-      record(.assistant, text)
+      record(.voice, text, in: lineSession)
       await send(.assistantFinishedSpeaking(text))
     case .assistantSpeaking: await send(.assistantSpeaking)
     case .closed(let reason):
@@ -283,10 +317,27 @@ public actor Bridge: Router {
     await changed()
   }
 
-  private func record(_ role: Role, _ text: String) {
-    guard !text.isEmpty else { return }
-    continuity.record(Utterance(role: role, text: text))
+  private func record(_ speaker: Conversation.Line.Speaker, _ text: String, in id: SessionID?) {
+    guard let id, !text.isEmpty else { return }
+    continuity.record(speaker, text, in: id)
     save()
+  }
+
+  /// A session's line for the voice is kept in that session's conversation, whichever session
+  /// the open line is about, and spoken in the line as it is.
+  private func say(_ line: VoiceLine) async {
+    record(.claude, line.text, in: line.session)
+    await send(.deliver(line))
+  }
+
+  /// A new target closes a line opened with another session's conversation; the next speech
+  /// opens it with the target's. With no session left there is no conversation to switch to,
+  /// so the line stays open.
+  private func followTarget() async {
+    guard machine.phase == .connecting || machine.phase == .live, lineKnowsSession,
+      let target = await registry.target, target != lineSession
+    else { return }
+    await send(.targetChanged)
   }
 
   // MARK: Routing
@@ -310,7 +361,7 @@ public actor Bridge: Router {
     // only a question the call keeps (not one dropped while off) routes the next handoff
     if delivery.status == .question, machine.phase != .off { questionRoute = delivery.session }
     let line = AnswerShaper.forVoice(delivery.text, status: delivery.status, label: delivery.label)
-    await send(.deliver(VoiceLine(text: line, session: delivery.session)))
+    await say(VoiceLine(text: line, session: delivery.session))
   }
 
   private func label(of id: SessionID) async throws -> SessionRow {
@@ -329,7 +380,7 @@ public actor Bridge: Router {
     case (false, true):
       let line = AnswerShaper.line(
         tag: "APPROVAL", label: row.label, body: "Claude is waiting for your approval")
-      await send(.deliver(VoiceLine(text: line, session: body.sessionId)))
+      await say(VoiceLine(text: line, session: body.sessionId))
     case (true, false):
       machine.withdraw { $0.session == body.sessionId && $0.text.hasPrefix("[APPROVAL]") }
     default: break
@@ -337,15 +388,17 @@ public actor Bridge: Router {
   }
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
-  /// it is and kept for later sessions; a live voice gets it at once, and it does not hold the
-  /// line open.
+  /// it is and kept in the session's conversation; a live line about that session gets it at
+  /// once, and it does not hold the line open.
   private func context(_ body: ContextBody) async throws {
     let row = try await label(of: body.sessionId)
     let line = AnswerShaper.line(
       tag: "CONTEXT", label: row.label, body: body.summary, limit: Self.maxContext)
-    continuity.context = line
+    continuity.setContext(line, for: body.sessionId)
     save()
-    if machine.phase == .live { try? await realtime?.addContext(line) }
+    if machine.phase == .live, lineSession == body.sessionId {
+      try? await realtime?.addContext(line)
+    }
   }
 
   private func sweep() async {
@@ -353,7 +406,9 @@ public actor Bridge: Router {
     await changed()
   }
 
+  /// Publishes the status if it changed; every change of the target passes through here.
   @discardableResult private func changed() async -> StatusReply {
+    await followTarget()
     let now = await status
     if now != published { publish.yield(now) }
     published = now
@@ -365,4 +420,13 @@ public actor Bridge: Router {
   }
 
   private static func sentence(_ error: any Error) -> String { error.localizedDescription }
+
+  /// How the popover's last lines name who said each.
+  private static func speaker(_ speaker: Conversation.Line.Speaker) -> String {
+    switch speaker {
+    case .owner: "You: "
+    case .voice: "Voice: "
+    case .claude: "Claude: "
+    }
+  }
 }

@@ -18,6 +18,8 @@ public enum CallEvent: Equatable, Sendable {
   case deliver(VoiceLine)
   case remoteClosed(String)
   case audioFailed(String)
+  /// Another session became the target; an open line carries the previous one's conversation.
+  case targetChanged
 }
 
 /// What the bridge does in reply, in order.
@@ -31,9 +33,10 @@ public enum CallEffect: Equatable, Sendable {
 }
 
 /// The billing-aware call. The realtime session is open only while someone speaks: speech opens
-/// it, silence or a finished handoff acknowledgement closes it, and the microphone stays with
-/// local voice detection in between. A result that arrives while it is closed is announced by a
-/// chime and waits in `pending` until the owner next speaks. Pure: the bridge runs the effects.
+/// it, silence, a finished handoff acknowledgement or a new target closes it, and the microphone
+/// stays with local voice detection in between. A result that arrives while it is closed is
+/// announced by a chime and waits in `pending` until the owner next speaks. Pure: the bridge
+/// runs the effects.
 public struct CallMachine: Sendable {
   public static let noiseSentence =
     "The voice hung up: the microphone heard sound but no words for 90 seconds."
@@ -118,6 +121,8 @@ public struct CallMachine: Sendable {
       }
       isAckUnfinished = false
       return [armSilence]
+    case (.connecting, .targetChanged), (.live, .targetChanged):
+      return [.closeRealtime] + hangUp()
     case (.live, .silenceElapsed):
       return [.closeRealtime] + (isSoundOn ? [.problem(Self.noiseSentence)] : []) + hangUp()
     default:

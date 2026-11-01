@@ -115,8 +115,10 @@ talking:
   popover show it as unheard, and the voice tells you when you next speak. A result counts as
   heard only once a reply of the voice has said it ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed));
   if the line closes first, it chimes and waits again.
-- The conversation is carried over to the next session, and across Stop and Start, so the voice
-  remembers what you said a minute ago.
+- Each Claude Code session has its own conversation with the voice. It is carried over to the
+  next realtime session, and across Stop and Start, so the voice remembers what you said a minute
+  ago. A new target switches the conversation: an open line closes, and your next words open it
+  with the new target's.
 - The popover shows the minutes the line was open, as measured by the app; how your plan meters
   realtime voice is not published.
 
@@ -129,8 +131,9 @@ session:
 - microphone audio while the line is open, from 2 seconds before you started speaking until it
   closes;
 - the voice's instructions;
-- the recent conversation (up to the last 24 lines) to continue it in a new session;
-- the requests still open, as their one-line briefs;
+- the target session's recent conversation (up to the last 24 lines) to continue it in a new
+  realtime session;
+- the target session's requests still open, as their one-line briefs;
 - each result, question, update and approval notice, as one line of at most 2,000 characters,
   with code blocks and tables removed. An update is Claude's answer in a later turn started by a
   background task's notification, for up to 10 minutes after a voice request and until any other
@@ -148,8 +151,9 @@ list of patterns, not a guarantee.
 The codex thread that carries the voice is ephemeral and read-only, with every codex feature
 turned off except where it keeps your login and how it uses your proxy, and every MCP server off; it is there only to talk.
 Claude's work goes to Anthropic as your Claude Code session always does. On your Mac the app
-keeps the usage meter, and the recent conversation and the context line last loaded until you
-press **New conversation**, in `~/Library/Application Support/claude-gpt-live-bridge`.
+keeps the usage meter and, for each of the 20 sessions used last, its recent conversation and
+the context line last loaded from it, until you press **New conversation** with it as the target
+or remove it, in `~/Library/Application Support/claude-gpt-live-bridge`.
 
 [SECURITY.md](SECURITY.md) has the threat model: in short, anything your microphone can hear
 can become a request that Claude runs under the session's own permission mode.

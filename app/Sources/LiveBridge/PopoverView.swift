@@ -1,8 +1,9 @@
 import BridgeCore
 import SwiftUI
 
-/// The menu bar popover: the call, the sessions, the context last sent, the last lines, the
-/// minutes, and the app's own settings. Liquid Glass on macOS 26 and later, materials before.
+/// The menu bar popover: the call, the sessions, the target's context line and last lines (each
+/// session has its own conversation with the voice), the minutes, and the app's own settings.
+/// Liquid Glass on macOS 26 and later, materials before.
 struct PopoverView: View {
   @Bindable var model: AppModel
   @State private var showContext = false
@@ -129,6 +130,7 @@ struct PopoverView: View {
       HStack {
         Button("Load context", systemImage: "square.and.arrow.down") { model.loadContext() }
         Button("New conversation", systemImage: "square.and.pencil") { model.newConversation() }
+          .help("Forget the voice's conversation with the target session")
       }
       .capsule(prominent: false)
       if let sent = model.status?.lastContext {
@@ -141,9 +143,13 @@ struct PopoverView: View {
     .card()
   }
 
+  /// The target's label; the context line and the last lines are its conversation's.
+  private var target: String? { model.status?.sessions.first(where: \.isTarget)?.label }
+
   private var lastLines: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Text("Last lines").font(.caption).foregroundStyle(.secondary)
+      Text(target.map { "Last lines with \($0)" } ?? "Last lines")
+        .font(.caption).foregroundStyle(.secondary)
       ForEach(Array((model.status?.recentTranscript ?? []).enumerated()), id: \.offset) { _, line in
         let parts = line.split(separator: ": ", maxSplits: 1)
         HStack(alignment: .firstTextBaseline) {

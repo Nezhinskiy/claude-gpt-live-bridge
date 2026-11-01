@@ -189,10 +189,10 @@ public actor SessionRegistry {
   }
 
   /// The requests not answered yet, as `[TASK] <label>: <brief>` lines for the voice; an
-  /// older request a newer one superseded is left out.
-  public func openTasks() -> [String] {
+  /// older request a newer one superseded is left out. Given a session, only its own.
+  public func openTasks(of only: SessionID? = nil) -> [String] {
     let labels = labels()
-    return ordered().flatMap { id, session in
+    return ordered().filter { only == nil || $0.key == only }.flatMap { id, session in
       let briefs =
         (session.inFlight.map { $0.id == session.latest ? [$0.brief] : [] } ?? [])
         + session.queued.map(\.brief)
