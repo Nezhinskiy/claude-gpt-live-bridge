@@ -7,6 +7,8 @@ import type { AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } fro
 /** LiveBridge.app's bundle identifier. */
 export const BUNDLE_ID = 'io.github.nezhinskiy.livebridge'
 const POLL_MS = 1000
+/** What `next` answers once the owner removed this session in the app (HTTP 410). */
+export const REMOVED = 'removed'
 
 /**
  * The engine calls the link makes. A hooks module spells every call `$.noun.event(...)` where
@@ -57,13 +59,20 @@ export class BridgeLink {
 
   /**
    * One poll: the app's status and any work for this session, or null while the app is out of
-   * reach. A session the app does not know (it restarted) joins again first.
+   * reach. A session the app does not know (it restarted) joins again first; one the owner
+   * removed is `REMOVED`, and the link forgets it without joining again or leaving.
    */
-  async next(retry = true): Promise<PollReply | null> {
+  async next(retry = true): Promise<PollReply | null | typeof REMOVED> {
     const joined = this.#joined
     if (joined === null || (!this.#isKnown && !(await this.join(joined)))) return null
     const reply = await this.#send(`next?sessionId=${encodeURIComponent(joined.sessionId)}`)
     if (reply?.ok === true) return parse(reply.text)
+    if (reply?.status === 410) {
+      this.stop()
+      this.#joined = null
+      this.#isKnown = false
+      return REMOVED
+    }
     this.#isKnown = false
     return reply?.status === 404 && retry ? this.next(false) : null
   }

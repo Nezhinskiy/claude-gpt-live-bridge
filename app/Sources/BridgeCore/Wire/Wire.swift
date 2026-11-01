@@ -147,5 +147,14 @@ public struct PollReply: Codable, Sendable, Equatable {
   public var work: Work?
 }
 
+/// What a non-2xx reply asks of the mod, beyond its HTTP status.
+public enum ErrorCode: String, Codable, Sendable {
+  /// `410`: the owner removed this session; the mod turns itself off instead of joining again.
+  case removed
+}
+
 /// The body of every non-2xx reply.
-public struct ErrorReply: Codable, Sendable, Equatable { public var error: String }
+public struct ErrorReply: Codable, Sendable, Equatable {
+  public var error: String
+  public var code: ErrorCode?
+}

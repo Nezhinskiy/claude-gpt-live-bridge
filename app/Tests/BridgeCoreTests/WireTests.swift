@@ -17,6 +17,7 @@ struct WireTests {
     "answer-ok": roundTrip(AnswerBody.self), "answer-failed": roundTrip(AnswerBody.self),
     "next-request": roundTrip(PollReply.self), "next-context": roundTrip(PollReply.self),
     "next-idle": roundTrip(PollReply.self), "error": roundTrip(ErrorReply.self),
+    "error-removed": roundTrip(ErrorReply.self),
   ]
 
   static func roundTrip<T: Codable & Sendable>(_ type: T.Type) -> @Sendable (Data) throws -> Data {

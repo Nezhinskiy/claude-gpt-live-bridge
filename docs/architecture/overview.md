@@ -96,6 +96,11 @@ Every reply carries the status: phase, target, sessions with labels (`Title · a
 titles are the same), minutes, the problem sentence, the context last sent, the last three
 lines and the count of unheard results.
 
+A session the owner removed with the popover's × is gone as if it had left, and until it joins
+again every call from it answers `410` with `"code": "removed"`. The mod then turns itself off
+for that session and logs "Removed from LiveBridge. /live on joins again." instead of joining
+again, as it does after a `404` (the app restarted).
+
 ## Flows
 
 ### Handoff

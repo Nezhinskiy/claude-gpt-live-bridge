@@ -74,31 +74,46 @@ struct PopoverView: View {
           .font(.callout).foregroundStyle(.secondary)
       }
       ForEach(shown.rows) { row in
-        Button {
-          model.setTarget(row.id)
-        } label: {
-          HStack {
-            Image(systemName: row.isTarget ? "largecircle.fill.circle" : "circle")
-              .foregroundStyle(row.isTarget ? Color.accentColor : .secondary)
-            VStack(alignment: .leading, spacing: 1) {
-              Text(row.label)
-              Label(row.detail, systemImage: Self.symbol(of: row.activity))
-                .font(.caption)
-                .foregroundStyle(row.activity == .approval ? .orange : .secondary)
-            }
-            Spacer()
+        HStack(spacing: 4) {
+          targetButton(row)
+          Button {
+            model.remove(row.id)
+          } label: {
+            Image(systemName: "xmark").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+              .frame(width: 22, height: 22).contentShape(.rect)
           }
-          .padding(6)
-          .background(
-            row.isTarget ? Color.accentColor.opacity(0.15) : .clear, in: .rect(cornerRadius: 8)
-          )
-          .contentShape(.rect)
+          .buttonStyle(.plain)
+          .help("Remove from LiveBridge; /live on joins the session again")
+          .accessibilityLabel("Remove \(row.label) from LiveBridge")
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(row.isTarget ? .isSelected : [])
       }
     }
     .card()
+  }
+
+  private func targetButton(_ row: SessionRowPresentation) -> some View {
+    Button {
+      model.setTarget(row.id)
+    } label: {
+      HStack {
+        Image(systemName: row.isTarget ? "largecircle.fill.circle" : "circle")
+          .foregroundStyle(row.isTarget ? Color.accentColor : .secondary)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(row.label)
+          Label(row.detail, systemImage: Self.symbol(of: row.activity))
+            .font(.caption)
+            .foregroundStyle(row.activity == .approval ? .orange : .secondary)
+        }
+        Spacer()
+      }
+      .padding(6)
+      .background(
+        row.isTarget ? Color.accentColor.opacity(0.15) : .clear, in: .rect(cornerRadius: 8)
+      )
+      .contentShape(.rect)
+    }
+    .buttonStyle(.plain)
+    .accessibilityAddTraits(row.isTarget ? .isSelected : [])
   }
 
   private static func symbol(of activity: SessionActivity) -> String {

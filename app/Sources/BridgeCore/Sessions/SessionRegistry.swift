@@ -12,11 +12,14 @@ public enum RegistryError: Error, Equatable {
   case unknownSession(SessionID)
   /// The id is not this session's open request (or, for an `update`, its latest one).
   case unknownRequest(RequestID)
+  /// The owner removed the session in the popover; it is told so until it joins again.
+  case removedSession(SessionID)
 
   public var message: String {
     switch self {
     case .unknownSession: "unknown session"
     case .unknownRequest: "unknown or stale request id"
+    case .removedSession: "this session was removed from LiveBridge"
     }
   }
 
@@ -25,8 +28,12 @@ public enum RegistryError: Error, Equatable {
     switch self {
     case .unknownSession: 404
     case .unknownRequest: 409
+    case .removedSession: 410
     }
   }
+
+  /// The wire's code for an error the mod acts on.
+  public var code: ErrorCode? { if case .removedSession = self { .removed } else { nil } }
 }
 
 /// The sessions that joined the call, their requests and their liveness.
@@ -56,6 +63,8 @@ public actor SessionRegistry {
   private static let sessionExpiry: TimeInterval = 5
   private static let requestTimeout: TimeInterval = 600
   private var sessions: [SessionID: Session] = [:]
+  /// Sessions the owner removed that have not joined since.
+  private var removed: Set<SessionID> = []
   private var joins = 0
   private var lastSweep: Date?
   /// A longer gap between sweeps means the Mac slept, not that every mod went quiet.
@@ -69,6 +78,7 @@ public actor SessionRegistry {
   /// Adds the session, or renames it and refreshes its liveness if it already joined. A session
   /// that `replaces` an id takes over that id's place, target and requests.
   public func join(_ body: JoinBody) {
+    removed.remove(body.sessionId)
     let replaced = body.replaces.flatMap { sessions.removeValue(forKey: $0) }
     if replaced != nil, target == body.replaces { target = body.sessionId }
     var session =
@@ -86,7 +96,16 @@ public actor SessionRegistry {
     drop(id, labels: labels(), reason: "session left")
   }
 
+  /// The owner removed the session: like `leave`, and until it joins again every call from it
+  /// throws `removedSession`, so the mod stops instead of joining again.
+  @discardableResult public func remove(_ id: SessionID) -> Delivery? {
+    guard sessions[id] != nil else { return nil }
+    removed.insert(id)
+    return leave(id)
+  }
+
   public func setTarget(_ id: SessionID) throws {
+    if removed.contains(id) { throw RegistryError.removedSession(id) }
     guard sessions[id] != nil else { throw RegistryError.unknownSession(id) }
     retarget(id)
   }
@@ -200,6 +219,7 @@ public actor SessionRegistry {
   }
 
   private func update<T>(_ id: SessionID, _ change: (inout Session) throws -> T) throws -> T {
+    if removed.contains(id) { throw RegistryError.removedSession(id) }
     guard var session = sessions[id] else { throw RegistryError.unknownSession(id) }
     defer { sessions[id] = session }
     return try change(&session)

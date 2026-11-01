@@ -113,6 +113,14 @@ public actor Bridge: Router {
     await changed()
   }
 
+  /// The popover's ×: forgets the session. Its open request fails as "session left", and its
+  /// next poll is told it was removed.
+  public func remove(_ id: SessionID) async {
+    if questionRoute == id { questionRoute = nil }
+    if let delivery = await registry.remove(id) { await deliver(delivery) }
+    await changed()
+  }
+
   /// Forgets the conversation; the next realtime session starts fresh.
   public func newConversation() async {
     continuity = Continuity()
@@ -156,7 +164,7 @@ public actor Bridge: Router {
       }
       return .json(await changed())
     } catch let error as RegistryError {
-      return .error(error.httpStatus, error.message)
+      return .error(error.httpStatus, error.message, code: error.code)
     } catch {
       return .error(400, "the body does not match the wire schema")
     }

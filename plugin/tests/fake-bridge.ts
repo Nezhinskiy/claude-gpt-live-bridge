@@ -45,6 +45,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     logs: [] as string[],
     summary: 'Goal: tidy the example project.',
     joined: new Set<string>(),
+    /** Sessions the owner removed in the popover; joining again clears the mark. */
+    removed: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
     work: [] as Work[],
     calls: [] as Call[],
@@ -93,11 +95,15 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     const route = new URL(e.url).pathname.replace('/v1/', '')
     const body = e.init.body === undefined ? undefined : JSON.parse(e.init.body)
     world.calls.push({ route, body })
+    if (route === 'join') world.removed.delete(body.sessionId)
     if (route === 'join') world.joined.add(body.sessionId)
     if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
     if (route === 'leave') world.joined.delete(body.sessionId)
     if (route === 'answer' && world.answerStatus !== 200) {
       return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
+    }
+    if (route === 'next' && world.removed.has(new URL(e.url).searchParams.get('sessionId') ?? '')) {
+      return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
     }
     const reply = route !== 'next'
       ? {}

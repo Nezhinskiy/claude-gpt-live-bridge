@@ -121,3 +121,27 @@ test('aSurfaceThatAttachesLaterIsToldOfTheCommand', async ($, on) => {
   await $.session.attach({ surface: 'desktop', clientId: 'desktop:default' })
   expect(world.commands).toEqual(['live', 'live'])
 })
+
+test('aRemovedSessionTurnsItselfOffAndDoesNotRejoin', async ($, on) => {
+  // The owner removed it in the popover: joining again by itself would undo that.
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await world.clock.advance(1000)
+  world.take('join')
+  world.joined.delete(ID)
+  world.removed.add(ID)
+  await world.clock.advance(1000)
+  expect(world.logs).toContain('Removed from LiveBridge. /live on joins again.')
+  world.take('next')
+  await world.clock.advance(3000)
+  expect(world.take('join')).toEqual([])
+  expect(world.take('next')).toEqual([])
+  expect(world.take('leave')).toEqual([])
+  expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
+  // A reload does not resume it either; /live on joins again.
+  await $.session.start(START)
+  expect(world.take('join')).toEqual([])
+  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
+})

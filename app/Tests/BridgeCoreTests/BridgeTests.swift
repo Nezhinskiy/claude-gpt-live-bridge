@@ -156,6 +156,18 @@ struct BridgeTests {
     #expect(await bridge.status.problem == nil)
   }
 
+  /// Removing a session from the popover answers its next poll with 410 and the wire's code.
+  @Test func removedSessionsNextPollIsGone() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.remove(a)
+    #expect(await bridge.status.sessions.map(\.sessionId) == [b])
+    let reply = await bridge.handle(
+      HTTPRequest(method: "GET", path: "/v1/next", query: ["sessionId": a.rawValue], body: Data()))
+    #expect(reply.status == 410)
+    #expect(try JSONDecoder().decode(ErrorReply.self, from: reply.body).code == .removed)
+  }
+
   @Test func handoffGoesToTarget() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")

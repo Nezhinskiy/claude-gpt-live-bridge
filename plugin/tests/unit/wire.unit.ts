@@ -50,7 +50,7 @@ const SHAPES: Record<string, Shape> = {
   }),
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop'] } }),
   'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
-  'error': fields<Wire.ErrorReply>({ error: S }),
+  'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
   'join': fields<Wire.JoinBody>({ sessionId: S, title: S, autoContext: 'boolean', replaces: optional(S) }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),

@@ -31,9 +31,10 @@ public struct HTTPResponse: Sendable, Equatable {
   }
 
   /// An error reply: `400` schema, `404` unknown session, `409` unknown or stale request id,
-  /// `413` body too large.
-  public static func error(_ status: Int, _ message: String) -> HTTPResponse {
-    json(ErrorReply(error: message), status: status)
+  /// `410` a session the owner removed (with its `code`), `413` body too large.
+  public static func error(_ status: Int, _ message: String, code: ErrorCode? = nil) -> HTTPResponse
+  {
+    json(ErrorReply(error: message, code: code), status: status)
   }
 }
 

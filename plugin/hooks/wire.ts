@@ -1,7 +1,8 @@
 // The JSON messages between the mod and LiveBridge.app, mirroring
 // app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). Optional
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
-// 404 unknown session, 409 unknown or stale request id, 413 body over 131072 bytes.
+// 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
+// `removed`), 413 body over 131072 bytes.
 
 /** The socket path relative to the home folder Foundation reports. */
 const SOCKET_REL = 'Library/Application Support/claude-gpt-live-bridge/run/bridge.sock';
@@ -62,4 +63,6 @@ export type StatusReply = {
 
 /** The reply to GET /v1/next; each poll also refreshes the session's liveness. */
 export type PollReply = { status: StatusReply; work?: Work };
-export type ErrorReply = { error: string };
+/** `removed` (410): the owner removed this session; the mod turns off instead of joining again. */
+export type ErrorCode = 'removed';
+export type ErrorReply = { error: string; code?: ErrorCode };

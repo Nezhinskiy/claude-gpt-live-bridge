@@ -6,7 +6,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Band } from '../types'
 import { bandStatus, drawBand, JOINING } from './band.tsx'
 import { summarize } from './context.ts'
-import { BridgeLink } from './link.ts'
+import { BridgeLink, REMOVED } from './link.ts'
 import { PLUGIN_NAME, voicePrompt } from './prompt.ts'
 import { fallbackTitle, titleFromRegistry } from './title.ts'
 import { clip, originOf, TurnTracker } from './turns.ts'
@@ -23,6 +23,7 @@ const ANSWER_LIMIT = 32_000
 const AUTO_CONTEXT = 'autoContext'
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
+const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
 const USAGE = 'Usage: /live on | off | target | status | context [auto|manual]'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
@@ -123,8 +124,10 @@ async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void
 async function tick($: EngineInterface): Promise<void> {
   const live = generation
   await follow($, false)
+  const joined = link?.session
   const reply = await link?.next()
   if (live !== generation) return
+  if (reply === REMOVED) return removed($, joined?.sessionId)
   if (!reply) {
     const now = await $.clock.now()
     if (offlineSince === null) {
@@ -149,6 +152,14 @@ async function tick($: EngineInterface): Promise<void> {
   } else if (reply.work?.kind === 'context') {
     void contextAsked($)
   }
+}
+
+/** The owner removed this session in the app: off here too, with no leave and no rejoin. */
+async function removed($: EngineInterface, sessionId: string | undefined): Promise<void> {
+  generation += 1
+  if (sessionId !== undefined) await $.store.delete(joinedKey(sessionId))
+  await setBand($, null)
+  $.ui.log(REMOVED_NOTE)
 }
 
 /** The prompt was refused: the request fails at once, and no later turn counts as its turn. */

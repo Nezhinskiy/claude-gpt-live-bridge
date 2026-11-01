@@ -52,6 +52,23 @@ struct SessionRegistryTests {
     #expect(await registry.rows().map(\.sessionId) == [b, c])
   }
 
+  /// The popover's ×: the session is forgotten, its open request fails as "session left", and
+  /// until it joins again every call from it is told it was removed (not "unknown", which the
+  /// mod answers by joining again).
+  @Test func removedSessionIsToldSoUntilItJoinsAgain() async throws {
+    for id in [a, b, c] { await join(id, id.rawValue) }
+    try await registry.enqueue(request(1), for: a)
+    let delivery = await registry.remove(a)
+    #expect(delivery?.status == .failed && delivery?.text == "session left")
+    #expect(await registry.target == c)
+    #expect(await registry.rows().map(\.sessionId) == [b, c])
+    await #expect(throws: RegistryError.removedSession(a)) { try await registry.poll(a) }
+    #expect(RegistryError.removedSession(a).httpStatus == 410)
+    await #expect(throws: RegistryError.removedSession(a)) { try await registry.setTarget(a) }
+    await join(a, "Alpha")
+    #expect(try await registry.poll(a) == nil)
+  }
+
   /// A title is cut at join, so no label can crowd an answer out of its 2,000-character line.
   @Test func longTitleIsCut() async throws {
     await join(a, String(repeating: "Long title ", count: 300))

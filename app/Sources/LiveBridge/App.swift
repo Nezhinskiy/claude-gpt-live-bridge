@@ -87,6 +87,7 @@ final class AppModel {
 
   func perform(_ action: CallAction) { Task { await bridge?.perform(action) } }
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
+  func remove(_ id: SessionID) { Task { await bridge?.remove(id) } }
   func loadContext() { Task { await bridge?.loadContext() } }
   func newConversation() { Task { await bridge?.newConversation() } }
 
