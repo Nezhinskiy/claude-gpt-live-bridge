@@ -10,7 +10,13 @@ export const VOICE_TAG = '⟦voice⟧'
 
 /** The first line the engine puts above a prompt this plugin submits (ADR 0001, item j). */
 const FRAMING = `The ${PLUGIN_NAME} plugin sent a message:\n`
-const MARKER = new RegExp(`^${VOICE_TAG} (\\S+)$`, 'mu')
+/**
+ * The marker line with a request id of the shape the app issues (a UUID), ending the prompt:
+ * at the end of the text, or where the engine's own paragraph follows it.
+ */
+const MARKER = new RegExp(`^${VOICE_TAG} ([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})(?:\\n\\n|$)`, 'iu')
+/** Every line terminator a reader may break a line at, besides \n. */
+const LINE_BREAKS = /\r\n?|[\u2028\u2029\u0085\v\f]/gu
 const SPEAKER: Record<Role, string> = { user: 'Owner', assistant: 'Voice', developer: 'Note' }
 
 /**
@@ -46,14 +52,20 @@ export function voicePrompt(request: VoiceRequest): string {
  * this plugin's message and hold the marker line. Null for any other turn.
  */
 export function voiceRequestId(text: string): string | null {
-  return text.startsWith(FRAMING) ? (MARKER.exec(text)?.[1] ?? null) : null
+  const at = text.lastIndexOf(`\n${VOICE_TAG} `)
+  return text.startsWith(FRAMING) && at >= 0 ? (MARKER.exec(text.slice(at + 1))?.[1] ?? null) : null
 }
 
 export function isVoicePrompt(text: string): boolean {
   return voiceRequestId(text) !== null
 }
 
-/** Speech never carries a marker of its own. */
+/**
+ * Speech as plain lines: every line break becomes \n, so a quoted line cannot end early, and no
+ * marker survives, however it was nested.
+ */
 function clean(text: string): string {
-  return text.replaceAll(VOICE_TAG, '').trim()
+  let lines = text.replace(LINE_BREAKS, '\n')
+  while (lines.includes(VOICE_TAG)) lines = lines.replaceAll(VOICE_TAG, '')
+  return lines.trim()
 }
