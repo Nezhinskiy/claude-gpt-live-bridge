@@ -1,6 +1,6 @@
 #!/bin/sh
 # A stand-in for `codex` in tests; tests copy it as `codex` into a directory with canned replies.
-#   codex features list      prints features.txt
+#   codex features list      prints features.txt (after 30 s when features.hang exists)
 #   codex app-server ...     reads one JSON-RPC message per line and, for method a/b with id N,
 #                            answers {"id":N,"result":<a_b.json>} when a_b.json exists, then
 #                            prints a_b.after when it exists. Every line read goes to
@@ -8,6 +8,7 @@
 #                            to child.pid (the process-group test kills it through the group).
 dir=$(dirname "$0")
 if [ "$1" = features ]; then
+  [ -f "$dir/features.hang" ] && sleep 30
   cat "$dir/features.txt"
   exit 0
 fi

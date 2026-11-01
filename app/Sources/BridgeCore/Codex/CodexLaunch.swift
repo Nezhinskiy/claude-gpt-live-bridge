@@ -45,21 +45,12 @@ public enum CodexProblem: LocalizedError, Equatable, Sendable {
 
 /// How the app finds and starts `codex app-server` for the voice thread.
 public enum CodexLaunch {
-  /// codex features that give the codex model a tool or a side effect; each is turned off if
-  /// codex has it. The primary controls stay the read-only sandbox, `approval_policy="never"`
-  /// and interrupting every codex turn; this list only narrows what an uninterrupted turn has.
-  public static let wantDisabled = [
-    "hooks", "apps", "plugins", "computer_use", "browser_use", "in_app_browser", "multi_agent",
-    "image_generation", "memories", "goals",
-    // shell and code execution, file reads, tool and skill installs
-    "shell_tool", "unified_exec", "unified_exec_tty", "shell_snapshot", "code_mode",
-    "code_mode_host", "view_image", "sleep_tool", "request_permissions_tool", "tool_suggest",
-    "skill_search", "skill_mcp_dependency_install", "multi_agent_v2",
-    // plugins, browsers, automation and web search by other names
-    "remote_plugin", "plugin_discovery_prefetch", "browser_use_external",
-    "browser_use_full_cdp_access", "browser_annotation_api", "in_app_local_automation",
-    "standalone_web_search", "web_search_request", "web_search_cached",
-  ]
+  /// The codex features the voice keeps on. Every other feature `codex features list` reports
+  /// is turned off, so one a later codex adds is off too (fail closed). The primary controls
+  /// stay the read-only sandbox, `approval_policy="never"` and interrupting every codex turn;
+  /// this narrows what an uninterrupted turn has. Derived against codex 0.166.0: the realtime
+  /// voice works with every feature off (`scripts/smoke.sh`), so none is kept.
+  public static let allowed: Set<String> = []
 
   /// The first `codex` in `searchPath`.
   public static func locate(searchPath: [String]) -> URL? {
@@ -71,41 +62,26 @@ public enum CodexLaunch {
   /// The user's own shell's `PATH`, then the usual install places: an app started by `open`
   /// gets launchd's minimal `PATH`, which rarely holds `codex` or the `node` an npm install of
   /// codex runs on. codex is started with this `PATH` too.
-  public static func defaultSearchPath() -> [String] {
+  public static func defaultSearchPath() async -> [String] {
     let shell = getpwuid(getuid()).map { String(cString: $0.pointee.pw_shell) } ?? "/bin/zsh"
     let home = FileManager.default.homeDirectoryForCurrentUser.path
-    return shellPath(shell)
+    return await shellPath(shell)
       + ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.local/bin", "/usr/bin", "/bin"]
   }
 
   /// `PATH` as `shell` sets it for a Terminal window (login and interactive), or `[]` when it
-  /// gives no answer within `timeout`. Output goes to a file: a shell's leftover children could
-  /// hold a pipe open.
-  static func shellPath(_ shell: String, timeout: Duration = .seconds(3)) -> [String] {
-    let out = FileManager.default.temporaryDirectory.appending(path: "path-\(UUID().uuidString)")
-    defer { try? FileManager.default.removeItem(at: out) }
+  /// gives no answer within `timeout`.
+  static func shellPath(_ shell: String, timeout: Duration = .seconds(3)) async -> [String] {
     let marker = "LIVEBRIDGE_PATH="
-    let process = Process()
-    process.executableURL = URL(filePath: shell)
-    process.arguments = ["-l", "-i", "-c", "printf '\\n\(marker)%s\\n' \"$PATH\""]
-    process.standardInput = FileHandle.nullDevice
-    process.standardError = FileHandle.nullDevice
-    guard FileManager.default.createFile(atPath: out.path, contents: nil),
-      let file = try? FileHandle(forWritingTo: out)
-    else { return [] }
-    process.standardOutput = file
-    guard (try? process.run()) != nil else { return [] }
-    let deadline = ContinuousClock.now + timeout
-    while process.isRunning, ContinuousClock.now < deadline { usleep(20_000) }
-    if process.isRunning { kill(process.processIdentifier, SIGKILL) }  // -i shells ignore TERM
-    let text = (try? String(contentsOf: out, encoding: .utf8)) ?? ""
-    let line = text.split(separator: "\n").last { $0.hasPrefix(marker) }
+    let script = "printf '\\n\(marker)%s\\n' \"$PATH\""
+    let answer = try? await run(URL(filePath: shell), ["-l", "-i", "-c", script], timeout: timeout)
+    let line = answer?.output.split(separator: "\n").last { $0.hasPrefix(marker) }
     return line?.dropFirst(marker.count).split(separator: ":").map(String.init) ?? []
   }
 
   /// The names in `codex features list` output (`name  stage  enabled`, the stage one or more
-  /// words), except stage `removed`. Output that is empty or has any other line throws
-  /// `protocolMismatch`: launching with fewer `--disable` flags would fail open.
+  /// words), except stage `removed`, which `--disable` no longer changes. Output that is empty
+  /// or has any other line throws `protocolMismatch`.
   public static func presentFeatures(featuresListOutput: String) throws -> Set<String> {
     var names: Set<String> = []
     for line in featuresListOutput.split(whereSeparator: \.isNewline) {
@@ -127,5 +103,82 @@ public enum CodexLaunch {
       "app-server", "-c", "sandbox_mode=\"read-only\"", "-c", "approval_policy=\"never\"", "-c",
       "web_search=\"disabled\"", "-c", "notify=[]", "-c", "model_reasoning_effort=\"low\"",
     ] + disable.flatMap { ["--disable", $0] }
+  }
+
+  /// Runs `codex features list`, starts `codex app-server` with every feature but `allowed`
+  /// turned off, initialises it and checks the ChatGPT sign-in. Throws `CodexProblem`.
+  public static func launch(
+    codex: URL, cwd: URL, searchPath: [String] = [], probeTimeout: Duration = .seconds(10)
+  ) async throws -> JSONRPCClient {
+    guard
+      let features = try await run(
+        codex, ["features", "list"], searchPath: searchPath, timeout: probeTimeout)
+    else { throw CodexProblem.protocolMismatch("no answer to `codex features list`") }
+    guard features.status == 0 else { throw CodexProblem.exited(features.status) }
+    let present = try presentFeatures(featuresListOutput: features.output)
+    let client = JSONRPCClient(
+      executable: codex, arguments: argv(disable: present.subtracting(allowed).sorted()),
+      cwd: cwd, searchPath: searchPath)
+    do {
+      try await client.start()
+      let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+      let hello: JSONValue = [
+        "clientInfo": [
+          "name": "claude-gpt-live-bridge", "title": "LiveBridge",
+          "version": .string(version as? String ?? "dev"),
+        ],
+        "capabilities": ["experimentalApi": true, "requestAttestation": false],
+      ]
+      let _: JSONValue = try await client.request("initialize", hello, timeout: .seconds(20))
+      await client.notify("initialized")
+      let account: JSONValue = try await client.request(
+        "account/read", JSONValue.object([:]), timeout: .seconds(20))
+      guard account["account"]?.object != nil else { throw CodexProblem.notLoggedIn }
+      return client
+    } catch {
+      await client.close()
+      throw error is CodexProblem ? error : CodexProblem.protocolMismatch("\(error)")
+    }
+  }
+
+  /// Runs `executable` and returns its exit status and output, or `nil` when it gives no
+  /// answer within `timeout` (it is then killed: an interactive shell ignores `SIGTERM`).
+  /// Throws `notInstalled` when it cannot start. Output goes to a file: a child it leaves
+  /// running could hold a pipe open.
+  static func run(
+    _ executable: URL, _ arguments: [String], searchPath: [String] = [], timeout: Duration
+  ) async throws -> (status: Int32, output: String)? {
+    let out = FileManager.default.temporaryDirectory.appending(path: "lb-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: out) }
+    guard FileManager.default.createFile(atPath: out.path, contents: nil),
+      let file = try? FileHandle(forWritingTo: out)
+    else { return nil }
+    defer { try? file.close() }
+    let process = Process()
+    process.executableURL = executable
+    process.arguments = arguments
+    process.use(searchPath: searchPath)
+    process.standardInput = FileHandle.nullDevice
+    process.standardOutput = file
+    process.standardError = FileHandle.nullDevice
+    do { try process.run() } catch { throw CodexProblem.notInstalled }
+    let deadline = ContinuousClock.now + timeout
+    while process.isRunning, ContinuousClock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(20))
+    }
+    guard !process.isRunning else {
+      kill(process.processIdentifier, SIGKILL)
+      return nil
+    }
+    return (process.terminationStatus, (try? String(contentsOf: out, encoding: .utf8)) ?? "")
+  }
+}
+
+extension Process {
+  /// Starts the child with this `PATH`, so a `#!/usr/bin/env node` codex finds its runtime.
+  func use(searchPath: [String]) {
+    guard !searchPath.isEmpty else { return }
+    environment = ProcessInfo.processInfo.environment.merging(
+      ["PATH": searchPath.joined(separator: ":")]) { $1 }
   }
 }

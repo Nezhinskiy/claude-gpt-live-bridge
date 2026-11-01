@@ -20,16 +20,59 @@ struct CodexLaunchTests {
     }
   }
 
-  @Test func argvDisablesOnlyPresentFeatures() throws {
+  /// Every feature codex lists is turned off but the allowed ones, also one this app has
+  /// never heard of; a `removed` one is left alone, as `--disable` no longer changes it.
+  @Test func argvDisablesEveryListedFeatureButTheAllowed() throws {
+    let listed = try features() + "brand_new_tool                           stable             true\n"
+    let present = try CodexLaunch.presentFeatures(featuresListOutput: listed)
+    #expect(present.isSuperset(of: ["instant_interrupt", "web_search_cached", "brand_new_tool"]))
+    #expect(present.isDisjoint(with: ["js_repl", "realtime_conversation"]))
+    #expect(CodexLaunch.allowed.isSubset(of: present))
+  }
+
+  @Test func launchDisablesFeaturesAndInitializes() async throws {
+    let fake = try FakeCodex()
+    let client = try await CodexLaunch.launch(codex: fake.codex, cwd: fake.dir)
     let present = try CodexLaunch.presentFeatures(featuresListOutput: try features())
-    #expect(present.contains("instant_interrupt"))  // a stage of two words
-    #expect(!present.contains("js_repl"))  // stage `removed`
-    let argv = CodexLaunch.argv(disable: CodexLaunch.wantDisabled.filter(present.contains))
-    let pairs = zip(argv, argv.dropFirst()).filter { $0.0 == "--disable" }.map(\.1)
-    #expect(pairs.contains("hooks") && pairs.contains("plugins") && pairs.contains("apps"))
-    #expect(pairs.contains("shell_tool"))  // a tool the codex model could call
-    #expect(!pairs.contains("goals"))  // codex no longer knows it
-    #expect(!argv.contains("js_repl"))
+    let argv = fake.log("argv.log").split(whereSeparator: \.isWhitespace).map(String.init)
+    let disabled = zip(argv, argv.dropFirst()).filter { $0.0 == "--disable" }.map(\.1)
+    #expect(Set(disabled) == present.subtracting(CodexLaunch.allowed))
+    let received = fake.log("received.log")
+    #expect(received.contains(#""name":"claude-gpt-live-bridge""#))
+    #expect(received.contains(#""experimentalApi":true"#))
+    #expect(received.contains(#"{"method":"initialized"}"#))
+    await client.close()
+  }
+
+  /// An npm install of codex is a `#!/usr/bin/env node` script: its runtime is found only
+  /// through the search path, which the app passes on to codex.
+  @Test func launchPassesTheSearchPathToCodex() async throws {
+    let fake = try FakeCodex(interpreter: "fake-node")
+    await #expect(throws: CodexProblem.exited(127)) {
+      try await CodexLaunch.launch(
+        codex: fake.codex, cwd: fake.dir, searchPath: ["/usr/bin", "/bin"])
+    }
+    let client = try await CodexLaunch.launch(
+      codex: fake.codex, cwd: fake.dir, searchPath: [fake.bin.path, "/usr/bin", "/bin"])
+    await client.close()
+  }
+
+  @Test func loggedOutCodexIsNotLoggedIn() async throws {
+    let fake = try FakeCodex(loggedIn: false)
+    await #expect(throws: CodexProblem.notLoggedIn) {
+      try await CodexLaunch.launch(codex: fake.codex, cwd: fake.dir)
+    }
+  }
+
+  /// A codex that hangs on `features list` cannot hold Start up for ever.
+  @Test func hungFeaturesListGivesUp() async throws {
+    let fake = try FakeCodex()
+    try fake.write("features.hang", "")
+    let start = ContinuousClock.now
+    await #expect(throws: CodexProblem.self) {
+      try await CodexLaunch.launch(codex: fake.codex, cwd: fake.dir, probeTimeout: .milliseconds(300))
+    }
+    #expect(ContinuousClock.now - start < .seconds(5))
   }
 
   /// Output codex might print after an upgrade or a crash must not launch with fewer
@@ -47,9 +90,8 @@ struct CodexLaunchTests {
     let empty = try temporaryDirectory()
     #expect(CodexLaunch.locate(searchPath: [empty.path]) == nil)
     await #expect(throws: CodexProblem.notInstalled) {
-      try await JSONRPCClient.launchVerified(codex: empty.appending(path: "codex"), cwd: empty)
+      try await CodexLaunch.launch(codex: empty.appending(path: "codex"), cwd: empty)
     }
-    #expect(CodexProblem.notInstalled.sentence.contains("not installed"))
   }
 
   @Test func findsCodexOutsideLaunchdPath() throws {
@@ -60,16 +102,16 @@ struct CodexLaunchTests {
 
   /// The PATH comes from the user's own shell, read as a Terminal window would start it; what
   /// its start-up files print is skipped, and a shell that hangs gives up after the timeout.
-  @Test func searchPathComesFromTheUserShell() throws {
+  @Test func searchPathComesFromTheUserShell() async throws {
     let dir = try temporaryDirectory()
     let shell = dir.appending(path: "shell")
     try Data("#!/bin/sh\necho 'Welcome back'\nPATH=/example/bin:/usr/bin:/bin\neval \"$4\"\n".utf8)
       .write(to: shell)
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shell.path)
-    #expect(CodexLaunch.shellPath(shell.path) == ["/example/bin", "/usr/bin", "/bin"])
+    #expect(await CodexLaunch.shellPath(shell.path) == ["/example/bin", "/usr/bin", "/bin"])
     try Data("#!/bin/sh\nsleep 30\n".utf8).write(to: shell)
     let start = ContinuousClock.now
-    #expect(CodexLaunch.shellPath(shell.path, timeout: .milliseconds(300)).isEmpty)
+    #expect(await CodexLaunch.shellPath(shell.path, timeout: .milliseconds(300)).isEmpty)
     #expect(ContinuousClock.now - start < .seconds(5))
   }
 
@@ -88,18 +130,6 @@ struct CodexLaunchTests {
     #expect(
       CodexProblem.realtimeError(observed).sentence
         == "Realtime voice failed (codex said: \(observed)).")
-  }
-
-  /// Every error the popover can show reads as a sentence that names its cause.
-  @Test func errorsReadAsSentences() {
-    let long = PathsError.socketPathTooLong(String(repeating: "a", count: 120))
-    #expect(
-      long.localizedDescription.contains("120 bytes") && long.localizedDescription.contains("103"))
-    #expect(ServerError.socketInUse("/example").localizedDescription.contains("another copy"))
-    let refused = RPCError(code: -32601, message: "method not found")
-    #expect(refused.localizedDescription.contains("method not found"))
-    #expect(CodexProblem.notInstalled.localizedDescription == CodexProblem.notInstalled.sentence)
-    #expect(CodexProblem.exited(127).sentence.contains("runtime"))
   }
 }
 

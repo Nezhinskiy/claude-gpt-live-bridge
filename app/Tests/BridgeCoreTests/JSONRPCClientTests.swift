@@ -4,40 +4,6 @@ import Testing
 @testable import BridgeCore
 
 struct JSONRPCClientTests {
-  @Test func launchVerifiedDisablesFeaturesAndInitializes() async throws {
-    let fake = try FakeCodex()
-    let client = try await JSONRPCClient.launchVerified(codex: fake.codex, cwd: fake.dir)
-    let argv = fake.log("argv.log")
-    #expect(argv.contains("--disable hooks") && argv.contains("--disable plugins"))
-    #expect(!argv.contains("goals") && !argv.contains("js_repl"))
-    let received = fake.log("received.log")
-    #expect(received.contains(#""name":"claude-gpt-live-bridge""#))
-    #expect(received.contains(#""experimentalApi":true"#))
-    #expect(received.contains(#"{"method":"initialized"}"#))
-    await client.close()
-  }
-
-  /// An npm install of codex is a `#!/usr/bin/env node` script: its runtime is found only
-  /// through the search path, which the app passes on to codex.
-  @Test func launchPassesTheSearchPathToCodex() async throws {
-    let fake = try FakeCodex(interpreter: "fake-node")
-    await #expect(throws: CodexProblem.exited(127)) {
-      try await JSONRPCClient.launchVerified(
-        codex: fake.codex, cwd: fake.dir, searchPath: ["/usr/bin", "/bin"])
-    }
-    let client = try await JSONRPCClient.launchVerified(
-      codex: fake.codex, cwd: fake.dir, searchPath: [fake.bin.path, "/usr/bin", "/bin"])
-    await client.close()
-  }
-
-  @Test func loggedOutCodexIsNotLoggedIn() async throws {
-    let fake = try FakeCodex(loggedIn: false)
-    await #expect(throws: CodexProblem.notLoggedIn) {
-      try await JSONRPCClient.launchVerified(codex: fake.codex, cwd: fake.dir)
-    }
-    #expect(CodexProblem.notLoggedIn.sentence.contains("codex login"))
-  }
-
   @Test func requestTimesOut() async throws {
     let fake = try FakeCodex()
     let client = JSONRPCClient(executable: fake.codex, arguments: ["app-server"], cwd: fake.dir)

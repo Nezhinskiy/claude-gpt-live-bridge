@@ -111,9 +111,9 @@ final class AppModel {
 
   /// A fresh codex app-server for the voice, launched with its tool features turned off.
   nonisolated private static func voice(cwd: URL) async throws -> any RealtimeControlling {
-    let path = CodexLaunch.defaultSearchPath()
+    let path = await CodexLaunch.defaultSearchPath()
     guard let codex = CodexLaunch.locate(searchPath: path) else { throw CodexProblem.notInstalled }
-    let client = try await JSONRPCClient.launchVerified(codex: codex, cwd: cwd, searchPath: path)
+    let client = try await CodexLaunch.launch(codex: codex, cwd: cwd, searchPath: path)
     return RealtimeSession(client: client, cwd: cwd)
   }
 

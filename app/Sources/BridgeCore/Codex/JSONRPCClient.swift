@@ -1,74 +1,5 @@
 import Foundation
 
-/// Any JSON value: codex's messages are read by field, not decoded into full types, so a field
-/// codex adds in a later release cannot break them.
-public enum JSONValue: Codable, Sendable, Equatable, ExpressibleByStringLiteral,
-  ExpressibleByBooleanLiteral, ExpressibleByDictionaryLiteral, ExpressibleByArrayLiteral
-{
-  case null
-  case bool(Bool)
-  case number(Double)
-  case string(String)
-  case array([JSONValue])
-  case object([String: JSONValue])
-
-  public init(stringLiteral value: String) { self = .string(value) }
-  public init(booleanLiteral value: Bool) { self = .bool(value) }
-  public init(arrayLiteral elements: JSONValue...) { self = .array(elements) }
-  public init(dictionaryLiteral elements: (String, JSONValue)...) {
-    self = .object(Dictionary(elements) { $1 })
-  }
-
-  /// The JSON form of any encodable value.
-  public init(encoding value: some Encodable) throws {
-    self = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let value = try decoder.singleValueContainer()
-    if value.decodeNil() {
-      self = .null
-    } else if let bool = try? value.decode(Bool.self) {
-      self = .bool(bool)
-    } else if let number = try? value.decode(Double.self) {
-      self = .number(number)
-    } else if let string = try? value.decode(String.self) {
-      self = .string(string)
-    } else if let array = try? value.decode([JSONValue].self) {
-      self = .array(array)
-    } else {
-      self = .object(try value.decode([String: JSONValue].self))
-    }
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var container = encoder.singleValueContainer()
-    switch self {
-    case .null: try container.encodeNil()
-    case .bool(let bool): try container.encode(bool)
-    case .number(let number): try container.encode(number)
-    case .string(let string): try container.encode(string)
-    case .array(let array): try container.encode(array)
-    case .object(let object): try container.encode(object)
-    }
-  }
-
-  public subscript(key: String) -> JSONValue? {
-    if case .object(let object) = self { object[key] } else { nil }
-  }
-
-  public var string: String? { if case .string(let string) = self { string } else { nil } }
-  public var array: [JSONValue]? { if case .array(let array) = self { array } else { nil } }
-  public var object: [String: JSONValue]? {
-    if case .object(let object) = self { object } else { nil }
-  }
-
-  public func decode<T: Decodable>(_ type: T.Type) throws -> T {
-    if let value = self as? T { return value }
-    return try JSONDecoder().decode(type, from: JSONEncoder().encode(self))
-  }
-}
-
 public struct RPCNotification: Sendable, Equatable {
   public var method: String
   public var params: JSONValue
@@ -89,15 +20,6 @@ public struct RPCError: LocalizedError, Codable, Sendable, Equatable {
     self.message = message
   }
   public var errorDescription: String? { "Codex refused a request: \(message) (\(code))." }
-}
-
-extension Process {
-  /// Starts the child with this `PATH`, so a `#!/usr/bin/env node` codex finds its runtime.
-  func use(searchPath: [String]) {
-    guard !searchPath.isEmpty else { return }
-    environment = ProcessInfo.processInfo.environment.merging(
-      ["PATH": searchPath.joined(separator: ":")]) { $1 }
-  }
 }
 
 /// The JSON-RPC connection to `codex app-server`; tests put a recording fake behind it.
@@ -260,55 +182,5 @@ public actor JSONRPCClient: RPCClient {
     for id in pending.keys { resolve(id, .failure(CodexProblem.exited(status))) }
     notify.finish()
     ask.finish()
-  }
-
-  /// Runs `codex features list`, starts `codex app-server` with every unwanted feature codex
-  /// has turned off, initialises it and checks the ChatGPT sign-in. Throws `CodexProblem`.
-  public static func launchVerified(
-    codex: URL, cwd: URL, searchPath: [String] = []
-  ) async throws -> JSONRPCClient {
-    let features = try await Self.output(of: codex, ["features", "list"], searchPath: searchPath)
-    let present = try CodexLaunch.presentFeatures(featuresListOutput: features)
-    let client = JSONRPCClient(
-      executable: codex,
-      arguments: CodexLaunch.argv(disable: CodexLaunch.wantDisabled.filter(present.contains)),
-      cwd: cwd, searchPath: searchPath)
-    do {
-      try await client.start()
-      let hello: JSONValue = [
-        "clientInfo": [
-          "name": "claude-gpt-live-bridge", "title": "LiveBridge", "version": "0.1.0",
-        ],
-        "capabilities": ["experimentalApi": true, "requestAttestation": false],
-      ]
-      let _: JSONValue = try await client.request("initialize", hello, timeout: .seconds(20))
-      await client.notify("initialized")
-      let account: JSONValue = try await client.request(
-        "account/read", JSONValue.object([:]), timeout: .seconds(20))
-      guard account["account"]?.object != nil else { throw CodexProblem.notLoggedIn }
-      return client
-    } catch {
-      await client.close()
-      throw error is CodexProblem ? error : CodexProblem.protocolMismatch("\(error)")
-    }
-  }
-
-  private static func output(
-    of executable: URL, _ arguments: [String], searchPath: [String]
-  ) async throws -> String {
-    let process = Process()
-    let output = Pipe()
-    process.executableURL = executable
-    process.arguments = arguments
-    process.use(searchPath: searchPath)
-    process.standardOutput = output
-    process.standardError = FileHandle.nullDevice
-    do { try process.run() } catch { throw CodexProblem.notInstalled }
-    let data = output.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else {
-      throw CodexProblem.exited(process.terminationStatus)
-    }
-    return String(decoding: data, as: UTF8.self)
   }
 }
