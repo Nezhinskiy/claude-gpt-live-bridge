@@ -27,12 +27,15 @@ struct PathsTests {
     #expect(try permissions(data) == 0o700)
   }
 
-  @Test func symlinkedDirIsRefused() throws {
+  /// The owner may keep the data elsewhere through a symlink; the folder it names is tightened.
+  @Test func symlinkedDirIsFollowed() throws {
     defer { try? FileManager.default.removeItem(at: base) }
     let elsewhere = base.appending(path: "elsewhere")
-    try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+      at: elsewhere, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o755])
     try FileManager.default.createSymbolicLink(
       at: base.appending(path: "claude-gpt-live-bridge"), withDestinationURL: elsewhere)
-    #expect(throws: PathsError.self) { try Paths.dataDir(in: base) }
+    #expect(try Paths.dataDir(in: base) == base.appending(path: "claude-gpt-live-bridge"))
+    #expect(try permissions(elsewhere) == 0o700)
   }
 }

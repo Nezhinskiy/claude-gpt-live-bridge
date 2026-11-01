@@ -3,8 +3,7 @@ import Foundation
 public enum PathsError: LocalizedError, Equatable {
   /// A Unix socket path must fit `sockaddr_un.sun_path`: at most 103 bytes.
   case socketPathTooLong(String)
-  /// The data or run directory is not a directory owned by this user, or cannot be made
-  /// owner-only.
+  /// The data or run directory cannot be made owner-only.
   case insecureRunDir(String)
 
   public var errorDescription: String? {
@@ -39,21 +38,18 @@ public enum Paths {
     try ownerOnlyDirectory(dataDir(in: base).appending(path: "run"))
   }
 
-  /// Creates `url` at mode `0700`, or resets an existing one with any group or other bit.
-  /// A symlink, or a directory another user owns, is refused.
+  /// Creates `url` at mode `0700`, or resets an existing one with any group or other bit. A
+  /// symlinked directory is followed: only the owner can put one there.
   static func ownerOnlyDirectory(_ url: URL) throws -> URL {
     let files = FileManager.default
     try files.createDirectory(
       at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    let real = url.resolvingSymlinksInPath().path
     func isOwnerOnly() throws -> Bool {
-      let attributes = try files.attributesOfItem(atPath: url.path)  // does not follow a symlink
-      guard attributes[.type] as? FileAttributeType == .typeDirectory,
-        (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid()
-      else { throw PathsError.insecureRunDir(url.path) }
-      return (attributes[.posixPermissions] as? Int ?? 0o777) & 0o077 == 0
+      (try files.attributesOfItem(atPath: real)[.posixPermissions] as? Int ?? 0o777) & 0o077 == 0
     }
     if try !isOwnerOnly() {
-      try? files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+      try? files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: real)
       guard try isOwnerOnly() else { throw PathsError.insecureRunDir(url.path) }
     }
     return url
