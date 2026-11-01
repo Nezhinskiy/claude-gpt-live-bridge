@@ -22,9 +22,11 @@ scripts/check.sh
 It runs `swift format lint --strict`, the Swift build and tests, the shell and audio-page
 tests, the mod's type check and unit tests, and, when `claude` is on your `PATH`, `claude plugin
 validate` and `claude plugin test`. CI runs the same script on the Xcode 27 macOS runner, where
-`claude` is absent. You need Xcode 16 or later with Swift 6 (CI uses Xcode 27.2; before Xcode
-26 the popover builds without Liquid Glass) and Node 26; the script installs the mod's one
-development dependency, TypeScript, with `npm ci`.
+`claude` is absent. You need a Swift 6.0 toolchain or later, the tools version
+`app/Package.swift` declares. It is tested with Xcode 27 and Swift 6.4 (CI uses Xcode 27.2), and
+older Xcode versions are untested; before Xcode 26 the code falls back to a popover without
+Liquid Glass. You also need Node 26; the script installs the mod's one development dependency,
+TypeScript, with `npm ci`.
 
 The end-to-end smoke test drives the real codex and opens one or two short realtime voice
 sessions on your ChatGPT plan, about a minute of voice:

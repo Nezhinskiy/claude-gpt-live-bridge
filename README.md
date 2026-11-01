@@ -26,8 +26,9 @@ tools and permission mode, and the voice tells you the result.
   login` to a ChatGPT plan that includes realtime voice. LiveBridge refuses a codex whose
   `codex features list` it cannot read, so another version may not start until LiveBridge is
   updated.
-- To build the app: Xcode 16 or later (Swift 6). Tested with Xcode 27 and Swift 6.4; Xcode 26
-  or later is needed for Liquid Glass, and an older Xcode builds the same popover with
+- To build the app: a Swift 6.0 toolchain or later, the tools version `app/Package.swift`
+  declares. Tested with Xcode 27 and Swift 6.4; older Xcode versions are untested. Liquid Glass
+  needs Xcode 26 or later; with an older Xcode the code falls back to the same popover with
   materials. The built app runs on macOS 14 or later.
 
 ## Install
