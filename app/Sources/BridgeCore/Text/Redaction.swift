@@ -3,7 +3,7 @@ import Foundation
 /// Removes credentials from text before the voice hears it or the popover shows it. Named
 /// patterns only, so commit SHAs, ids and hashes are kept; there is no entropy rule.
 public enum Redaction {
-  public static let mask = "[redacted]"
+  public static let mask = "(redacted)"
 
   /// Each pattern with its replacement; `$1` keeps a prefix such as a field name.
   static let rules: [(NSRegularExpression, String)] = [

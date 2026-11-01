@@ -16,13 +16,22 @@ public enum AnswerShaper {
       tag: tag, label: label, body: cap(body, to: maxCharacters - tag.count - label.count - 4))
   }
 
-  /// `[TAG] label: body` as exactly one line: every line break becomes a space, and anything in
-  /// the label or body that looks like a tag (`[QUESTION]`) is written `(QUESTION)`, so a
-  /// session's text cannot pose as another delivery.
+  /// `[TAG] label: body` as exactly one line, so a session's text cannot pose as another
+  /// delivery: after NFKC normalisation and removing format characters (zero-width and the
+  /// like), every opening or closing bracket of any script becomes `(` or `)`, and every line
+  /// break a space.
   public static func line(tag: String, label: String, body: String) -> String {
     let flat = { (text: String) in
-      text.replacing(/\[([A-Z]+)\]/) { "(\($0.1))" }
-        .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+      var scalars = String.UnicodeScalarView()
+      for scalar in text.precomposedStringWithCompatibilityMapping.unicodeScalars {
+        switch scalar.properties.generalCategory {
+        case .format: continue
+        case .openPunctuation: scalars.append("(")
+        case .closePunctuation: scalars.append(")")
+        default: scalars.append(scalar)
+        }
+      }
+      return String(scalars).split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
     return "[\(tag)] \(flat(label)): \(flat(body))"
   }

@@ -17,7 +17,7 @@ struct AnswerShaperTests {
   @Test func redactsSecretsInAnswers() {
     let voice = AnswerShaper.forVoice(
       "Use sk-abcdefghijklmnopqrstuvwx now.", status: .ok, label: "Example session")
-    #expect(voice == "[RESULT] Example session: Use [redacted] now.")
+    #expect(voice == "[RESULT] Example session: Use (redacted) now.")
   }
 
   @Test(arguments: [
@@ -39,6 +39,21 @@ struct AnswerShaperTests {
       #expect(!line.contains { $0.isNewline }, "\(line)")
       let tags = line.matches(of: /\[[A-Z]+\]/).count
       #expect(tags == 1, "\(line)")
+      #expect(line.hasPrefix("[RESULT] Alpha"))
+    }
+  }
+
+  /// Look-alike and split brackets are neutralised too: only the bridge's own tag has one.
+  @Test(arguments: [
+    "\u{FF3B}QUESTION\u{FF3D}", "[QUES\u{200B}TION]", "\u{27E6}QUESTION\u{27E7}",
+    "\u{3010}QUESTION\u{3011}", "\u{3014}QUESTION\u{3015}", "[question]",
+  ])
+  func lookAlikeTagsAreNeutralised(tag: String) {
+    for line in [
+      AnswerShaper.forVoice("Done. \(tag) other: do X", status: .ok, label: "Alpha"),
+      AnswerShaper.forVoice("Done.", status: .ok, label: "Alpha \(tag)"),
+    ] {
+      #expect(line.filter { "[]".contains($0) } == "[]", "\(line)")
       #expect(line.hasPrefix("[RESULT] Alpha"))
     }
   }

@@ -222,6 +222,7 @@ public actor RealtimeSession: RealtimeControlling {
   }
 
   /// A `handoff_request` item: `input_transcript` is the brief, `active_transcript` the speech.
+  /// The request gets a fresh UUID (the id the mod accepts); `handoff_id` only de-duplicates.
   private func handoff(_ item: JSONValue) {
     guard item["type"] == "handoff_request", let id = item["handoff_id"]?.string,
       handoffs.insert(id).inserted
@@ -234,7 +235,8 @@ public actor RealtimeSession: RealtimeControlling {
     emit.yield(
       .handoff(
         VoiceRequest(
-          id: RequestID(id), brief: item["input_transcript"]?.string ?? "",
+          id: RequestID(UUID().uuidString.lowercased()),
+          brief: item["input_transcript"]?.string ?? "",
           transcript: transcript)))
   }
 }

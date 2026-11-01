@@ -172,10 +172,13 @@ struct RealtimeSessionTests {
     rpc.push(try adrJSON("realtime-transcript-done-assistant"))
     var events = session.events.makeAsyncIterator()
     let words = "Please list the files in this folder"
-    let request = VoiceRequest(
-      id: RequestID("item_000000000000000000001"), brief: words,
-      transcript: [Utterance(role: .user, text: words)])
-    #expect(await events.next() == .handoff(request))
+    guard case .handoff(let request) = await events.next() else {
+      Issue.record("no handoff")
+      return
+    }
+    // The mod accepts only UUID request ids; codex's `item_…` id only de-duplicates.
+    #expect(request.id.rawValue.wholeMatch(of: /[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/) != nil)
+    #expect(request.brief == words && request.transcript == [Utterance(role: .user, text: words)])
     #expect(await events.next() == .assistantUtterance("I'm pulling up the folder now."))
     #expect(await events.next() == .assistantDone)
   }

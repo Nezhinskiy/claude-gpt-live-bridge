@@ -19,7 +19,7 @@ struct RedactionTests {
   ])
   func redactsNamedPattern(text: String, secret: String) {
     let redacted = Redaction.redact(text)
-    #expect(!redacted.contains(secret) && redacted.contains("[redacted]"), "\(redacted)")
+    #expect(!redacted.contains(secret) && redacted.contains("(redacted)"), "\(redacted)")
   }
 
   @Test func keepsFullGitShas() {
