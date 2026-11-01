@@ -8,12 +8,14 @@ import { bandStatus, drawBand, JOINING } from './band.tsx'
 import { summarize } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
 import { PLUGIN_NAME, voicePrompt } from './prompt.ts'
-import { fallbackTitle, titleFromRegistry } from './title.ts'
+import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { clip, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
+/** How often a poll looks through the whole registry while this session's record is not found. */
+const RESCAN_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
 /**
  * In characters: under the app's 131,072-byte body limit even at four UTF-8 bytes each; the app
@@ -45,6 +47,9 @@ let note: string | null = null
  * belongs to a join that is over, so it stops there instead of acting on the app's reply.
  */
 let generation = 0
+/** The registry file holding this session's record, once found: each poll reads it alone. */
+let recordFile: string | null = null
+let lastScan = -Infinity
 
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
@@ -59,15 +64,26 @@ async function save($: EngineInterface): Promise<void> {
  * Fragile by design: `~/.claude/sessions` is Claude Code's private state, not the mod API, and
  * its shape may change in any release (ADR 0001, item e). The API has no call for the title the
  * session list shows; only the classic hook payloads carry an optional `session_title`, and only
- * at a session's start or a prompt. Each file is parsed on its own, because Claude Code rewrites
- * them on every status change and one may be empty or half written at any moment.
+ * at a session's start or a prompt, while the desktop app may name a session seconds after
+ * either. So the poll follows the record: once found, it reads that one file; until then it looks
+ * through them all at most every `RESCAN_MS` (`isPoll`), and answers null when it did not look.
+ * Each file is parsed on its own, because Claude Code rewrites them on every status change and
+ * one may be empty or half written at any moment.
  */
-async function readTitle($: EngineInterface, sessionId: string): Promise<string> {
+async function readTitle($: EngineInterface, sessionId: string, isPoll = false): Promise<string | null> {
   const dir = `${home}/.claude/sessions`
-  const entries = await $.fs.list(dir).catch(() => [])
-  const records: unknown[] = []
-  for (const entry of entries.filter(one => one.kind === 'file' && one.name.endsWith('.json'))) {
-    records.push(await $.fs.read(`${dir}/${entry.name}`).then(text => parseRecord(String(text)), () => null))
+  const read = (name: string) => $.fs.read(`${dir}/${name}`).then(text => parseRecord(String(text)), () => null)
+  let records: unknown[] = recordFile === null ? [] : [await read(recordFile)]
+  if (recordIndex(records, sessionId) < 0) {
+    recordFile = null
+    const now = await $.clock.now()
+    if (isPoll && now - lastScan < RESCAN_MS) return null
+    lastScan = now
+    const names = (await $.fs.list(dir).catch(() => []))
+      .filter(one => one.kind === 'file' && one.name.endsWith('.json')).map(one => one.name)
+    records = []
+    for (const name of names) records.push(await read(name))
+    recordFile = names[recordIndex(records, sessionId)] ?? null
   }
   return titleFromRegistry(records, sessionId) ?? fallbackTitle(await $.session.cwd())
 }
@@ -87,7 +103,8 @@ async function turnOn($: EngineInterface): Promise<boolean> {
   note = null
   const sessionId = await $.session.id()
   const autoContext = (await $.store.get(AUTO_CONTEXT)) === true
-  const isJoined = (await link?.join({ sessionId, title: await readTitle($, sessionId), autoContext })) === true
+  const title = (await readTitle($, sessionId)) ?? ''
+  const isJoined = (await link?.join({ sessionId, title, autoContext })) === true
   await save($)
   await setBand($, {})
   link?.start(() => tick($))
@@ -103,17 +120,17 @@ async function turnOff($: EngineInterface): Promise<void> {
 }
 
 /**
- * Joins again when, when asked, its title changed, or when /clear gave the session a new id:
- * that join replaces the old id, so the app keeps the target and the request in flight.
+ * Joins again when its title changed, or when /clear gave the session a new id: that join
+ * replaces the old id, so the app keeps the target and the request in flight. `isPoll`: the
+ * one-second poll, which looks for the title as cheaply as `readTitle` allows.
  */
-async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void> {
+async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
   const joined = link?.session
   const live = generation
   if (!link || !joined) return
   const sessionId = await $.session.id()
   const isNewId = sessionId !== joined.sessionId
-  if (!isNewId && !isTitleChecked) return
-  const title = await readTitle($, sessionId)
+  const title = (await readTitle($, sessionId, isPoll && !isNewId)) ?? joined.title
   if (live !== generation || (!isNewId && title === joined.title)) return
   if (isNewId) await $.store.delete(joinedKey(joined.sessionId))
   await link.join({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
@@ -123,7 +140,7 @@ async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void
 /** One poll: status into the band, a voice request into a prompt, a context request answered. */
 async function tick($: EngineInterface): Promise<void> {
   const live = generation
-  await follow($, false)
+  await follow($, true)
   const joined = link?.session
   const reply = await link?.next()
   if (live !== generation) return
@@ -301,7 +318,7 @@ export const register: Register = on => {
       // A turn with no origin seen is treated as typed: its answer never reaches the voice.
       tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'typed', await $.clock.now())
       lastOrigin = null
-      await follow($, true)
+      await follow($, false)
       await save($)
       await link?.activity('working')
     }

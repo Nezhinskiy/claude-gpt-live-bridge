@@ -189,7 +189,10 @@ renamed sessions (`nameSource: "user"`) and for automatic titles (`nameSource` a
 record's `hostSessionId` is the desktop's own id; `sessionId` is the engine's session id, which
 `$.session.id()` returns as "the transcript file's name" (documented; the equality is inferred).
 The record shape is in `plugin/tests/fixtures/adr/session-registry-record.json`. A terminal CLI
-session's record was not checked.
+session's record was not checked. Found later, in the owner's first real run: the desktop app can
+write `name` seconds after the session's process starts (2.6 s in the observed record), after
+the mod has already rejoined on `session.start`, so a title read only at a join or a turn's
+start stays the folder name.
 
 **(f) Launching the app.** `$.process` (both `run` and `spawn`) is one noun, documented as "CLI
 only". `$.process.spawn` is known to work in a desktop Code tab session (an existing mod relies

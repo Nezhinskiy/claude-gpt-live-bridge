@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { fallbackTitle, titleFromRegistry } from '../../hooks/title.ts'
+import { fallbackTitle, recordIndex, titleFromRegistry } from '../../hooks/title.ts'
 
 const record: unknown = JSON.parse(
   readFileSync(`${import.meta.dirname}/../fixtures/adr/session-registry-record.json`, 'utf8'),
@@ -22,4 +22,11 @@ test('missingRecordIsNull', () => {
 test('fallbackIsTheFolderName', () => {
   assert.equal(fallbackTitle('/Users/example/Dev/example-project/'), 'example-project')
   assert.equal(fallbackTitle('/'), '/')
+})
+
+test('theRecordIsFoundBeforeItHasAName', () => {
+  // A desktop session's record exists before the app names it; the poll then reads it alone.
+  const records = ['text', { sessionId: '11111111-0000-0000-0000-000000000002' }, { sessionId: ID, name: '' }]
+  assert.equal(recordIndex(records, ID), 2)
+  assert.equal(recordIndex([null, record], '22222222-0000-0000-0000-000000000003'), -1)
 })

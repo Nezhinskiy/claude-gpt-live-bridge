@@ -145,3 +145,21 @@ test('aRemovedSessionTurnsItselfOffAndDoesNotRejoin', async ($, on) => {
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
 })
+
+test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
+  // The desktop app may name a session seconds after the mod joined it, with no turn between.
+  const world = fakeWorld(on)
+  world.otherRecords = { '1.json': '{"sessionId":"11111111-0000-0000-0000-000000000002","name":"Other"}' }
+  world.title = ''
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'example-project', autoContext: false }])
+  world.title = 'Live mode'
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Live mode', autoContext: false }])
+  // Once found, a poll reads this session's record alone.
+  world.read = []
+  await world.clock.advance(1000)
+  expect(world.read).toEqual(['/Users/example/.claude/sessions/12345.json'])
+  expect(world.take('join')).toEqual([])
+})
