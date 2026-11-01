@@ -39,6 +39,10 @@ public actor Bridge: Router {
   private var published: StatusReply?
   public nonisolated let updates: AsyncStream<StatusReply>
   private let publish: AsyncStream<StatusReply>.Continuation
+  /// The sessions whose summary just arrived (`POST /v1/context`), so the popover's Load
+  /// context stops waiting for it.
+  public nonisolated let contextArrivals: AsyncStream<SessionID>
+  private let announceContext: AsyncStream<SessionID>.Continuation
 
   /// `realtime` makes the codex side of a call; it is called at Start, and again after codex
   /// stopped. Sessions are swept every second.
@@ -66,6 +70,8 @@ public actor Bridge: Router {
       continuity = Continuity()
     }
     (updates, publish) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+    (contextArrivals, announceContext) = AsyncStream.makeStream(
+      bufferingPolicy: .bufferingNewest(8))
     Task { [weak self] in
       while (try? await time.sleep(for: .seconds(1))) != nil, let bridge = self {
         await bridge.sweep()
@@ -116,8 +122,11 @@ public actor Bridge: Router {
   }
 
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
-  public func loadContext() async {
-    if let target = await registry.target { await registry.requestContext(for: target) }
+  /// Returns the session asked, or nil when there is no target.
+  @discardableResult public func loadContext() async -> SessionID? {
+    guard let target = await registry.target else { return nil }
+    await registry.requestContext(for: target)
+    return target
   }
 
   /// The popover's choice of target, which also ends a question's route; a session that left is
@@ -396,6 +405,7 @@ public actor Bridge: Router {
       tag: "CONTEXT", label: row.label, body: body.summary, limit: Self.maxContext)
     continuity.setContext(line, for: body.sessionId)
     save()
+    announceContext.yield(body.sessionId)
     if machine.phase == .live, lineSession == body.sessionId {
       try? await realtime?.addContext(line)
     }

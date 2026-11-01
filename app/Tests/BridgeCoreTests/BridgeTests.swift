@@ -195,9 +195,24 @@ struct BridgeTests {
     try await join(b, "Beta")
     try await post("/v1/target", TargetBody(sessionId: b))
     _ = try await registry.poll(b)  // a fresh target may already owe a summary
-    await bridge.loadContext()
+    #expect(await bridge.loadContext() == b)
     #expect(try await registry.poll(b) == .context)
     #expect(try await registry.poll(a) == nil)
+  }
+
+  /// With no session there is nobody to ask, so the popover has nothing to wait for.
+  @Test func loadContextWithoutTargetAsksNobody() async {
+    #expect(await bridge.loadContext() == nil)
+  }
+
+  /// A session's summary is announced to the popover, which stops waiting for it; one from a
+  /// session that never joined is not.
+  @Test func arrivingContextIsAnnounced() async throws {
+    try await join(a, "Alpha")
+    var arrivals = bridge.contextArrivals.makeAsyncIterator()
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Not joined."))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    #expect(await arrivals.next() == a)
   }
 
   @Test func popoverSetsTheTarget() async throws {
