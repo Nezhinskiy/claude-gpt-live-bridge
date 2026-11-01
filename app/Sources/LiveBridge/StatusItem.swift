@@ -36,7 +36,12 @@ enum SpanGlyph {
   }
 
   static func still(_ phase: CallPhase) -> [CGFloat] {
-    [.off: off, .listening: closed, .connecting: connecting, .live: bridge][phase]!
+    switch phase {
+    case .off: off
+    case .listening: closed
+    case .connecting: connecting
+    case .live: bridge
+    }
   }
 
   /// One frame; `t` turns the working ring and pulses the approval diamond.

@@ -29,6 +29,8 @@ public actor Bridge: Router {
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
   private var callStart: Date?
+  /// The status last published, so an unchanged one is not published again.
+  private var published: StatusReply?
   public nonisolated let updates: AsyncStream<StatusReply>
   private let publish: AsyncStream<StatusReply>.Continuation
 
@@ -75,7 +77,8 @@ public actor Bridge: Router {
       guard machine.phase == .off, !starting else { return }
       guard await registry.target != nil else {
         problem = Self.noSession
-        return await changed()
+        await changed()
+        return
       }
       starting = true
       do { _ = try await controller() } catch is CancellationError {
@@ -83,7 +86,8 @@ public actor Bridge: Router {
       } catch {
         starting = false
         problem = Self.sentence(error)
-        return await changed()
+        await changed()
+        return
       }
       starting = false
       callStart = time.now
@@ -131,7 +135,7 @@ public actor Bridge: Router {
       switch (req.method, req.path) {
       case ("GET", "/v1/next"):
         guard let id = req.query["sessionId"] else { return .error(400, "sessionId is missing") }
-        let work = try await registry.poll(SessionID(id))
+        let work = try await registry.poll(SessionID(rawValue: id))
         return .json(PollReply(status: await status, work: work))
       case ("POST", "/v1/join"):
         await registry.join(try req.decodeBody(JoinBody.self))
@@ -149,8 +153,7 @@ public actor Bridge: Router {
       case ("POST", "/v1/call"): await perform(try req.decodeBody(CallBody.self).action)
       default: return .error(404, "no route \(req.method) \(req.path)")
       }
-      await changed()
-      return .json(await status)
+      return .json(await changed())
     } catch let error as RegistryError {
       return .error(error.httpStatus, error.message)
     } catch {
@@ -336,7 +339,12 @@ public actor Bridge: Router {
     await changed()
   }
 
-  private func changed() async { publish.yield(await status) }
+  @discardableResult private func changed() async -> StatusReply {
+    let now = await status
+    if now != published { publish.yield(now) }
+    published = now
+    return now
+  }
 
   private func save() {
     try? JSONEncoder().encode(continuity).write(to: continuityFile, options: .atomic)

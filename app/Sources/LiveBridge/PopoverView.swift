@@ -72,7 +72,7 @@ struct PopoverView: View {
               .foregroundStyle(row.isTarget ? Color.accentColor : .secondary)
             VStack(alignment: .leading, spacing: 1) {
               Text(row.label)
-              Label(row.detail, systemImage: Self.symbol[row.activity]!)
+              Label(row.detail, systemImage: Self.symbol(of: row.activity))
                 .font(.caption)
                 .foregroundStyle(row.activity == .approval ? .orange : .secondary)
             }
@@ -91,9 +91,13 @@ struct PopoverView: View {
     .card()
   }
 
-  private static let symbol: [SessionActivity: String] = [
-    .idle: "moon.zzz", .working: "arrow.triangle.2.circlepath", .approval: "exclamationmark.circle",
-  ]
+  private static func symbol(of activity: SessionActivity) -> String {
+    switch activity {
+    case .idle: "moon.zzz"
+    case .working: "arrow.triangle.2.circlepath"
+    case .approval: "exclamationmark.circle"
+    }
+  }
 
   private var context: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -139,7 +143,12 @@ struct PopoverView: View {
   }
 
   private func tint(_ tint: Tint) -> Color {
-    [.quiet: .secondary, .active: .teal, .attention: .orange, .problem: .red][tint]!
+    switch tint {
+    case .quiet: .secondary
+    case .active: .teal
+    case .attention: .orange
+    case .problem: .red
+    }
   }
 }
 

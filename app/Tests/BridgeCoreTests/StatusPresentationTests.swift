@@ -3,8 +3,8 @@ import Testing
 @testable import BridgeCore
 
 struct StatusPresentationTests {
-  static let target = SessionID("00000000-0000-0000-0000-000000000001")
-  static let other = SessionID("11111111-0000-0000-0000-000000000002")
+  static let target = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+  static let other = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
   static func status(
     _ call: CallPhase, other activity: SessionActivity = .idle, problem: String? = nil,

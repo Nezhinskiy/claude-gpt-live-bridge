@@ -6,9 +6,9 @@ import Testing
 struct SessionRegistryTests {
   let time = TestTime()
   let registry: SessionRegistry
-  let a = SessionID("00000000-0000-0000-0000-000000000001")
-  let b = SessionID("11111111-0000-0000-0000-000000000002")
-  let c = SessionID("22222222-0000-0000-0000-000000000003")
+  let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+  let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
+  let c = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
 
   init() { registry = SessionRegistry(time: time) }
 
@@ -17,7 +17,7 @@ struct SessionRegistryTests {
   }
 
   func request(_ n: Int) -> VoiceRequest {
-    VoiceRequest(id: RequestID("request-\(n)"), brief: "Example request \(n)", transcript: [])
+    VoiceRequest(id: RequestID(rawValue: "request-\(n)"), brief: "Example request \(n)", transcript: [])
   }
 
   func answer(

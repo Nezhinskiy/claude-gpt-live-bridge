@@ -76,16 +76,20 @@ public struct StatusPresentation: Sendable, Equatable {
       }
     rows = s.sessions.map {
       SessionRowPresentation(
-        id: $0.sessionId, label: $0.label, detail: Self.activityText[$0.activity]!,
+        id: $0.sessionId, label: $0.label, detail: Self.text(of: $0.activity),
         activity: $0.activity, isTarget: $0.isTarget)
     }
     minutes =
       "\(Int(s.minutesThisCall.rounded())) min this call · \(Int(s.minutesToday.rounded())) min today"
   }
 
-  private static let activityText: [SessionActivity: String] = [
-    .idle: "Idle", .working: "Claude working", .approval: "Waiting for your approval",
-  ]
+  private static func text(of activity: SessionActivity) -> String {
+    switch activity {
+    case .idle: "Idle"
+    case .working: "Claude working"
+    case .approval: "Waiting for your approval"
+    }
+  }
 
   /// The menu bar item's spoken description.
   public var accessibilityLabel: String {

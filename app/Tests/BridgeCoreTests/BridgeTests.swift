@@ -75,8 +75,8 @@ struct BridgeTests {
   let registry: SessionRegistry
   let bridge: Bridge
   let dir: URL
-  let a = SessionID("00000000-0000-0000-0000-000000000001")
-  let b = SessionID("11111111-0000-0000-0000-000000000002")
+  let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+  let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
   init(realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil) throws {
     dir = try temporaryDirectory()
@@ -100,7 +100,7 @@ struct BridgeTests {
   }
 
   func request(_ n: Int) -> VoiceRequest {
-    VoiceRequest(id: RequestID("request-\(n)"), brief: "Example request \(n)", transcript: [])
+    VoiceRequest(id: RequestID(rawValue: "request-\(n)"), brief: "Example request \(n)", transcript: [])
   }
 
   /// Hands `request` to `session` and posts its answer.

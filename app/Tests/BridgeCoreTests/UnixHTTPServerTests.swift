@@ -59,7 +59,7 @@ struct UnixHTTPServerTests {
   @Test func routesJoin() async throws {
     FileManager.default.createFile(atPath: socket.path, contents: Data("stale".utf8))
     let join = JoinBody(
-      sessionId: SessionID("00000000-0000-0000-0000-000000000001"),
+      sessionId: SessionID(rawValue: "00000000-0000-0000-0000-000000000001"),
       title: "Example session", autoContext: false)
     try await withServer {
       let reply = try await exchange(post("/v1/join", try JSONEncoder().encode(join)))

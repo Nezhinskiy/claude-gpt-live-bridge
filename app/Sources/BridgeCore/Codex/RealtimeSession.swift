@@ -253,7 +253,7 @@ public actor RealtimeSession: RealtimeControlling {
     emit.yield(
       .handoff(
         VoiceRequest(
-          id: RequestID(UUID().uuidString.lowercased()),
+          id: RequestID(rawValue: UUID().uuidString.lowercased()),
           brief: item["input_transcript"]?.string ?? "",
           transcript: transcript)))
   }

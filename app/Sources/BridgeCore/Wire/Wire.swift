@@ -7,14 +7,12 @@
 public struct SessionID: RawRepresentable, Hashable, Codable, Sendable {
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
-  public init(_ rawValue: String) { self.rawValue = rawValue }
 }
 
 /// The id the app gives a voice request; the answer quotes it.
 public struct RequestID: RawRepresentable, Hashable, Codable, Sendable {
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
-  public init(_ rawValue: String) { self.rawValue = rawValue }
 }
 
 public enum Role: String, Codable, Sendable { case user, assistant }
