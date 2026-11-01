@@ -25,19 +25,21 @@ public struct TranscriptLine: Sendable, Equatable {
 
 /// The popover's heights, in points, for a screen whose visible area (below the menu bar, above
 /// the Dock) is `visibleHeight` tall. The popover never grows past it, which would leave a
-/// transparent band at its top, and the sections that grow with their content (the sessions,
-/// the last lines and what was sent) scroll inside their own caps.
+/// transparent band at its top. The sessions list shows `visibleSessions` rows; the last lines
+/// and what was sent share what the screen leaves; each scrolls inside its own cap.
 public struct PopoverLayout: Sendable, Equatable {
   /// Room kept between the popover and the screen's edges.
   public static let screenMargin = 24.0
-  /// The call card, the context buttons, the footer, the section titles and the spacing.
-  public static let fixedChrome = 340.0
-  /// The sections' caps never go below 60 points each.
-  public static let minimumSections = 180.0
+  /// The call card, five session rows, the context buttons, the footer, the section titles and
+  /// the spacing.
+  public static let fixedChrome = 340.0 + 236
+  /// The last lines' and what was sent's caps never go below 60 points each.
+  public static let minimumSections = 120.0
+  /// The sessions list's height in rows; more sessions scroll inside it.
+  public static let visibleSessions = 5
 
   /// The whole popover's height; past it, the popover scrolls.
   public let maxHeight: Double
-  public let sessions: Double
   public let lastLines: Double
   public let sent: Double
 
@@ -46,8 +48,31 @@ public struct PopoverLayout: Sendable, Equatable {
     // Each section has its 60 points; what the screen leaves beyond them is shared out.
     let extra = max(maxHeight - Self.fixedChrome - Self.minimumSections, 0)
     func cap(_ share: Double, _ most: Double) -> Double { min(60 + extra * share, most) }
-    sessions = cap(0.4, 280)
-    lastLines = cap(0.35, 220)
-    sent = cap(0.25, 180)
+    lastLines = cap(0.6, 220)
+    sent = cap(0.4, 180)
+  }
+
+  /// The sessions list's cap for rows `rowHeight` tall with `spacing` between them: exactly
+  /// `visibleSessions` rows. Until a row has been measured (`rowHeight` 0) nothing is cut.
+  public static func sessionsCap(rowHeight: Double, spacing: Double) -> Double {
+    guard rowHeight > 0 else { return .infinity }
+    let rows = Double(visibleSessions)
+    return rows * rowHeight + (rows - 1) * spacing
+  }
+}
+
+/// The popover's corner radii. Like macOS's own menu bar modules (Control Center's), the window
+/// has large corners, and the cards inside are concentric with them: the window's radius less
+/// the popover's padding. Liquid Glass (macOS 26 and later) rounds more.
+public struct PopoverCorners: Sendable, Equatable {
+  /// The popover's padding between the window's edge and its cards.
+  public static let inset = 12.0
+
+  public let window: Double
+  public let card: Double
+
+  public init(glass: Bool) {
+    window = glass ? 24 : 16
+    card = max(window - Self.inset, 8)
   }
 }

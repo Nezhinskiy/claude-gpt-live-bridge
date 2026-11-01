@@ -98,16 +98,34 @@ struct PopoverLayoutTests {
     #expect(layout.maxHeight <= visible - PopoverLayout.screenMargin)
     #expect(layout.maxHeight > 0)
     #expect(
-      layout.sessions + layout.lastLines + layout.sent + PopoverLayout.fixedChrome
+      layout.lastLines + layout.sent + PopoverLayout.fixedChrome
         <= max(layout.maxHeight, PopoverLayout.minimumSections + PopoverLayout.fixedChrome))
-    for cap in [layout.sessions, layout.lastLines, layout.sent] { #expect(cap >= 60) }
+    for cap in [layout.lastLines, layout.sent] { #expect(cap >= 60) }
   }
 
   @Test func aTallScreenKeepsSectionsModest() {
     let layout = PopoverLayout(visibleHeight: 2200)
     #expect(layout.lastLines <= 220)
     #expect(layout.sent <= 180)
-    #expect(layout.sessions <= 280)
+  }
+
+  /// The sessions list shows five rows, measured from a real row; more scroll inside it.
+  @Test func theSessionsListShowsFiveRows() {
+    #expect(PopoverLayout.visibleSessions == 5)
+    #expect(PopoverLayout.sessionsCap(rowHeight: 40, spacing: 4) == 5 * 40 + 4 * 4)
+    #expect(PopoverLayout.sessionsCap(rowHeight: 52.5, spacing: 0) == 262.5)
+    // until a row has been measured nothing is cut
+    #expect(PopoverLayout.sessionsCap(rowHeight: 0, spacing: 4) == .infinity)
+  }
+
+  /// The window's corners are larger, as macOS's own menu bar modules have, and the cards
+  /// inside are concentric with them.
+  @Test(arguments: [true, false])
+  func theCardsAreConcentricWithTheWindow(_ glass: Bool) {
+    let corners = PopoverCorners(glass: glass)
+    #expect(corners.window == (glass ? 24 : 16))
+    #expect(corners.card == max(corners.window - PopoverCorners.inset, 8))
+    #expect(corners.card < corners.window)
   }
 }
 
