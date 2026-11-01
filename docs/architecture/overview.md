@@ -44,8 +44,13 @@ microphone or Claude:
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`.
-- `Continuity`: the last 24 lines of the conversation and the loaded context, seeded into each
-  new realtime session (`initialItems`) so the voice does not notice it was replaced.
+- `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
+  (the owner's, the voice's and the lines the session sent the voice) and the context loaded
+  from it. Each new realtime session is seeded with the target's (`initialItems`), so the voice
+  does not notice it was replaced and never mixes two sessions' conversations; a new target
+  closes an open line. A result from another session is spoken in the open line and kept in its
+  own session's conversation. New conversation forgets the target's, removing a session forgets
+  its own, and only the 20 conversations used last are kept.
 - `RealtimeSession`: one ephemeral, read-only codex thread per realtime session; it refuses to go
   on unless codex reports every MCP server disabled, interrupts every codex turn and declines
   every request codex sends.
@@ -88,8 +93,8 @@ that both test suites parse.
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
 Every reply carries the status: phase, target, sessions with labels (`Title · ab12` when two
-titles are the same), minutes, the problem sentence, the context last sent, the last three
-lines and the count of unheard results.
+titles are the same), minutes, the problem sentence, the target's context line and the last
+three lines of its conversation, and the count of unheard results.
 
 ## Flows
 
@@ -128,7 +133,9 @@ sequenceDiagram
 ### Silent hang-up
 
 The realtime session is billed while open, so silence closes it. Voice detection keeps running
-on the Mac, and the next speech opens a new session seeded with the conversation so far.
+on the Mac, and the next speech opens a new session seeded with the target's conversation so
+far. A new target closes an open line the same way, so the next speech opens it with the new
+target's conversation.
 
 ```mermaid
 sequenceDiagram

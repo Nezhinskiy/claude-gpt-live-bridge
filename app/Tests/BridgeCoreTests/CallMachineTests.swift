@@ -131,6 +131,12 @@ struct CallMachineTests {
       "audioFailedGoesOff", live, .audioFailed("r"), .off,
       [.closeRealtime, .stopLocalVAD, .problem("r")]),
     row("deliverWhileOffIsIgnored", [], deliver("a"), .off, []),
+    row(
+      "targetChangeClosesTheOpenLine", live + [deliver("a")], .targetChanged, .listening,
+      [.closeRealtime, .chime], pending: ["a"]),
+    row(
+      "targetChangeWhileConnectingCloses", connecting, .targetChanged, .listening, [.closeRealtime]),
+    row("targetChangeWhileListeningChangesNothing", [.start], .targetChanged, .listening, []),
   ]
 
   @Test(arguments: table) func transition(_ row: Transition) {

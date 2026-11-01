@@ -61,8 +61,8 @@ voices.
   - answer those handoffs with any text, which the voice then reads out;
   - start a call, which turns on the microphone under LiveBridge's permission (macOS shows its
     microphone indicator in the menu bar);
-  - read the status, including the last lines of the conversation and the context line last
-    sent.
+  - read the status, including the last lines of the target's conversation and its context
+    line.
 
   Such a process can already do worse without LiveBridge: for example, it can add hooks to
   `~/.claude/settings.json` that run in every Claude Code session.
@@ -117,14 +117,18 @@ secret.
 - **A handoff can hop between sessions.** The voice hands work to the target session, or to the
   session that asked the last question. So text that session A read can become a prompt in
   session B, which may run in a more permissive mode.
-- **A loaded context persists.** A `[CONTEXT]` line is saved in the data folder and given to
-  every later realtime session, across Stop and Start and app restarts, until you press **New
-  conversation** or load another session's context. A session set to `/live context auto` sends a
-  new one whenever it becomes the target. One injected summary can therefore steer every later
-  call. The recent conversation is carried over the same way.
+- **A loaded context persists.** Each session's `[CONTEXT]` line is saved in the data folder
+  with that session's conversation and given to every later realtime session while that session
+  is the target, across Stop and Start and app restarts, until you press **New conversation**
+  with it as the target, load a new summary from it, or remove it from LiveBridge. A session set
+  to `/live context auto` sends a new one whenever it becomes the target. One injected summary can
+  therefore steer every later call with that session. Its recent conversation is carried over
+  the same way, including the lines the session sent the voice. A result from another session is
+  still spoken in whatever line is open, and the voice's reply to it stays in that line's
+  conversation, so one session's text can still reach the conversation about another.
 
-Join only sessions whose input you trust, press **New conversation** after a session has read
-text you do not trust, and keep voice off for a session whose permission mode acts without
+Join only sessions whose input you trust, press **New conversation** with a session as the
+target after it has read text you do not trust, and keep voice off for a session whose permission mode acts without
 asking.
 
 ### What leaves the Mac
