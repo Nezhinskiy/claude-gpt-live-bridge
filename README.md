@@ -26,10 +26,8 @@ tools and permission mode, and the voice tells you the result.
   login` to a ChatGPT plan that includes realtime voice. LiveBridge refuses a codex whose
   `codex features list` it cannot read, so another version may not start until LiveBridge is
   updated.
-- To build the app: a Swift 6.0 toolchain or later, the tools version `app/Package.swift`
-  declares. Tested with Xcode 27 and Swift 6.4; older Xcode versions are untested. Liquid Glass
-  needs Xcode 26 or later; with an older Xcode the code falls back to the same popover with
-  materials. The built app runs on macOS 14 or later.
+- To build the app: Xcode with a Swift 6.0 toolchain or later. The tested versions are in
+  [CONTRIBUTING.md](CONTRIBUTING.md#toolchain). The built app runs on macOS 14 or later.
 
 ## Install
 
@@ -68,24 +66,28 @@ In the Claude Code session you want to talk to:
 
 | Command | What it does |
 |---|---|
-| `/voicemod on` | Joins LiveBridge under the session's title, and opens the app if it is not running. |
-| `/voicemod off` | Leaves LiveBridge. |
-| `/voicemod target` | Makes this session the one the voice hands work to. |
-| `/voicemod status` | One line: the call, the target, unheard results, minutes today. |
-| `/voicemod context` | Sends the voice a short summary of this session, written by the session's model. |
-| `/voicemod context auto` / `manual` | Sends that summary whenever the session becomes the target, or only on request. |
+| `/live on` | Joins LiveBridge under the session's title, and opens the app if it is not running. |
+| `/live off` | Leaves LiveBridge. |
+| `/live target` | Makes this session the one the voice hands work to. |
+| `/live status` (or just `/live`) | One line: the call, the target, unheard results, minutes today. |
+| `/live context` | Sends the voice a short summary of this session, written by the session's model. |
+| `/live context auto` / `manual` | Sends that summary whenever the session becomes the target, or only on request. |
 
-Then press **Start**, in the band above the prompt or in the menu bar popover, and talk. The
-popover lists the joined sessions (click one to make it the target), shows the last lines of the
-conversation and exactly what context was sent, and has **New conversation**, **Open at login**
-(off by default) and the minutes the voice line was open today.
+The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode.
+
+Then press **Start**, in the band above the prompt or in the menu bar popover, and talk. Start
+stays disabled in the popover until a session has joined. The popover lists the joined sessions
+(click one to make it the target), shows the last lines of the conversation and the context line
+exactly as it was sent, and has **New conversation**, **Open at login** (off by default) and the
+minutes the voice line was open today.
 
 What the voice does:
 
 - It answers small talk and explanations itself, and hands off anything that needs the
   repository or the session: tasks, questions about the code, decisions, corrections and stops.
 - Before it hands off anything destructive or outward (delete, push, publish, send, deploy,
-  pay) it repeats the request and asks "yes?".
+  pay) it repeats the request and asks "yes?". This is a habit the voice is told to keep, not a
+  safeguard; [SECURITY.md](SECURITY.md) says what is one.
 - It reads results back in a sentence or two, with the session's name. Code blocks and tables
   stay in the session, and credentials it recognises are redacted.
 - When Claude asks a question, the voice puts it to you and sends your answer back to that
@@ -106,8 +108,8 @@ talking:
   handoff. Sound without words (music, a TV) closes it after 90 seconds.
 - A result that arrives while the line is closed plays a chime and waits: the band and the
   popover show it as unheard, and the voice tells you when you next speak. A result counts as
-  heard only once a reply the voice began after it names its session or repeats its words; if
-  the line closes first, it chimes and waits again.
+  heard only once a reply of the voice has said it ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed));
+  if the line closes first, it chimes and waits again.
 - The conversation is carried over to the next session, and across Stop and Start, so the voice
   remembers what you said a minute ago.
 - The popover shows the minutes the line was open, as measured by the app; how your plan meters
@@ -124,23 +126,39 @@ session:
 - the voice's instructions;
 - the recent conversation (up to the last 24 lines) to continue it in a new session;
 - the requests still open, as their one-line briefs;
-- each result, question, update and approval notice, as one line of at most 2,000 characters
-  with code blocks and tables removed and recognised credentials redacted. An update is Claude's
-  answer in a later turn started by a background task's notification, for up to 10 minutes
-  after a voice request and until any other turn starts in the session;
-- a session's context summary when you load it (at most 1,500 characters, redacted the same
-  way). The popover shows exactly what was sent;
+- each result, question, update and approval notice, as one line of at most 2,000 characters,
+  with code blocks and tables removed. An update is Claude's answer in a later turn started by a
+  background task's notification, for up to 10 minutes after a voice request and until any other
+  turn starts in the session;
+- a session's context summary when you load it, as one line of at most 1,500 characters. The
+  popover shows that line exactly as it was sent;
 - with every line above, its session's label: the Claude Code session title, or the session
   folder's name when it has none;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
 
-The codex thread that carries the voice is ephemeral and read-only, with every codex tool and
-MCP server turned off; it can only talk. Claude's work goes to Anthropic as your Claude Code
-session always does. On your Mac the app keeps the recent conversation and the usage meter in
-`~/Library/Application Support/claude-gpt-live-bridge`.
+Results, questions, updates and summaries pass through a redactor of known credential shapes
+first (private keys, JWTs, common API tokens, URL passwords, `password=`-style fields). It is a
+list of patterns, not a guarantee.
+
+The codex thread that carries the voice is ephemeral and read-only, with every codex feature
+but one (where codex keeps your login) and every MCP server turned off; it is there only to talk.
+Claude's work goes to Anthropic as your Claude Code session always does. On your Mac the app
+keeps the usage meter, and the recent conversation and the context line last loaded until you
+press **New conversation**, in `~/Library/Application Support/claude-gpt-live-bridge`.
 
 [SECURITY.md](SECURITY.md) has the threat model: in short, anything your microphone can hear
 can become a request that Claude runs under the session's own permission mode.
+
+## Known limitations
+
+- When your next words reopen the line, the voice sometimes answers only them and does not say
+  the waiting result. The result is not lost: it stays waiting, chimes when the line closes, and
+  goes to the voice again the next time the line opens.
+- A Claude Code session that was already open before the mod loaded may need to be reopened
+  before `/live` works in it.
+- Whether a reply has said a waiting result is judged by its words, against a list of common
+  words in English and Russian only. In another language a result can count as heard when the
+  voice only mentioned it.
 
 ## How it works
 
