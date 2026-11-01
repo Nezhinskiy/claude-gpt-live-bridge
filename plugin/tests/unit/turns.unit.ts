@@ -83,3 +83,12 @@ test('originComesFromPromptSubmit', () => {
   for (const kind of others) assert.equal(originOf({ kind }, self), 'typed', kind)
   assert.equal(originOf({ kind: 'plugin', name: 'other' }, self), 'typed')
 })
+
+test('aRefusedSubmissionIsNoLongerPending', () => {
+  const tracker = new TurnTracker()
+  tracker.submitted(ID)
+  tracker.refused('11111111-0000-0000-0000-00000000000b')
+  assert.equal(tracker.current, ID, 'another id leaves it')
+  tracker.refused(ID)
+  assert.equal(tracker.current, null)
+})

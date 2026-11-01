@@ -64,6 +64,11 @@ export class TurnTracker {
     this.#pending = id
   }
 
+  /** Claude Code did not take the voice request's prompt: no turn of it will start. */
+  refused(id: RequestId): void {
+    if (this.#pending === id) this.#pending = null
+  }
+
   /** A main-loop turn started at `now` (ms). Its prompt names the voice request it answers, if any. */
   turnStarted(turnId: string, text: string, origin: TurnOrigin, now: number): void {
     const id = voiceRequestId(text)

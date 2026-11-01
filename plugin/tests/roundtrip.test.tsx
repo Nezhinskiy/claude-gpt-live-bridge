@@ -58,6 +58,11 @@ test('refusedPromptFailsTheRequestAtOnce', async ($, on) => {
   expect(world.take('answer')).toEqual([
     { sessionId: ID, id: REQUEST.id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' },
   ])
+  // A typed turn after it is no voice turn: its permission dialog is not reported.
+  world.take('activity')
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
 
 test('approvalIsReported', async ($, on) => {

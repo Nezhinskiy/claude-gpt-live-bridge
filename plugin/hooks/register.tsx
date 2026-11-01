@@ -140,11 +140,17 @@ async function tick($: EngineInterface): Promise<void> {
     await save($)
     // It resolves once the turn starts, which may be after the running one: do not hold the poll.
     const id = reply.work.id
-    void $.prompt.submit({ text: voicePrompt(reply.work) }).catch(() =>
-      link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' }))
+    void $.prompt.submit({ text: voicePrompt(reply.work) }).catch(() => refused($, id))
   } else if (reply.work?.kind === 'context') {
     void sendContext($)
   }
+}
+
+/** The prompt was refused: the request fails at once, and no later turn counts as its turn. */
+async function refused($: EngineInterface, id: string): Promise<void> {
+  tracker.refused(id)
+  await save($).catch(() => {})  // the answer matters more than the snapshot
+  await link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' })
 }
 
 async function sendContext($: EngineInterface): Promise<boolean> {
