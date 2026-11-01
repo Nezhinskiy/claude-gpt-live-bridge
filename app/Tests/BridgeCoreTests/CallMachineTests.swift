@@ -21,6 +21,7 @@ struct CallMachineTests {
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
   static let result = "[RESULT] Alpha · 0a1b: The build passes on main."
   static let common = "[RESULT] Beta · 2c3d: That works with the new flag."
+  static let done = "[RESULT] Alpha · 0a1b: Done."
   /// A result given to the open line, then the voice's next reply under way.
   static let told: [CallEvent] = live + [.deliver(result), .assistantSpeaking]
   static func said(_ text: String) -> CallEvent { .assistantFinishedSpeaking(text) }
@@ -62,7 +63,13 @@ struct CallMachineTests {
     row(
       "deliverWhileLiveIsAddedAndReArmsSilence", live, .deliver("a"), .live,
       [.addContext("a"), arm], pending: ["a"]),
-    row("replyNamingTheSessionMarksItHeard", told, said("Alpha is green."), .live, [arm]),
+    row(
+      "replyNamingOnlyTheSessionKeepsTheResult", told, said("Alpha is still working."), .live,
+      [arm], pending: [result]),
+    row("labelAndOneBodyWordMarkItHeard", told, said("Alpha's build is green."), .live, [arm]),
+    row(
+      "labelAloneHearsAResultWithNoDistinctWord", live + [.deliver(done), .assistantSpeaking],
+      said("Alpha is done."), .live, [arm]),
     row("replySayingTheResultMarksItHeard", told, said("The BUILD pässes."), .live, [arm]),
     row(
       "oneSharedWordKeepsTheResult", told, said("The build is next."), .live, [arm],

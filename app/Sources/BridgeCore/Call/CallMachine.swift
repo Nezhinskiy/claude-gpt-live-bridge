@@ -143,24 +143,28 @@ public struct CallMachine: Sendable {
     return effects
   }
 
-  /// Whether a reply's transcript mentions a `[TAG] label: body` result: the label without its
-  /// ` · id` suffix, or two of the body's words of four letters or more. Case and diacritics
-  /// are ignored, and the tag is not a word of the result.
+  /// Whether a reply's transcript says a `[TAG] label: body` result: two of the body's
+  /// distinctive words (four letters or more, not in `commonWords`), or the label without its
+  /// ` · id` suffix together with one of them. The label alone counts only for a body with no
+  /// distinctive word, which could not be heard otherwise: "Alpha is still working" names a
+  /// session without saying its result. Case and diacritics are ignored, and the tag is not a
+  /// word of the result.
   static func says(_ transcript: String, _ result: String) -> Bool {
     let said = words(transcript)
     let line = result.trimmingPrefix(#/\[[^\]]*\] /#)
     let colon = line.firstRange(of: ": ")
     let head = line[..<(colon?.lowerBound ?? line.startIndex)]
     let label = words(head.split(separator: " · ").first.map(String.init) ?? "")
-    if !label.isEmpty, said.indices.contains(where: { said[$0...].starts(with: label) }) {
-      return true
-    }
+    let named =
+      !label.isEmpty && said.indices.contains(where: { said[$0...].starts(with: label) })
     let body = words(String(line[(colon?.upperBound ?? line.startIndex)...]))
     let distinct = Set(body.filter { $0.count >= 4 }).subtracting(commonWords)
-    return distinct.intersection(said).count >= 2
+    let heard = distinct.intersection(said).count
+    return named ? distinct.isEmpty || heard >= 1 : heard >= 2
   }
 
-  /// Words any reply may say, which therefore say nothing about a result.
+  /// Words any reply may say, which therefore say nothing about a result. English and Russian
+  /// only: in another language more replies count as saying a result.
   static let commonWords: Set<String> = [
     "about", "also", "been", "claude", "could", "done", "from", "have", "here", "into", "just",
     "like", "more", "okay", "only", "session", "should", "some", "than", "that", "their", "them",
