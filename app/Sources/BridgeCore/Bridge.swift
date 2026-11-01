@@ -129,6 +129,9 @@ public actor Bridge: Router {
     return target
   }
 
+  /// The Settings choice: whether a session that becomes the target is asked for its summary.
+  public func setAutoContext(_ on: Bool) async { await registry.setAutoContext(on) }
+
   /// The popover's choice of target, which also ends a question's route; a session that left is
   /// ignored.
   public func setTarget(_ id: SessionID) async {

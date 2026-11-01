@@ -215,6 +215,16 @@ struct BridgeTests {
     #expect(await arrivals.next() == a)
   }
 
+  /// Settings' automatic context asks each session that becomes the target for its summary.
+  @Test func automaticContextFollowsTheTarget() async throws {
+    await bridge.setAutoContext(true)
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    #expect(try await registry.poll(a) == .context)
+    try await post("/v1/target", TargetBody(sessionId: b))
+    #expect(try await registry.poll(b) == .context)
+  }
+
   @Test func popoverSetsTheTarget() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")

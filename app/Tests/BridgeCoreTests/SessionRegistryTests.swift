@@ -195,9 +195,12 @@ struct SessionRegistryTests {
     #expect(await registry.target == nil)
   }
 
+  /// The app's own setting decides, not the flag a session joins with.
   @Test func becomingTargetWithAutoContextAsksForContext() async throws {
+    await registry.setAutoContext(true)
     await join(a)
-    await join(b, "Other session", autoContext: true)
+    #expect(try await registry.poll(a) == .context)  // the first session becomes the target
+    await join(b, "Other session", autoContext: false)
     #expect(try await registry.poll(b) == nil)
     try await registry.setTarget(b)
     #expect(try await registry.poll(b) == .context)
@@ -210,5 +213,12 @@ struct SessionRegistryTests {
     await join(a)
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval))
     #expect(await registry.rows().map(\.activity) == [.approval])
+  }
+
+  @Test func aSessionsOwnAutoContextFlagNoLongerAsks() async throws {
+    await join(a)
+    await join(b, "Other session", autoContext: true)
+    try await registry.setTarget(b)
+    #expect(try await registry.poll(b) == nil)
   }
 }

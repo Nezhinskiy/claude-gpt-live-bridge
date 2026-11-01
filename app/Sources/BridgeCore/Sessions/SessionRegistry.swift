@@ -47,7 +47,6 @@ public actor SessionRegistry {
   private struct Session {
     let joinOrder: Int
     var title = ""
-    var autoContext = false
     var lastPoll: Date
     var activity = SessionActivity.idle
     var queued: [VoiceRequest] = []
@@ -72,6 +71,9 @@ public actor SessionRegistry {
   /// The longest title kept; the label, the band and every voice line carry it.
   public static let maxTitle = 80
   public private(set) var target: SessionID?
+  /// The app's setting: a session that becomes the target is asked for its summary. A join's
+  /// own `autoContext` is accepted and ignored.
+  public private(set) var autoContext = false
 
   public init(time: any TimeSource) { self.time = time }
 
@@ -85,7 +87,6 @@ public actor SessionRegistry {
       sessions[body.sessionId] ?? replaced ?? Session(joinOrder: joins, lastPoll: time.now)
     joins += 1
     session.title = String(body.title.prefix(Self.maxTitle))
-    session.autoContext = body.autoContext
     session.lastPoll = time.now
     sessions[body.sessionId] = session
     if target == nil { retarget(body.sessionId) }
@@ -225,10 +226,12 @@ public actor SessionRegistry {
     return try change(&session)
   }
 
-  /// Makes `id` the target; a session with `autoContext` is asked for its summary.
+  public func setAutoContext(_ on: Bool) { autoContext = on }
+
+  /// Makes `id` the target; with `autoContext` on it is asked for its summary.
   private func retarget(_ id: SessionID?) {
     target = id
-    if let id, sessions[id]?.autoContext == true { sessions[id]?.wantsContext = true }
+    if let id, autoContext { sessions[id]?.wantsContext = true }
   }
 
   private func drop(_ id: SessionID, labels: [SessionID: String], reason: String) -> Delivery? {
