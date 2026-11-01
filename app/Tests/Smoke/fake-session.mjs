@@ -52,7 +52,13 @@ let unheard = 0
 let status = null
 
 while (Date.now() - t0 < deadline) {
-  const reply = (await send('GET', `/v1/next?sessionId=${sessionId}`)).json
+  const polled = await send('GET', `/v1/next?sessionId=${sessionId}`)
+  if (polled.status !== 200) {
+    log('pollFailed', { status: polled.status, reply: polled.json })
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    continue
+  }
+  const reply = polled.json
   status = reply.status
   if (status.call !== phase) {
     phase = status.call
@@ -83,7 +89,7 @@ while (Date.now() - t0 < deadline) {
   await new Promise(resolve => setTimeout(resolve, 1000))
 }
 
-const secondsOpen = Math.round(status.minutesThisCall * 600) / 10
+const secondsOpen = Math.round((status?.minutesThisCall ?? 0) * 600) / 10
 await send('POST', '/v1/call', { action: 'stop' })
 await send('POST', '/v1/leave', { sessionId })
 
