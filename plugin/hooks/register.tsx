@@ -124,6 +124,10 @@ async function turnOn($: EngineInterface): Promise<boolean> {
   const isJoined = (await link?.join({ sessionId, title })) === true
   await save($)
   await setBand($, {})
+  // Writing the band redraws only the instances that read it. A surface that asked for the
+  // band before this hook could run (the desktop app opening a new session asks a process with
+  // no hooks) holds it as drawn by nobody and asks again only when told to.
+  $.ui.invalidate('ui.render')
   link?.start(() => tick($))
   return isJoined
 }

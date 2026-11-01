@@ -43,6 +43,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     /** The session's model fails the summary request. */
     isForkFailing: false,
     logs: [] as string[],
+    /** Every event the mod asked the engine to run again (`$.ui.invalidate`), in order. */
+    invalidated: [] as string[],
     summary: 'Goal: tidy the example project.',
     /** How many prompts the session has had; 0 is a new session with nothing to summarise. */
     turns: 1,
@@ -133,6 +135,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('ui.log', (_, e) => {
     world.logs.push(e.text)
+    return { value: undefined }
+  })
+  on('ui.invalidate', (_, e) => {
+    world.invalidated.push(e.event)
     return { value: undefined }
   })
   on('model.fork', async () => {

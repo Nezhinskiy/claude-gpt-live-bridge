@@ -70,6 +70,18 @@ test('beforeTheFirstReplyTheBandSaysItIsJoining', async ($, on) => {
   }
 })
 
+test('joiningAsksEverySurfaceToDrawTheBandAgain', async ($, on) => {
+  // A surface keeps the band it drew last. One that drew it before this mod's hook ran (the
+  // desktop app opening a new session, whose band it asked a process with no hooks) read no
+  // state, so writing the band redraws nothing there and the band never shows: the join asks
+  // for every instance again.
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(world.invalidated).toEqual([])
+  await $.command.run({ ...LIVE, args: 'on' })
+  expect(world.invalidated).toEqual(['ui.render'])
+})
+
 const OTHER = '11111111-0000-0000-0000-000000000002'
 const elsewhere = (call: 'off' | 'listening'): StatusReply => ({
   call, unheard: 0, minutesToday: 0, minutesThisCall: 0, recentTranscript: [],
