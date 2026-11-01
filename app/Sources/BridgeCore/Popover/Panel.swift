@@ -91,7 +91,8 @@ public struct PanelMachine: Sendable, Equatable {
 
   public private(set) var isOpen = false
   public private(set) var inSession = false
-  private var highlighted = false
+  /// The app draws the button's highlight: the panel is open with no system session.
+  public private(set) var highlighted = false
 
   public init() {}
 

@@ -18,19 +18,27 @@ enum Main {
   }
 }
 
-/// LiveBridge.app: a menu bar app with no Dock icon (`LSUIElement`).
+/// LiveBridge.app: a menu bar app with no Dock icon (`LSUIElement`). The menu bar item and its
+/// popover are AppKit's (`StatusPanel`); Settings is the one SwiftUI scene.
 struct LiveBridgeApp: App {
-  @State private var model = AppModel()
+  @NSApplicationDelegateAdaptor private var delegate: AppDelegate
 
   var body: some Scene {
-    MenuBarExtra {
-      PopoverView(model: model)
-    } label: {
-      Image(nsImage: model.glyph.image)
-        .accessibilityLabel(model.presentation?.accessibilityLabel ?? "LiveBridge")
-    }
-    .menuBarExtraStyle(.window)
-    Settings { SettingsView(model: model) }
+    Settings { SettingsView(model: delegate.model) }
+  }
+}
+
+/// Owns the app's model and puts its item in the menu bar once the app has launched. A click on
+/// one of its notifications opens the popover.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+  let model = AppModel()
+  private var statusPanel: StatusPanel?
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    let statusPanel = StatusPanel(model: model)
+    self.statusPanel = statusPanel
+    model.notifier.onOpen = { [weak statusPanel] in statusPanel?.open() }
   }
 }
 

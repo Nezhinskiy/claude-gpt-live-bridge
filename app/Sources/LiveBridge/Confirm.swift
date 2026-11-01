@@ -2,7 +2,7 @@ import AppKit
 import BridgeCore
 
 /// A native alert before the popover erases a conversation. It is app-modal rather than a sheet
-/// on the menu bar window, which closes as soon as another window takes the focus.
+/// on the popover's panel, and stands above the panel, which stays open under it.
 @MainActor
 enum Confirm {
   /// True only when the owner clicks the destructive button. Cancel is the default button, as
@@ -22,6 +22,8 @@ enum Confirm {
       return nil
     }
     defer { escape.map(NSEvent.removeMonitor) }
+    alert.layout()
+    alert.window.level = NSWindow.Level(rawValue: PopoverPanel.level.rawValue + 1)
     NSApp.activate()  // a menu bar app is not active, so its alert would open behind others
     return alert.runModal() == .alertSecondButtonReturn
   }

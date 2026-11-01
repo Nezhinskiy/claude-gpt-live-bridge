@@ -94,9 +94,9 @@ struct PanelMachineTests {
   @Test func theButtonTogglesThePanelAndItsHighlight() {
     var machine = PanelMachine()
     #expect(machine.handle(.statusItemPressed) == [.show, .highlight(true)])
-    #expect(machine.isOpen)
+    #expect(machine.isOpen && machine.highlighted)
     #expect(machine.handle(.statusItemPressed) == [.hide, .highlight(false)])
-    #expect(!machine.isOpen)
+    #expect(!machine.isOpen && !machine.highlighted)
   }
 
   @Test(arguments: [
@@ -130,7 +130,7 @@ struct PanelMachineTests {
   @Test func theSystemsSessionOpensAndClosesIt() {
     var machine = PanelMachine()
     #expect(machine.handle(.sessionBegan) == [.show])
-    #expect(machine.isOpen && machine.inSession)
+    #expect(machine.isOpen && machine.inSession && !machine.highlighted)
     #expect(machine.handle(.sessionEnded) == [.hide])
     #expect(!machine.isOpen && !machine.inSession)
     #expect(machine.handle(.sessionEnded) == [])

@@ -5,8 +5,8 @@ import UserNotifications
 /// Shows the bridge's notices in Notification Center: alerts only, no sound (the app plays its
 /// own chime). Permission is asked the first time a notice is posted or the setting is turned
 /// on. Clicking a notice opens the menu bar popover. Without an app bundle (a bare `swift run`)
-/// there is no Notification Center to post to, and notices are dropped. Unchecked: its one
-/// stored property is set once, and the notification center may be used from any thread.
+/// there is no Notification Center to post to, and notices are dropped. Unchecked: its stored
+/// properties are set once, and the notification center may be used from any thread.
 final class Notifier: NSObject, ResultNotifying, UNUserNotificationCenterDelegate,
   @unchecked Sendable
 {
@@ -19,6 +19,8 @@ final class Notifier: NSObject, ResultNotifying, UNUserNotificationCenterDelegat
   static let deniedSentence = "Notifications are off for LiveBridge in System Settings."
 
   private let center: UNUserNotificationCenter?
+  /// Opens the popover; set once at launch.
+  @MainActor var onOpen: () -> Void = {}
 
   override init() {
     center = Bundle.main.bundleIdentifier == nil ? nil : .current()
@@ -61,7 +63,6 @@ final class Notifier: NSObject, ResultNotifying, UNUserNotificationCenterDelegat
   func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
   ) async {
-    // MenuBarExtra has no API to open its popover, and a click sent to its button is ignored.
-    await MainActor.run { NSApp.activate() }
+    await MainActor.run { onOpen() }
   }
 }
