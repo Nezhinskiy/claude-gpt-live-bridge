@@ -156,8 +156,17 @@ public struct CallMachine: Sendable {
       return true
     }
     let body = words(String(line[(colon?.upperBound ?? line.startIndex)...]))
-    return Set(body.filter { $0.count >= 4 }).intersection(said).count >= 2
+    let distinct = Set(body.filter { $0.count >= 4 }).subtracting(commonWords)
+    return distinct.intersection(said).count >= 2
   }
+
+  /// Words any reply may say, which therefore say nothing about a result.
+  static let commonWords: Set<String> = [
+    "about", "also", "been", "claude", "could", "done", "from", "have", "here", "into", "just",
+    "like", "more", "okay", "only", "session", "should", "some", "than", "that", "their", "them",
+    "then", "there", "they", "this", "very", "were", "what", "when", "which", "will", "with",
+    "would", "your", "если", "есть", "когда", "можно", "сейчас", "тоже", "только", "чтобы",
+  ]
 
   private static func words(_ text: String) -> [String] {
     text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
