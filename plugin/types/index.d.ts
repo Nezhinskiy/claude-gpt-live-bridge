@@ -7,7 +7,7 @@ export type BandStatus = {
   /** The voice target's label, or `none`. */
   target: string
   isTarget: boolean
-  /** Results waiting for the owner to speak. */
+  /** Results the voice has not replied after yet. */
   unheard: number
   minutesToday: number
   /** The app's problem sentence. */
