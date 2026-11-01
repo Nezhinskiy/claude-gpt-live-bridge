@@ -10,6 +10,14 @@ tools and permission mode, and the voice tells you the result.
 
 *Русская версия: [README.ru.md](README.ru.md).*
 
+**Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
+between your own codex and your own Claude Code. The app and the mod talk over a Unix socket
+only your user can open, and the app listens on no network port. The only traffic that leaves
+your Mac is what those two tools already send: the voice line to OpenAI through your codex,
+only while it is open, and Claude's work to Anthropic through your Claude Code session.
+Exactly what reaches OpenAI is listed under [Privacy](#privacy); what this does and does not
+protect against is in [SECURITY.md](SECURITY.md).
+
 > **Unofficial.** This project is not affiliated with, endorsed by or supported by Anthropic or
 > OpenAI. It relies on codex's experimental realtime API, which can change with any codex
 > release.
