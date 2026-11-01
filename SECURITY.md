@@ -16,79 +16,123 @@ advisory is published with credit to you unless you ask otherwise.
 
 LiveBridge is a menu bar app plus a Claude Code mod on one Mac, for one user. It turns speech
 into prompts for a Claude Code session, so its security comes down to who can put words into
-that session and what leaves the Mac.
+that session and what leaves the Mac. This section says which parts are controls and which are
+only conveniences. An instruction to a language model is never counted as a control.
+
+### The one control against unwanted actions
+
+**Claude Code's own permission prompt.** A voice request reaches Claude as a prompt in the
+target session, and Claude runs it **under that session's own permission mode, auto mode
+included**. Whatever that mode would ask before a tool runs, it still asks, and only you can
+answer, at your keyboard in Claude Code. LiveBridge has no code that answers a permission
+prompt: the mod declares no `tool.check` hook, and its `classic.PermissionRequest` hook only
+tells the voice that a prompt is waiting.
+
+In a mode that acts without asking, nothing else stands between what the microphone hears and
+what Claude does. For such a session, keep voice off, or keep the microphone away from other
+voices.
+
+### What the microphone can do
+
+- **Anything audible to the microphone can become a request**: a TV, a call on speaker,
+  another person in the room. Speech-recognition errors pass through as heard.
+- **The voice's confirmation is UX, not a control.** Before it hands off anything destructive
+  or outward (delete, push, publish, send, deploy, pay), the voice is told to repeat the request
+  and wait for a spoken "yes". The prompt Claude receives asks it to confirm such an action in
+  text first, unless the request says the owner already confirmed by voice. Both are
+  instructions to language models. The voice writes the "confirmed by voice" sentence itself, so
+  anything that can steer the voice can write it too.
+- **The transcript quoting is a convenience.** The prompt quotes the recognised speech as data
+  and tells Claude to use it only to resolve names and ambiguity. That keeps side talk from being
+  taken as a request. It does not stop an adversary: the instruction Claude acts on is the
+  voice's brief, which is the voice model's rewrite of that same speech. The request id on the
+  prompt's last line ties each answer to its request; it is there for correctness, not security.
 
 ### Who can drive the bridge
 
 - **Other users of the Mac are kept out.** The mod talks to the app over HTTP on a Unix socket,
-  `~/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock`. The `run` folder and the
-  data folder above it are created at mode `0700`, or tightened back to it at every start; a
-  symlink or a folder another user owns is refused. That folder's permission is the bridge's one
-  access control: there is no listening TCP port, no shared secret and no peer check.
-- **Every process running as your user is trusted.** Any of them can open the socket, join as a
-  session, start a call, read the status and the last lines of the conversation, or post a fake
-  answer for the voice to read out. A process running as you can already do worse, such as
-  typing into Claude Code itself.
+  `~/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock`. The `run` folder and
+  the data folder above it are created at mode `0700`, or set back to it at every start (a
+  symlinked folder is followed, and the folder it names is set to `0700`). That folder's mode is
+  the bridge's one access control: there is no listening TCP port, no shared secret and no peer
+  check.
+- **Every process running as your user is trusted.** Any of them can open the socket and:
+  - join as a session, make itself the target, and receive every handoff the voice makes;
+  - answer those handoffs with any text, which the voice then reads out;
+  - start a call, which turns on the microphone under LiveBridge's permission (macOS shows its
+    microphone indicator in the menu bar);
+  - read the status, including the last lines of the conversation and the context line last
+    sent.
+
+  Such a process can already do worse without LiveBridge: for example, it can add hooks to
+  `~/.claude/settings.json` that run in every Claude Code session.
 - **Other plugins in the same Claude Code engine are trusted.** They share the engine with the
   mod and can see or submit the same prompts. Install only plugins you trust.
-
-### What the microphone can do
-
-- **Anything audible to the microphone can become a request**: a TV, a call on speaker, another
-  person in the room. The voice hands requests to the target session, where Claude runs them
-  **under that session's own permission mode, auto mode included**. LiveBridge adds no tool
-  guard and never answers a permission prompt; a prompt the session's mode would show still
-  appears in Claude Code, and the voice only tells you that one is waiting.
-- **The one extra step** is the voice's own confirmation: before it hands off anything
-  destructive or outward (delete, push, publish, send, deploy, pay), it repeats the request and
-  waits for a spoken "yes", and the prompt Claude receives asks it to confirm in text first unless
-  the request says you confirmed by voice. Both are instructions to language models, not
-  enforcement. If the session runs in a mode that does not ask before acting, keep voice off, or
-  the microphone away from other voices.
-- The prompt marks speech as data: the transcript is quoted as recognised speech, and a request
-  id that speech cannot forge ties each answer to its request. Speech-recognition errors pass
-  through as heard.
 
 ### What the voice model can do
 
 The voice runs on a codex thread that is ephemeral and read-only (`sandbox_mode="read-only"`,
-`approval_policy="never"`, web search off, notifications off), with every codex feature that
-runs tools, reads files, browses or installs turned off at launch. The app checks that codex
-reports every configured MCP server disabled before each session, and closes the session if one
-starts; it interrupts every codex turn on the thread at once and declines every request codex
-sends. These checks fail closed: if codex cannot list its features, reports an MCP server that
-is not disabled, leaves a configured server out of its report, or answers in a shape this
-version does not read, the call does not start.
+`approval_policy="never"`, web search off, notifications off). These keep that thread from
+acting:
 
-Results, open tasks and context summaries are added to the voice as one tagged line each, with
-every bracket neutralised and line breaks removed, so a session's text cannot pose as another
-delivery. Each goes in with the rank of the owner's own words (`user`), never as an instruction
-to the voice (`developer`), and the prompt treats them as data to relay. The voice still reads
-them as the owner's turn, so a session's text could try to steer it.
+- **Every codex turn on the thread is interrupted at once**, and **every request codex sends**
+  (approvals, tool calls, input requests and the rest) **is declined**.
+- **Every codex feature is off except an allow-list.** At launch the app runs
+  `codex features list` and turns off every feature it reports, except those in
+  `CodexLaunch.allowed`, which holds only `secret_auth_storage` (where codex keeps your login;
+  it runs nothing). A feature a later codex adds under a new name is therefore off too. This
+  narrows what a turn could use if one were not interrupted.
+- **Every MCP server is off.** The app turns off every server codex's configuration names when
+  it starts the thread, then requires codex to report each one disabled before every session. It
+  closes the session if codex later reports a server starting or ready.
 
-**Residual risk, by design.** Claude skips its own text confirmation when a request says the
-owner already confirmed it by voice, and the voice writes that sentence itself. Anything that can
-steer the voice can therefore produce it: text a joined session read (a README, an issue, a web
-page, a tool's output) that reaches the voice through a result, an update or a summary, or
-anything audible to the microphone. The voice is told to hand such a request off only after a
-spoken yes, but that is an instruction, not enforcement. Join only sessions whose input you trust, and keep
-voice off for a session whose permission mode acts without asking.
+These checks fail closed. The call does not start if codex cannot list its features, lists them
+in a shape this version does not read, or gives no answer within 10 seconds. It also does not
+start if codex reports an MCP server that is not disabled, or leaves a configured server out of
+its report.
+
+What is not a control here: the read-only sandbox does not limit reading, so a codex turn that
+did run a command could read any file your user can read. The thread's instruction to "never
+act" is a model instruction.
+
+### What session text can do
+
+Results, questions, updates, open tasks and context summaries go to the voice as one tagged line
+each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
+space. That keeps the format unambiguous, but it is not a control: each line goes in with the
+rank of the owner's own words (`user`), so a session's text needs no fake tag to give the voice
+orders. The voice is told to treat such text as data to relay, which is again an instruction.
+
+The redactor that removes credential shapes from these lines (private keys, JWTs, common API
+tokens, URL passwords, `password=`-style fields) is a convenience against an accidental leak. It
+is a list of patterns, and it does not stop an adversary: injected text can spell out or encode a
+secret.
+
+### Residual risk, by design
+
+- **Anything that steers the voice can start work.** Text a joined session read (a README, an
+  issue, a web page, a tool's output) can reach the voice in a result, an update or a summary,
+  and talk it into a handoff, including the "confirmed by voice" sentence above.
+- **A handoff can hop between sessions.** The voice hands work to the target session, or to the
+  session that asked the last question. So text that session A read can become a prompt in
+  session B, which may run in a more permissive mode.
+- **A loaded context persists.** A `[CONTEXT]` line is saved in the data folder and given to
+  every later realtime session, across Stop and Start and app restarts, until you press **New
+  conversation** or load another session's context. A session set to `/live context auto` sends a
+  new one whenever it becomes the target. One injected summary can therefore steer every later
+  call. The recent conversation is carried over the same way.
+
+Join only sessions whose input you trust, press **New conversation** after a session has read
+text you do not trust, and keep voice off for a session whose permission mode acts without
+asking.
 
 ### What leaves the Mac
 
-Through codex's realtime session, to OpenAI: microphone audio while the line is open (from 2 s
-before speech starts until it closes), the voice's instructions, the recent conversation (up to
-24 lines), the briefs of requests still open, each result, question, update and approval notice
-(at most 2,000 characters, code blocks and tables removed), and a session's context summary when
-you load it (at most 1,500 characters), each line with its session's label (the session title,
-or its folder's name), and the WebRTC offer with the Mac's local addresses as connection
-candidates. Results and summaries pass through a redactor of known
-credential shapes first (private keys, JWTs, common API tokens, URL passwords, `password=`-style
-fields). It is a list of patterns, not a guarantee. Nothing is sent while the line is closed:
-voice detection runs on the Mac.
-
-Codex talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The
-Claude session sends its work to Anthropic as it always does. LiveBridge has no telemetry.
+The list of what goes to OpenAI, and when, is in the README's
+[Privacy](README.md#privacy) section. Nothing is sent while the line is closed: voice detection
+runs on the Mac. Codex talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's
+credentials. The Claude session sends its work to Anthropic as it always does. LiveBridge has no
+telemetry.
 
 ### Out of scope
 
