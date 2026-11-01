@@ -1,0 +1,41 @@
+#!/bin/sh
+# The end-to-end smoke test: the debug app with a spoken WAV as its microphone, the real codex
+# on your ChatGPT login, and a fake Claude Code session (app/Tests/Smoke/fake-session.mjs)
+# over the wire. It opens one or two short realtime sessions, about a minute of voice in all.
+#
+#   scripts/smoke.sh        SMOKE_DIR=<dir> keeps the scratch files there (default: a new
+#                           directory under /tmp; the socket path must stay within 103 bytes)
+#
+# Passes when, within 120 s: the request produced exactly one handoff and the small talk none,
+# the voice spoke the answer after its result arrived, the realtime session was open for less
+# than 60 s in all, and the call ended back in `listening`.
+set -eu
+cd "$(dirname "$0")/.."
+
+dir=${SMOKE_DIR:-$(mktemp -d /tmp/livebridge-smoke.XXXXXX)}
+home="$dir/home"
+data="$home/Library/Application Support/claude-gpt-live-bridge"
+app="$PWD/app/.build/app/LiveBridge.app"
+mkdir -p "$home"
+
+# 6 s of silence, the request, 29 s of silence, small talk, then silence to the end.
+say -o "$dir/fake-mic.wav" --file-format=WAVE --data-format=LEI16@24000 \
+  "[[slnc 6000]] Please list the files in this folder. [[slnc 29000]]
+   Thanks! By the way, how is your day going? [[slnc 75000]]"
+
+CFFIXED_USER_HOME="$home" scripts/build-app.sh --run --fake-mic "$dir/fake-mic.wav" >/dev/null
+trap 'pkill -f "^$app/Contents/MacOS/LiveBridge( |\$)" || true' EXIT
+i=0
+until [ -S "$data/run/bridge.sock" ]; do
+  i=$((i + 1))
+  [ $i -le 100 ] || { echo "smoke: the app did not open its socket" >&2; exit 1; }
+  sleep 0.2
+done
+
+status=0
+node app/Tests/Smoke/fake-session.mjs "$data/run/bridge.sock" 120 || status=$?
+echo "conversation:"
+node -e 'for (const u of JSON.parse(require("fs").readFileSync(process.argv[1])).utterances)
+  console.log(`  ${u.role}: ${u.text}`)' "$data/continuity.json" || true
+[ $status = 0 ] && echo "smoke: PASS" || echo "smoke: FAIL"
+exit $status
