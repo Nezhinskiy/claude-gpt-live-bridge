@@ -1,11 +1,14 @@
-// The band above the prompt: the call's phase, the voice target, unheard results, the actions
-// and what is wrong, in one or two rows.
+// The band above the prompt: one row with the call's phase, the voice target and unheard results
+// on the left and the actions on the right; what is wrong, when anything is, on a row below.
 import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { Band, BandStatus } from '../types'
 import type { CallAction, CallPhase, SessionId, StatusReply } from './wire.ts'
 
 export type BandActions = { call(action: CallAction): void; target(): void; loadContext(): void }
+
+/** What the band and `/live status` say before the app's first reply. */
+export const JOINING = 'LiveBridge: joining…'
 
 const PHASE: Record<CallPhase, [color: string, label: string]> = {
   off: ['inactive', 'Voice off'],
@@ -26,24 +29,45 @@ export function bandStatus(status: StatusReply, self: SessionId): BandStatus {
 
 export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, state: Band, act: BandActions) {
   const { Box, Button, Text } = $.ui.resolve(e)
+  // One cell on the terminal; a graphical surface's own small step between its native buttons.
+  const space = e.surface === 'terminal' ? 1 : 'sm'
   const status = state.isOffline ? undefined : state.status
-  const problem = [state.isOffline ? 'LiveBridge: bridge offline.' : '', state.problem ?? status?.problem ?? '']
-    .filter(part => part !== '').join(' ')
+  const problem = state.problem ?? status?.problem
   const [color, label] = PHASE[status?.call ?? 'off']
+  const unheard = status !== undefined && status.unheard > 0 ? ` · ${status.unheard} unheard` : ''
   return (
     <Box flexDirection="column">
-      {status !== undefined && (
-        <Box>
-          <Text color={color}>● </Text>
-          <Text>{label}</Text>
-          <Text dimColor>{` · target: ${status.target}${status.unheard > 0 ? ` · ${status.unheard} unheard` : ''} `}</Text>
-          <Button key="call" label={status.call === 'off' ? 'Start' : 'Stop'} onPress={() => act.call(status.call === 'off' ? 'start' : 'stop')} />
-          {!status.isTarget && <Button key="target" label="Make target" onPress={() => act.target()} />}
-          <Button key="context" label="Load context" onPress={() => act.loadContext()} />
+      <Box flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={space}>
+        {status === undefined
+          ? state.isOffline
+            ? <Text color="warning" wrap="truncate-end">LiveBridge: bridge offline</Text>
+            : <Text dimColor wrap="truncate-end">{JOINING}</Text>
+          : (
+              <Box flexDirection="row" alignItems="center" columnGap={space} flexShrink={1}>
+                <Text color={color}>●</Text>
+                <Text weight="semibold">{label}</Text>
+                <Text dimColor wrap="truncate-end">{`target: ${status.target}${unheard}`}</Text>
+              </Box>
+            )}
+        {status !== undefined && (
+          <Box flexDirection="row" alignItems="center" columnGap={space} flexShrink={0}>
+            <Button
+              key="call"
+              variant="primary"
+              label={status.call === 'off' ? 'Start' : 'Stop'}
+              onPress={() => act.call(status.call === 'off' ? 'start' : 'stop')}
+            />
+            {!status.isTarget && <Button key="target" label="Make target" onPress={() => act.target()} />}
+            <Button key="context" label="Load context" onPress={() => act.loadContext()} />
+          </Box>
+        )}
+      </Box>
+      {problem !== undefined && (
+        <Box flexDirection="row" columnGap={space}>
+          <Text color="warning">⚠</Text>
+          <Text color="warning" wrap="wrap">{problem}</Text>
         </Box>
       )}
-      {problem !== '' && <Text color="warning">{problem}</Text>}
-      {status === undefined && problem === '' && <Text dimColor>LiveBridge: joining…</Text>}
     </Box>
   )
 }

@@ -4,7 +4,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Band } from '../types'
-import { bandStatus, drawBand } from './band.tsx'
+import { bandStatus, drawBand, JOINING } from './band.tsx'
 import { summarize } from './context.ts'
 import { BridgeLink } from './link.ts'
 import { PLUGIN_NAME, voicePrompt } from './prompt.ts'
@@ -179,7 +179,7 @@ async function statusText($: EngineInterface): Promise<string> {
   const state = await read($, band)
   if (state === null) return 'Voice is off for this session. /live on joins LiveBridge.'
   const status = state.status
-  if (!state.isOffline && status === undefined) return 'LiveBridge: joining…'
+  if (!state.isOffline && status === undefined) return JOINING
   if (state.isOffline || status === undefined) return `LiveBridge is not reachable. ${state.problem ?? ''}`.trim()
   return `LiveBridge: ${status.call}; target: ${status.target}; ${status.unheard} unheard; ` +
     `${Math.round(status.minutesToday)} min today.${status.problem ? ` ${status.problem}` : ''}`
