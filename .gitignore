@@ -1,0 +1,5 @@
+# stayfixed:ignore:begin
+# stayfixed's local state: yours, never a collaborator's.
+.stayfixed/local/
+.stayfixed/assessment.json
+# stayfixed:ignore:end

@@ -1,0 +1,19 @@
+# Written by `stayfixed init`. Every key you leave out takes the preset's default;
+# `[stayfixed] version`, `state` and `enforced`, and `[ci] ref`, are stayfixed's to
+# rewrite in place; every other key is yours.
+
+[stayfixed]
+version = "0.6.1"
+state = "initialised"
+agents = ["claude", "codex"]
+
+[project]
+name = "claude-gpt-live-bridge"
+base_branch = "main"
+release_branch = "main"
+
+[memory]
+mode = "overlay"
+
+[ci]
+mode = "none"
