@@ -118,6 +118,7 @@ public actor Bridge: Router {
   public func remove(_ id: SessionID) async {
     if questionRoute == id { questionRoute = nil }
     if let delivery = await registry.remove(id) { await deliver(delivery) }
+    // item 5 merge: await forgetConversation(of: id)
     await changed()
   }
 
