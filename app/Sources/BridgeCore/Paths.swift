@@ -27,7 +27,8 @@ public enum Paths {
   /// `<data dir>/run`, holding the socket.
   public static func runDir() throws -> URL { try runDir(in: .applicationSupportDirectory) }
 
-  /// `<run dir>/bridge.sock`; the mod builds the same path from `HOME`.
+  /// `<run dir>/bridge.sock`; the mod builds the same path from `CFFIXED_USER_HOME` when it is
+  /// set, else from `HOME`, as Foundation does.
   public static func socketPath() throws -> URL { try runDir().appending(path: "bridge.sock") }
 
   static func dataDir(in base: URL) throws -> URL {

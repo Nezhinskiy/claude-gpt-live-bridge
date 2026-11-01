@@ -109,7 +109,7 @@ final class AppModel {
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
   }
 
-  /// A fresh codex app-server for the voice, launched with its tool features turned off.
+  /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed` off.
   nonisolated private static func voice(cwd: URL) async throws -> any RealtimeControlling {
     let path = await CodexLaunch.defaultSearchPath()
     guard let codex = CodexLaunch.locate(searchPath: path) else { throw CodexProblem.notInstalled }
