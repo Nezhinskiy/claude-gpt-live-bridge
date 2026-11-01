@@ -1,5 +1,5 @@
-# Runs scripts/check.sh on every push and pull request. The Claude Code engine is not on the
-# runner, so check.sh skips `claude plugin validate` and `claude plugin test` by itself.
+# Runs scripts/check.sh on every push and pull request. Claude Code is installed first, so the
+# mod's engine-facing half is type-checked against its API types and run by `claude plugin test`.
 name: CI
 
 on:
@@ -26,6 +26,10 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26'
+      - name: Install Claude Code
+        # Pinned: its API types and its test kit are what the mod is checked against. No login is
+        # needed for validate, test, or the mod's own command that lays the types.
+        run: npm install -g --no-audit --no-fund @anthropic-ai/claude-code@2.1.309
       - name: Select Xcode 27.2
         run: sudo xcode-select -s /Applications/Xcode_27.2.app
       - name: Show the toolchain
@@ -33,5 +37,6 @@ jobs:
           xcodebuild -version
           swift --version
           node --version
+          claude --version
       - name: Check
         run: scripts/check.sh
