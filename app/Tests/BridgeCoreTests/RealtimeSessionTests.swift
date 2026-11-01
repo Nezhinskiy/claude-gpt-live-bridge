@@ -51,6 +51,11 @@ actor FakeRPC: RPCClient {
 
   func reply(to request: RPCServerRequest, error: RPCError) { declined.append(request.id) }
   func close() {}
+  /// codex exits: its streams end.
+  nonisolated func exit() {
+    notify.finish()
+    ask.finish()
+  }
 
   func params(_ method: String) -> [JSONValue] {
     calls.filter { $0.method == method }.map(\.params)
@@ -225,6 +230,20 @@ struct RealtimeSessionTests {
     let sent = try #require(await rpc.params("thread/realtime/appendText").first?.object)
     #expect(sent["role"] == observed["role"] && sent["text"] == observed["text"])
     #expect(sent["threadId"] == thread)
+  }
+
+  /// The events end with the session, so whoever reads them lets the controller go.
+  @Test func eventsEndAtShutdownAndWhenCodexExits() async throws {
+    var events = session.events.makeAsyncIterator()
+    await session.shutdown()
+    #expect(await events.next() == nil)
+    let codex = try FakeRPC()
+    let other = RealtimeSession(client: codex, cwd: cwd)
+    _ = try await other.open(offerSDP: "offer", items: [])
+    var more = other.events.makeAsyncIterator()
+    codex.exit()
+    #expect(await more.next() == .closed(CodexProblem.exited(-1).sentence))
+    #expect(await more.next() == nil)
   }
 
   @Test func serverRequestsAreDeclined() async throws {

@@ -164,9 +164,11 @@ public actor RealtimeSession: RealtimeControlling {
       timeout: timeout)
   }
 
+  /// Ends codex and the events, so the reader of the events lets this controller go.
   public func shutdown() async {
     await close()
     await client.close()
+    emit.finish()
   }
 
   private func listen() async {
@@ -185,7 +187,9 @@ public actor RealtimeSession: RealtimeControlling {
     }
   }
 
+  /// codex exited: an open session closes, and the events end.
   private func ended() {
+    defer { emit.finish() }
     guard thread != nil else { return }
     thread = nil
     fail(CodexProblem.exited(-1))
