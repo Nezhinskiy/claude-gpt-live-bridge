@@ -9,14 +9,19 @@ test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('not running')
 
   await world.clock.advance(1000)
-  expect(world.launches).toEqual([['open', '-g', '-b', 'io.github.nezhinskiy.livebridge']])
+  // Where build-app.sh installs it first, a folder only the owner writes; then whatever app
+  // Launch Services knows by the bundle id.
+  expect(world.launches).toEqual([
+    ['open', '-g', '/Users/example/Applications/LiveBridge.app'],
+    ['open', '-g', '-b', 'io.github.nezhinskiy.livebridge'],
+  ])
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect((await band.find({ type: 'Text', text: /menu bar/ }))?.text).toContain('Open LiveBridge from the menu bar')
   expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeUndefined()
 
   await world.clock.advance(10_000)
   expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeDefined()
-  expect(world.launches).toHaveLength(1)
+  expect(world.launches).toHaveLength(2)
 
   world.isAppUp = true
   await world.clock.advance(1000)
@@ -40,5 +45,18 @@ test('joiningAgainOpensTheAppAgain', async ($, on) => {
   expect(world.launches.length).toBeGreaterThan(opened)
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeUndefined()
+  await band.unmount()
+})
+
+test('anInstalledAppIsOpenedByItsPath', async ($, on) => {
+  const world = fakeWorld(on)
+  world.isAppUp = false
+  world.isAppInstalled = true
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await world.clock.advance(1000)
+  expect(world.launches).toEqual([['open', '-g', '/Users/example/Applications/LiveBridge.app']])
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await band.find({ type: 'Text', text: /menu bar/ })).toBeUndefined()
   await band.unmount()
 })

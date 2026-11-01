@@ -7,6 +7,8 @@ import type { AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } fro
 
 /** LiveBridge.app's bundle identifier. */
 export const BUNDLE_ID = 'io.github.nezhinskiy.livebridge'
+/** Where build-app.sh installs the app, relative to the home folder. */
+const APP_REL = 'Applications/LiveBridge.app'
 const POLL_MS = 1000
 
 /**
@@ -23,6 +25,7 @@ export type LinkPorts = {
 export class BridgeLink {
   readonly #ports: LinkPorts
   readonly #socketPath: string
+  readonly #appPath: string
   /** What this session last joined as, kept so that it can join again after the app restarts. */
   #joined: JoinBody | null = null
   #isKnown = false
@@ -32,6 +35,7 @@ export class BridgeLink {
   constructor(ports: LinkPorts, home: string) {
     this.#ports = ports
     this.#socketPath = `${home}/${SOCKET_REL}`
+    this.#appPath = `${home}/${APP_REL}`
   }
 
   get session(): JoinBody | null {
@@ -89,10 +93,18 @@ export class BridgeLink {
     await this.#send('call', { action })
   }
 
-  /** Opens the app in the background (ADR 0001, item f); false when that did not work. */
+  /**
+   * Opens the app in the background (ADR 0001, item f); false when that did not work. First by
+   * the path build-app.sh installs it at, a folder only the owner writes; only then by bundle id,
+   * which trusts whichever app Launch Services picks for it.
+   */
   async ensureApp(): Promise<boolean> {
+    return (await this.#open(['open', '-g', this.#appPath])) || this.#open(['open', '-g', '-b', BUNDLE_ID])
+  }
+
+  async #open(argv: readonly string[]): Promise<boolean> {
     try {
-      return (await this.#ports.run(['open', '-g', '-b', BUNDLE_ID])).exitCode === 0
+      return (await this.#ports.run(argv)).exitCode === 0
     } catch {
       return false
     }

@@ -29,6 +29,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     sessionId: ID,
     title: 'Example session',
     isAppUp: true,
+    /** Whether ~/Applications holds the app; Launch Services never finds it by bundle id here. */
+    isAppInstalled: false,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
     isSubmitRefused: false,
@@ -72,7 +74,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
   })
   on('process.run', (_, e) => {
     world.launches.push(e.argv)
-    return { value: { exitCode: 1, stdout: '', stderr: 'no such application', isStdoutTruncated: false, isStderrTruncated: false } }
+    const exitCode = world.isAppInstalled && e.argv.at(-1)?.endsWith('/Applications/LiveBridge.app') ? 0 : 1
+    return { value: { exitCode, stdout: '', stderr: exitCode === 0 ? '' : 'no such application', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('http.fetch', async (_, e) => {
     if (!world.isAppUp || e.init?.socketPath !== SOCKET) throw new Error('connect ENOENT')
