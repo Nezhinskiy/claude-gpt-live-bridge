@@ -310,7 +310,8 @@ public actor Bridge: Router {
   }
 
   private func deliver(_ delivery: Delivery, from session: SessionID?) async {
-    if delivery.status == .question { questionRoute = session }
+    // only a question the call keeps (not one dropped while off) routes the next handoff
+    if delivery.status == .question, machine.phase != .off { questionRoute = session }
     let line = AnswerShaper.forVoice(delivery.text, status: delivery.status, label: delivery.label)
     await deliver(line, from: session)
   }

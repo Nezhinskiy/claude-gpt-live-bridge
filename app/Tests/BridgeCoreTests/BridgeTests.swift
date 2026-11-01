@@ -224,6 +224,16 @@ struct BridgeTests {
     #expect(await eventually { await test.registry.openTasks().contains(task) })
   }
 
+  /// A question the owner never heard, because the call was off, routes nothing.
+  @Test func questionWhileOffRoutesNothing() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await answer(request(1), from: b, .question, "Which branch?")
+    await live()
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
+  }
+
   @Test func deliveryWhileLiveIsAddedAsContext() async throws {
     try await join(a, "Alpha")
     await live()
