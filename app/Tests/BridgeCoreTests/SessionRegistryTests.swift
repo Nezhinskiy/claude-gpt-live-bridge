@@ -96,7 +96,7 @@ struct SessionRegistryTests {
     #expect(try await registry.complete(answer(request(1))) == nil)
     _ = try await registry.poll(a)
     let delivery = try await registry.complete(answer(request(2)))
-    #expect(delivery == Delivery(label: "Example session", status: .ok, text: "done"))
+    #expect(delivery == Delivery(session: a, label: "Example session", status: .ok, text: "done"))
   }
 
   @Test func updateDoesNotCloseTheRequest() async throws {
@@ -121,7 +121,7 @@ struct SessionRegistryTests {
     time.advance(by: .seconds(1))
     #expect(
       await registry.sweep() == [
-        Delivery(label: "Example session", status: .failed, text: "session closed")
+        Delivery(session: a, label: "Example session", status: .failed, text: "session closed")
       ])
     #expect(await registry.rows().map(\.sessionId) == [b])
     #expect(await registry.target == b)
@@ -135,10 +135,12 @@ struct SessionRegistryTests {
     #expect(await run(600) == [])  // request 1 was superseded by request 2
     #expect(try await registry.poll(a) == .request(request(2)))
     #expect(await run(599) == [])
-    #expect(await run(1) == [Self.timedOut])
+    #expect(await run(1) == [timedOut])
   }
 
-  static let timedOut = Delivery(label: "Example session", status: .failed, text: "timed out")
+  var timedOut: Delivery {
+    Delivery(session: a, label: "Example session", status: .failed, text: "timed out")
+  }
 
   /// The Mac slept: no mod polled and no sweep ran, which is not a session going quiet.
   @Test func sleepNeitherExpiresSessionsNorFailsRequests() async throws {
@@ -152,7 +154,7 @@ struct SessionRegistryTests {
     #expect(await registry.sweep() == [])
     #expect(await registry.rows().map(\.sessionId) == [a, b])
     #expect(await run(9) == [])
-    #expect(await run(1) == [Self.timedOut])  // ten minutes awake in all
+    #expect(await run(1) == [timedOut])  // ten minutes awake in all
   }
 
   /// `/clear` gives the session a new id: it keeps its place, the target and its request.
@@ -165,7 +167,7 @@ struct SessionRegistryTests {
     #expect(await registry.target == c)
     #expect(await registry.rows().map(\.sessionId) == [c, b])
     let delivery = try await registry.complete(answer(request(1), from: c))
-    #expect(delivery == Delivery(label: "Alpha", status: .ok, text: "done"))
+    #expect(delivery == Delivery(session: c, label: "Alpha", status: .ok, text: "done"))
   }
 
   @Test func leavingWithAnOpenRequestFailsIt() async throws {

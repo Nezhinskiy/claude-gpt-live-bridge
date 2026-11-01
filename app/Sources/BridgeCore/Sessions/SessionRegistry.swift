@@ -2,6 +2,7 @@ import Foundation
 
 /// What the voice should say about a session's request, under the session's label.
 public struct Delivery: Sendable, Equatable {
+  public var session: SessionID
   public var label: String
   public var status: AnswerStatus
   public var text: String
@@ -139,7 +140,7 @@ public actor SessionRegistry {
       }
       guard session.latest == answer.id, let label else { return nil }
       let text = answer.text.isEmpty ? answer.reason ?? "" : answer.text
-      return Delivery(label: label, status: answer.status, text: text)
+      return Delivery(session: answer.sessionId, label: label, status: answer.status, text: text)
     }
   }
 
@@ -167,7 +168,8 @@ public actor SessionRegistry {
       {
         sessions[id]?.inFlight = nil
         if session.latest == flight.id, let label = labels[id] {
-          deliveries.append(Delivery(label: label, status: .failed, text: "timed out"))
+          deliveries.append(
+            Delivery(session: id, label: label, status: .failed, text: "timed out"))
         }
       }
     }
@@ -220,6 +222,6 @@ public actor SessionRegistry {
     guard let session = sessions.removeValue(forKey: id) else { return nil }
     if target == id { retarget(ordered().last?.key) }
     guard session.hasOpenRequest, let label = labels[id] else { return nil }
-    return Delivery(label: label, status: .failed, text: reason)
+    return Delivery(session: id, label: label, status: .failed, text: reason)
   }
 }

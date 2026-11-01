@@ -294,6 +294,35 @@ struct BridgeTests {
     #expect(await voice.added.isEmpty)
   }
 
+  /// A request that timed out is unheard like any other failure, so a newer request to the
+  /// same session withdraws it.
+  @Test func newerRequestSupersedesATimedOutRequest() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    for _ in 0...600 {  // the sweep runs each second; the session keeps polling
+      #expect(await eventually { time.sleepers == 1 })
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)
+    }
+    #expect(await eventually { await bridge.status.unheard == 1 })
+    voice.emit(.handoff(request(2)))
+    #expect(await eventually { await bridge.status.unheard == 0 })
+  }
+
+  /// An approval notice the owner has not heard goes once the approval is settled.
+  @Test func settledApprovalWithdrawsItsNotice() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
+    #expect(await bridge.status.unheard == 1)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
+    #expect(await bridge.status.unheard == 0)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.added.isEmpty)
+  }
+
   @Test func updateWhileClosedChimes() async throws {
     try await join(a, "Alpha")
     await bridge.perform(.start)

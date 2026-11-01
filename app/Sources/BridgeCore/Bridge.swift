@@ -50,8 +50,6 @@ public actor Bridge: Router {
   private var lastContext: String?
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
-  /// Where each result waiting in `machine.pending` came from.
-  private var unheard: [(session: SessionID, text: String)] = []
   private var callStart: Date?
   public nonisolated let updates: AsyncStream<StatusReply>
   private let publish: AsyncStream<StatusReply>.Continuation
@@ -162,12 +160,10 @@ public actor Bridge: Router {
         if problem == Self.noSession { problem = nil }
       case ("POST", "/v1/leave"):
         let delivery = await registry.leave(try req.decodeBody(LeaveBody.self).sessionId)
-        if let delivery { await deliver(delivery, from: nil) }
+        if let delivery { await deliver(delivery) }
       case ("POST", "/v1/answer"):
         let body = try req.decodeBody(AnswerBody.self)
-        if let delivery = try await registry.complete(body) {
-          await deliver(delivery, from: body.sessionId)
-        }
+        if let delivery = try await registry.complete(body) { await deliver(delivery) }
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
       case ("POST", "/v1/target"):
@@ -190,7 +186,6 @@ public actor Bridge: Router {
     let before = machine.phase
     let effects = machine.handle(event)
     let now = time.now  // read before any await, so an interleaved event cannot shift it
-    unheard.removeAll { !machine.pending.contains($0.text) }
     if before != .live, machine.phase == .live { await meter.opened(at: now) }
     if before == .live, machine.phase != .live { await meter.closed(at: now) }
     for effect in effects { await run(effect) }
@@ -308,26 +303,19 @@ public actor Bridge: Router {
     questionRoute = nil
     for id in [route, await registry.target].compactMap({ $0 }) {
       guard (try? await registry.enqueue(request, for: id)) != nil else { continue }
-      let superseded = unheard.filter { $0.session == id }.map(\.text)
-      machine.withdraw { superseded.contains($0) }
-      unheard.removeAll { $0.session == id }
+      machine.withdraw { $0.session == id }
       return
     }
     let line = AnswerShaper.line(
       tag: "FAILED", label: "LiveBridge", body: "no Claude Code session is joined.")
-    await send(.deliver(line))
+    await send(.deliver(VoiceLine(text: line)))
   }
 
-  private func deliver(_ delivery: Delivery, from session: SessionID?) async {
+  private func deliver(_ delivery: Delivery) async {
     // only a question the call keeps (not one dropped while off) routes the next handoff
-    if delivery.status == .question, machine.phase != .off { questionRoute = session }
+    if delivery.status == .question, machine.phase != .off { questionRoute = delivery.session }
     let line = AnswerShaper.forVoice(delivery.text, status: delivery.status, label: delivery.label)
-    await deliver(line, from: session)
-  }
-
-  private func deliver(_ line: String, from session: SessionID?) async {
-    if let session { unheard.append((session, line)) }
-    await send(.deliver(line))
+    await send(.deliver(VoiceLine(text: line, session: delivery.session)))
   }
 
   private func label(of id: SessionID) async throws -> SessionRow {
@@ -337,13 +325,20 @@ public actor Bridge: Router {
     return row
   }
 
+  /// A session that starts waiting for approval sends the voice a notice, which goes once the
+  /// approval is settled.
   private func activity(_ body: ActivityBody) async {
-    let row = try? await label(of: body.sessionId)
+    guard let row = try? await label(of: body.sessionId) else { return }
     await registry.setActivity(body)
-    guard body.state == .approval, let row, row.activity != .approval else { return }
-    let line = AnswerShaper.line(
-      tag: "APPROVAL", label: row.label, body: "Claude is waiting for your approval")
-    await deliver(line, from: body.sessionId)
+    switch (row.activity == .approval, body.state == .approval) {
+    case (false, true):
+      let line = AnswerShaper.line(
+        tag: "APPROVAL", label: row.label, body: "Claude is waiting for your approval")
+      await send(.deliver(VoiceLine(text: line, session: body.sessionId)))
+    case (true, false):
+      machine.withdraw { $0.session == body.sessionId && $0.text.hasPrefix("[APPROVAL]") }
+    default: break
+    }
   }
 
   /// A session's summary is redacted and capped, shown as it is, and kept for later sessions;
@@ -360,7 +355,7 @@ public actor Bridge: Router {
   }
 
   private func sweep() async {
-    for delivery in await registry.sweep() { await deliver(delivery, from: nil) }
+    for delivery in await registry.sweep() { await deliver(delivery) }
     await changed()
   }
 

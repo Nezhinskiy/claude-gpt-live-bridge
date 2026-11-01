@@ -1,5 +1,11 @@
 import Foundation
 
+/// A line for the voice and the session it came from (`nil`: the bridge's own).
+public struct VoiceLine: Equatable, Sendable {
+  public var text: String
+  public var session: SessionID?
+}
+
 /// What happens to the call: owner actions, local voice detection, the realtime session, timers.
 public enum CallEvent: Equatable, Sendable {
   case start, stop, speechStarted, speechEnded, connected
@@ -9,7 +15,7 @@ public enum CallEvent: Equatable, Sendable {
   case silenceElapsed, handedOff
   /// The voice is saying something (a transcript delta); the owner's words were recognised.
   case assistantSpeaking, userTranscribed
-  case deliver(String)
+  case deliver(VoiceLine)
   case remoteClosed(String)
   case audioFailed(String)
 }
@@ -34,9 +40,9 @@ public struct CallMachine: Sendable {
   public private(set) var phase: CallPhase = .off
   /// Results the voice has not said yet: waiting for the owner to speak, or given to the open
   /// session. A hang-up keeps them, so none is lost; one may be spoken twice.
-  public private(set) var pending: [String] = []
+  public private(set) var pending: [VoiceLine] = []
   /// The results given before the voice's current reply began; only that reply can say them.
-  private var replyCanSay: [String]?
+  private var replyCanSay: [VoiceLine]?
   /// The line closes once the voice's acknowledgement of a handoff ends, unless a result or the
   /// owner's speech came after the handoff. The silence timer stays armed meanwhile.
   public private(set) var awaitingAck = false
@@ -84,14 +90,14 @@ public struct CallMachine: Sendable {
       return []
     case (.connecting, .connected):
       phase = .live
-      return [.flushPreroll] + pending.map(CallEffect.addContext) + [armSilence, .problem(nil)]
+      return [.flushPreroll] + pending.map { .addContext($0.text) } + [armSilence, .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return [.problem(reason)] + hangUp()
     case (.live, .deliver(let result)):  // a result the voice never speaks still hangs up
       pending.append(result)
       awaitingAck = false
-      return [.addContext(result), armSilence]
+      return [.addContext(result.text), armSilence]
     case (.live, .speechStarted):
       isSoundOn = true
       awaitingAck = false
@@ -109,7 +115,7 @@ public struct CallMachine: Sendable {
       let canSay = replyCanSay ?? []
       replyCanSay = nil
       if !isAckUnfinished {
-        pending.removeAll { canSay.contains($0) && Self.says(text, $0) }
+        pending.removeAll { canSay.contains($0) && Self.says(text, $0.text) }
       } else if awaitingAck {
         return [.closeRealtime] + hangUp()
       }
@@ -123,7 +129,7 @@ public struct CallMachine: Sendable {
   }
 
   /// Drops waiting results, such as one a newer request to the same session superseded.
-  public mutating func withdraw(where isSuperseded: (String) -> Bool) {
+  public mutating func withdraw(where isSuperseded: (VoiceLine) -> Bool) {
     pending.removeAll(where: isSuperseded)
   }
 
