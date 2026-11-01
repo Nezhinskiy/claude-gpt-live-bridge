@@ -49,8 +49,8 @@ struct CallMachineTests {
       "closeWhileConnectingKeepsResultsUnheard", unheard, .remoteClosed("r"), .listening,
       [.problem("r")], pending: ["a"]),
     row(
-      "deliverWhileLiveIsAddedAsContext", live, .deliver("a"), .live,
-      [.addContext("a"), .cancelSilenceTimer]),
+      "deliverWhileLiveIsAddedAndReArmsSilence", live, .deliver("a"), .live,
+      [.addContext("a"), arm]),
     row("speechHoldsTheLine", live, .speechStarted, .live, [.cancelSilenceTimer]),
     row("speechWithoutReplyStillHangsUp", live, .speechEnded, .live, [arm]),
     row("replyArmsTheSilenceTimer", live, .assistantFinishedSpeaking, .live, [arm]),

@@ -59,8 +59,8 @@ public struct CallMachine: Sendable {
       (.live, .remoteClosed(let reason)):
       hangUp()
       return [.problem(reason)]
-    case (.live, .deliver(let result)):
-      return [.addContext(result), .cancelSilenceTimer]
+    case (.live, .deliver(let result)):  // a result the voice never speaks still hangs up
+      return [.addContext(result), armSilence]
     case (.live, .speechStarted):
       return [.cancelSilenceTimer]
     case (.live, .speechEnded):
