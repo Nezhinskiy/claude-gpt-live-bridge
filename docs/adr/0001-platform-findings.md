@@ -249,8 +249,8 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
   (the silence rule waits for that acknowledgement), and `initialItems` for continuity.
 - Every `turn/started` on the voice thread is interrupted at once; it costs nothing audible.
 - Results go to the voice with `appendText` (`role: "user"`, tagged lines). A result that arrives
-  while the session is closed cannot make a fresh session speak by itself; how a call-back starts
-  speaking is left open by this record and needs a separate decision.
+  while the session is closed cannot make a fresh session speak by itself, so it waits for the
+  owner to speak (see "Decision: results while the voice is closed" below).
 - Realtime failures are read from `thread/realtime/error` (and `closed` with `reason: "error"`),
   not from the start call's response; a message we do not recognise is shown as is. Not logged in
   is `account/read` returning `account: null`.
@@ -287,8 +287,8 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
   ad-hoc re-signing may ask again after an upgrade.
 - Silent-frame dropping shortens pauses in the replayed part of an utterance and leaves up to
   about 0.5 to 1 s of lag until the speaker pauses; the first word is never lost.
-- The call-back case (a result after the voice session hung up) has no confirmed way to make the
-  voice speak first; it needs its own decision before that feature is built.
+- A result that arrives after the voice session hung up is heard only once the owner speaks
+  again; until then the owner gets a chime and an unheard count, not the result itself.
 - Not yet observed, and to be checked by hand in the desktop app before release: the microphone
   path with a granted permission (and whether it avoids the Local Network prompt), which events
   fire for a permission dialog, the origin of a task-notification turn, `$.process.run` in a
@@ -301,3 +301,15 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 ## Status
 
 Accepted, 2026-11-01. Items marked inferred or documented-only above stay open until observed.
+
+## Decision: results while the voice is closed
+
+Decided by the owner on 2026-11-01, after the findings above.
+
+When an answer, a question or a later update arrives while no realtime session is open, the app
+plays a short chime and does not open a session for it. Item (b) shows why: a fresh session with
+no user turn does not speak appended text or initial items, so reopening one would spend session
+time and still leave the result unsaid. The result waits in the app, counted as unheard in the
+Claude Code band and the popover. When the owner next speaks and a session connects, every waiting
+result is given to the voice as context, and the voice speaks each one once, with its session's
+label. A failed connection keeps the results waiting; nothing is retried on its own.
