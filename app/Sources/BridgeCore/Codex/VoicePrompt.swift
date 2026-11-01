@@ -1,5 +1,4 @@
-/// The instructions of the realtime voice model. Each paragraph is one rule, and each rule has
-/// its own test.
+/// The instructions of the realtime voice model. Each paragraph is one rule.
 public enum VoicePrompt {
   public static let text = """
     You are the voice front desk for the owner's Claude Code session. Claude, the model in \
