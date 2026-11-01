@@ -32,13 +32,17 @@ Method:
   not accept. Each answer below says whether it was **observed**, **documented** in the types,
   or **inferred**.
 
-Generated protocol (`codex app-server generate-ts --experimental`, 0.166.0), the methods we use:
+Generated protocol (`codex app-server generate-ts --experimental`, 0.166.0), the methods the app
+uses:
 
 | Kind | Methods |
 |---|---|
-| Client requests | `initialize` (then the `initialized` notification), `account/read`, `config/read`, `thread/start`, `mcpServerStatus/list`, `thread/realtime/start`, `thread/realtime/stop`, `thread/realtime/appendText`, `thread/realtime/appendSpeech`, `thread/realtime/appendAudio`, `thread/realtime/listVoices`, `turn/interrupt` |
-| Server notifications | `thread/started`, `thread/realtime/started`, `thread/realtime/sdp`, `thread/realtime/itemAdded`, `thread/realtime/transcript/delta`, `thread/realtime/transcript/done`, `thread/realtime/outputAudio/delta`, `thread/realtime/item/started`, `thread/realtime/item/completed`, `thread/realtime/item/transcript/delta`, `thread/realtime/error`, `thread/realtime/closed`, `turn/started`, `turn/completed`, `thread/status/changed`, `mcpServer/startupStatus/updated`, `account/updated`, `warning`, `configWarning`, `remoteControl/status/changed` |
-| Server requests (all declined) | `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `execCommandApproval`, `applyPatchApproval`, `item/tool/call`, `item/tool/requestUserInput`, `mcpServer/elicitation/request`, `account/chatgptAuthTokens/refresh`, `attestation/generate`, `currentTime/read` |
+| Client requests | `initialize` (then the `initialized` notification), `account/read`, `config/read`, `thread/start`, `mcpServerStatus/list`, `thread/realtime/start`, `thread/realtime/stop`, `thread/realtime/appendText`, `turn/interrupt` |
+| Server notifications the app reads | `thread/realtime/sdp`, `thread/realtime/itemAdded`, `thread/realtime/transcript/delta`, `thread/realtime/transcript/done`, `thread/realtime/error`, `thread/realtime/closed`, `turn/started`, `mcpServer/startupStatus/updated`; every other notification is ignored |
+| Server requests (every one declined) | `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `execCommandApproval`, `applyPatchApproval`, `item/tool/call`, `item/tool/requestUserInput`, `mcpServer/elicitation/request`, `account/chatgptAuthTokens/refresh`, `attestation/generate`, `currentTime/read` |
+
+The findings below also cite `thread/realtime/appendSpeech` and `thread/realtime/appendAudio`,
+which the spike tried and the app does not use.
 
 `thread/realtime/start` takes `threadId`, `outputModality`, and optionally `version`,
 `transport` (`{type:"webrtc", sdp}`, `{type:"websocket"}` or `{type:"existingCall", callId}`),
@@ -85,7 +89,7 @@ Observed.
 - `thread/realtime/appendAudio` (`{threadId, audio:{data, sampleRate, numChannels,
   samplesPerChannel, itemId}}`, 6 s of 24 kHz PCM16) returned `{}` in 8 ms, then the backend
   rejected it (`thread/realtime/error`: "Invalid value: 'input_audio.append'", fixture
-  `realtime-error-append-audio-unsupported.json`) and the session closed with reason `error`.
+  [`fixtures/realtime-error-append-audio-unsupported.json`](fixtures/realtime-error-append-audio-unsupported.json)) and the session closed with reason `error`.
   A V3 WebRTC session cannot take side-channel audio.
 - Pre-roll test: a WAV played as a live microphone from t = 0 (2.5 s silence, then a 6 s
   request with a short pause, then silence); an energy VAD (−45 dBFS, 250 ms) fired at 2.43 s
@@ -186,7 +190,8 @@ only". `$.process.spawn` is known to work in a desktop Code tab session (an exis
 on it there); `run` is the same noun under the same note. Observed in the CLI:
 `$.process.run(["open", "-g", "-b", "<bundle id>"])` runs with no shell and resolves
 `{exitCode, stdout, stderr, …}`; for an unknown bundle id, exit code 1 and the Launch Services
-message (fixture `process-run-open-unknown-bundle.json`).
+message (fixture
+[`fixtures/process-run-open-unknown-bundle.json`](fixtures/process-run-open-unknown-bundle.json)).
 
 **(g) `$.http.fetch` over a Unix socket.** Observed: 80 sequential requests from four sessions,
 median 1 ms, slowest 37 ms; three sessions started at the same time used one shared
@@ -254,8 +259,8 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 - Realtime failures are read from `thread/realtime/error` (and `closed` with `reason: "error"`),
   not from the start call's response; a message we do not recognise is shown as is. Not logged in
   is `account/read` returning `account: null`.
-- MCP isolation, fail closed, without a restart: launch with `--disable` for the tool features
-  codex reports as present (including `plugins` and `apps`), read every server name with
+- MCP isolation, fail closed, without a restart: launch with `--disable` for every feature
+  codex reports as present (including `plugins` and `apps`) except a short allow-list, read every server name with
   `config/read`, pass `config: {mcp_servers: {<name>: {enabled: false}}}` on `thread/start`, then
   require every `runtimeStatus` from `mcpServerStatus/list` (all pages) to be `disabled`; `null`
   counts as not disabled. `-c 'mcp_servers={}'` is not used.
@@ -266,8 +271,10 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 
 - The session label is the `name` of the registry record whose `sessionId` equals
   `$.session.id()`, read from `*.json` files only; the folder name is the fallback.
-- The mod launches the app with `$.process.run(["open", "-g", "-b", <bundle id>])`; a rejection or
-  a non-zero exit counts as "not launched" and the band asks the user to open the app.
+- The mod launches the app with `$.process.run(["open", "-g", <path>])` at the path
+  `build-app.sh` installs it to, `~/Applications/LiveBridge.app`, and falls back to
+  `["open", "-g", "-b", <bundle id>]`; a rejection or a non-zero exit of both counts as "not
+  launched" and the band asks the user to open the app.
 - All sessions share one socket path; polling once a second is cheap.
 - The mod records its own submission at `prompt.submit` (`origin.kind == "plugin"`, its own name)
   and takes the next main-loop `turn.start` as the voice turn; it recognises a voice prompt by the
@@ -295,8 +302,9 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
   desktop Code tab session, and the realtime error on a plan without realtime.
 - Fixtures under `app/Tests/BridgeCoreTests/Fixtures/adr/` and `plugin/tests/fixtures/adr/` are
   the observed messages with every id, path, address and title replaced by a placeholder; each
-  is read by a test, so parsers are tested against real shapes, or cited above as evidence. A
-  codex upgrade that changes them should change this record first.
+  is read by a test, so parsers are tested against real shapes. The two that no test reads are
+  kept as evidence in [`fixtures/`](fixtures/) beside this record. A codex upgrade that changes
+  them should change this record first.
 
 ## Status
 
