@@ -108,7 +108,8 @@ enum SpanGlyph {
 }
 
 /// Keeps the menu bar image current: still frames for still states, 12 frames a second while
-/// something moves, and still frames whenever the owner asked macOS to reduce motion.
+/// something moves, and still frames whenever the owner asked macOS to reduce motion. The timer
+/// runs in the common run loop modes, so the glyph keeps moving while the menu is open.
 @MainActor @Observable
 final class StatusGlyph {
   private(set) var image = SpanGlyph.image(
@@ -127,9 +128,11 @@ final class StatusGlyph {
     let moves =
       !reduce && badge != .problem && (phase != .off || [.working, .approval].contains(badge))
     if moves, timer == nil {
-      timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
+      let timer = Timer(timeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
         MainActor.assumeIsolated { self?.draw(still: false) }
       }
+      RunLoop.main.add(timer, forMode: .common)
+      self.timer = timer
     } else if !moves {
       timer?.invalidate()
       timer = nil

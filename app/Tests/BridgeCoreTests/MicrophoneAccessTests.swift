@@ -17,7 +17,7 @@ struct MicrophoneAccessTests {
     #expect(MicrophoneAccess(asked: true) == .granted && MicrophoneAccess(asked: false) == .denied)
   }
 
-  /// The popover offers to open the setting for the page's refusal as for the app's own.
+  /// The menu offers to open the setting for the page's refusal as for the app's own.
   @Test func theSettingButtonFollowsTheDeniedSentence() throws {
     var status = StatusPresentationTests.status(.off, problem: MicrophoneAccess.deniedSentence)
     #expect(StatusPresentation(status).opensMicrophoneSettings)

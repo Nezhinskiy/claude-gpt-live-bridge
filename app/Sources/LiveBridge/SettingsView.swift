@@ -35,7 +35,7 @@ struct SettingsView: View {
         Toggle(
           "Load a session's context automatically when it becomes the target",
           isOn: $model.autoContext)
-        Text("Otherwise only Load context in the popover sends it.")
+        Text("Otherwise only Load context in the menu sends it.")
           .font(.caption).foregroundStyle(.secondary)
       }
       Section("General") {

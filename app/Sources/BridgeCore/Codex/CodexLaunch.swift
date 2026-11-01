@@ -1,6 +1,6 @@
 import Foundation
 
-/// Why the voice cannot start or just stopped, as one sentence for the popover and the band.
+/// Why the voice cannot start or just stopped, as one sentence for the menu and the band.
 public enum CodexProblem: LocalizedError, Equatable, Sendable {
   case notInstalled, notLoggedIn
   /// MCP servers that could not be turned off for the voice thread (fail closed).

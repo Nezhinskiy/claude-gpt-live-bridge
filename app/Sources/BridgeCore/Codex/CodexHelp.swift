@@ -1,4 +1,4 @@
-/// What the popover's problem banner explains when codex is missing or not signed in, with the
+/// What the menu's problem banner explains when codex is missing or not signed in, with the
 /// command to copy into Terminal.
 public struct CodexHelp: Sendable, Equatable {
   public static let loginCommand = "codex login"

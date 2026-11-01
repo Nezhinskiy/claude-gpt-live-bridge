@@ -28,7 +28,7 @@ struct CodexHelpTests {
     #expect(CodexHelp.for(problem: MicrophoneAccess.deniedSentence) == nil)
   }
 
-  @Test func thePopoverOffersItForTheStatusProblem() {
+  @Test func theMenuOffersItForTheStatusProblem() {
     let status = StatusReply(
       call: .off, sessions: [], minutesToday: 0, minutesThisCall: 0,
       problem: CodexProblem.notLoggedIn.sentence, lastContext: nil, recentTranscript: [],

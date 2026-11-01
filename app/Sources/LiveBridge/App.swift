@@ -19,7 +19,7 @@ enum Main {
 }
 
 /// LiveBridge.app: a menu bar app with no Dock icon (`LSUIElement`). The menu bar item and its
-/// popover are AppKit's (`StatusPanel`); Settings is the one SwiftUI scene.
+/// menu are AppKit's (`StatusMenu`); Settings is the one SwiftUI scene.
 struct LiveBridgeApp: App {
   @NSApplicationDelegateAdaptor private var delegate: AppDelegate
 
@@ -29,16 +29,16 @@ struct LiveBridgeApp: App {
 }
 
 /// Owns the app's model and puts its item in the menu bar once the app has launched. A click on
-/// one of its notifications opens the popover.
+/// one of its notifications opens the menu.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   let model = AppModel()
-  private var statusPanel: StatusPanel?
+  private var statusMenu: StatusMenu?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    let statusPanel = StatusPanel(model: model)
-    self.statusPanel = statusPanel
-    model.notifier.onOpen = { [weak statusPanel] in statusPanel?.open() }
+    let statusMenu = StatusMenu(model: model)
+    self.statusMenu = statusMenu
+    model.notifier.onOpen = { [weak statusMenu] in statusMenu?.open() }
   }
 }
 
@@ -55,7 +55,7 @@ enum VoiceListing: Equatable {
 final class AppModel {
   private(set) var status: StatusReply?
   private(set) var presentation: StatusPresentation?
-  /// Where the popover's Load context stands for the target.
+  /// Where the menu's Load context stands for the target.
   private(set) var contextLoad = ContextLoadState.ready
   let glyph = StatusGlyph()
   private var appProblem: String?
@@ -154,13 +154,13 @@ final class AppModel {
   func perform(_ action: CallAction) { Task { await bridge?.perform(action) } }
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
 
-  /// The session row's ×, once the owner confirms it.
+  /// The session row's ×, once the owner confirms it; the menu has closed by then.
   func remove(_ row: SessionRowPresentation) {
     guard Confirm.ask(.remove(label: row.label)) else { return }
     Task { await bridge?.remove(row.id) }
   }
 
-  /// Asks the target for its summary; the button waits until it arrives, 60 s pass or the
+  /// Asks the target for its summary; the item waits until it arrives, 60 s pass or the
   /// session leaves.
   func loadContext() {
     guard contextLoad.isEnabled, let target = targetRow else { return }

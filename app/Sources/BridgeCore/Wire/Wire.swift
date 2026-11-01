@@ -122,7 +122,7 @@ public struct SessionRow: Codable, Sendable, Equatable {
   public var isTarget: Bool
 }
 
-/// What the band and the popover show.
+/// What the band and the menu show.
 public struct StatusReply: Codable, Sendable, Equatable {
   public var call: CallPhase
   public var sessions: [SessionRow]

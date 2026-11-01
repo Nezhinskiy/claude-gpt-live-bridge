@@ -12,7 +12,7 @@ public enum Badge: Sendable, Equatable {
   case problem
 }
 
-/// The accent the popover gives the call.
+/// The accent the menu gives the call.
 public enum Tint: Sendable, Equatable { case quiet, active, attention, problem }
 
 public struct SessionRowPresentation: Sendable, Equatable, Identifiable {
@@ -23,7 +23,7 @@ public struct SessionRowPresentation: Sendable, Equatable, Identifiable {
   public let isTarget: Bool
 }
 
-/// What the menu bar glyph and the popover show for one `StatusReply`. Pure.
+/// What the menu bar glyph and the menu show for one `StatusReply`. Pure.
 public struct StatusPresentation: Sendable, Equatable {
   /// The call phase the glyph's bars draw.
   public let bars: CallPhase
@@ -37,13 +37,13 @@ public struct StatusPresentation: Sendable, Equatable {
   public let canAct: Bool
   public let rows: [SessionRowPresentation]
   public let problem: String?
-  /// The problem is the microphone's refusal: the popover offers to open that setting.
+  /// The problem is the microphone's refusal: the menu offers to open that setting.
   public let opensMicrophoneSettings: Bool
   /// codex is missing or not signed in: the banner explains how, with a command to copy.
   public let codexHelp: CodexHelp?
   public let unheard: Int
   public let minutes: String
-  /// No session has joined: the popover offers `joinCommand` to copy.
+  /// No session has joined: the menu offers `joinCommand` to copy.
   public let offersJoinCommand: Bool
   /// What joins a Claude Code session.
   public static let joinCommand = "/live on"

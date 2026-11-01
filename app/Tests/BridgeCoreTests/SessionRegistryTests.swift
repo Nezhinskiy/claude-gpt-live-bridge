@@ -52,7 +52,7 @@ struct SessionRegistryTests {
     #expect(await registry.rows().map(\.sessionId) == [b, c])
   }
 
-  /// The popover's ×: the session is forgotten, its open request fails as "session left", and
+  /// The menu's ×: the session is forgotten, its open request fails as "session left", and
   /// until it joins again every call from it is told it was removed (not "unknown", which the
   /// mod answers by joining again).
   @Test func removedSessionIsToldSoUntilItJoinsAgain() async throws {

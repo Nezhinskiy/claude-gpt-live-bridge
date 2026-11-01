@@ -4,7 +4,7 @@ import UserNotifications
 
 /// Shows the bridge's notices in Notification Center: alerts only, no sound (the app plays its
 /// own chime). Permission is asked the first time a notice is posted or the setting is turned
-/// on. Clicking a notice opens the menu bar popover. Without an app bundle (a bare `swift run`)
+/// on. Clicking a notice opens the menu bar menu. Without an app bundle (a bare `swift run`)
 /// there is no Notification Center to post to, and notices are dropped. Unchecked: its stored
 /// properties are set once, and the notification center may be used from any thread.
 final class Notifier: NSObject, ResultNotifying, UNUserNotificationCenterDelegate,
@@ -19,7 +19,7 @@ final class Notifier: NSObject, ResultNotifying, UNUserNotificationCenterDelegat
   static let deniedSentence = "Notifications are off for LiveBridge in System Settings."
 
   private let center: UNUserNotificationCenter?
-  /// Opens the popover; set once at launch.
+  /// Opens the menu bar menu; set once at launch.
   @MainActor var onOpen: () -> Void = {}
 
   override init() {

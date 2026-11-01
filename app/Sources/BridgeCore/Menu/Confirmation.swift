@@ -1,4 +1,4 @@
-/// What the popover asks before it erases a session's conversation.
+/// What the menu asks before it erases a session's conversation.
 public struct Confirmation: Sendable, Equatable {
   public let title: String
   public let message: String

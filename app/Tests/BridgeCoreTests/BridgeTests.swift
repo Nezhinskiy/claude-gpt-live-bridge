@@ -169,7 +169,7 @@ struct BridgeTests {
     #expect(await bridge.status.problem == nil)
   }
 
-  /// Removing a session from the popover answers its next poll with 410 and the wire's code.
+  /// Removing a session from the menu answers its next poll with 410 and the wire's code.
   @Test func removedSessionsNextPollIsGone() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
@@ -197,7 +197,7 @@ struct BridgeTests {
       ])
   }
 
-  /// The popover's Load context asks only the target for its summary.
+  /// The menu's Load context asks only the target for its summary.
   @Test func loadContextAsksTheTarget() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
@@ -208,12 +208,12 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == nil)
   }
 
-  /// With no session there is nobody to ask, so the popover has nothing to wait for.
+  /// With no session there is nobody to ask, so the menu has nothing to wait for.
   @Test func loadContextWithoutTargetAsksNobody() async {
     #expect(await bridge.loadContext() == nil)
   }
 
-  /// A session's summary is announced to the popover, which stops waiting for it; one from a
+  /// A session's summary is announced to the menu, which stops waiting for it; one from a
   /// session that never joined is not.
   @Test func arrivingContextIsAnnounced() async throws {
     try await join(a, "Alpha")
@@ -233,7 +233,7 @@ struct BridgeTests {
     #expect(try await registry.poll(b) == .context)
   }
 
-  @Test func popoverSetsTheTarget() async throws {
+  @Test func theMenuSetsTheTarget() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
     #expect(await registry.target == a)
@@ -571,7 +571,7 @@ struct BridgeTests {
     #expect(await bridge.status.lastContext == "[CONTEXT] Beta: Beta's work.")
   }
 
-  /// A session removed from the app (the popover's ×) loses its conversation, on disk too.
+  /// A session removed from the app (the menu's ×) loses its conversation, on disk too.
   @Test func removedSessionLosesItsConversation() async throws {
     try await join(a, "Alpha")
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where the popover's Load context stands for one session.
+/// Where the menu's Load context stands for one session.
 public enum ContextLoadState: Sendable, Equatable {
   /// Nothing pending: the button can be pressed.
   case ready
@@ -29,7 +29,7 @@ public enum ContextLoadState: Sendable, Equatable {
   public var isEnabled: Bool { self == .ready }
 }
 
-/// The popover's Load context presses, per session: pending from the press until that session's
+/// The menu's Load context presses, per session: pending from the press until that session's
 /// summary arrives (`POST /v1/context`), `timeout` passes or the session leaves; then shown as
 /// loaded for `shownLoaded`. Pure: the caller passes the time.
 public struct ContextLoads: Sendable, Equatable {

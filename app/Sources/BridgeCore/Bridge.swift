@@ -42,7 +42,7 @@ public actor Bridge: Router {
   private var published: StatusReply?
   public nonisolated let updates: AsyncStream<StatusReply>
   private let publish: AsyncStream<StatusReply>.Continuation
-  /// The sessions whose summary just arrived (`POST /v1/context`), so the popover's Load
+  /// The sessions whose summary just arrived (`POST /v1/context`), so the menu's Load
   /// context stops waiting for it.
   public nonisolated let contextArrivals: AsyncStream<SessionID>
   private let announceContext: AsyncStream<SessionID>.Continuation
@@ -140,7 +140,7 @@ public actor Bridge: Router {
   /// The Settings choice: whether a session that becomes the target is asked for its summary.
   public func setAutoContext(_ on: Bool) async { await registry.setAutoContext(on) }
 
-  /// The popover's choice of target, which also ends a question's route; a session that left is
+  /// The menu's choice of target, which also ends a question's route; a session that left is
   /// ignored.
   public func setTarget(_ id: SessionID) async {
     questionRoute = nil
@@ -148,7 +148,7 @@ public actor Bridge: Router {
     await changed()
   }
 
-  /// The popover's ×: forgets the session and its conversation. Its open request fails as
+  /// The menu's ×: forgets the session and its conversation. Its open request fails as
   /// "session left", and its next poll is told it was removed.
   public func remove(_ id: SessionID) async {
     if questionRoute == id { questionRoute = nil }
@@ -454,7 +454,7 @@ public actor Bridge: Router {
 
   private static func sentence(_ error: any Error) -> String { error.localizedDescription }
 
-  /// How the popover's last lines name who said each.
+  /// How the menu's last lines name who said each.
   private static func speaker(_ speaker: Conversation.Line.Speaker) -> String {
     switch speaker {
     case .owner: "You: "

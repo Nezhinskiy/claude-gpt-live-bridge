@@ -1,4 +1,4 @@
-/// How sessions are named in the popover, the band and the voice's announcements.
+/// How sessions are named in the menu, the band and the voice's announcements.
 public enum Labels {
   /// Each session's title. Sessions that share a title get ` · ` and the shortest id prefix,
   /// at least four characters, that tells them apart: `Example session · 0000`.

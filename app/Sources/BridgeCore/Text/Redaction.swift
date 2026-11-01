@@ -1,6 +1,6 @@
 import Foundation
 
-/// Removes credentials from text before the voice hears it or the popover shows it. Named
+/// Removes credentials from text before the voice hears it or the menu shows it. Named
 /// patterns only, so commit SHAs, ids and hashes are kept; there is no entropy rule.
 public enum Redaction {
   public static let mask = "(redacted)"

@@ -12,7 +12,7 @@ public enum RegistryError: Error, Equatable {
   case unknownSession(SessionID)
   /// The id is not this session's open request (or, for an `update`, its latest one).
   case unknownRequest(RequestID)
-  /// The owner removed the session in the popover; it is told so until it joins again.
+  /// The owner removed the session in the menu; it is told so until it joins again.
   case removedSession(SessionID)
 
   public var message: String {

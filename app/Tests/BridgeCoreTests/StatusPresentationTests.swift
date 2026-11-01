@@ -89,7 +89,7 @@ struct StatusPresentationTests {
     #expect(StatusPresentation(Self.status(.live)).minutes == "4 min this call · 31 min today")
   }
 
-  /// With no session joined, the popover offers the command that joins one, to copy.
+  /// With no session joined, the menu offers the command that joins one, to copy.
   @Test func noSessionOffersTheJoinCommand() {
     let none = StatusReply(
       call: .off, sessions: [], minutesToday: 0, minutesThisCall: 0, problem: nil,
