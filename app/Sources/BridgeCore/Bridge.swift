@@ -343,7 +343,5 @@ public actor Bridge: Router {
     try? JSONEncoder().encode(continuity).write(to: continuityFile, options: .atomic)
   }
 
-  private static func sentence(_ error: any Error) -> String {
-    (error as? CodexProblem)?.sentence ?? error.localizedDescription
-  }
+  private static func sentence(_ error: any Error) -> String { error.localizedDescription }
 }

@@ -122,6 +122,27 @@ struct RealtimeSessionTests {
     #expect(await rpc.params("mcpServerStatus/list").map { $0["cursor"] } == [nil, "page-2"])
   }
 
+  /// A reply this version cannot read, a configured server codex does not report, or a status
+  /// list that never ends each refuse the session (fail closed).
+  @Test func mcpCheckFailsClosed() async throws {
+    let open = { try await session.open(offerSDP: "offer", items: []) }
+    let disabled = try #require(adrJSON("mcp-server-status-list-all-disabled")["result"]?.object)
+    let withoutStdio = disabled.merging([
+      "data": .array(Array(disabled["data"]?.array?.dropFirst() ?? []))
+    ]) { $1 }
+    await rpc.set("mcpServerStatus/list", [.object(withoutStdio)])
+    await #expect(throws: CodexProblem.mcpNotDisabled(["example-stdio"])) { try await open() }
+    await rpc.set("mcpServerStatus/list", [["servers": []]])
+    await #expect(throws: CodexProblem.self) { try await open() }
+    await rpc.set(
+      "mcpServerStatus/list", [.object(disabled.merging(["nextCursor": "again"]) { $1 })])
+    await #expect(throws: CodexProblem.self) { try await open() }
+    #expect(await rpc.params("mcpServerStatus/list").count == 2 + RealtimeSession.maxStatusPages)
+    await rpc.set("config/read", [["settings": [:]]])
+    await #expect(throws: CodexProblem.self) { try await open() }
+    #expect(await rpc.params("thread/realtime/start").isEmpty)
+  }
+
   @Test func realtimeErrorFailsOpen() async throws {
     let error = try adrJSON("realtime-error-version-unsupported", params: ["threadId": thread])
     await rpc.setOnStart([error])

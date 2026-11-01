@@ -56,8 +56,9 @@ The voice runs on a codex thread that is ephemeral and read-only (`sandbox_mode=
 runs tools, reads files, browses or installs turned off at launch. The app checks that codex
 reports every configured MCP server disabled before each session, and closes the session if one
 starts; it interrupts every codex turn on the thread at once and declines every request codex
-sends. These checks fail closed: if codex cannot list its features, or reports an MCP server
-that is not disabled, the call does not start.
+sends. These checks fail closed: if codex cannot list its features, reports an MCP server that
+is not disabled, leaves a configured server out of its report, or answers in a shape this
+version does not read, the call does not start.
 
 Results from a session are added to the voice as one tagged line each, with every bracket
 neutralised and line breaks removed, so a session's text cannot pose as another delivery. The

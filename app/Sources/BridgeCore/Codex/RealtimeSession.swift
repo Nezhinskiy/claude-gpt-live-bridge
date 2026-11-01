@@ -36,6 +36,8 @@ public actor RealtimeSession: RealtimeControlling {
   private let voice: String?
   private let cwd: URL
   private let timeout = Duration.seconds(20)
+  /// More `mcpServerStatus/list` pages than this is a reply this version does not understand.
+  static let maxStatusPages = 50
   /// The open session's thread; notifications for any other thread are ignored.
   private var thread: String?
   private var answer: CheckedContinuation<String, any Error>?
@@ -59,7 +61,10 @@ public actor RealtimeSession: RealtimeControlling {
     await listen()
     let config: JSONValue = try await client.request(
       "config/read", ["cwd": .string(cwd.path)] as JSONValue, timeout: timeout)
-    let names = (config["config"]?["mcp_servers"]?.object ?? [:]).keys
+    guard let servers = (config["config"]?["mcp_servers"] ?? [:]).object else {
+      throw CodexProblem.protocolMismatch("config/read without an MCP server table")
+    }
+    let names = servers.keys
     let off = JSONValue.object(
       Dictionary(uniqueKeysWithValues: names.map { ($0, ["enabled": false]) }))
     let started: JSONValue = try await client.request(
@@ -74,7 +79,7 @@ public actor RealtimeSession: RealtimeControlling {
     }
     thread = id
     do {
-      try await requireMCPDisabled(thread: id)
+      try await requireMCPDisabled(thread: id, configured: names)
       return try await start(thread: id, offerSDP: offerSDP, items: items)
     } catch {
       await close()
@@ -82,21 +87,32 @@ public actor RealtimeSession: RealtimeControlling {
     }
   }
 
-  /// Every `mcpServerStatus/list` page must report every server `disabled` (`null` is not).
-  private func requireMCPDisabled(thread: String) async throws {
+  /// Every `mcpServerStatus/list` page must report every server `disabled` (`null` is not),
+  /// and every configured server must be reported. Any other shape fails closed.
+  private func requireMCPDisabled(thread: String, configured: some Sequence<String>) async throws {
     var cursor: String?
     var enabled: [String] = []
-    repeat {
+    var reported: Set<String> = []
+    for _ in 0..<Self.maxStatusPages {
       var params: [String: JSONValue] = ["threadId": .string(thread), "detail": "toolsAndAuthOnly"]
       params["cursor"] = cursor.map(JSONValue.string)
       let page: JSONValue = try await client.request(
         "mcpServerStatus/list", JSONValue.object(params), timeout: timeout)
-      for server in page["data"]?.array ?? [] where server["runtimeStatus"] != "disabled" {
-        enabled.append(server["name"]?.string ?? "unnamed")
+      guard let servers = page["data"]?.array else {
+        throw CodexProblem.protocolMismatch("mcpServerStatus/list without data")
+      }
+      for server in servers {
+        let name = server["name"]?.string ?? "unnamed"
+        reported.insert(name)
+        if server["runtimeStatus"] != "disabled" { enabled.append(name) }
       }
       cursor = page["nextCursor"]?.string
-    } while cursor != nil
-    guard enabled.isEmpty else { throw CodexProblem.mcpNotDisabled(enabled) }
+      guard cursor == nil else { continue }
+      enabled += configured.filter { !reported.contains($0) }
+      guard enabled.isEmpty else { throw CodexProblem.mcpNotDisabled(enabled) }
+      return
+    }
+    throw CodexProblem.protocolMismatch("mcpServerStatus/list did not end")
   }
 
   /// `thread/realtime/start` answers `{}`; the SDP answer or an error follows as a notification.
@@ -194,12 +210,12 @@ public actor RealtimeSession: RealtimeControlling {
       answer = nil
     case "thread/realtime/error":
       lastError = params["message"]?.string ?? ""
-      fail(CodexProblem.classify(realtimeError: lastError ?? ""))
+      fail(CodexProblem.realtimeError(lastError ?? ""))
     case "thread/realtime/closed":
       thread = nil
       fail(CodexProblem.protocolMismatch("closed before the SDP answer"))
       let code = params["reason"]?.string ?? "no reason"
-      let reason = lastError.map { CodexProblem.classify(realtimeError: $0).sentence }
+      let reason = lastError.map { CodexProblem.realtimeError($0).sentence }
       emit.yield(.closed(reason ?? "The voice session closed (\(code))."))
     case "thread/realtime/itemAdded":
       handoff(params["item"] ?? .null)

@@ -2,10 +2,17 @@ import Foundation
 import Network
 import os
 
-public enum ServerError: Error, Equatable {
+public enum ServerError: LocalizedError, Equatable {
   /// Another process accepts connections on the socket (a second copy of the app).
   case socketInUse(String)
   case startFailed(String)
+
+  public var errorDescription: String? {
+    switch self {
+    case .socketInUse: "another copy of LiveBridge is already running; quit it first."
+    case .startFailed(let reason): "its socket could not be opened (\(reason))."
+    }
+  }
 }
 
 /// A minimal HTTP/1.1 server on a Unix domain socket: one request per connection, bodies framed

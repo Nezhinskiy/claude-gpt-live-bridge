@@ -45,7 +45,7 @@ struct CodexLaunchTests {
 
   @Test func missingCodexIsNotInstalled() async throws {
     let empty = try temporaryDirectory()
-    #expect(CodexLaunch.locate(explicit: nil, searchPath: [empty.path]) == nil)
+    #expect(CodexLaunch.locate(searchPath: [empty.path]) == nil)
     await #expect(throws: CodexProblem.notInstalled) {
       try await JSONRPCClient.launchVerified(codex: empty.appending(path: "codex"), cwd: empty)
     }
@@ -54,22 +54,52 @@ struct CodexLaunchTests {
 
   @Test func findsCodexOutsideLaunchdPath() throws {
     let fake = try FakeCodex()
-    let found = CodexLaunch.locate(explicit: nil, searchPath: ["/usr/bin", fake.dir.path])
+    let found = CodexLaunch.locate(searchPath: ["/usr/bin", fake.dir.path])
     #expect(found?.standardizedFileURL == fake.codex.standardizedFileURL)
-    #expect(CodexLaunch.locate(explicit: fake.codex.path, searchPath: []) == fake.codex)
+  }
+
+  /// The PATH comes from the user's own shell, read as a Terminal window would start it; what
+  /// its start-up files print is skipped, and a shell that hangs gives up after the timeout.
+  @Test func searchPathComesFromTheUserShell() throws {
+    let dir = try temporaryDirectory()
+    let shell = dir.appending(path: "shell")
+    try Data("#!/bin/sh\necho 'Welcome back'\nPATH=/example/bin:/usr/bin:/bin\neval \"$4\"\n".utf8)
+      .write(to: shell)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shell.path)
+    #expect(CodexLaunch.shellPath(shell.path) == ["/example/bin", "/usr/bin", "/bin"])
+    try Data("#!/bin/sh\nsleep 30\n".utf8).write(to: shell)
+    let start = ContinuousClock.now
+    #expect(CodexLaunch.shellPath(shell.path, timeout: .milliseconds(300)).isEmpty)
+    #expect(ContinuousClock.now - start < .seconds(5))
   }
 
   /// No real "plan without realtime" error has been observed (ADR 0001 (k)); these messages are
-  /// constructed. The unknown one is the observed version error, shown verbatim.
-  @Test func realtimeErrorsAreClassified() throws {
-    let plan = CodexProblem.classify(realtimeError: "Realtime is not available on your plan")
-    #expect(plan == .realtimeUnavailable)
-    #expect(plan.sentence.contains("ChatGPT plan"))
-    #expect(CodexProblem.classify(realtimeError: "401 Unauthorized: please log in") == .notLoggedIn)
+  /// constructed. codex's own words stay in every sentence, so a wrong hint still shows the cause.
+  @Test func realtimeErrorsKeepCodexWordsWithAHint() throws {
+    let plan = CodexProblem.realtimeError("Realtime is not available on your plan").sentence
+    #expect(plan.contains("not available on your plan") && plan.contains("ChatGPT plan"))
+    let login = CodexProblem.realtimeError("401 Unauthorized: please log in").sentence
+    #expect(login.contains("401 Unauthorized") && login.contains("codex login"))
+    for message in ["503 Service Unavailable", "The planned explanation was cut short"] {
+      #expect(!CodexProblem.realtimeError(message).sentence.contains("plan may"), "\(message)")
+    }
     let observed = try #require(
       try adrJSON("realtime-error-version-unsupported")["params"]?["message"]?.string)
-    #expect(CodexProblem.classify(realtimeError: observed) == .realtimeError(observed))
-    #expect(CodexProblem.realtimeError(observed).sentence.contains(observed))
+    #expect(
+      CodexProblem.realtimeError(observed).sentence
+        == "Realtime voice failed (codex said: \(observed)).")
+  }
+
+  /// Every error the popover can show reads as a sentence that names its cause.
+  @Test func errorsReadAsSentences() {
+    let long = PathsError.socketPathTooLong(String(repeating: "a", count: 120))
+    #expect(
+      long.localizedDescription.contains("120 bytes") && long.localizedDescription.contains("103"))
+    #expect(ServerError.socketInUse("/example").localizedDescription.contains("another copy"))
+    let refused = RPCError(code: -32601, message: "method not found")
+    #expect(refused.localizedDescription.contains("method not found"))
+    #expect(CodexProblem.notInstalled.localizedDescription == CodexProblem.notInstalled.sentence)
+    #expect(CodexProblem.exited(127).sentence.contains("runtime"))
   }
 }
 
@@ -78,18 +108,32 @@ struct FakeCodex {
   let dir: URL
   var codex: URL { dir.appending(path: "codex") }
 
-  init(loggedIn: Bool = true) throws {
+  /// The directory of `interpreter`, which `codex` runs on through `/usr/bin/env`.
+  var bin: URL { dir.appending(path: "bin") }
+
+  /// `interpreter` makes `codex` a `#!/usr/bin/env <interpreter>` script, as an npm install is.
+  init(loggedIn: Bool = true, interpreter: String? = nil) throws {
     dir = try temporaryDirectory()
     let script = try #require(
       Bundle.module.url(
         forResource: "fake-app-server", withExtension: "sh", subdirectory: "Fixtures"))
-    try FileManager.default.copyItem(at: script, to: codex)
-    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: codex.path)
+    var text = try String(contentsOf: script, encoding: .utf8)
+    if let interpreter {
+      try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+      try Self.executable(bin.appending(path: interpreter), "#!/bin/sh\nexec /bin/sh \"$@\"\n")
+      text = "#!/usr/bin/env \(interpreter)\n" + text
+    }
+    try Self.executable(codex, text)
     try adrFixture("codex-features-list", extension: "txt").write(
       to: dir.appending(path: "features.txt"))
     try write("initialize.json", #"{"userAgent":"fake","codexHome":"/Users/example/.codex"}"#)
     let account = loggedIn ? #"{"type":"chatgpt","planType":"plus"}"# : "null"
     try write("account_read.json", #"{"account":\#(account),"requiresOpenaiAuth":true}"#)
+  }
+
+  static func executable(_ url: URL, _ text: String) throws {
+    try Data(text.utf8).write(to: url)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
   }
 
   func write(_ name: String, _ text: String) throws {

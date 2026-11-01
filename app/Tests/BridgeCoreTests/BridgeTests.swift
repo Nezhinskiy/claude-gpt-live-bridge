@@ -233,10 +233,10 @@ struct BridgeTests {
     #expect(await missing.bridge.status.call == .off)
     #expect(await missing.bridge.status.problem == CodexProblem.notInstalled.sentence)
 
-    await voice.fail(with: .realtimeUnavailable)
+    await voice.fail(with: .realtimeError("Realtime is not available on your plan"))
     await live()
     #expect(await bridge.status.call == .listening)
-    #expect(await bridge.status.problem == CodexProblem.realtimeUnavailable.sentence)
+    #expect(await bridge.status.problem?.contains("ChatGPT plan") == true)
   }
 
   @Test func contextIsRedactedCappedAndShown() async throws {

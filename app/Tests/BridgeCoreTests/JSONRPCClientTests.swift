@@ -17,6 +17,19 @@ struct JSONRPCClientTests {
     await client.close()
   }
 
+  /// An npm install of codex is a `#!/usr/bin/env node` script: its runtime is found only
+  /// through the search path, which the app passes on to codex.
+  @Test func launchPassesTheSearchPathToCodex() async throws {
+    let fake = try FakeCodex(interpreter: "fake-node")
+    await #expect(throws: CodexProblem.exited(127)) {
+      try await JSONRPCClient.launchVerified(
+        codex: fake.codex, cwd: fake.dir, searchPath: ["/usr/bin", "/bin"])
+    }
+    let client = try await JSONRPCClient.launchVerified(
+      codex: fake.codex, cwd: fake.dir, searchPath: [fake.bin.path, "/usr/bin", "/bin"])
+    await client.close()
+  }
+
   @Test func loggedOutCodexIsNotLoggedIn() async throws {
     let fake = try FakeCodex(loggedIn: false)
     await #expect(throws: CodexProblem.notLoggedIn) {

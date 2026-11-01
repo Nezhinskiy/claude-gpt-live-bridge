@@ -242,7 +242,11 @@ sequenceDiagram
 - **Codex missing or signed out:** Start reports why in one sentence, in the popover and the
   band, and the call stays off.
 - **A plan without realtime voice, or any realtime error:** the first connect reports codex's
-  reason in one sentence and the call goes back to `listening`.
+  own words in one sentence, with a hint when they name sign-in or the plan, and the call goes
+  back to `listening`.
+- **Codex installed with npm, or found only through a shell's start-up files:** the app reads
+  `PATH` from the user's own shell (at most 3 s) and starts codex with it; a codex whose runtime
+  is still missing gets its own sentence.
 - **The app not running:** the mod opens it; while the socket does not answer for 10 s the band
   says "bridge offline". After the app restarts, the mod joins again on its next poll; the call
   starts off.

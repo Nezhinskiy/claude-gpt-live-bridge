@@ -81,12 +81,22 @@ public struct RPCServerRequest: Sendable, Equatable {
   public var params: JSONValue
 }
 
-public struct RPCError: Error, Codable, Sendable, Equatable {
+public struct RPCError: LocalizedError, Codable, Sendable, Equatable {
   public var code: Int
   public var message: String
   public init(code: Int, message: String) {
     self.code = code
     self.message = message
+  }
+  public var errorDescription: String? { "Codex refused a request: \(message) (\(code))." }
+}
+
+extension Process {
+  /// Starts the child with this `PATH`, so a `#!/usr/bin/env node` codex finds its runtime.
+  func use(searchPath: [String]) {
+    guard !searchPath.isEmpty else { return }
+    environment = ProcessInfo.processInfo.environment.merging(
+      ["PATH": searchPath.joined(separator: ":")]) { $1 }
   }
 }
 
@@ -132,9 +142,10 @@ public actor JSONRPCClient: RPCClient {
   private let notify: AsyncStream<RPCNotification>.Continuation
   private let ask: AsyncStream<RPCServerRequest>.Continuation
 
-  public init(executable: URL, arguments: [String], cwd: URL) {
+  public init(executable: URL, arguments: [String], cwd: URL, searchPath: [String] = []) {
     process.executableURL = executable
     process.arguments = arguments
+    process.use(searchPath: searchPath)
     process.currentDirectoryURL = cwd
     process.standardInput = input
     process.standardOutput = output
@@ -235,13 +246,15 @@ public actor JSONRPCClient: RPCClient {
 
   /// Runs `codex features list`, starts `codex app-server` with every unwanted feature codex
   /// has turned off, initialises it and checks the ChatGPT sign-in. Throws `CodexProblem`.
-  public static func launchVerified(codex: URL, cwd: URL) async throws -> JSONRPCClient {
-    let features = try await Self.output(of: codex, ["features", "list"])
+  public static func launchVerified(
+    codex: URL, cwd: URL, searchPath: [String] = []
+  ) async throws -> JSONRPCClient {
+    let features = try await Self.output(of: codex, ["features", "list"], searchPath: searchPath)
     let present = try CodexLaunch.presentFeatures(featuresListOutput: features)
     let client = JSONRPCClient(
       executable: codex,
       arguments: CodexLaunch.argv(disable: CodexLaunch.wantDisabled.filter(present.contains)),
-      cwd: cwd)
+      cwd: cwd, searchPath: searchPath)
     do {
       try await client.start()
       let hello: JSONValue = [
@@ -262,11 +275,14 @@ public actor JSONRPCClient: RPCClient {
     }
   }
 
-  private static func output(of executable: URL, _ arguments: [String]) async throws -> String {
+  private static func output(
+    of executable: URL, _ arguments: [String], searchPath: [String]
+  ) async throws -> String {
     let process = Process()
     let output = Pipe()
     process.executableURL = executable
     process.arguments = arguments
+    process.use(searchPath: searchPath)
     process.standardOutput = output
     process.standardError = FileHandle.nullDevice
     do { try process.run() } catch { throw CodexProblem.notInstalled }
