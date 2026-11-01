@@ -75,7 +75,10 @@ public actor SessionRegistry {
   /// own `autoContext` is accepted and ignored.
   public private(set) var autoContext = false
 
-  public init(time: any TimeSource) { self.time = time }
+  public init(time: any TimeSource, autoContext: Bool = false) {
+    self.time = time
+    self.autoContext = autoContext
+  }
 
   /// Adds the session, or renames it and refreshes its liveness if it already joined. A session
   /// that `replaces` an id takes over that id's place, target and requests.

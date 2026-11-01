@@ -30,7 +30,15 @@ struct LiveBridgeApp: App {
         .accessibilityLabel(model.presentation?.accessibilityLabel ?? "LiveBridge")
     }
     .menuBarExtraStyle(.window)
+    Settings { SettingsView(model: model) }
   }
+}
+
+/// Where Settings' voice list stands. The list comes from a short-lived codex app-server.
+enum VoiceListing: Equatable {
+  case idle, loading
+  case loaded([String])
+  case failed(String)
 }
 
 /// The composition root: the bridge, its Unix-socket server, the audio page, and what the menu
@@ -43,15 +51,34 @@ final class AppModel {
   private(set) var contextLoad = ContextLoadState.ready
   let glyph = StatusGlyph()
   private var appProblem: String?
+  /// Why Open at login could not be changed, shown in Settings.
+  private(set) var loginProblem: String?
   var openAtLogin = LoginItem.isEnabled {
     didSet {
       guard openAtLogin != LoginItem.isEnabled else { return }
+      loginProblem = nil
       do { try LoginItem.set(openAtLogin) } catch {
-        appProblem = "Open at login could not be changed: \(error.localizedDescription)"
+        loginProblem = "Open at login could not be changed: \(error.localizedDescription)"
         openAtLogin = LoginItem.isEnabled
       }
     }
   }
+  /// The voice chosen in Settings; nil is codex's default. It applies from the next opening.
+  var voice: String? {
+    didSet { settings?.update { [voice] in $0.voice = voice } }
+  }
+  /// Load a session's context automatically when it becomes the target.
+  var autoContext = false {
+    didSet {
+      settings?.update { [autoContext] in $0.autoContext = autoContext }
+      Task { [autoContext] in await bridge?.setAutoContext(autoContext) }
+    }
+  }
+  private(set) var voices = VoiceListing.idle
+  /// Why the chosen voice was set back to codex's default.
+  private(set) var voiceNote: String?
+  @ObservationIgnored private var settings: SettingsStore?
+  @ObservationIgnored private var codexCwd: URL?
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
@@ -67,9 +94,16 @@ final class AppModel {
       let data = try Paths.dataDir()
       let cwd = data.appending(path: "codex-cwd")
       try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+      let settings = SettingsStore(file: data.appending(path: "settings.json"))
+      self.settings = settings
+      codexCwd = cwd
+      voice = settings.current.voice
+      autoContext = settings.current.autoContext
       let time = SystemTime()
+      let registry = SessionRegistry(time: time, autoContext: settings.current.autoContext)
       let bridge = Bridge(
-        registry: SessionRegistry(time: time), realtime: { try await Self.voice(cwd: cwd) },
+        registry: registry,
+        realtime: { try await Self.voice(cwd: cwd, voice: { settings.current.voice }) },
         audio: audio, meter: UsageMeterStore(file: data.appending(path: "usage.json"), time: time),
         continuityFile: data.appending(path: "continuity.json"), time: time)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
@@ -161,12 +195,50 @@ final class AppModel {
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
   }
 
+  /// Asks codex for its voices, once per run unless it failed. A chosen voice codex no longer
+  /// offers goes back to codex's default; when listing fails the choice is kept.
+  func listVoices() {
+    switch voices {
+    case .loading, .loaded: return
+    case .idle, .failed: break
+    }
+    guard let codexCwd else {
+      voices = .failed("LiveBridge could not start, so codex was not asked for its voices.")
+      return
+    }
+    voices = .loading
+    Task {
+      do {
+        let offered = try await Self.offeredVoices(cwd: codexCwd)
+        voices = .loaded(offered)
+        if let chosen = voice, Voices.effective(chosen, offered: offered) == nil {
+          voice = nil
+          voiceNote = "Codex no longer offers \(chosen), so its default voice is used."
+        }
+      } catch {
+        voices = .failed("Codex did not list its voices: \(error.localizedDescription)")
+      }
+    }
+  }
+
   /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed` off.
-  nonisolated private static func voice(cwd: URL) async throws -> any RealtimeControlling {
+  nonisolated private static func voice(cwd: URL, voice: @escaping @Sendable () -> String?)
+    async throws -> any RealtimeControlling
+  {
+    RealtimeSession(client: try await launchCodex(cwd: cwd), cwd: cwd, voice: voice)
+  }
+
+  /// The voices, from a codex app-server started for the question and ended after it.
+  nonisolated private static func offeredVoices(cwd: URL) async throws -> [String] {
+    let client = try await launchCodex(cwd: cwd)
+    defer { Task { await client.close() } }
+    return try await Voices.list(client: client)
+  }
+
+  nonisolated private static func launchCodex(cwd: URL) async throws -> JSONRPCClient {
     let path = await CodexLaunch.defaultSearchPath()
     guard let codex = CodexLaunch.locate(searchPath: path) else { throw CodexProblem.notInstalled }
-    let client = try await CodexLaunch.launch(codex: codex, cwd: cwd, searchPath: path)
-    return RealtimeSession(client: client, cwd: cwd)
+    return try await CodexLaunch.launch(codex: codex, cwd: cwd, searchPath: path)
   }
 
   /// `--fake-mic <wav>`: debug builds play the file as the microphone.

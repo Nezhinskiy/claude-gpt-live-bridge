@@ -87,9 +87,19 @@ removes it and erases its conversation, and `/live on` in that session joins it 
 the last lines of the conversation (each cut to four lines) and the context line exactly as it
 was sent, and has **Load context** (it waits, as **Loading context…**, until the target's summary
 arrives or a minute passes), **New conversation** (it asks before it erases what the voice
-remembers of the target and its loaded context), **Open at login** (off by default) and the
-minutes the voice line was open today. The popover never grows past the screen: its lists scroll
-inside it.
+remembers of the target and its loaded context), the minutes the voice line was open today and
+**Settings…**. Both erasing buttons ask first, with Cancel as the default. The popover never
+grows past the screen: its lists scroll inside it.
+
+**Settings…** opens LiveBridge's Settings window:
+
+- **Voice**: the realtime voices your codex offers (codex lists them when the window opens), or
+  **Codex default**. A new voice is heard from the next time the voice line opens. If codex
+  cannot list its voices, the window says why and the line keeps the voice already chosen; a
+  voice codex no longer offers goes back to the default.
+- **Load a session's context automatically when it becomes the target** (off by default): one
+  setting for every session, kept by the app.
+- **Open at login** (off by default).
 
 What the voice does:
 
@@ -156,7 +166,7 @@ list of patterns, not a guarantee.
 The codex thread that carries the voice is ephemeral and read-only, with every codex feature
 turned off except where it keeps your login and how it uses your proxy, and every MCP server off; it is there only to talk.
 Claude's work goes to Anthropic as your Claude Code session always does. On your Mac the app
-keeps the usage meter and, for each of the 20 sessions used last, its recent conversation and
+keeps its settings, the usage meter and, for each of the 20 sessions used last, its recent conversation and
 the context line last loaded from it, until you press **New conversation** with it as the target
 or remove it, in `~/Library/Application Support/claude-gpt-live-bridge`.
 

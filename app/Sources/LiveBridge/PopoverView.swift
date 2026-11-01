@@ -11,6 +11,13 @@ struct PopoverView: View {
   @Bindable var model: AppModel
   @State private var showContext = false
   @State private var copied = false
+  @Environment(\.openSettings) private var openSettings
+
+  /// Opens Settings in front: the app is activated first, as a menu bar app is not active.
+  private func showSettings() {
+    NSApp.activate()
+    openSettings()
+  }
 
   private var layout: PopoverLayout {
     PopoverLayout(visibleHeight: Double(NSScreen.main?.visibleFrame.height ?? 800))
@@ -217,9 +224,14 @@ struct PopoverView: View {
   private func footer(_ shown: StatusPresentation) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       Text(shown.minutes).font(.caption).foregroundStyle(.secondary)
-      Toggle("Open at login", isOn: $model.openAtLogin).toggleStyle(.switch)
-      Button("Quit LiveBridge") { NSApplication.shared.terminate(nil) }
-        .keyboardShortcut("q").buttonStyle(.plain)
+      HStack {
+        Button("Settings…", systemImage: "gearshape") { showSettings() }
+          .keyboardShortcut(",")
+        Spacer()
+        Button("Quit LiveBridge") { NSApplication.shared.terminate(nil) }
+          .keyboardShortcut("q")
+      }
+      .buttonStyle(.plain)
     }
     .padding(.horizontal, 4)
   }
