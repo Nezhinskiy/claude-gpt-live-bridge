@@ -108,7 +108,9 @@ async function tick($: EngineInterface): Promise<void> {
     tracker.submitted(reply.work.id)
     await save($)
     // It resolves once the turn starts, which may be after the running one: do not hold the poll.
-    void $.prompt.submit({ text: voicePrompt(reply.work) })
+    const id = reply.work.id
+    void $.prompt.submit({ text: voicePrompt(reply.work) }).catch(() =>
+      link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' }))
   } else if (reply.work?.kind === 'context') {
     void sendContext($)
   }

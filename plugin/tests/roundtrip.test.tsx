@@ -48,6 +48,18 @@ test('rejectedAnswerIsShownNotDropped', async ($, on) => {
   await band.unmount()
 })
 
+test('refusedPromptFailsTheRequestAtOnce', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...VOICEMOD, args: 'on' })
+  world.isSubmitRefused = true
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  expect(world.take('answer')).toEqual([
+    { sessionId: ID, id: REQUEST.id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' },
+  ])
+})
+
 test('approvalIsReported', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })

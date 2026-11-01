@@ -31,6 +31,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     isAppUp: true,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
+    isSubmitRefused: false,
     joined: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
     work: [] as Work[],
@@ -84,6 +85,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     return { value: { status: reply ? 200 : 404, ok: reply !== undefined, headers: {}, text } }
   })
   on('prompt.submit', (_, e) => {
+    if (world.isSubmitRefused) throw new Error('the session is closing')
     world.submitted.push(e.text)
     return { text: e.text, origin: e.origin }
   })
