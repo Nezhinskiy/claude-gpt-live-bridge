@@ -10,7 +10,9 @@ import SwiftUI
 struct PopoverView: View {
   @Bindable var model: AppModel
   @State private var showContext = false
-  @State private var copied = false
+  /// The command just copied, which its button says for two seconds.
+  @State private var copied: String?
+  @State private var showHelp = false
   @Environment(\.openSettings) private var openSettings
 
   /// Opens Settings in front: the app is activated first, as a menu bar app is not active.
@@ -35,7 +37,8 @@ struct PopoverView: View {
       if let shown = model.presentation {
         call(shown)
         if let problem = model.problem {
-          problemBanner(problem, opensSettings: shown.opensMicrophoneSettings)
+          problemBanner(
+            problem, opensSettings: shown.opensMicrophoneSettings, help: shown.codexHelp)
         }
         sessions(shown)
         context
@@ -72,7 +75,9 @@ struct PopoverView: View {
     .card()
   }
 
-  private func problemBanner(_ problem: String, opensSettings: Bool = false) -> some View {
+  private func problemBanner(
+    _ problem: String, opensSettings: Bool = false, help: CodexHelp? = nil
+  ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       Label(problem, systemImage: "exclamationmark.triangle.fill")
         .font(.callout).symbolRenderingMode(.multicolor).lineLimit(6)
@@ -81,6 +86,22 @@ struct PopoverView: View {
           NSWorkspace.shared.open(MicrophoneAccess.settingsURL)
         }
         .capsule(prominent: false)
+      }
+      if let help {
+        Button(help.button, systemImage: showHelp ? "chevron.up" : "questionmark.circle") {
+          showHelp.toggle()
+        }
+        .capsule(prominent: false)
+        if showHelp {
+          VStack(alignment: .leading, spacing: 8) {
+            Text(help.steps).font(.caption).fixedSize(horizontal: false, vertical: true)
+            Text(help.command).font(.caption.monospaced()).textSelection(.enabled)
+            copyButton(help.command, title: help.copy)
+          }
+          .padding(8)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
+        }
       }
     }
     .card()
@@ -94,7 +115,10 @@ struct PopoverView: View {
           Text("No session has joined.")
             .font(.callout).foregroundStyle(.secondary)
           Spacer()
-          copyJoinCommand
+          copyButton(
+            StatusPresentation.joinCommand, title: "Copy \(StatusPresentation.joinCommand)"
+          )
+          .help("Copy \(StatusPresentation.joinCommand), then run it in a Claude Code session")
         }
       }
       CappedScroll(cap: layout.sessions) {
@@ -120,22 +144,21 @@ struct PopoverView: View {
     .card()
   }
 
-  /// Copies `/live on`, to paste into a Claude Code session; says so for two seconds.
-  private var copyJoinCommand: some View {
+  /// Copies `command`, to paste into a Claude Code session or Terminal; says so for two seconds.
+  private func copyButton(_ command: String, title: String) -> some View {
     Button(
-      copied ? "Copied" : "Copy \(StatusPresentation.joinCommand)",
-      systemImage: copied ? "checkmark" : "doc.on.doc"
+      copied == command ? "Copied" : title,
+      systemImage: copied == command ? "checkmark" : "doc.on.doc"
     ) {
       NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(StatusPresentation.joinCommand, forType: .string)
-      copied = true
+      NSPasteboard.general.setString(command, forType: .string)
+      copied = command
       Task {
         try? await Task.sleep(for: .seconds(2))
-        copied = false
+        if copied == command { copied = nil }
       }
     }
     .capsule(prominent: false)
-    .help("Copy \(StatusPresentation.joinCommand), then run it in a Claude Code session")
   }
 
   private func targetButton(_ row: SessionRowPresentation) -> some View {

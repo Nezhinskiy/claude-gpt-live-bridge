@@ -39,6 +39,8 @@ public struct StatusPresentation: Sendable, Equatable {
   public let problem: String?
   /// The problem is the microphone's refusal: the popover offers to open that setting.
   public let opensMicrophoneSettings: Bool
+  /// codex is missing or not signed in: the banner explains how, with a command to copy.
+  public let codexHelp: CodexHelp?
   public let unheard: Int
   public let minutes: String
   /// No session has joined: the popover offers `joinCommand` to copy.
@@ -53,6 +55,7 @@ public struct StatusPresentation: Sendable, Equatable {
     bars = s.call
     problem = s.problem
     opensMicrophoneSettings = s.problem == MicrophoneAccess.deniedSentence
+    codexHelp = CodexHelp.for(problem: s.problem)
     unheard = s.unheard
     badge =
       if s.problem != nil { .problem } else if activities.contains(.approval) {

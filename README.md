@@ -22,7 +22,7 @@ tools and permission mode, and the voice tells you the result.
 - macOS 14 or later on Apple Silicon.
 - Claude Code 2.1.289 or later (mods).
 - [Codex CLI](https://github.com/openai/codex) (`codex`, tested with 0.166.0), installed with
-  Homebrew or npm, on the `PATH` your shell sets in a Terminal window, and signed in with `codex
+  Homebrew (`brew install --cask codex`) or npm (`npm install -g @openai/codex`), on the `PATH` your shell sets in a Terminal window, and signed in with `codex
   login` to a ChatGPT plan that includes realtime voice. LiveBridge refuses a codex whose
   `codex features list` it cannot read, so another version may not start until LiveBridge is
   updated.
@@ -89,7 +89,9 @@ was sent, and has **Load context** (it waits, as **Loading context…**, until t
 arrives or a minute passes), **New conversation** (it asks before it erases what the voice
 remembers of the target and its loaded context), the minutes the voice line was open today and
 **Settings…**. Both erasing buttons ask first, with Cancel as the default. The popover never
-grows past the screen: its lists scroll inside it.
+grows past the screen: its lists scroll inside it. When Start fails because codex is not
+installed or not signed in, the problem has **How to install codex** or **How to sign in**: the
+steps, and a button that copies the command to run in Terminal.
 
 **Settings…** opens LiveBridge's Settings window:
 
