@@ -12,8 +12,8 @@ struct SessionRegistryTests {
 
   init() { registry = SessionRegistry(time: time) }
 
-  func join(_ id: SessionID, _ title: String = "Example session", autoContext: Bool = false) async {
-    await registry.join(JoinBody(sessionId: id, title: title, autoContext: autoContext))
+  func join(_ id: SessionID, _ title: String = "Example session") async {
+    await registry.join(JoinBody(sessionId: id, title: title))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -181,7 +181,7 @@ struct SessionRegistryTests {
     await join(b, "Beta")
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    await registry.join(JoinBody(sessionId: c, title: "Alpha", autoContext: false, replaces: a))
+    await registry.join(JoinBody(sessionId: c, title: "Alpha", replaces: a))
     #expect(await registry.target == c)
     #expect(await registry.rows().map(\.sessionId) == [c, b])
     let delivery = try await registry.complete(answer(request(1), from: c))
@@ -195,12 +195,12 @@ struct SessionRegistryTests {
     #expect(await registry.target == nil)
   }
 
-  /// The app's own setting decides, not the flag a session joins with.
+  /// The app's own setting decides.
   @Test func becomingTargetWithAutoContextAsksForContext() async throws {
     await registry.setAutoContext(true)
     await join(a)
     #expect(try await registry.poll(a) == .context)  // the first session becomes the target
-    await join(b, "Other session", autoContext: false)
+    await join(b, "Other session")
     #expect(try await registry.poll(b) == nil)
     try await registry.setTarget(b)
     #expect(try await registry.poll(b) == .context)
@@ -213,12 +213,5 @@ struct SessionRegistryTests {
     await join(a)
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval))
     #expect(await registry.rows().map(\.activity) == [.approval])
-  }
-
-  @Test func aSessionsOwnAutoContextFlagNoLongerAsks() async throws {
-    await join(a)
-    await join(b, "Other session", autoContext: true)
-    try await registry.setTarget(b)
-    #expect(try await registry.poll(b) == nil)
   }
 }

@@ -51,7 +51,7 @@ const SHAPES: Record<string, Shape> = {
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop'] } }),
   'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
-  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, autoContext: 'boolean', replaces: optional(S) }),
+  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S) }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
   'target': fields<Wire.TargetBody>({ sessionId: S }),
@@ -91,7 +91,7 @@ test('everyWireFixtureParsesIntoItsType', () => {
 })
 
 test('theCheckRejectsADriftedShape', () => {
-  const join = { sessionId: 'a', title: 'b', autoContext: false }
+  const join = { sessionId: 'a', title: 'b' }
   assert.deepEqual(mismatches(join, SHAPES['join']!, 'join'), [])
   assert.deepEqual(mismatches({ ...join, extra: 1, title: null }, SHAPES['join']!, 'join'), [
     'join.extra: unknown', 'join.title: null (absent fields are omitted)',

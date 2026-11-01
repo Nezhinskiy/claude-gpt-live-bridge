@@ -9,7 +9,7 @@ test('reloadResumesPolling', async ($, on) => {
   // A hot reload runs session.start again with the module's own variables gone; the store stays.
   const world = fakeWorld(on, { [`joined:${ID}`]: { pending: null, followUp: null, turns: [] } })
   await $.session.start(START)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
   await world.clock.advance(1000)
   expect(world.take('next')).toHaveLength(1)
 })
@@ -24,7 +24,7 @@ test('clearRejoinsWithNewId', async ($, on) => {
   await world.clock.advance(1000)
   // One join that replaces the old id, so the app keeps the target and any open request.
   expect(world.take('leave')).toEqual([])
-  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', autoContext: false, replaces: ID }])
+  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', replaces: ID }])
   expect(world.joined).toEqual(new Set([OTHER]))
   await world.clock.advance(1000)
   expect(world.take('join')).toEqual([])
@@ -37,15 +37,13 @@ test('renameRejoins', async ($, on) => {
   world.take('join')
   world.title = 'Renamed session'
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Renamed session', autoContext: false }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Renamed session' }])
 })
 
-test('offTurnsContextAutoAndLeaves', async ($, on) => {
+test('offLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
-  await $.command.run({ ...LIVE, args: 'context auto' })
-  expect(world.take('join').at(-1)).toEqual({ sessionId: ID, title: 'Example session', autoContext: true })
   expect((await $.command.run({ ...LIVE, args: 'off' })).text).toContain('Left')
   expect(world.take('leave')).toEqual([{ sessionId: ID }])
   await world.clock.advance(3000)
@@ -58,7 +56,7 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
   world.otherRecords = { '1.json': '', '2.json': '{"sessionId": "', '3.json': 'null' }
   await $.session.start(START)
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Example session')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
@@ -101,7 +99,7 @@ test('theCommandIsLive', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
   expect(world.commands).toEqual(['live'])
-  expect((await $.command.run({ ...LIVE, args: 'help' })).text).toBe('Usage: /live on | off | target | status | context [auto|manual]')
+  expect((await $.command.run({ ...LIVE, args: 'help' })).text).toBe('Usage: /live on | off | target | status | context')
   expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('/live on')
 })
 
@@ -143,7 +141,7 @@ test('aRemovedSessionTurnsItselfOffAndDoesNotRejoin', async ($, on) => {
   await $.session.start(START)
   expect(world.take('join')).toEqual([])
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
 })
 
 test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
@@ -153,13 +151,26 @@ test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
   world.title = ''
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'example-project', autoContext: false }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'example-project' }])
   world.title = 'Live mode'
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Live mode', autoContext: false }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Live mode' }])
   // Once found, a poll reads this session's record alone.
   world.read = []
   await world.clock.advance(1000)
   expect(world.read).toEqual(['/Users/example/.claude/sessions/12345.json'])
   expect(world.take('join')).toEqual([])
+})
+
+test('automaticContextIsTheAppsSetting', async ($, on) => {
+  // The app decides it for every session (LiveBridge Settings); the join carries no flag.
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  for (const option of ['auto', 'manual']) {
+    expect((await $.command.run({ ...LIVE, args: `context ${option}` })).text).toContain('LiveBridge Settings')
+  }
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
+  expect(world.take('context')).toEqual([])
+  expect(world.forks).toBe(0)
 })

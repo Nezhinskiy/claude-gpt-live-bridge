@@ -92,7 +92,7 @@ that both test suites parse.
 
 | Route | Body or reply |
 |---|---|
-| `POST /v1/join` | `sessionId`, `title`, `autoContext`; an upsert that also refreshes liveness |
+| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`; an upsert that also refreshes liveness |
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |

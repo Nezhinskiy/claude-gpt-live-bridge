@@ -130,7 +130,8 @@ test('aFailedSummaryClearsTheNoteAndSaysSo', async ($, on) => {
 })
 
 test('theAppsAskDuringStartsSummaryWaitsForIt', async ($, on) => {
-  // With context auto the app asks as Start makes the session the target: one summary serves both.
+  // With automatic context on in the app, it asks as Start makes the session the target: one
+  // summary serves both.
   const world = await joined($, on)
   world.forkMs = 5000
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })

@@ -27,9 +27,10 @@ export type Work = ({ kind: 'request' } & VoiceRequest) | { kind: 'context' };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
- * session had before `/clear`: its place, target and requests move to the new id.
+ * session had before `/clear`: its place, target and requests move to the new id. Whether a new
+ * target is asked for its summary is the app's own setting, not the join's.
  */
-export type JoinBody = { sessionId: SessionId; title: string; autoContext: boolean; replaces?: SessionId };
+export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 

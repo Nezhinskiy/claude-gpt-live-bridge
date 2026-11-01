@@ -60,7 +60,7 @@ struct UnixHTTPServerTests {
     FileManager.default.createFile(atPath: socket.path, contents: Data("stale".utf8))
     let join = JoinBody(
       sessionId: SessionID(rawValue: "00000000-0000-0000-0000-000000000001"),
-      title: "Example session", autoContext: false)
+      title: "Example session")
     try await withServer {
       let reply = try await exchange(post("/v1/join", try JSONEncoder().encode(join)))
       #expect(reply.status == 200)

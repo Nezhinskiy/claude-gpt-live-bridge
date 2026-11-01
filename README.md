@@ -74,9 +74,10 @@ In the Claude Code session you want to talk to:
 | `/live target` | Makes this session the one the voice hands work to. |
 | `/live status` (or just `/live`) | One line: the call, the target, unheard results, minutes today. |
 | `/live context` | Sends the voice a new summary of this session, written by the session's model. |
-| `/live context auto` / `manual` | Also sends that summary whenever the session becomes the target, or only on Start and on request. |
 
-The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode.
+The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode. Whether a
+session's summary is also sent whenever it becomes the target is not a command: it is one setting
+for every session, in LiveBridge's Settings window (see below).
 
 Then press **Start**, in the band above the prompt or in the menu bar popover, and talk. The
 band's Start makes its session the target, starts the call and sends the voice the session's

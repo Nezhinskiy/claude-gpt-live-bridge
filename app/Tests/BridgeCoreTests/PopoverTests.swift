@@ -30,7 +30,7 @@ struct ContextLoadsTests {
 
   @Test func aContextNobodyPressedForShowsNothing() {
     var loads = ContextLoads()
-    loads.arrived(a, at: t0)  // as when a session with autoContext becomes the target
+    loads.arrived(a, at: t0)  // as when automatic context asks a new target for it
     #expect(loads.state(of: a, at: t0) == .ready)
   }
 

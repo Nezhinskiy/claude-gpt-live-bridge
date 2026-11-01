@@ -22,7 +22,6 @@ const OPEN_APP = 'Open LiveBridge from the menu bar.'
  * shortens answers for speech itself.
  */
 const ANSWER_LIMIT = 32_000
-const AUTO_CONTEXT = 'autoContext'
 /** How long a summary may take before the band stops saying it is loading. */
 const CONTEXT_TIMEOUT_MS = 60_000
 /** How long the band says "Context sent". */
@@ -30,7 +29,9 @@ const SENT_NOTE_MS = 3_000
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
-const USAGE = 'Usage: /live on | off | target | status | context [auto|manual]'
+const USAGE = 'Usage: /live on | off | target | status | context'
+/** What `/live context auto` and `manual`, the options before the app's own setting, answer now. */
+const CONTEXT_SETTING = 'Loading context automatically is now one setting for every session: LiveBridge Settings, from the menu bar popover.'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
 const joinedKey = (sessionId: string) => `joined:${sessionId}`
@@ -119,9 +120,8 @@ async function turnOn($: EngineInterface): Promise<boolean> {
   offlineSince = null
   note = null
   const sessionId = await $.session.id()
-  const autoContext = (await $.store.get(AUTO_CONTEXT)) === true
   const title = (await readTitle($, sessionId)) ?? ''
-  const isJoined = (await link?.join({ sessionId, title, autoContext })) === true
+  const isJoined = (await link?.join({ sessionId, title })) === true
   await save($)
   await setBand($, {})
   link?.start(() => tick($))
@@ -287,7 +287,7 @@ async function statusText($: EngineInterface): Promise<string> {
     `${Math.round(status.minutesToday)} min today.${status.problem ? ` ${status.problem}` : ''}`
 }
 
-/** `/live on|off|target|status|context [auto|manual]`. */
+/** `/live on|off|target|status|context`. */
 async function live($: EngineInterface, args: string): Promise<string> {
   // ''.split(/\s+/) is [''], which would leave the default unused.
   const [verb = 'status', option] = args.trim() === '' ? [] : args.trim().split(/\s+/)
@@ -299,11 +299,7 @@ async function live($: EngineInterface, args: string): Promise<string> {
       ? `Joined LiveBridge as “${link?.session?.title}”.`
       : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
   }
-  if (verb === 'context' && (option === 'auto' || option === 'manual')) {
-    await $.store.set(AUTO_CONTEXT, option === 'auto')
-    if (joined) await link?.join({ ...joined, autoContext: option === 'auto' })
-    return `Context is now loaded ${option === 'auto' ? 'automatically' : 'on request'}.`
-  }
+  if (verb === 'context' && (option === 'auto' || option === 'manual')) return CONTEXT_SETTING
   if (!['off', 'target', 'context'].includes(verb) || option !== undefined) return USAGE
   if (!joined) return 'This session has not joined LiveBridge.'
   if (verb === 'off') {
@@ -345,7 +341,7 @@ async function declareCommand($: EngineInterface): Promise<void> {
     await $.command.register({
       name: 'live',
       description: 'Talk to this session by voice through LiveBridge',
-      argumentHint: 'on|off|target|status|context [auto|manual]',
+      argumentHint: 'on|off|target|status|context',
     })
   } catch (error) {
     $.ui.log(`LiveBridge could not declare /live: ${String(error)}`)

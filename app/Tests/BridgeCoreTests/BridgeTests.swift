@@ -99,8 +99,8 @@ struct BridgeTests {
       HTTPRequest(method: "POST", path: path, query: [:], body: body))
   }
 
-  func join(_ id: SessionID, _ title: String, autoContext: Bool = false) async throws {
-    try await post("/v1/join", JoinBody(sessionId: id, title: title, autoContext: autoContext))
+  func join(_ id: SessionID, _ title: String) async throws {
+    try await post("/v1/join", JoinBody(sessionId: id, title: title))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -550,7 +550,7 @@ struct BridgeTests {
     voice.emit(.userUtterance("Remember the colour teal."))
     #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
     try await post(
-      "/v1/join", JoinBody(sessionId: cleared, title: "Alpha", autoContext: false, replaces: a))
+      "/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
     #expect(await bridge.status.call == .live)
     #expect(await bridge.status.recentTranscript == ["You: Remember the colour teal."])
     voice.emit(.userUtterance("And blue."))

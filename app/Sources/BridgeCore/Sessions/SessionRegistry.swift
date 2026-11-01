@@ -71,8 +71,8 @@ public actor SessionRegistry {
   /// The longest title kept; the label, the band and every voice line carry it.
   public static let maxTitle = 80
   public private(set) var target: SessionID?
-  /// The app's setting: a session that becomes the target is asked for its summary. A join's
-  /// own `autoContext` is accepted and ignored.
+  /// The app's setting: a session that becomes the target is asked for its summary. A join from
+  /// an older mod may still carry an `autoContext` flag; decoding drops it.
   public private(set) var autoContext = false
 
   public init(time: any TimeSource, autoContext: Bool = false) {

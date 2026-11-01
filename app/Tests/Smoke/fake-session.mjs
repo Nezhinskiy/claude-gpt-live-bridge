@@ -36,7 +36,7 @@ const t0 = Date.now()
 const now = () => Math.round((Date.now() - t0) / 100) / 10
 const log = (event, detail = {}) => console.log(JSON.stringify({ t: now(), event, ...detail }))
 
-await send('POST', '/v1/join', { sessionId, title: 'Example session', autoContext: false })
+await send('POST', '/v1/join', { sessionId, title: 'Example session' })
 await send('POST', '/v1/target', { sessionId })
 await send('POST', '/v1/call', { action: 'start' })
 log('started')
