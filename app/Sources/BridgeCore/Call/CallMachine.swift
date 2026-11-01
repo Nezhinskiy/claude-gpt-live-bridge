@@ -26,6 +26,7 @@ public struct CallMachine: Sendable {
   /// Results the voice has not heard yet; each is added as context once a session connects.
   public private(set) var pending: [String] = []
   /// The voice is saying its short acknowledgement of a handoff; the session closes after it.
+  /// The silence timer stays armed meanwhile, so a lost acknowledgement still hangs up.
   public private(set) var awaitingAck = false
   public let silenceSeconds: Int
 
@@ -72,7 +73,6 @@ public struct CallMachine: Sendable {
       hangUp()
       return [.closeRealtime]
     case (.live, .silenceElapsed):
-      guard !awaitingAck else { return [] }
       hangUp()
       return [.closeRealtime]
     default:

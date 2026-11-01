@@ -59,7 +59,9 @@ struct CallMachineTests {
       "handoffWaitsForAckThenHangsUp", live + [.handedOff], .assistantFinishedSpeaking,
       .listening, [.closeRealtime]),
     row("silenceHangsUp", live, .silenceElapsed, .listening, [.closeRealtime]),
-    row("silenceDuringTheAckWaits", live + [.handedOff], .silenceElapsed, .live, []),
+    row(
+      "lostAckStillHangsUpOnSilence", live + [.handedOff], .silenceElapsed, .listening,
+      [.closeRealtime]),
     row(
       "ackDoesNotOutliveItsSession",
       live + [.handedOff, .remoteClosed("r"), .speechStarted, .connected], .silenceElapsed,
