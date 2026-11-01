@@ -3,3 +3,5 @@
 .stayfixed/local/
 .stayfixed/assessment.json
 # stayfixed:ignore:end
+# SwiftPM build output.
+app/.build/
