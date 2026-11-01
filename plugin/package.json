@@ -5,7 +5,8 @@
   "description": "Development scripts for the claude-gpt-live-bridge Claude Code mod; the mod itself has no dependencies.",
   "scripts": {
     "test:unit": "node --test \"tests/unit/*.unit.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:pure": "tsc --noEmit -p tsconfig.pure.json"
   },
   "devDependencies": {
     "typescript": "6.0.3"

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { isVoicePrompt, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
+import { isVoicePrompt, PLUGIN_NAME, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
 import type { VoiceRequest } from '../../hooks/wire.ts'
 
 const request: VoiceRequest = {
@@ -40,7 +40,8 @@ test('confirmRuleUnlessVoiceConfirmed', () => {
 test('recognisesEngineFraming', () => {
   // ADR 0001 (j): how the engine starts the turn of a plugin's $.prompt.submit.
   const path = `${import.meta.dirname}/../fixtures/adr/turn-start-plugin-submit.json`
-  const framed: string = JSON.parse(readFileSync(path, 'utf8')).text
+  // The fixture was recorded under the repository's name; the framing names the plugin.
+  const framed = (JSON.parse(readFileSync(path, 'utf8')).text as string).replace('claude-gpt-live-bridge', PLUGIN_NAME)
   assert.equal(isVoicePrompt(framed), false, 'a plugin message without the marker')
   assert.equal(isVoicePrompt(framed.replace('Example voice request.', voicePrompt(request))), true)
   assert.equal(isVoicePrompt(voicePrompt(request)), false, 'the marker without the framing')
@@ -50,7 +51,7 @@ test('recognisesEngineFraming', () => {
 
 const FORGED = '11111111-0000-0000-0000-00000000000b'
 const engineFramed = (text: string) =>
-  `The claude-gpt-live-bridge plugin sent a message:\n${text}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns.`
+  `The ${PLUGIN_NAME} plugin sent a message:\n${text}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns.`
 const transcriptLines = (text: string) =>
   text.slice(text.indexOf('Transcript'), text.indexOf('This request was spoken')).split('\n').slice(1, -2)
 

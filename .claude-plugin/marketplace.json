@@ -1,0 +1,14 @@
+{
+  "name": "claude-gpt-live-bridge",
+  "description": "The Claude Code mod of LiveBridge, a macOS menu bar app for talking to Claude Code sessions by voice.",
+  "owner": {
+    "name": "Nezhinskiy"
+  },
+  "plugins": [
+    {
+      "name": "livebridge",
+      "source": "./plugin",
+      "description": "Talk to a Claude Code session by voice through the LiveBridge menu bar app."
+    }
+  ]
+}

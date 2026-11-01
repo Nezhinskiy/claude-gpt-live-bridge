@@ -6,7 +6,7 @@ import { originOf, TurnTracker } from '../../hooks/turns.ts'
 
 const ID = '00000000-0000-0000-0000-00000000000a'
 const framed = (id: string) =>
-  `The claude-gpt-live-bridge plugin sent a message:\n${voicePrompt({ id, brief: 'List the files', transcript: [] })}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns.`
+  `The livebridge plugin sent a message:\n${voicePrompt({ id, brief: 'List the files', transcript: [] })}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns.`
 
 function voiceTurn(answer: string, outcome: 'answer' | 'aborted' | 'error' = 'answer') {
   const tracker = new TurnTracker()
@@ -67,7 +67,7 @@ test('typedTurnNeverPosts', () => {
 })
 
 test('originComesFromPromptSubmit', () => {
-  const self = 'claude-gpt-live-bridge'
+  const self = 'livebridge'
   assert.equal(originOf({ kind: 'plugin', name: self }, self), 'voice')
   assert.equal(originOf({ kind: 'plugin', name: 'other' }, self), 'background')
   for (const kind of ['composer', 'bridge', 'sdk', 'slack-ping']) assert.equal(originOf({ kind }, self), 'typed')

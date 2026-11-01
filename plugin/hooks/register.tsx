@@ -1,0 +1,247 @@
+// Wiring only: engine events to the bridge link, the turn tracker and the band. A hooks module
+// passes `$` only to functions declared at its top level, so the session's state lives here too.
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
+
+import type { Band } from '../types'
+import { bandStatus, drawBand } from './band.tsx'
+import { summarize } from './context.ts'
+import { BridgeLink } from './link.ts'
+import { PLUGIN_NAME, voicePrompt } from './prompt.ts'
+import { fallbackTitle, titleFromRegistry } from './title.ts'
+import { originOf, TurnTracker } from './turns.ts'
+import type { TurnOrigin, TurnSnapshot } from './turns.ts'
+
+const OFFLINE_AFTER_MS = 10_000
+const OPEN_APP = 'Open LiveBridge from the menu bar.'
+/** Well under the app's 131,072-byte body limit; the app shortens answers for speech itself. */
+const ANSWER_LIMIT = 32_000
+const AUTO_CONTEXT = 'autoContext'
+const USAGE = 'Usage: /voicemod on | off | target | status | context [auto|manual]'
+
+/** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
+const joinedKey = (sessionId: string) => `joined:${sessionId}`
+
+/** What the band draws (the scan that lists a module's state reads it here, in this file). */
+const band = atom({ plugin: 'livebridge', key: 'band' } as const, null)
+
+let link: BridgeLink | null = null
+let home = ''
+let tracker = new TurnTracker()
+let lastOrigin: TurnOrigin | null = null
+let approval: { tool: string; agent: string | undefined } | null = null
+let offlineSince: number | null = null
+
+const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
+  update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
+
+async function save($: EngineInterface): Promise<void> {
+  if (link?.session) await $.store.set(joinedKey(link.session.sessionId), tracker.snapshot())
+}
+
+/** The `name` of this session's registry record, read from `*.json` files only (never `*.key`). */
+async function readTitle($: EngineInterface, sessionId: string): Promise<string> {
+  const dir = `${home}/.claude/sessions`
+  const entries = await $.fs.list(dir).catch(() => [])
+  const records: unknown[] = []
+  for (const entry of entries.filter(one => one.kind === 'file' && one.name.endsWith('.json'))) {
+    records.push(await $.fs.read(`${dir}/${entry.name}`).then(text => JSON.parse(String(text)), () => null))
+  }
+  return titleFromRegistry(records, sessionId) ?? fallbackTitle(await $.session.cwd())
+}
+
+async function turnOn($: EngineInterface): Promise<boolean> {
+  const sessionId = await $.session.id()
+  const autoContext = (await $.store.get(AUTO_CONTEXT)) === true
+  const isJoined = (await link?.join({ sessionId, title: await readTitle($, sessionId), autoContext })) === true
+  await save($)
+  await setBand($, {})
+  link?.start(() => tick($))
+  return isJoined
+}
+
+async function turnOff($: EngineInterface): Promise<void> {
+  link?.stop()
+  if (link?.session) await $.store.delete(joinedKey(link.session.sessionId))
+  await link?.leave()
+  await setBand($, null)
+}
+
+/** Joins again when /clear gave the session a new id or, when asked, its title changed. */
+async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void> {
+  const joined = link?.session
+  if (!link || !joined) return
+  const sessionId = await $.session.id()
+  const isNewId = sessionId !== joined.sessionId
+  if (!isNewId && !isTitleChecked) return
+  const title = await readTitle($, sessionId)
+  if (!isNewId && title === joined.title) return
+  if (isNewId) {
+    await $.store.delete(joinedKey(joined.sessionId))
+    await link.leave()
+    tracker = new TurnTracker()
+  }
+  await link.join({ ...joined, sessionId, title })
+  await save($)
+}
+
+/** One poll: status into the band, a voice request into a prompt, a context request answered. */
+async function tick($: EngineInterface): Promise<void> {
+  await follow($, false)
+  const reply = await link?.next()
+  if (!reply) {
+    const now = await $.clock.now()
+    if (offlineSince === null) {
+      offlineSince = now
+      if (link && !(await link.ensureApp())) await setBand($, { problem: OPEN_APP })
+    }
+    await setBand($, { isOffline: now - offlineSince >= OFFLINE_AFTER_MS })
+    return
+  }
+  offlineSince = null
+  const self = link?.session?.sessionId ?? ''
+  await update($, band, () => ({ isOffline: false, status: bandStatus(reply.status, self) }))
+  if (reply.work?.kind === 'request') {
+    tracker.submitted(reply.work.id)
+    await save($)
+    // It resolves once the turn starts, which may be after the running one: do not hold the poll.
+    void $.prompt.submit({ text: voicePrompt(reply.work) })
+  } else if (reply.work?.kind === 'context') {
+    void sendContext($)
+  }
+}
+
+async function sendContext($: EngineInterface): Promise<boolean> {
+  const summary = await summarize($)
+  if (summary !== '') await link?.context(summary)
+  return summary !== ''
+}
+
+async function statusText($: EngineInterface): Promise<string> {
+  const state = await read($, band)
+  if (state === null) return 'Voice is off for this session. /voicemod on joins LiveBridge.'
+  const status = state.status
+  if (state.isOffline || status === undefined) return `LiveBridge is not reachable. ${state.problem ?? ''}`.trim()
+  return `LiveBridge: ${status.call}; target: ${status.target}; ${status.unheard} unheard; ` +
+    `${Math.round(status.minutesToday)} min today.${status.problem ? ` ${status.problem}` : ''}`
+}
+
+/** `/voicemod on|off|target|status|context [auto|manual]`. */
+async function voicemod($: EngineInterface, args: string): Promise<string> {
+  const [verb = 'status', option] = args.trim().split(/\s+/)
+  const joined = link?.session
+  if (verb === 'status') return statusText($)
+  if (verb === 'on') {
+    if (joined) return 'This session has already joined LiveBridge.'
+    return (await turnOn($))
+      ? `Joined LiveBridge as “${link?.session?.title}”.`
+      : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
+  }
+  if (verb === 'context' && (option === 'auto' || option === 'manual')) {
+    await $.store.set(AUTO_CONTEXT, option === 'auto')
+    if (joined) await link?.join({ ...joined, autoContext: option === 'auto' })
+    return `Context is now loaded ${option === 'auto' ? 'automatically' : 'on request'}.`
+  }
+  if (!['off', 'target', 'context'].includes(verb) || option !== undefined) return USAGE
+  if (!joined) return 'This session has not joined LiveBridge.'
+  if (verb === 'off') {
+    await turnOff($)
+    return 'Left LiveBridge.'
+  }
+  if (verb === 'target') {
+    await link?.target()
+    return 'This session is now the voice target.'
+  }
+  return (await sendContext($)) ? 'Sent a summary of this session to LiveBridge.' : 'Nothing to summarise yet.'
+}
+
+/** Whether a tool's run, failure or denial settles the permission request being reported. */
+function settles(e: { tool_name: string; agent_id?: string }): boolean {
+  if (approval?.tool !== e.tool_name || approval.agent !== e.agent_id) return false
+  approval = null
+  return true
+}
+
+export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    await $.command.register({
+      name: 'voicemod',
+      description: 'Talk to this session by voice through LiveBridge',
+      argumentHint: 'on|off|target|status|context [auto|manual]',
+    })
+    home = (await $.env.get('HOME')) ?? ''
+    link = new BridgeLink({
+      fetch: (url, init) => $.http.fetch(url, init),
+      run: argv => $.process.run(argv),
+      every: (ms, fn) => $.clock.every(ms, fn),
+      log: text => $.ui.log(text),
+    }, home)
+    // A hot reload runs this again with the module's variables gone; the store kept the join.
+    const saved = await $.store.get(joinedKey(await $.session.id()))
+    if (saved !== undefined) {
+      tracker = new TurnTracker(saved as TurnSnapshot)
+      await turnOn($)
+    }
+    return next(e)
+  })
+
+  on('command.run', { command: 'voicemod' }, async ($, e) => ({ text: await voicemod($, e.args) }))
+
+  on('prompt.submit', ($, e, next) => {
+    // A delivery into a running turn starts no turn of its own.
+    if (e.turnId === undefined) lastOrigin = originOf(e.origin, PLUGIN_NAME)
+    return next(e)
+  })
+
+  on('turn.start', async ($, e, next) => {
+    if (e.agentId === undefined) {
+      tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'background')
+      lastOrigin = null
+      await follow($, true)
+      await save($)
+      await link?.activity('working')
+    }
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    if (e.agentId === undefined) {
+      // `answer` per this build's types; the ADR 0001 fixture recorded `text`, so read either.
+      const answer = e.answer ?? (e as { text?: string }).text ?? ''
+      const post = tracker.turnCompleted(e.turnId, answer, e.reason)
+      approval = null
+      await save($)
+      if (post) await link?.answer({ ...post, text: post.text.slice(0, ANSWER_LIMIT) })
+      await link?.activity('idle')
+    }
+    return next(e)
+  })
+
+  // ADR 0001 (i): a permission request that reaches the person during a voice turn.
+  on('classic.PermissionRequest', async ($, e, next) => {
+    if (tracker.current !== null) {
+      approval = { tool: e.tool_name, agent: e.agent_id }
+      await link?.activity('approval')
+    }
+    return next(e)
+  })
+  on('classic.PostToolUse', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+  on('classic.PostToolUseFailure', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+  on('classic.PermissionDenied', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+
+  on('session.end', async ($, e, next) => {
+    // After /clear the session goes on under a new id: the next poll leaves the old one and joins.
+    if (e.reason !== 'clear') await turnOff($)
+    return next(e)
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const state = await read($, band)
+    if (state === null || e.props.hasSurvey || !link?.session) return next(e)
+    return drawBand($, e, state, {
+      call: action => void link?.call(action),
+      target: () => void link?.target(),
+      loadContext: () => void sendContext($),
+    })
+  })
+}

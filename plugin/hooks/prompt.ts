@@ -3,7 +3,7 @@
 import type { Role, VoiceRequest } from './wire.ts'
 
 /** The plugin's name, as `plugin.json` has it and as the engine frames its messages. */
-export const PLUGIN_NAME = 'claude-gpt-live-bridge'
+export const PLUGIN_NAME = 'livebridge'
 
 /** Marks a voice request inside its prompt; the request id follows it on the last line. */
 export const VOICE_TAG = '⟦voice⟧'
