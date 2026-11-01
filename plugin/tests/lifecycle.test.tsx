@@ -62,3 +62,9 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
+
+test('bareCommandShowsTheStatus', async ($, on) => {
+  fakeWorld(on)
+  await $.session.start(START)
+  for (const args of ['', '   ']) expect((await $.command.run({ ...VOICEMOD, args })).text).toContain('Voice is off')
+})

@@ -150,7 +150,8 @@ async function statusText($: EngineInterface): Promise<string> {
 
 /** `/voicemod on|off|target|status|context [auto|manual]`. */
 async function voicemod($: EngineInterface, args: string): Promise<string> {
-  const [verb = 'status', option] = args.trim().split(/\s+/)
+  // ''.split(/\s+/) is [''], which would leave the default unused.
+  const [verb = 'status', option] = args.trim() === '' ? [] : args.trim().split(/\s+/)
   const joined = link?.session
   if (verb === 'status') return statusText($)
   if (verb === 'on') {
