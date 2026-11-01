@@ -1,0 +1,9 @@
+{
+  "emittedAtMs": 1700000000000,
+  "method": "thread/realtime/started",
+  "params": {
+    "version": "v3",
+    "threadId": "00000000-0000-0000-0000-000000000001",
+    "realtimeSessionId": "00000000-0000-0000-0000-000000000001"
+  }
+}

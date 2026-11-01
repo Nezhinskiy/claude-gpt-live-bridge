@@ -1,0 +1,10 @@
+{
+  "start_ms": 4600,
+  "end_ms": 4800,
+  "type": "output_transcript.added",
+  "item": {
+    "id": "item_000000000000000000004",
+    "type": "output_transcript",
+    "text": " On it"
+  }
+}

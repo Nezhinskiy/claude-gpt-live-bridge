@@ -1,0 +1,11 @@
+{
+  "type": "session.usage.updated",
+  "usage": {
+    "backend_model_usage": [],
+    "audio_duration_ms": 13800
+  },
+  "usage_limit": {
+    "reset_seconds": null,
+    "status": null
+  }
+}

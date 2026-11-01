@@ -1,0 +1,8 @@
+{
+  "emittedAtMs": 1700000000000,
+  "method": "thread/realtime/error",
+  "params": {
+    "message": "Invalid value: 'input_audio.append'. Supported values are: 'session.update', 'output_audio.playback.play', 'session.feedback', 'input_audio.pause', 'input_audio.resume', 'session.context.append', 'response.item.create', 'response.create', 'delegation.context.append', 'delegation.function_call_output.create', 'transport.dtmf.send', and 'session.close'.",
+    "threadId": "00000000-0000-0000-0000-000000000004"
+  }
+}

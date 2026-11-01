@@ -1,0 +1,10 @@
+{
+  "turn": {
+    "transcript": "Please list the files in this folder",
+    "start_ms": 2200,
+    "id": "turn_000000000000000000001",
+    "end_ms": 4800,
+    "role": "user"
+  },
+  "type": "turn.done"
+}

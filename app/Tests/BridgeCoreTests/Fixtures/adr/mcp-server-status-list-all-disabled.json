@@ -1,0 +1,50 @@
+{
+  "id": 3,
+  "result": {
+    "data": [
+      {
+        "authStatus": "unsupported",
+        "pluginId": null,
+        "httpOrigin": null,
+        "toolsError": null,
+        "toolListMeta": null,
+        "runtimeStatus": "disabled",
+        "resources": [],
+        "tools": {},
+        "serverInfo": null,
+        "resourceTemplates": [],
+        "name": "example-stdio",
+        "serverCapabilities": null
+      },
+      {
+        "authStatus": "unsupported",
+        "pluginId": null,
+        "httpOrigin": "https://mcp.example.com",
+        "toolsError": null,
+        "toolListMeta": null,
+        "runtimeStatus": "disabled",
+        "resources": [],
+        "tools": {},
+        "serverInfo": null,
+        "resourceTemplates": [],
+        "name": "example-http",
+        "serverCapabilities": null
+      },
+      {
+        "authStatus": "unsupported",
+        "pluginId": null,
+        "httpOrigin": null,
+        "toolsError": null,
+        "toolListMeta": null,
+        "runtimeStatus": "disabled",
+        "resources": [],
+        "tools": {},
+        "serverInfo": null,
+        "resourceTemplates": [],
+        "name": "example-disabled",
+        "serverCapabilities": null
+      }
+    ],
+    "nextCursor": null
+  }
+}

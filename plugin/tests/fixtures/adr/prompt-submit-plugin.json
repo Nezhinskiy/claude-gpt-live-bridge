@@ -1,0 +1,7 @@
+{
+  "text": "Example voice request.",
+  "origin": {
+    "kind": "plugin",
+    "name": "claude-gpt-live-bridge"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": 4,
+  "method": "thread/realtime/appendAudio",
+  "params": {
+    "audio": {
+      "data": "AAAA",
+      "itemId": null,
+      "numChannels": 1,
+      "sampleRate": 24000,
+      "samplesPerChannel": 2
+    },
+    "threadId": "00000000-0000-0000-0000-000000000004"
+  }
+}

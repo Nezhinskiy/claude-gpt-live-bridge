@@ -1,0 +1,9 @@
+{
+  "id": 5,
+  "method": "thread/realtime/appendText",
+  "params": {
+    "text": "[RESULT] Example session: the folder has three files: alpha, beta and gamma.",
+    "threadId": "00000000-0000-0000-0000-000000000006",
+    "role": "user"
+  }
+}
