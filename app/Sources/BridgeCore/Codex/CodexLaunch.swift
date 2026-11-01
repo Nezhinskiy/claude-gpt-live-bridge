@@ -49,8 +49,9 @@ public enum CodexLaunch {
   /// is turned off, so one a later codex adds is off too (fail closed). The primary controls
   /// stay the read-only sandbox, `approval_policy="never"` and interrupting every codex turn;
   /// this narrows what an uninterrupted turn has. Derived against codex 0.166.0: the realtime
-  /// voice works with every feature off (`scripts/smoke.sh`), so none is kept.
-  public static let allowed: Set<String> = []
+  /// voice works with every feature off (`scripts/smoke.sh`). `secret_auth_storage` only says
+  /// where codex keeps the login: turning it off would hide a keychain login, and it runs no tool.
+  public static let allowed: Set<String> = ["secret_auth_storage"]
 
   /// The first `codex` in `searchPath`.
   public static func locate(searchPath: [String]) -> URL? {

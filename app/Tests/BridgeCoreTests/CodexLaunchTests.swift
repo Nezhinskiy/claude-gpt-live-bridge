@@ -25,6 +25,7 @@ struct CodexLaunchTests {
   @Test func argvDisablesEveryListedFeatureButTheAllowed() throws {
     let listed =
       try features() + "brand_new_tool                           stable             true\n"
+      + "secret_auth_storage                      stable             false\n"
     let present = try CodexLaunch.presentFeatures(featuresListOutput: listed)
     #expect(present.isSuperset(of: ["instant_interrupt", "web_search_cached", "brand_new_tool"]))
     #expect(present.isDisjoint(with: ["js_repl", "realtime_conversation"]))
