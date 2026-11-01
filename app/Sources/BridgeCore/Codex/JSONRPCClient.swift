@@ -155,13 +155,31 @@ public actor JSONRPCClient: RPCClient {
     (serverRequests, ask) = AsyncStream.makeStream()
   }
 
-  /// Starts the process and its reader.
+  /// Starts the process and its reader. Each client reads its own pipe as data arrives:
+  /// `FileHandle.bytes` serves every reader in the process from one queue with a blocking
+  /// read, so a client waiting on an idle codex would hold up every other client's replies.
   public func start() throws {
     signal(SIGPIPE, SIG_IGN)  // a write after codex exits must fail, not end the app
     do { try process.run() } catch { throw CodexProblem.notInstalled }
-    let lines = output.fileHandleForReading.bytes.lines
+    let (chunks, sink) = AsyncStream.makeStream(of: Data.self)
+    output.fileHandleForReading.readabilityHandler = { handle in
+      let data = handle.availableData
+      if data.isEmpty {
+        handle.readabilityHandler = nil
+        sink.finish()
+      } else {
+        sink.yield(data)
+      }
+    }
     Task { [weak self] in
-      do { for try await line in lines { await self?.receive(line) } } catch {}
+      var buffer = Data()
+      for await chunk in chunks {
+        buffer += chunk
+        while let end = buffer.firstIndex(of: UInt8(ascii: "\n")) {  // `\n` alone ends a message
+          await self?.receive(buffer[..<end])
+          buffer = buffer[(end + 1)...]
+        }
+      }
       await self?.finish()
     }
   }
@@ -215,8 +233,8 @@ public actor JSONRPCClient: RPCClient {
     try? input.fileHandleForWriting.write(contentsOf: line + Data("\n".utf8))
   }
 
-  private func receive(_ line: String) {
-    guard let message = try? JSONDecoder().decode(Incoming.self, from: Data(line.utf8)) else {
+  private func receive(_ line: Data) {
+    guard let message = try? JSONDecoder().decode(Incoming.self, from: line) else {
       return
     }
     switch (message.id, message.method) {
