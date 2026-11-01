@@ -81,10 +81,15 @@ The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voic
 Then press **Start**, in the band above the prompt or in the menu bar popover, and talk. The
 band's Start makes its session the target and starts the call; while the call talks to another
 session, the band shows **Talk here** instead. Start stays disabled in the popover until a
-session has joined. The popover lists the joined sessions (click one to make it the target; its
-× removes it, and `/live on` in that session joins it again), shows the last lines of the
-conversation and the context line exactly as it was sent, and has **New conversation**, **Open
-at login** (off by default) and the minutes the voice line was open today.
+session has joined; until then the popover has **Copy /live on**, to paste into a session. The
+popover lists the joined sessions (click one to make it the target; its × asks first, then
+removes it and erases its conversation, and `/live on` in that session joins it again), shows
+the last lines of the conversation (each cut to four lines) and the context line exactly as it
+was sent, and has **Load context** (it waits, as **Loading context…**, until the target's summary
+arrives or a minute passes), **New conversation** (it asks before it erases what the voice
+remembers of the target and its loaded context), **Open at login** (off by default) and the
+minutes the voice line was open today. The popover never grows past the screen: its lists scroll
+inside it.
 
 What the voice does:
 

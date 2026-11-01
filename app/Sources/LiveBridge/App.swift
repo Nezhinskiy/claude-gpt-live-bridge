@@ -39,6 +39,8 @@ struct LiveBridgeApp: App {
 final class AppModel {
   private(set) var status: StatusReply?
   private(set) var presentation: StatusPresentation?
+  /// Where the popover's Load context stands for the target.
+  private(set) var contextLoad = ContextLoadState.ready
   let glyph = StatusGlyph()
   private var appProblem: String?
   var openAtLogin = LoginItem.isEnabled {
@@ -53,6 +55,8 @@ final class AppModel {
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
+  @ObservationIgnored private var loads = ContextLoads()
+  @ObservationIgnored private var loadsTimer: Task<Void, Never>?
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
   private static let log = Logger(subsystem: "io.github.nezhinskiy.livebridge", category: "call")
 
@@ -79,6 +83,9 @@ final class AppModel {
       Task { [weak self] in
         for await status in bridge.updates { self?.show(status) }
       }
+      Task { [weak self] in
+        for await id in bridge.contextArrivals { self?.contextArrived(id) }
+      }
     } catch {
       appProblem = "LiveBridge could not start its bridge: \(error.localizedDescription)"
       glyph.show(.off, badge: .problem, level: 0)
@@ -87,9 +94,51 @@ final class AppModel {
 
   func perform(_ action: CallAction) { Task { await bridge?.perform(action) } }
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
-  func remove(_ id: SessionID) { Task { await bridge?.remove(id) } }
-  func loadContext() { Task { await bridge?.loadContext() } }
-  func newConversation() { Task { await bridge?.newConversation() } }
+
+  /// The session row's ×, once the owner confirms it.
+  func remove(_ row: SessionRowPresentation) {
+    guard Confirm.ask(.remove(label: row.label)) else { return }
+    Task { await bridge?.remove(row.id) }
+  }
+
+  /// Asks the target for its summary; the button waits until it arrives, 60 s pass or the
+  /// session leaves.
+  func loadContext() {
+    guard contextLoad.isEnabled, let target = targetRow else { return }
+    loads.pressed(target.sessionId, at: Date())
+    refreshLoads()
+    Task { await bridge?.loadContext() }
+  }
+
+  /// Forgets the target's conversation, once the owner confirms it.
+  func newConversation() {
+    guard let target = targetRow, Confirm.ask(.newConversation(label: target.label)) else {
+      return
+    }
+    Task { await bridge?.newConversation() }
+  }
+
+  private var targetRow: SessionRow? { status?.sessions.first(where: \.isTarget) }
+
+  private func contextArrived(_ id: SessionID) {
+    loads.arrived(id, at: Date())
+    refreshLoads()
+  }
+
+  /// Shows the target's Load context state, and comes back when a state ends by itself.
+  private func refreshLoads() {
+    let now = Date()
+    let state = targetRow.map { loads.state(of: $0.sessionId, at: now) } ?? .ready
+    if state != contextLoad { contextLoad = state }
+    loadsTimer?.cancel()
+    loadsTimer = nil
+    guard let next = loads.nextChange(after: now) else { return }
+    loadsTimer = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(next.timeIntervalSince(now)))
+      guard !Task.isCancelled else { return }
+      self?.refreshLoads()
+    }
+  }
 
   private func showLevel(_ value: Double) {
     level = value
@@ -106,6 +155,8 @@ final class AppModel {
     if next != status {
       status = next
       presentation = StatusPresentation(next)
+      loads.keep(only: Set(next.sessions.map(\.sessionId)))
+      refreshLoads()
     }
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
   }

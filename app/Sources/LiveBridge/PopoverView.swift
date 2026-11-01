@@ -3,31 +3,43 @@ import SwiftUI
 
 /// The menu bar popover: the call, the sessions, the target's context line and last lines (each
 /// session has its own conversation with the voice), the minutes, and the app's own settings.
-/// Liquid Glass on macOS 26 and later, materials before.
+/// Liquid Glass on macOS 26 and later, materials before. It never grows past the screen's
+/// visible height (a taller menu bar window leaves a transparent band at its top): the sessions,
+/// the last lines and what was sent scroll inside their own caps, and past the screen the whole
+/// popover scrolls.
 struct PopoverView: View {
   @Bindable var model: AppModel
   @State private var showContext = false
+  @State private var copied = false
+
+  private var layout: PopoverLayout {
+    PopoverLayout(visibleHeight: Double(NSScreen.main?.visibleFrame.height ?? 800))
+  }
 
   var body: some View {
     GlassGroup {
-      VStack(alignment: .leading, spacing: 10) {
-        if let shown = model.presentation {
-          call(shown)
-          if let problem = model.problem {
-            problemBanner(problem, opensSettings: shown.opensMicrophoneSettings)
-          }
-          sessions(shown)
-          context
-          if !(model.status?.recentTranscript.isEmpty ?? true) { lastLines }
-          footer(shown)
-        } else {
-          if let problem = model.problem { problemBanner(problem) } else { ProgressView() }
-          Button("Quit LiveBridge") { NSApplication.shared.terminate(nil) }
-        }
-      }
-      .padding(12)
+      CappedScroll(cap: layout.maxHeight) { content }
     }
     .frame(width: 340)
+  }
+
+  private var content: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if let shown = model.presentation {
+        call(shown)
+        if let problem = model.problem {
+          problemBanner(problem, opensSettings: shown.opensMicrophoneSettings)
+        }
+        sessions(shown)
+        context
+        if !(model.status?.recentTranscript.isEmpty ?? true) { lastLines }
+        footer(shown)
+      } else {
+        if let problem = model.problem { problemBanner(problem) } else { ProgressView() }
+        Button("Quit LiveBridge") { NSApplication.shared.terminate(nil) }
+      }
+    }
+    .padding(12)
   }
 
   private func call(_ shown: StatusPresentation) -> some View {
@@ -56,7 +68,7 @@ struct PopoverView: View {
   private func problemBanner(_ problem: String, opensSettings: Bool = false) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       Label(problem, systemImage: "exclamationmark.triangle.fill")
-        .font(.callout).symbolRenderingMode(.multicolor)
+        .font(.callout).symbolRenderingMode(.multicolor).lineLimit(6)
       if opensSettings {
         Button("Open Microphone Settings", systemImage: "mic") {
           NSWorkspace.shared.open(MicrophoneAccess.settingsURL)
@@ -70,26 +82,53 @@ struct PopoverView: View {
   private func sessions(_ shown: StatusPresentation) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Text("Sessions").font(.caption).foregroundStyle(.secondary)
-      if shown.rows.isEmpty {
-        Text("No session has joined.")
-          .font(.callout).foregroundStyle(.secondary)
+      if shown.offersJoinCommand {
+        HStack {
+          Text("No session has joined.")
+            .font(.callout).foregroundStyle(.secondary)
+          Spacer()
+          copyJoinCommand
+        }
       }
-      ForEach(shown.rows) { row in
-        HStack(spacing: 4) {
-          targetButton(row)
-          Button {
-            model.remove(row.id)
-          } label: {
-            Image(systemName: "xmark").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              .frame(width: 22, height: 22).contentShape(.rect)
+      CappedScroll(cap: layout.sessions) {
+        VStack(alignment: .leading, spacing: 4) {
+          ForEach(shown.rows) { row in
+            HStack(spacing: 4) {
+              targetButton(row)
+              Button {
+                model.remove(row)
+              } label: {
+                Image(systemName: "xmark").font(.caption.weight(.semibold))
+                  .foregroundStyle(.secondary)
+                  .frame(width: 22, height: 22).contentShape(.rect)
+              }
+              .buttonStyle(.plain)
+              .help("Remove from LiveBridge and erase its conversation; /live on joins it again")
+              .accessibilityLabel("Remove \(row.label) from LiveBridge")
+            }
           }
-          .buttonStyle(.plain)
-          .help("Remove from LiveBridge; /live on joins the session again")
-          .accessibilityLabel("Remove \(row.label) from LiveBridge")
         }
       }
     }
     .card()
+  }
+
+  /// Copies `/live on`, to paste into a Claude Code session; says so for two seconds.
+  private var copyJoinCommand: some View {
+    Button(
+      copied ? "Copied" : "Copy \(StatusPresentation.joinCommand)",
+      systemImage: copied ? "checkmark" : "doc.on.doc"
+    ) {
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(StatusPresentation.joinCommand, forType: .string)
+      copied = true
+      Task {
+        try? await Task.sleep(for: .seconds(2))
+        copied = false
+      }
+    }
+    .capsule(prominent: false)
+    .help("Copy \(StatusPresentation.joinCommand), then run it in a Claude Code session")
   }
 
   private func targetButton(_ row: SessionRowPresentation) -> some View {
@@ -100,7 +139,7 @@ struct PopoverView: View {
         Image(systemName: row.isTarget ? "largecircle.fill.circle" : "circle")
           .foregroundStyle(row.isTarget ? Color.accentColor : .secondary)
         VStack(alignment: .leading, spacing: 1) {
-          Text(row.label)
+          Text(row.label).lineLimit(1)
           Label(row.detail, systemImage: Self.symbol(of: row.activity))
             .font(.caption)
             .foregroundStyle(row.activity == .approval ? .orange : .secondary)
@@ -128,14 +167,22 @@ struct PopoverView: View {
   private var context: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
-        Button("Load context", systemImage: "square.and.arrow.down") { model.loadContext() }
+        Button(model.contextLoad.title, systemImage: model.contextLoad.symbol) {
+          model.loadContext()
+        }
+        .disabled(!model.contextLoad.isEnabled)
+        .help("Ask the target session for a summary of its work, for the voice")
         Button("New conversation", systemImage: "square.and.pencil") { model.newConversation() }
-          .help("Forget the voice's conversation with the target session")
+          .help("Erase the voice's conversation with the target session")
       }
       .capsule(prominent: false)
       if let sent = model.status?.lastContext {
         DisclosureGroup("What was sent", isExpanded: $showContext) {
-          Text(sent).font(.caption).textSelection(.enabled).padding(.top, 4)
+          CappedScroll(cap: layout.sent) {
+            Text(sent).font(.caption).textSelection(.enabled)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          .padding(.top, 4)
         }
         .font(.caption)
       }
@@ -150,14 +197,18 @@ struct PopoverView: View {
     VStack(alignment: .leading, spacing: 4) {
       Text(target.map { "Last lines with \($0)" } ?? "Last lines")
         .font(.caption).foregroundStyle(.secondary)
-      ForEach(Array((model.status?.recentTranscript ?? []).enumerated()), id: \.offset) { _, line in
-        let parts = line.split(separator: ": ", maxSplits: 1)
-        HStack(alignment: .firstTextBaseline) {
-          Text(parts.count == 2 ? parts[0] : "").foregroundStyle(.secondary).frame(
-            width: 44, alignment: .leading)
-          Text(parts.last ?? "").fixedSize(horizontal: false, vertical: true)
+      CappedScroll(cap: layout.lastLines) {
+        VStack(alignment: .leading, spacing: 4) {
+          let lines = (model.status?.recentTranscript ?? []).map(TranscriptLine.init)
+          ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+            HStack(alignment: .firstTextBaseline) {
+              Text(line.speaker).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
+              Text(line.text).lineLimit(4).truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .font(.caption)
+          }
         }
-        .font(.caption)
       }
     }
     .card()
@@ -180,6 +231,27 @@ struct PopoverView: View {
     case .attention: .orange
     case .problem: .red
     }
+  }
+}
+
+/// A vertical scroll view as tall as its content, up to `cap` points; past it, it scrolls. A
+/// plain ScrollView in a menu bar window takes no height of its own, so the content's height is
+/// measured.
+private struct CappedScroll<Content: View>: View {
+  let cap: Double
+  @ViewBuilder var content: Content
+  @State private var height = 0.0
+
+  var body: some View {
+    ScrollView(.vertical) {
+      content.onGeometryChange(for: Double.self) {
+        Double($0.size.height)
+      } action: {
+        height = $0
+      }
+    }
+    .scrollBounceBehavior(.basedOnSize)
+    .frame(height: min(height, cap))
   }
 }
 
