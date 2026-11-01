@@ -21,14 +21,26 @@ struct CodexLaunchTests {
   }
 
   @Test func argvDisablesOnlyPresentFeatures() throws {
-    let present = CodexLaunch.presentFeatures(featuresListOutput: try features())
+    let present = try CodexLaunch.presentFeatures(featuresListOutput: try features())
     #expect(present.contains("instant_interrupt"))  // a stage of two words
     #expect(!present.contains("js_repl"))  // stage `removed`
     let argv = CodexLaunch.argv(disable: CodexLaunch.wantDisabled.filter(present.contains))
     let pairs = zip(argv, argv.dropFirst()).filter { $0.0 == "--disable" }.map(\.1)
     #expect(pairs.contains("hooks") && pairs.contains("plugins") && pairs.contains("apps"))
+    #expect(pairs.contains("shell_tool"))  // a tool the codex model could call
     #expect(!pairs.contains("goals"))  // codex no longer knows it
     #expect(!argv.contains("js_repl"))
+  }
+
+  /// Output codex might print after an upgrade or a crash must not launch with fewer
+  /// `--disable` flags.
+  @Test(arguments: ["", "garbage", "hooks stable maybe", "hooks true", "\n\n"])
+  func unreadableFeaturesListFailsClosed(output: String) {
+    #expect {
+      try CodexLaunch.presentFeatures(featuresListOutput: output)
+    } throws: { error in
+      if case CodexProblem.protocolMismatch = error { true } else { false }
+    }
   }
 
   @Test func missingCodexIsNotInstalled() async throws {

@@ -237,7 +237,7 @@ public actor JSONRPCClient: RPCClient {
   /// has turned off, initialises it and checks the ChatGPT sign-in. Throws `CodexProblem`.
   public static func launchVerified(codex: URL, cwd: URL) async throws -> JSONRPCClient {
     let features = try await Self.output(of: codex, ["features", "list"])
-    let present = CodexLaunch.presentFeatures(featuresListOutput: features)
+    let present = try CodexLaunch.presentFeatures(featuresListOutput: features)
     let client = JSONRPCClient(
       executable: codex,
       arguments: CodexLaunch.argv(disable: CodexLaunch.wantDisabled.filter(present.contains)),

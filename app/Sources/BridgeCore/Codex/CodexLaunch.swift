@@ -42,10 +42,20 @@ public enum CodexProblem: Error, Equatable, Sendable {
 
 /// How the app finds and starts `codex app-server` for the voice thread.
 public enum CodexLaunch {
-  /// codex features that could give the voice thread tools; each is turned off if codex has it.
+  /// codex features that give the codex model a tool or a side effect; each is turned off if
+  /// codex has it. The primary controls stay the read-only sandbox, `approval_policy="never"`
+  /// and interrupting every codex turn; this list only narrows what an uninterrupted turn has.
   public static let wantDisabled = [
     "hooks", "apps", "plugins", "computer_use", "browser_use", "in_app_browser", "multi_agent",
     "image_generation", "memories", "goals",
+    // shell and code execution, file reads, tool and skill installs
+    "shell_tool", "unified_exec", "unified_exec_tty", "shell_snapshot", "code_mode",
+    "code_mode_host", "view_image", "sleep_tool", "request_permissions_tool", "tool_suggest",
+    "skill_search", "skill_mcp_dependency_install", "multi_agent_v2",
+    // plugins, browsers, automation and web search by other names
+    "remote_plugin", "plugin_discovery_prefetch", "browser_use_external",
+    "browser_use_full_cdp_access", "browser_annotation_api", "in_app_local_automation",
+    "standalone_web_search", "web_search_request", "web_search_cached",
   ]
 
   /// `explicit` if it is executable, else the first `codex` in `searchPath`.
@@ -75,16 +85,21 @@ public enum CodexLaunch {
     return path + ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.local/bin"]
   }
 
-  /// The names in `codex features list` output (`name  stage  enabled`), except stage `removed`.
-  public static func presentFeatures(featuresListOutput: String) -> Set<String> {
-    Set(
-      featuresListOutput.split(separator: "\n").compactMap { line in
-        let fields = line.split(separator: " ")
-        guard fields.count >= 3, !fields.dropFirst().dropLast().contains("removed") else {
-          return nil
-        }
-        return String(fields[0])
-      })
+  /// The names in `codex features list` output (`name  stage  enabled`, the stage one or more
+  /// words), except stage `removed`. Output that is empty or has any other line throws
+  /// `protocolMismatch`: launching with fewer `--disable` flags would fail open.
+  public static func presentFeatures(featuresListOutput: String) throws -> Set<String> {
+    var names: Set<String> = []
+    for line in featuresListOutput.split(whereSeparator: \.isNewline) {
+      let fields = line.split(whereSeparator: \.isWhitespace)
+      guard let name = fields.first, let enabled = fields.last, fields.count >= 3,
+        ["true", "false"].contains(enabled),
+        fields.dropFirst().dropLast().allSatisfy({ $0.allSatisfy(\.isLetter) })
+      else { throw CodexProblem.protocolMismatch("unreadable `codex features list` line") }
+      if !fields.dropFirst().dropLast().contains("removed") { names.insert(String(name)) }
+    }
+    guard !names.isEmpty else { throw CodexProblem.protocolMismatch("no codex features listed") }
+    return names
   }
 
   /// `codex app-server` pinned read-only, never asking, with no web search and no notify
