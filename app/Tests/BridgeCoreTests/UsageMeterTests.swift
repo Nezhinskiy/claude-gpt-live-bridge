@@ -42,11 +42,11 @@ struct UsageMeterTests {
     let time = TestTime()
     let start = time.now
     let store = UsageMeterStore(file: file, time: time)
-    await store.opened()
+    await store.opened(at: time.now)
     time.advance(by: .seconds(30))
     #expect(await store.minutes(since: start) == 0.5)
     time.advance(by: .seconds(60))
-    await store.closed()
+    await store.closed(at: time.now)
     #expect(await UsageMeterStore(file: file, time: time).minutes(since: start) == 1.5)
   }
 }

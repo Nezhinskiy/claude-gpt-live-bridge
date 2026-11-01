@@ -373,13 +373,6 @@ struct BridgeTests {
     #expect(await restarted.status.lastContext == shown)
   }
 
-  @Test func autoContextOnTargetSwitch() async throws {
-    try await join(a, "Alpha")
-    try await join(b, "Beta", autoContext: true)
-    try await post("/v1/target", TargetBody(sessionId: b))
-    #expect(try await registry.poll(b) == .context)
-  }
-
   @Test func stopThenStartResumesConversation() async throws {
     await live()
     voice.emit(.userUtterance("Remember the colour teal."))

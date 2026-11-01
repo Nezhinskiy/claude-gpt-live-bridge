@@ -50,18 +50,15 @@ public struct CallMachine: Sendable {
   private var isAckUnfinished = false
   /// Local voice detection hears sound; the timer then allows `noiseCapSeconds`.
   private var isSoundOn = false
-  public let silenceSeconds: Int
-  public let noiseCapSeconds: Int
+  public static let silenceSeconds = 20
+  public static let noiseCapSeconds = 90
 
-  public init(silenceSeconds: Int = 20, noiseCapSeconds: Int = 90) {
-    self.silenceSeconds = silenceSeconds
-    self.noiseCapSeconds = noiseCapSeconds
-  }
+  public init() {}
 
   /// Silence is counted from the last speech, recognised words or reply; while sound goes on
   /// without words, the line still closes after `noiseCapSeconds`.
   private var armSilence: CallEffect {
-    .armSilenceTimer(seconds: isSoundOn ? noiseCapSeconds : silenceSeconds)
+    .armSilenceTimer(seconds: isSoundOn ? Self.noiseCapSeconds : Self.silenceSeconds)
   }
 
   public mutating func handle(_ event: CallEvent) -> [CallEffect] {
@@ -145,7 +142,7 @@ public struct CallMachine: Sendable {
   }
 
   private mutating func end(with effects: [CallEffect]) -> [CallEffect] {
-    self = CallMachine(silenceSeconds: silenceSeconds, noiseCapSeconds: noiseCapSeconds)
+    self = CallMachine()
     return effects
   }
 

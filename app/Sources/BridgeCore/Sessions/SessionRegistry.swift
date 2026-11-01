@@ -33,8 +33,8 @@ public enum RegistryError: Error, Equatable {
 ///
 /// Each session has at most one request in flight: `poll` hands out the next queued request only
 /// after the previous one completed. A newer request supersedes the answer of an older one,
-/// which is then not delivered. A session that stops polling for `sessionExpiry` is dropped and
-/// its open request fails; a request in flight for `requestTimeout` fails too. Exactly one
+/// which is then not delivered. A session that stops polling for 5 s is dropped and its open
+/// request fails; a request in flight for 10 minutes fails too. Exactly one
 /// session is the target while any is joined.
 public actor SessionRegistry {
   private struct Session {
@@ -53,8 +53,8 @@ public actor SessionRegistry {
   }
 
   private let time: any TimeSource
-  private let sessionExpiry: TimeInterval
-  private let requestTimeout: TimeInterval
+  private static let sessionExpiry: TimeInterval = 5
+  private static let requestTimeout: TimeInterval = 600
   private var sessions: [SessionID: Session] = [:]
   private var joins = 0
   private var lastSweep: Date?
@@ -64,14 +64,7 @@ public actor SessionRegistry {
   public static let maxTitle = 80
   public private(set) var target: SessionID?
 
-  public init(
-    time: any TimeSource, sessionExpiry: Duration = .seconds(5),
-    requestTimeout: Duration = .seconds(600)
-  ) {
-    self.time = time
-    self.sessionExpiry = sessionExpiry.timeInterval
-    self.requestTimeout = requestTimeout.timeInterval
-  }
+  public init(time: any TimeSource) { self.time = time }
 
   /// Adds the session, or renames it and refreshes its liveness if it already joined. A session
   /// that `replaces` an id takes over that id's place, target and requests.
@@ -161,10 +154,10 @@ public actor SessionRegistry {
     let labels = labels()
     var deliveries: [Delivery] = []
     for (id, session) in ordered() {
-      if now.timeIntervalSince(session.lastPoll) >= sessionExpiry {
+      if now.timeIntervalSince(session.lastPoll) >= Self.sessionExpiry {
         deliveries += [drop(id, labels: labels, reason: "session closed")].compactMap { $0 }
       } else if let flight = session.inFlight,
-        now.timeIntervalSince(flight.since) >= requestTimeout
+        now.timeIntervalSince(flight.since) >= Self.requestTimeout
       {
         sessions[id]?.inFlight = nil
         if session.latest == flight.id, let label = labels[id] {
