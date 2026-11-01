@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 
 @testable import BridgeCore
 
@@ -8,6 +9,7 @@ actor FakeVoice: RealtimeControlling {
   var added: [String] = []
   var failure: CodexProblem?
   var closes = 0
+  var shutdowns = 0
   nonisolated let events: AsyncStream<RealtimeEvent>
   private let emitter: AsyncStream<RealtimeEvent>.Continuation
 
@@ -20,17 +22,28 @@ actor FakeVoice: RealtimeControlling {
   }
   func close() { closes += 1 }
   func addContext(_ text: String) { added.append(text) }
-  func shutdown() {}
+  func shutdown() { shutdowns += 1 }
   func fail(with problem: CodexProblem?) { failure = problem }
   nonisolated func emit(_ event: RealtimeEvent) { emitter.yield(event) }
 }
 
-/// A fresh voice for each controller, as the app makes after Stop.
+/// A fresh voice for each controller, as the app makes after Stop. While `slow`, each launch
+/// waits for `finishLaunch()`, as codex takes seconds to start.
 actor FakeVoices {
   private(set) var made: [FakeVoice] = []
-  func make() -> FakeVoice {
+  var slow = false
+  private var launches: [CheckedContinuation<Void, Never>] = []
+  func make() async -> FakeVoice {
+    if slow { await withCheckedContinuation { launches.append($0) } }
     made.append(FakeVoice())
     return made[made.count - 1]
+  }
+  func setSlow() { slow = true }
+  var waiting: Int { launches.count }
+  func finishLaunch() {
+    slow = false
+    launches.forEach { $0.resume() }
+    launches = []
   }
 }
 
@@ -104,6 +117,45 @@ struct BridgeTests {
   func live() async {
     await bridge.perform(.start)
     await bridge.audioEvent(.speechStarted)
+  }
+
+  /// A second Start while codex is still launching does not launch a second codex, and a
+  /// Stop meanwhile wins: the launched codex is ended and the microphone stays off.
+  @Test func oneStartAtATimeAndStopDuringStartWins() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    await voices.setSlow()
+    async let first: Void = test.bridge.perform(.start)
+    #expect(await eventually { await voices.waiting == 1 })
+    async let second: Void = test.bridge.perform(.start)
+    try? await Task.sleep(for: .milliseconds(100))
+    await test.bridge.perform(.stop)
+    await voices.finishLaunch()
+    _ = await (first, second)
+    #expect(await voices.made.count == 1)
+    #expect(await voices.made.first?.shutdowns == 1)
+    #expect(await test.bridge.status.call == .off)
+    #expect(await !test.audio.calls.contains("startListening"))
+    await test.bridge.perform(.start)  // the next Start launches a fresh codex
+    #expect(await test.bridge.status.call == .listening)
+    #expect(await voices.made.count == 2)
+  }
+
+  /// The sentence of a failed Start goes once a Start succeeds.
+  @Test func startThatSucceedsClearsTheProblem() async throws {
+    let fails = OSAllocatedUnfairLock(initialState: true)
+    let test = try BridgeTests { [voice] in
+      if fails.withLock({ $0 }) { throw CodexProblem.protocolMismatch("no reply to initialize") }
+      return voice
+    }
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    #expect(await test.bridge.status.problem != nil)
+    fails.withLock { $0 = false }
+    await test.bridge.perform(.start)
+    #expect(await test.bridge.status.call == .listening)
+    #expect(await test.bridge.status.problem == nil)
   }
 
   @Test func handoffGoesToTarget() async throws {

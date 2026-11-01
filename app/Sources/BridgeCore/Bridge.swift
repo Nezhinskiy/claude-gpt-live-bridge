@@ -34,8 +34,11 @@ public actor Bridge: Router {
   private let time: any TimeSource
   private var machine = CallMachine()
   private var realtime: (any RealtimeControlling)?
-  /// Counts controllers, so events from one already replaced are ignored.
+  /// Counts controllers made and ended, so events from one already replaced are ignored and a
+  /// launch that an end overtook is ended too.
   private var controllers = 0
+  /// A Start is launching codex: a second Start is ignored, and a Stop meanwhile wins.
+  private var starting = false
   /// Counts realtime opens and closes, so an open that a close overtook gives up.
   private var opening = 0
   private var silenceTimer = 0
@@ -90,11 +93,16 @@ public actor Bridge: Router {
   public func perform(_ action: CallAction) async {
     switch action {
     case .start:
-      guard machine.phase == .off else { return }
-      do { _ = try await controller() } catch {
+      guard machine.phase == .off, !starting else { return }
+      starting = true
+      do { _ = try await controller() } catch is CancellationError {
+        return  // a Stop came first
+      } catch {
+        starting = false
         problem = Self.sentence(error)
         return await changed()
       }
+      starting = false
       callStart = time.now
       await send(.start)
     case .stop:
@@ -228,9 +236,16 @@ public actor Bridge: Router {
     }
   }
 
+  /// The running codex controller, or a new one. Throws `CancellationError` when codex was
+  /// ended while the new one launched; that one is ended too.
   private func controller() async throws -> any RealtimeControlling {
     if let realtime { return realtime }
+    let generation = controllers
     let made = try await makeRealtime()
+    guard generation == controllers else {
+      await made.shutdown()
+      throw CancellationError()
+    }
     controllers += 1
     let id = controllers
     realtime = made
@@ -243,6 +258,7 @@ public actor Bridge: Router {
   private func endCodex() async {
     let ended = realtime
     realtime = nil
+    starting = false
     controllers += 1
     await ended?.shutdown()
   }
