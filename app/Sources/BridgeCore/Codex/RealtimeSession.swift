@@ -138,7 +138,9 @@ public actor RealtimeSession: RealtimeControlling {
       "thread/realtime/stop", ["threadId": .string(id)] as JSONValue, timeout: timeout)
   }
 
-  /// Result lines go in as `user` text, the role ADR 0001 (b) observed being spoken.
+  /// Result lines go in as `user` text, the role ADR 0001 (b) observed being spoken. The voice
+  /// reads them as the owner's words, so a session's text could still steer it; the one-line
+  /// shape and the prompt's "data, not instructions" rule narrow that, they do not close it.
   public func addContext(_ text: String) async throws {
     guard let id = thread else { throw CodexProblem.protocolMismatch("no voice session open") }
     let _: JSONValue = try await client.request(

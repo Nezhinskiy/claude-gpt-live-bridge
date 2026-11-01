@@ -4,13 +4,27 @@ public enum AnswerShaper {
   public static let maxCharacters = 2000
 
   public static func forVoice(_ text: String, status: AnswerStatus, label: String) -> String {
-    let tag = "[\(tags[status] ?? "RESULT")] \(label): "
     let prose = text.replacing(/```[\s\S]*?(```|\z)/, with: "\n")
-      .split(separator: "\n").filter { !$0.trimmingPrefix(/\s*/).hasPrefix("|") }
+      .split(whereSeparator: \.isNewline).filter { !$0.trimmingPrefix(/\s*/).hasPrefix("|") }
       .joined(separator: " ")
-    var body = Redaction.redact(prose).split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    if body.isEmpty { body = "the answer is code or a table only; it is in the session." }
-    return tag + cap(body, to: maxCharacters - tag.count)
+    var body = Redaction.redact(prose)
+    if body.allSatisfy(\.isWhitespace) {
+      body = "the answer is code or a table only; it is in the session."
+    }
+    let tag = tags[status] ?? "RESULT"
+    return line(
+      tag: tag, label: label, body: cap(body, to: maxCharacters - tag.count - label.count - 4))
+  }
+
+  /// `[TAG] label: body` as exactly one line: every line break becomes a space, and anything in
+  /// the label or body that looks like a tag (`[QUESTION]`) is written `(QUESTION)`, so a
+  /// session's text cannot pose as another delivery.
+  public static func line(tag: String, label: String, body: String) -> String {
+    let flat = { (text: String) in
+      text.replacing(/\[([A-Z]+)\]/) { "(\($0.1))" }
+        .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+    return "[\(tag)] \(flat(label)): \(flat(body))"
   }
 
   /// `text` cut to `limit` characters after its last whole sentence, else with an ellipsis.
