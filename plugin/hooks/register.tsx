@@ -299,8 +299,10 @@ async function live($: EngineInterface, args: string): Promise<string> {
   if (verb === 'status') return statusText($)
   if (verb === 'on') {
     if (joined) return 'This session has already joined LiveBridge.'
+    // No title here: a new session's is still the one Claude Code derives from its folder, and
+    // the app shows the name the session is given next, once the poll follows it.
     return (await turnOn($))
-      ? `Joined LiveBridge as “${link?.session?.title}”.`
+      ? 'Joined LiveBridge.'
       : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
   }
   if (verb === 'context' && (option === 'auto' || option === 'manual')) return CONTEXT_SETTING

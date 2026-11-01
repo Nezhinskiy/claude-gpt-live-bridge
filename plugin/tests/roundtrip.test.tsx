@@ -15,7 +15,7 @@ test('roundtrip', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true })
   const reply = await $.command.run({ ...LIVE, args: 'on' })
-  expect(reply.text).toContain('Example session')
+  expect(reply.text).toContain('Joined')
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
   expect(world.read.every(path => path.endsWith('.json'))).toBe(true)
 

@@ -55,7 +55,7 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
   const world = fakeWorld(on)
   world.otherRecords = { '1.json': '', '2.json': '{"sessionId": "', '3.json': 'null' }
   await $.session.start(START)
-  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Example session')
+  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
@@ -90,7 +90,7 @@ test('aFixedHomeMovesTheSocketOnly', async ($, on) => {
   const world = fakeWorld(on, {}, { CFFIXED_USER_HOME: '/tmp/lb' })
   world.socket = '/tmp/lb/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
   await $.session.start(START)
-  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Example session')
+  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
   expect(world.read.every(path => path.startsWith('/Users/example/.claude/sessions/'))).toBe(true)
 })
 
@@ -160,6 +160,20 @@ test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
   await world.clock.advance(1000)
   expect(world.read).toEqual(['/Users/example/.claude/sessions/12345.json'])
   expect(world.take('join')).toEqual([])
+})
+
+test('theJoinNamesNoTitleTheAppWillReplace', async ($, on) => {
+  // A new session's record first holds a name Claude Code derives from its folder; the desktop
+  // app names it after its first prompt, and the app shows that name once the poll follows it.
+  const world = fakeWorld(on)
+  world.title = 'example-project-42'
+  await $.session.start(START)
+  const joined = (await $.command.run({ ...LIVE, args: 'on' })).text
+  expect(joined).toContain('Joined')
+  expect(joined).not.toContain('example-project')
+  world.title = 'Live on'
+  await world.clock.advance(1000)
+  expect(world.take('join').at(-1)).toEqual({ sessionId: ID, title: 'Live on' })
 })
 
 test('automaticContextIsTheAppsSetting', async ($, on) => {
