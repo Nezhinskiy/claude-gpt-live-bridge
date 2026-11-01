@@ -103,6 +103,7 @@ final class StatusPanel: NSObject {
     if measured > 0 { contentHeight = measured }
     place()
     panel.makeKeyAndOrderFront(nil)
+    reshadow()
     watchClicks()
   }
 
@@ -122,7 +123,16 @@ final class StatusPanel: NSObject {
     let size = CGSize(width: PopoverView.width, height: max(contentHeight, 1))
     let frame = PanelPlacement.frame(size: size, under: buttonFrame, screens: Self.screens)
     if frame != panel.frame { panel.setFrame(frame, display: true) }
-    panel.invalidateShadow()
+    reshadow()
+  }
+
+  /// The window server builds a borderless window's shadow from what it has drawn when asked.
+  /// Asked before the glass has drawn, it takes the whole rectangle, and a dark square rim shows
+  /// past the rounded corners; so it is asked again once the panel has displayed.
+  private func reshadow() {
+    guard panel.isVisible else { return }
+    panel.display()
+    DispatchQueue.main.async { [panel] in panel.invalidateShadow() }
   }
 
   /// The status item's button in screen coordinates, if it is in the menu bar.
