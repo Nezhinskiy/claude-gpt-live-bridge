@@ -105,6 +105,19 @@ struct RealtimeSessionTests {
     #expect(realtime["clientManagedHandoffs"] == true && realtime["delegationAckFiller"] == true)
     #expect(realtime["prompt"]?.string == VoicePrompt.text)
     #expect(realtime["initialItems"] == (try JSONValue(encoding: items)))
+    #expect(realtime["voice"] == nil)  // codex's default
+  }
+
+  /// The voice chosen in Settings is read at each open, so a change applies from the next one.
+  @Test func openUsesTheChosenVoice() async throws {
+    let chosen = Chosen()
+    let session = RealtimeSession(client: rpc, cwd: cwd, voice: { chosen.voice })
+    chosen.voice = "cedar"
+    _ = try await session.open(offerSDP: "offer", items: [])
+    await session.close()
+    chosen.voice = "viola"
+    _ = try await session.open(offerSDP: "offer", items: [])
+    #expect(await rpc.params("thread/realtime/start").map { $0["voice"] } == ["cedar", "viola"])
   }
 
   @Test func openRefusesWhenAServerIsEnabled() async throws {
@@ -251,4 +264,8 @@ struct RealtimeSessionTests {
     rpc.ask.yield(RPCServerRequest(id: "srv-1", method: "item/tool/call", params: [:]))
     #expect(await eventually { await rpc.declined == ["srv-1"] })
   }
+}
+
+final class Chosen: @unchecked Sendable {
+  var voice: String?
 }

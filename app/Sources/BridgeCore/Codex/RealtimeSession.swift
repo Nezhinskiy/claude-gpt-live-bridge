@@ -34,6 +34,8 @@ public protocol RealtimeControlling: Sendable {
 public actor RealtimeSession: RealtimeControlling {
   private let client: any RPCClient
   private let cwd: URL
+  /// The voice chosen in Settings, read at each open; nil leaves it to codex.
+  private let voice: @Sendable () -> String?
   private let timeout = Duration.seconds(20)
   /// More `mcpServerStatus/list` pages than this is a reply this version does not understand.
   static let maxStatusPages = 50
@@ -49,9 +51,10 @@ public actor RealtimeSession: RealtimeControlling {
   private let emit: AsyncStream<RealtimeEvent>.Continuation
 
   /// `cwd` is an empty directory the app owns (`<data dir>/codex-cwd`).
-  public init(client: any RPCClient, cwd: URL) {
+  public init(client: any RPCClient, cwd: URL, voice: @escaping @Sendable () -> String? = { nil }) {
     self.client = client
     self.cwd = cwd
+    self.voice = voice
     (events, emit) = AsyncStream.makeStream()
   }
 
@@ -117,12 +120,14 @@ public actor RealtimeSession: RealtimeControlling {
   /// `thread/realtime/start` answers `{}`; the SDP answer or an error follows as a notification.
   private func start(thread: String, offerSDP: String, items: [InitialItem]) async throws -> String
   {
-    let params: JSONValue = [
+    var fields: [String: JSONValue] = [
       "threadId": .string(thread), "version": "v3", "outputModality": "audio",
       "transport": ["type": "webrtc", "sdp": .string(offerSDP)],
       "includeStartupContext": false, "clientManagedHandoffs": true, "delegationAckFiller": true,
       "prompt": .string(VoicePrompt.text), "initialItems": try JSONValue(encoding: items),
     ]
+    fields["voice"] = voice().map(JSONValue.string)
+    let params = JSONValue.object(fields)
     lastError = nil
     attempt += 1
     let mine = attempt
