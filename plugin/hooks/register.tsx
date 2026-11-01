@@ -11,6 +11,7 @@ import { PLUGIN_NAME, voicePrompt } from './prompt.ts'
 import { fallbackTitle, titleFromRegistry } from './title.ts'
 import { clip, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
+import { socketPath } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
@@ -235,7 +236,10 @@ export const register: Register = on => {
       run: argv => $.process.run(argv),
       every: (ms, fn) => $.clock.every(ms, fn),
       log: text => $.ui.log(text),
-    }, home)
+    }, {
+      socketPath: socketPath(home, await $.env.get('CFFIXED_USER_HOME')),
+      appPath: `${home}/Applications/LiveBridge.app`,
+    })
     // A hot reload runs this again with the module's variables gone; the store kept the join.
     const saved = await $.store.get(joinedKey(await $.session.id()))
     if (saved !== undefined) {

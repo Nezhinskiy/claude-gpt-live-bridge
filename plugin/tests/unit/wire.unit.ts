@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
+import { socketPath } from '../../hooks/wire.ts'
 import type * as Wire from '../../hooks/wire.ts'
 
 // A field-by-field description of each wire type. `fields<T>` takes exactly the keys of T, so
@@ -95,4 +96,12 @@ test('theCheckRejectsADriftedShape', () => {
   assert.deepEqual(mismatches({ ...join, extra: 1, title: null }, SHAPES['join']!, 'join'), [
     'join.extra: unknown', 'join.title: null (absent fields are omitted)',
   ])
+})
+
+test('socketFollowsTheHomeFoundationUses', () => {
+  // The app finds Application Support through Foundation, which honours CFFIXED_USER_HOME.
+  const rel = 'Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
+  assert.equal(socketPath('/Users/example', undefined), `/Users/example/${rel}`)
+  assert.equal(socketPath('/Users/example', ''), `/Users/example/${rel}`)
+  assert.equal(socketPath('/Users/example', '/tmp/lb'), `/tmp/lb/${rel}`)
 })

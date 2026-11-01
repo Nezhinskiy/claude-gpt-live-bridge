@@ -86,3 +86,12 @@ test('offDuringAPollSubmitsNothing', async ($, on) => {
   await poll
   expect(world.submitted).toEqual([])
 })
+
+test('aFixedHomeMovesTheSocketOnly', async ($, on) => {
+  // CFFIXED_USER_HOME=/tmp/lb build-app.sh --run keeps the app's files there; the registry stays home.
+  const world = fakeWorld(on, {}, { CFFIXED_USER_HOME: '/tmp/lb' })
+  world.socket = '/tmp/lb/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
+  await $.session.start(START)
+  expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('Example session')
+  expect(world.read.every(path => path.startsWith('/Users/example/.claude/sessions/'))).toBe(true)
+})

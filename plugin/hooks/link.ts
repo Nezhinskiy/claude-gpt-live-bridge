@@ -2,13 +2,10 @@
 // one-second poll loop. Each call answers what happened and never throws.
 import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-code'
 
-import { SOCKET_REL } from './wire.ts'
 import type { AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } from './wire.ts'
 
 /** LiveBridge.app's bundle identifier. */
 export const BUNDLE_ID = 'io.github.nezhinskiy.livebridge'
-/** Where build-app.sh installs the app, relative to the home folder. */
-const APP_REL = 'Applications/LiveBridge.app'
 const POLL_MS = 1000
 
 /**
@@ -32,10 +29,11 @@ export class BridgeLink {
   #timer: Timer | null = null
   #isPolling = false
 
-  constructor(ports: LinkPorts, home: string) {
+  /** `appPath`: where build-app.sh installs the app. */
+  constructor(ports: LinkPorts, paths: { socketPath: string; appPath: string }) {
     this.#ports = ports
-    this.#socketPath = `${home}/${SOCKET_REL}`
-    this.#appPath = `${home}/${APP_REL}`
+    this.#socketPath = paths.socketPath
+    this.#appPath = paths.appPath
   }
 
   get session(): JoinBody | null {

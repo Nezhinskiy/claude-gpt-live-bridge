@@ -3,8 +3,16 @@
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 413 body over 131072 bytes.
 
-/** The socket path relative to the user's home directory. */
-export const SOCKET_REL = 'Library/Application Support/claude-gpt-live-bridge/run/bridge.sock';
+/** The socket path relative to the home folder Foundation reports. */
+const SOCKET_REL = 'Library/Application Support/claude-gpt-live-bridge/run/bridge.sock';
+
+/**
+ * The app's socket. The app finds Application Support through Foundation, which takes
+ * `CFFIXED_USER_HOME` over the account's home when it is set, so the mod does the same.
+ */
+export function socketPath(home: string, fixedHome: string | undefined): string {
+  return `${fixedHome || home}/${SOCKET_REL}`;
+}
 
 export type SessionId = string;
 export type RequestId = string;

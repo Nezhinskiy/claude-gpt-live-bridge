@@ -20,15 +20,17 @@ export const VOICEMOD = { command: 'voicemod', origin: { kind: 'composer' }, pre
 
 export type Call = { route: string; body?: Record<string, unknown> }
 
-export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
+export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Record<string, string> = {}) {
   const clock = mock.clock(on)
-  mock.env(on, { HOME: '/Users/example' })
+  mock.env(on, { HOME: '/Users/example', ...env })
   mock.store(on, store)
   const world = {
     clock,
     sessionId: ID,
     title: 'Example session',
     isAppUp: true,
+    /** The socket the app listens on. */
+    socket: SOCKET as string,
     /** Whether ~/Applications holds the app; Launch Services never finds it by bundle id here. */
     isAppInstalled: false,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
@@ -78,7 +80,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     return { value: { exitCode, stdout: '', stderr: exitCode === 0 ? '' : 'no such application', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('http.fetch', async (_, e) => {
-    if (!world.isAppUp || e.init?.socketPath !== SOCKET) throw new Error('connect ENOENT')
+    if (!world.isAppUp || e.init?.socketPath !== world.socket) throw new Error('connect ENOENT')
     const route = new URL(e.url).pathname.replace('/v1/', '')
     const body = e.init.body === undefined ? undefined : JSON.parse(e.init.body)
     world.calls.push({ route, body })
