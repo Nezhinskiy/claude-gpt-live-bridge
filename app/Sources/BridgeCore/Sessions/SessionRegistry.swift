@@ -59,6 +59,8 @@ public actor SessionRegistry {
   private var lastSweep: Date?
   /// A longer gap between sweeps means the Mac slept, not that every mod went quiet.
   private static let sleepGap: TimeInterval = 3
+  /// The longest title kept; the label, the band and every voice line carry it.
+  public static let maxTitle = 80
   public private(set) var target: SessionID?
 
   public init(
@@ -78,7 +80,7 @@ public actor SessionRegistry {
     var session =
       sessions[body.sessionId] ?? replaced ?? Session(joinOrder: joins, lastPoll: time.now)
     joins += 1
-    session.title = body.title
+    session.title = String(body.title.prefix(Self.maxTitle))
     session.autoContext = body.autoContext
     session.lastPoll = time.now
     sessions[body.sessionId] = session

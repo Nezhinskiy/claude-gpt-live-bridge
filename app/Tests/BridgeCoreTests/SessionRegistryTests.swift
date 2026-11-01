@@ -51,6 +51,15 @@ struct SessionRegistryTests {
     #expect(await registry.rows().map(\.sessionId) == [b, c])
   }
 
+  /// A title is cut at join, so no label can crowd an answer out of its 2,000-character line.
+  @Test func longTitleIsCut() async throws {
+    await join(a, String(repeating: "Long title ", count: 300))
+    let label = try #require(await registry.rows().first?.label)
+    #expect(label.count == SessionRegistry.maxTitle)
+    let line = AnswerShaper.forVoice("Done.", status: .ok, label: label)
+    #expect(line.hasSuffix(": Done.") && line.count <= AnswerShaper.maxCharacters)
+  }
+
   @Test func rejoinRenamesWithoutDuplicating() async {
     await join(a, "Alpha")
     await join(a, "Renamed")
