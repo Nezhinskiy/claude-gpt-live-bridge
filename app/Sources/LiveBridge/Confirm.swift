@@ -5,16 +5,24 @@ import BridgeCore
 /// on the menu bar window, which closes as soon as another window takes the focus.
 @MainActor
 enum Confirm {
-  /// True when the owner chose the destructive button (Return); Cancel takes Escape.
+  /// True only when the owner clicks the destructive button. Cancel is the default button, as
+  /// the macOS guidelines ask of a destructive alert: Return and Escape both cancel.
   static func ask(_ confirmation: Confirmation) -> Bool {
     let alert = NSAlert()
     alert.alertStyle = .warning
     alert.messageText = confirmation.title
     alert.informativeText = confirmation.message
+    alert.addButton(withTitle: "Cancel")  // the first button takes Return
     let confirm = alert.addButton(withTitle: confirmation.confirm)
     confirm.hasDestructiveAction = true
-    alert.addButton(withTitle: "Cancel")
+    // Cancel holds Return, so Escape has no button of its own: it ends the alert as a cancel.
+    let escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+      guard event.keyCode == 53 else { return event }
+      NSApp.abortModal()
+      return nil
+    }
+    defer { escape.map(NSEvent.removeMonitor) }
     NSApp.activate()  // a menu bar app is not active, so its alert would open behind others
-    return alert.runModal() == .alertFirstButtonReturn
+    return alert.runModal() == .alertSecondButtonReturn
   }
 }
