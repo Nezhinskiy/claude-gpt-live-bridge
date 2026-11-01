@@ -17,7 +17,7 @@ const FRAMING = `The ${PLUGIN_NAME} plugin sent a message:\n`
 const MARKER = new RegExp(`^${VOICE_TAG} ([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})(?:\\n\\n|$)`, 'iu')
 /** Every line terminator a reader may break a line at, besides \n. */
 const LINE_BREAKS = /\r\n?|[\u2028\u2029\u0085\v\f]/gu
-const SPEAKER: Record<Role, string> = { user: 'Owner', assistant: 'Voice', developer: 'Note' }
+const SPEAKER: Record<Role, string> = { user: 'Owner', assistant: 'Voice' }
 
 /**
  * The prompt a voice request is submitted as (without `asUser`): the brief first, then the

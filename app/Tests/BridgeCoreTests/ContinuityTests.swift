@@ -21,7 +21,7 @@ struct ContinuityTests {
     continuity.setContext("context")
     #expect(
       continuity.initialItems(tasks: ["task"]) == [
-        InitialItem(role: .developer, text: "context"), InitialItem(role: .developer, text: "task"),
+        InitialItem(role: .user, text: "context"), InitialItem(role: .user, text: "task"),
         InitialItem(role: .user, text: "hi"), InitialItem(role: .assistant, text: "hello"),
       ])
   }

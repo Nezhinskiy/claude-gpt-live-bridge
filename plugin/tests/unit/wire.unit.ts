@@ -18,7 +18,7 @@ const fields = <T>(shape: { [K in keyof Required<T>]: Shape }): Shape => ({ fiel
 const optional = (shape: Shape): Shape => ({ optional: shape })
 const S = 'string'
 
-const UTTERANCE = fields<Wire.Utterance>({ role: { oneOf: ['user', 'assistant', 'developer'] }, text: S })
+const UTTERANCE = fields<Wire.Utterance>({ role: { oneOf: ['user', 'assistant'] }, text: S })
 const ROW = fields<Wire.SessionRow>({
   sessionId: S, label: S, activity: { oneOf: ['idle', 'working', 'approval'] }, isTarget: 'boolean',
 })

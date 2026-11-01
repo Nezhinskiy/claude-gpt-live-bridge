@@ -24,12 +24,11 @@ public struct Continuity: Codable, Sendable, Equatable {
   /// The session's context summary, or `nil` once it is no longer loaded.
   public mutating func setContext(_ summary: String?) { context = summary }
 
-  /// The loaded context and the open task lines as `developer` notes, then the newest
-  /// utterances that fit codex's limits.
+  /// The loaded context and the open task lines, then the newest utterances that fit codex's
+  /// limits. Notes go in as `user` lines, data with the rank of the owner's words and no more,
+  /// like every line the app adds while a session is open.
   public func initialItems(tasks: [String]) -> [InitialItem] {
-    let notes = ([context].compactMap { $0 } + tasks).map {
-      InitialItem(role: .developer, text: $0)
-    }
+    let notes = ([context].compactMap { $0 } + tasks).map { InitialItem(role: .user, text: $0) }
     var tokens = notes.reduce(0) { $0 + Self.estimatedTokens($1.text) }
     var talk: [InitialItem] = []
     for utterance in utterances.reversed() {

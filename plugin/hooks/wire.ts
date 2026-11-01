@@ -9,7 +9,7 @@ export const SOCKET_REL = 'Library/Application Support/claude-gpt-live-bridge/ru
 export type SessionId = string;
 export type RequestId = string;
 
-export type Role = 'user' | 'assistant' | 'developer';
+export type Role = 'user' | 'assistant';
 export type Utterance = { role: Role; text: string };
 
 /** brief: the voice model's self-contained request; transcript: the speech since the last one. */

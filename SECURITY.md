@@ -60,10 +60,19 @@ sends. These checks fail closed: if codex cannot list its features, reports an M
 is not disabled, leaves a configured server out of its report, or answers in a shape this
 version does not read, the call does not start.
 
-Results from a session are added to the voice as one tagged line each, with every bracket
-neutralised and line breaks removed, so a session's text cannot pose as another delivery. The
-voice reads those lines as the owner's turn, so a session's text could still try to steer it;
-the prompt treats them as data to relay. A session you do not trust should not be joined.
+Results, open tasks and context summaries are added to the voice as one tagged line each, with
+every bracket neutralised and line breaks removed, so a session's text cannot pose as another
+delivery. Each goes in with the rank of the owner's own words (`user`), never as an instruction
+to the voice (`developer`), and the prompt treats them as data to relay. The voice still reads
+them as the owner's turn, so a session's text could try to steer it.
+
+**Residual risk, by design.** Claude skips its own text confirmation when a request says the
+owner already confirmed it by voice, and the voice writes that sentence itself. Anything that can
+steer the voice can therefore produce it: text a joined session read (a README, an issue, a web
+page, a tool's output) that reaches the voice through a result, an update or a summary, or
+anything audible to the microphone. The voice is told to hand such a request off only after a
+spoken yes, but that is an instruction, not enforcement. Join only sessions whose input you trust, and keep
+voice off for a session whose permission mode acts without asking.
 
 ### What leaves the Mac
 

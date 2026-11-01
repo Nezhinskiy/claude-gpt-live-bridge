@@ -79,7 +79,7 @@ struct RealtimeSessionTests {
   }
 
   @Test func openSendsPinnedParams() async throws {
-    let items = [InitialItem(role: .developer, text: "[CONTEXT] Example session: a summary.")]
+    let items = [InitialItem(role: .user, text: "[CONTEXT] Example session: a summary.")]
     let answer = try await session.open(offerSDP: "offer", items: items)
     #expect(answer == (try adrJSON("realtime-sdp")["params"]?["sdp"]?.string))
     #expect(

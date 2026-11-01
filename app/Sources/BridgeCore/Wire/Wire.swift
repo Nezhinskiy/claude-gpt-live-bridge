@@ -17,9 +17,9 @@ public struct RequestID: RawRepresentable, Hashable, Codable, Sendable {
   public init(_ rawValue: String) { self.rawValue = rawValue }
 }
 
-public enum Role: String, Codable, Sendable { case user, assistant, developer }
+public enum Role: String, Codable, Sendable { case user, assistant }
 
-/// One final line of speech, or a note the app adds for the voice (`developer`).
+/// One final line of speech.
 public struct Utterance: Codable, Sendable, Equatable {
   public var role: Role
   public var text: String

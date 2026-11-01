@@ -114,7 +114,7 @@ struct BridgeTests {
     await bridge.audioEvent(.speechStarted)  // the next session knows the task is open
     #expect(
       await voice.opens.last == [
-        InitialItem(role: .developer, text: "[TASK] Beta: Example request 1")
+        InitialItem(role: .user, text: "[TASK] Beta: Example request 1")
       ])
   }
 
@@ -251,7 +251,7 @@ struct BridgeTests {
     await live()
     #expect(
       await voice.opens.first?.first
-        == InitialItem(role: .developer, text: "[CONTEXT] Alpha: \(shown)"))
+        == InitialItem(role: .user, text: "[CONTEXT] Alpha: \(shown)"))
   }
 
   @Test func autoContextOnTargetSwitch() async throws {
