@@ -73,15 +73,19 @@ In the Claude Code session you want to talk to:
 | `/live off` | Leaves LiveBridge. |
 | `/live target` | Makes this session the one the voice hands work to. |
 | `/live status` (or just `/live`) | One line: the call, the target, unheard results, minutes today. |
-| `/live context` | Sends the voice a short summary of this session, written by the session's model. |
-| `/live context auto` / `manual` | Sends that summary whenever the session becomes the target, or only on request. |
+| `/live context` | Sends the voice a new summary of this session, written by the session's model. |
+| `/live context auto` / `manual` | Also sends that summary whenever the session becomes the target, or only on Start and on request. |
 
 The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode.
 
 Then press **Start**, in the band above the prompt or in the menu bar popover, and talk. The
-band's Start makes its session the target and starts the call; while the call talks to another
-session, the band shows **Talk here** instead. Start stays disabled in the popover until a
-session has joined; until then the popover has **Copy /live on**, to paste into a session. The
+band's Start makes its session the target, starts the call and sends the voice the session's
+summary, with "Loading context…" and then "Context sent" in the band while it goes. A new
+session with no prompt yet has nothing to summarise, and when no turn has completed since the
+last summary, Start sends that one again instead of asking the model for another. While the
+call talks to another session, the band shows **Talk here** beside Stop. Start stays disabled
+in the popover until a session has joined; until then the popover has **Copy /live on**, to
+paste into a session. The
 popover lists the joined sessions (click one to make it the target; its × asks first, then
 removes it and erases its conversation, and `/live on` in that session joins it again), shows
 the last lines of the conversation (each cut to four lines) and the context line exactly as it
@@ -182,6 +186,13 @@ can become a request that Claude runs under the session's own permission mode.
   goes to the voice again the next time the line opens.
 - A Claude Code session that was already open before the mod loaded may need to be reopened
   before `/live` works in it.
+- In the Claude desktop app, `/live` typed in a session whose Claude Code process has not
+  started yet (a new session, or one just reopened) can show "/live isn't a command here." The
+  command still runs. The desktop lists such a session's commands from a check it runs with hooks
+  turned off, so the mod's code, which declares `/live`, does not run there; once the session is
+  running, the desktop takes its list from the session itself. The mod has no fix for this: a
+  static command file would be listed as `/livebridge:live`, not `/live`, and with hooks off it
+  would send its text to the model instead of running the mod.
 - Whether a reply has said a waiting result is judged by its words, against a list of common
   words in English and Russian only. In another language a result can count as heard when the
   voice only mentioned it.

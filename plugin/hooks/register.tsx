@@ -23,6 +23,10 @@ const OPEN_APP = 'Open LiveBridge from the menu bar.'
  */
 const ANSWER_LIMIT = 32_000
 const AUTO_CONTEXT = 'autoContext'
+/** How long a summary may take before the band stops saying it is loading. */
+const CONTEXT_TIMEOUT_MS = 60_000
+/** How long the band says "Context sent". */
+const SENT_NOTE_MS = 3_000
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
@@ -50,6 +54,19 @@ let generation = 0
 /** The registry file holding this session's record, once found: each poll reads it alone. */
 let recordFile: string | null = null
 let lastScan = -Infinity
+/**
+ * The last summary the model wrote, while no turn has completed since: sending it again costs
+ * no model call. Kept in memory only, as the transcript it summarises is the session's own.
+ */
+let summary: string | null = null
+/** Counts completed main turns, so a summary written across one is not kept as current. */
+let turnsDone = 0
+/** The summary on its way, which a second ask joins instead of asking the model again. */
+let sending: Promise<ContextOutcome> | null = null
+/** Counts sends; one that timed out is over, and what it wrote later is dropped. */
+let sendCount = 0
+
+type ContextOutcome = 'sent' | 'empty' | 'failed'
 
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
@@ -132,7 +149,10 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
   const isNewId = sessionId !== joined.sessionId
   const title = (await readTitle($, sessionId, isPoll && !isNewId)) ?? joined.title
   if (live !== generation || (!isNewId && title === joined.title)) return
-  if (isNewId) await $.store.delete(joinedKey(joined.sessionId))
+  if (isNewId) {
+    staleSummary()  // /clear: a new transcript
+    await $.store.delete(joinedKey(joined.sessionId))
+  }
   await link.join({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
   await save($)
 }
@@ -159,7 +179,10 @@ async function tick($: EngineInterface): Promise<void> {
   offlineSince = null
   const self = link?.session?.sessionId ?? ''
   if (reply.work?.kind === 'request') note = null
-  await update($, band, () => ({ isOffline: false, status: bandStatus(reply.status, self), ...(note && { problem: note }) }))
+  await update($, band, now => ({
+    isOffline: false, status: bandStatus(reply.status, self),
+    ...(note && { problem: note }), ...(now?.context && { context: now.context }),
+  }))
   if (reply.work?.kind === 'request') {
     tracker.submitted(reply.work.id)
     await save($)
@@ -186,13 +209,63 @@ async function refused($: EngineInterface, id: string): Promise<void> {
   await link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' })
 }
 
-/** Sends the session's summary to the app; says what happened and never rejects. */
-async function sendContext($: EngineInterface): Promise<'sent' | 'empty' | 'failed'> {
+function staleSummary(): void {
+  turnsDone += 1
+  summary = null
+}
+
+/** The band's note on the summary; undefined takes it down. */
+function showContext($: EngineInterface, context: Band['context']) {
+  return update($, band, now => {
+    if (now === null) return null
+    const { context: _, ...rest } = now
+    return context === undefined ? rest : { ...rest, context }
+  })
+}
+
+/** Whether the session has had a prompt: a new one has nothing to summarise. */
+async function hasTurns($: EngineInterface): Promise<boolean> {
   try {
-    const summary = await summarize($)
-    if (summary === '') return 'empty'
-    await link?.context(summary)
-    return 'sent'
+    return (await $.session.turns()) > 0
+  } catch {
+    return true  // not known: the model says when there is nothing
+  }
+}
+
+/**
+ * Sends the session's summary to the app; says what happened and never rejects. `isFresh` asks
+ * the model again even when no turn has completed since its last summary. While one is on its
+ * way a second ask joins it.
+ */
+function sendContext($: EngineInterface, isFresh: boolean): Promise<ContextOutcome> {
+  sending ??= deliverContext($, isFresh).finally(() => { sending = null })
+  return sending
+}
+
+async function deliverContext($: EngineInterface, isFresh: boolean): Promise<ContextOutcome> {
+  if (!(await hasTurns($))) return 'empty'
+  const send = ++sendCount
+  await showContext($, 'loading')
+  let timer: { cancel(): void } | undefined
+  const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
+  const outcome = await Promise.race([writeAndPost($, isFresh, send), late])
+  timer?.cancel()
+  if (outcome !== 'sent') sendCount += 1  // a summary this send writes after its time is dropped
+  await showContext($, outcome === 'sent' ? 'sent' : undefined)
+  if (outcome === 'sent') {
+    $.clock.after(SENT_NOTE_MS, () => void (send === sendCount && showContext($, undefined)))
+  }
+  return outcome
+}
+
+async function writeAndPost($: EngineInterface, isFresh: boolean, send: number): Promise<ContextOutcome> {
+  try {
+    const turns = turnsDone
+    const text = !isFresh && summary !== null ? summary : await summarize($)
+    if (send !== sendCount) return 'failed'
+    if (text === '') return 'empty'
+    if (turns === turnsDone) summary = text
+    return (await link?.context(text)) === true ? 'sent' : 'failed'
   } catch {
     return 'failed'
   }
@@ -200,7 +273,8 @@ async function sendContext($: EngineInterface): Promise<'sent' | 'empty' | 'fail
 
 /** The summary asked for by the app or the band, which have no reply line of their own. */
 async function contextAsked($: EngineInterface): Promise<void> {
-  if ((await sendContext($)) === 'failed') $.ui.log(NO_SUMMARY)
+  // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
+  if ((await sendContext($, false)) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
 }
 
 async function statusText($: EngineInterface): Promise<string> {
@@ -240,13 +314,17 @@ async function live($: EngineInterface, args: string): Promise<string> {
     await link?.target()
     return 'This session is now the voice target.'
   }
-  const sent = await sendContext($)
+  const sent = await sendContext($, true)
   return sent === 'sent' ? 'Sent a summary of this session to LiveBridge.' : sent === 'empty' ? 'Nothing to summarise yet.' : NO_SUMMARY
 }
 
-/** The band's Start: a call started from a session talks to that session. */
-async function startHere(): Promise<void> {
+/**
+ * The band's Start: a call started from a session talks to that session, and the voice gets the
+ * session's summary as the call starts, without holding it up.
+ */
+async function startHere($: EngineInterface): Promise<void> {
   await link?.target()
+  void contextAsked($)
   await link?.call('start')
 }
 
@@ -328,6 +406,7 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       const post = tracker.turnCompleted(e.turnId, e.answer, e.reason)
+      staleSummary()
       approval = null
       await save($)
       if (post && !(await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) })) && post.status !== 'update') {
@@ -361,10 +440,9 @@ export const register: Register = on => {
     const state = await read($, band)
     if (state === null || e.props.hasSurvey || !link?.session) return next(e)
     return drawBand($, e, state, {
-      start: () => void startHere(),
+      start: () => void startHere($),
       stop: () => void link?.call('stop'),
       target: () => void link?.target(),
-      loadContext: () => void contextAsked($),
     })
   })
 }

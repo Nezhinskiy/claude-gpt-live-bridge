@@ -74,9 +74,11 @@ and joins again when that title changes, polls it once a second, submits each vo
 the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
 origin. It draws a band above the prompt with the call's phase, the target, the unheard count
-and the buttons Start/Stop, Talk here and Load context, with the problem sentence on a row of
-its own. Start makes the session the target first; Talk here shows only while the call talks to
-another session, and moves it here. When the socket does not answer, it opens
+and the buttons Start/Stop and Talk here, with the problem sentence on a row of its own. Start
+makes the session the target, starts the call and sends the session's summary (none for a
+session with no prompt yet; the last one again, with no model call, while no turn has completed
+since it was written), with a short note in the band while it goes. Talk here shows only while
+the call talks to another session, and moves it here. When the socket does not answer, it opens
 `~/Applications/LiveBridge.app` with `open -g`, and falls back to `open -g -b <bundle id>`.
 
 ## The wire
