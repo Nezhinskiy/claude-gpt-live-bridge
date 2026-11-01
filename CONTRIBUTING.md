@@ -11,7 +11,17 @@ an issue first so we can agree on the shape.
 | `plugin/` | The Claude Code mod `livebridge`. `hooks/register.tsx` is wiring only; the other `hooks/*.ts` modules are pure. |
 | `wire/fixtures/` | One JSON file per message between the mod and the app: the shared oracle both sides test against. |
 | `scripts/` | `check.sh` (every check CI runs), `build-app.sh` (build, install, uninstall), `smoke.sh` (end to end). |
-| `docs/` | [Architecture](docs/architecture/overview.md) and [ADRs](docs/adr/). |
+| `docs/` | [Architecture](docs/architecture/overview.md) and [ADRs](docs/adr/); the rest is the stayfixed scaffold (below). |
+
+## Toolchain
+
+- A Swift 6.0 toolchain or later, the tools version `app/Package.swift` declares. It is tested
+  with Xcode 27 and Swift 6.4 (CI uses Xcode 27.2); older Xcode versions are untested. Liquid
+  Glass needs Xcode 26 or later; with an older Xcode the code falls back to the same popover with
+  materials.
+- Node 26, for the mod's checks and the audio page's tests. `scripts/check.sh` installs the
+  mod's development dependencies, TypeScript and `@types/node`, with `npm ci`.
+- Claude Code, for the mod's engine-facing half (below).
 
 ## Checks
 
@@ -24,11 +34,7 @@ tests, the type check and unit tests of the mod's pure modules, and, when `claud
 `PATH`, the type check of the mod's engine-facing files, `claude plugin validate` and `claude
 plugin test`. Without `claude` the script says that half was not checked and still passes; CI
 installs Claude Code (a pinned version) on the Xcode 27 macOS runner and runs the same script,
-which fails there if `claude` is missing. You need a Swift 6.0 toolchain or later, the tools version
-`app/Package.swift` declares. It is tested with Xcode 27 and Swift 6.4 (CI uses Xcode 27.2), and
-older Xcode versions are untested; before Xcode 26 the code falls back to a popover without
-Liquid Glass. You also need Node 26; the script installs the mod's development dependencies,
-TypeScript and `@types/node`, with `npm ci`.
+which fails there if `claude` is missing.
 
 The end-to-end smoke test drives the real codex and opens one or two short realtime voice
 sessions on your ChatGPT plan, about a minute of voice:
@@ -51,7 +57,9 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 /usr/bin/log stream --info --predicate 'subsystem == "io.github.nezhinskiy.livebridge"'
 ```
 
-`claude --plugin-dir plugin` loads the mod from the working tree.
+`claude --plugin-dir plugin` loads the mod from the working tree. The mod follows
+`CFFIXED_USER_HOME` to the socket as the app does, so `CFFIXED_USER_HOME=/tmp/lb claude
+--plugin-dir plugin` talks to the app started with the same variable.
 
 ## Conventions
 
@@ -63,5 +71,24 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`,
   `docs`, `test`, `build`, `chore`, …), one logical change each.
 - Write for a reader who has not seen the code: short sentences, the reason before the detail.
+
+## stayfixed
+
+The repository uses stayfixed, a documentation and process tool, to keep its process
+documents in one shape. Its files are:
+
+| Path | What it is for |
+|---|---|
+| `stayfixed.toml` | The project's settings: names, the base branch, where notes are kept. |
+| `.stayfixed/manifest.json` | A record of the files stayfixed wrote, so an upgrade keeps hand edits. Do not edit it. |
+| `AGENTS.md` (the marked region) | Instructions for coding agents; stayfixed rewrites only the region between its markers. |
+| `docs/roadmap.md`, `docs/roadmap-history.md`, `docs/trail.toml` | Where the project is now and what comes next; closed phases; the index of design and plan documents. |
+| `docs/specs/`, `docs/plans/` | Design and plan documents, when a change is big enough to need one. |
+| `docs/bugs/`, `docs/bug-reports.md`, `docs/runbooks/bug-reports.md` | The bug ledger: one file per entry, a generated index (do not edit it by hand), and how to file and close an entry. |
+| `docs/adr/0000-template.md` | The template for a new ADR. |
+| `docs/architecture/documentation.md` | Where each kind of fact belongs, so each has one home. |
+
+You do not need stayfixed to contribute: the files are plain Markdown and TOML. With it,
+`stayfixed docs check` checks the documents' budgets and links.
 
 By contributing you agree that your contribution is licensed under the [MIT License](LICENSE).
