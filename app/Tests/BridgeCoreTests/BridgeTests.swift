@@ -109,6 +109,25 @@ struct BridgeTests {
       ])
   }
 
+  /// The popover's Load context asks only the target for its summary.
+  @Test func loadContextAsksTheTarget() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await post("/v1/target", TargetBody(sessionId: b))
+    _ = try await registry.poll(b)  // a fresh target may already owe a summary
+    await bridge.loadContext()
+    #expect(try await registry.poll(b) == .context)
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  @Test func popoverSetsTheTarget() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    #expect(await bridge.status.target == a)
+    await bridge.setTarget(b)
+    #expect(await bridge.status.target == b)
+  }
+
   @Test func questionReplyGoesToAskingSession() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")

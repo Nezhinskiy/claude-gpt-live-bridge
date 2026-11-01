@@ -103,6 +103,17 @@ public actor Bridge: Router {
     }
   }
 
+  /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
+  public func loadContext() async {
+    if let target = await registry.target { await registry.requestContext(for: target) }
+  }
+
+  /// The popover's choice of target; a session that left is ignored.
+  public func setTarget(_ id: SessionID) async {
+    try? await registry.setTarget(id)
+    await changed()
+  }
+
   /// Forgets the conversation; the next realtime session starts fresh.
   public func newConversation() async {
     continuity = Continuity()

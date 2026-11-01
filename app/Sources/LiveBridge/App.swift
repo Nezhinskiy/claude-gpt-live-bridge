@@ -10,16 +10,11 @@ struct LiveBridgeApp: App {
   @State private var model = AppModel()
 
   var body: some Scene {
-    MenuBarExtra("LiveBridge") {
-      VStack(alignment: .leading, spacing: 8) {
-        Text(model.status?.call.rawValue ?? "off")
-        if let problem = model.problem { Text(problem) }
-        Button(model.status?.call == .off ? "Start" : "Stop") {
-          model.perform(model.status?.call == .off ? .start : .stop)
-        }
-        Button("Quit LiveBridge") { NSApplication.shared.terminate(nil) }
-      }
-      .padding()
+    MenuBarExtra {
+      PopoverView(model: model)
+    } label: {
+      Image(nsImage: model.glyph.image)
+        .accessibilityLabel(model.presentation?.accessibilityLabel ?? "LiveBridge")
     }
     .menuBarExtraStyle(.window)
   }
@@ -30,15 +25,25 @@ struct LiveBridgeApp: App {
 @MainActor @Observable
 final class AppModel {
   private(set) var status: StatusReply?
-  /// The input level while the line is open, 0 to 1.
-  private(set) var level = 0.0
-  private var startupProblem: String?
+  private(set) var presentation: StatusPresentation?
+  let glyph = StatusGlyph()
+  private var appProblem: String?
+  var openAtLogin = LoginItem.isEnabled {
+    didSet {
+      guard openAtLogin != LoginItem.isEnabled else { return }
+      do { try LoginItem.set(openAtLogin) } catch {
+        appProblem = "Open at login could not be changed: \(error.localizedDescription)"
+        openAtLogin = LoginItem.isEnabled
+      }
+    }
+  }
+  @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
   private static let log = Logger(subsystem: "io.github.nezhinskiy.livebridge", category: "call")
 
-  var problem: String? { startupProblem ?? status?.problem }
+  var problem: String? { appProblem ?? status?.problem }
 
   init() {
     do {
@@ -56,17 +61,26 @@ final class AppModel {
       self.server = server
       let (events, sink) = AsyncStream.makeStream(of: AudioEvent.self)
       audio.onEvent = { sink.yield($0) }
-      audio.onLevel = { [weak self] in self?.level = $0 }
+      audio.onLevel = { [weak self] in self?.showLevel($0) }
       Task { for await event in events { await bridge.audioEvent(event) } }
       Task { [weak self] in
         for await status in bridge.updates { self?.show(status) }
       }
     } catch {
-      startupProblem = "LiveBridge could not start its bridge: \(error.localizedDescription)"
+      appProblem = "LiveBridge could not start its bridge: \(error.localizedDescription)"
+      glyph.show(.off, badge: .problem, level: 0)
     }
   }
 
   func perform(_ action: CallAction) { Task { await bridge?.perform(action) } }
+  func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
+  func loadContext() { Task { await bridge?.loadContext() } }
+  func newConversation() { Task { await bridge?.newConversation() } }
+
+  private func showLevel(_ value: Double) {
+    level = value
+    if let presentation { glyph.show(presentation.bars, badge: presentation.badge, level: value) }
+  }
 
   private func show(_ next: StatusReply) {
     if next.call != status?.call || next.problem != status?.problem {
@@ -75,7 +89,11 @@ final class AppModel {
       )
     }
     if next.call != .live { level = 0 }
-    status = next
+    if next != status {
+      status = next
+      presentation = StatusPresentation(next)
+    }
+    glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
   }
 
   /// A fresh codex app-server for the voice, launched with its tool features turned off.
