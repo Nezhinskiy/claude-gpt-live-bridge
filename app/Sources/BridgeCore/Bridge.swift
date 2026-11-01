@@ -6,7 +6,7 @@ public actor Bridge: Router {
   public static let maxContext = 1500
   /// Why Start did nothing: there is no session to talk to.
   public static let noSession =
-    "No Claude Code session has joined: run /voice on in a session, then start."
+    "No Claude Code session has joined: run /live on in a session, then start."
 
   private let registry: SessionRegistry
   private let makeRealtime: @Sendable () async throws -> any RealtimeControlling

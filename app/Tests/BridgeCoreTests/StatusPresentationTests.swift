@@ -79,7 +79,7 @@ struct StatusPresentationTests {
     var empty = Self.status(.off)
     empty.sessions = []
     let shown = StatusPresentation(empty)
-    #expect(!shown.canAct && shown.detail.contains("/voice on"))
+    #expect(!shown.canAct && shown.detail.contains("/live on"))
     #expect(StatusPresentation(Self.status(.off)).canAct)
     empty.call = .listening
     #expect(StatusPresentation(empty).canAct)  // Stop always works

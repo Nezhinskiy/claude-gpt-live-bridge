@@ -68,7 +68,7 @@ public struct StatusPresentation: Sendable, Equatable {
         (
           "Off",
           s.sessions.isEmpty
-            ? "Run /voice on in a Claude Code session to start." : "Start to talk to your sessions."
+            ? "Run /live on in a Claude Code session to start." : "Start to talk to your sessions."
         )
       case .listening: ("Listening — line closed", "The line opens when you speak.")
       case .connecting: ("Connecting…", "Opening the voice line.")
