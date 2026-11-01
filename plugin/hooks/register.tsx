@@ -42,15 +42,31 @@ async function save($: EngineInterface): Promise<void> {
   if (link?.session) await $.store.set(joinedKey(link.session.sessionId), tracker.snapshot())
 }
 
-/** The `name` of this session's registry record, read from `*.json` files only (never `*.key`). */
+/**
+ * The `name` of this session's registry record, read from `*.json` files only (never `*.key`).
+ *
+ * Fragile by design: `~/.claude/sessions` is Claude Code's private state, not the mod API, and
+ * its shape may change in any release (ADR 0001, item e). The API has no call for the title the
+ * session list shows; only the classic hook payloads carry an optional `session_title`, and only
+ * at a session's start or a prompt. Each file is parsed on its own, because Claude Code rewrites
+ * them on every status change and one may be empty or half written at any moment.
+ */
 async function readTitle($: EngineInterface, sessionId: string): Promise<string> {
   const dir = `${home}/.claude/sessions`
   const entries = await $.fs.list(dir).catch(() => [])
   const records: unknown[] = []
   for (const entry of entries.filter(one => one.kind === 'file' && one.name.endsWith('.json'))) {
-    records.push(await $.fs.read(`${dir}/${entry.name}`).then(text => JSON.parse(String(text)), () => null))
+    records.push(await $.fs.read(`${dir}/${entry.name}`).then(text => parseRecord(String(text)), () => null))
   }
   return titleFromRegistry(records, sessionId) ?? fallbackTitle(await $.session.cwd())
+}
+
+function parseRecord(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
 }
 
 async function turnOn($: EngineInterface): Promise<boolean> {

@@ -51,3 +51,14 @@ test('offTurnsContextAutoAndLeaves', async ($, on) => {
   await world.clock.advance(3000)
   expect(world.take('next')).toEqual([])
 })
+
+test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
+  // Claude Code rewrites these files on every status change, so one may be empty or cut short.
+  const world = fakeWorld(on)
+  world.otherRecords = { '1.json': '', '2.json': '{"sessionId": "', '3.json': 'null' }
+  await $.session.start(START)
+  expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('Example session')
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+})

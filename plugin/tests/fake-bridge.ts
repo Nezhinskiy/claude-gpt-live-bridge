@@ -39,6 +39,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     submitted: [] as string[],
     launches: [] as (readonly string[])[],
     read: [] as string[],
+    /** The registry's other `*.json` files, by name: Claude Code rewrites them, so one may be half written. */
+    otherRecords: {} as Record<string, string>,
     /** The calls to one route since the last look, then forgets them. */
     take(route: string) {
       const found = world.calls.filter(call => call.route === route)
@@ -52,14 +54,13 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
   on('session.cwd', () => ({ value: '/Users/example/Dev/example-project' }))
   on('command.register', () => ({ value: { command: 'voicemod' } }))
   on('fs.list', () => ({
-    value: [
-      { name: '12345.json', kind: 'file', size: 1, mtimeMs: 0, isLink: false },
-      { name: '12345.key', kind: 'file', size: 1, mtimeMs: 0, isLink: false },
-    ],
+    value: [...Object.keys(world.otherRecords), '12345.json', '12345.key']
+      .map(name => ({ name, kind: 'file', size: 1, mtimeMs: 0, isLink: false }) as const),
   }))
   on('fs.read', (_, e) => {
     world.read.push(e.path)
-    return { value: JSON.stringify({ pid: 12345, sessionId: world.sessionId, name: world.title }) }
+    const other = world.otherRecords[e.path.split('/').at(-1) ?? '']
+    return { value: other ?? JSON.stringify({ pid: 12345, sessionId: world.sessionId, name: world.title }) }
   })
   on('process.run', (_, e) => {
     world.launches.push(e.argv)
