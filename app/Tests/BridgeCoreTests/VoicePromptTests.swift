@@ -26,8 +26,11 @@ struct VoicePromptTests {
     #expect(VoicePrompt.text.contains("the owner confirmed by voice"))
   }
 
-  @Test func speaksEachResultOnce() {
-    #expect(VoicePrompt.text.contains("once, at the next pause, after you answer"))
+  /// The voice gives one reply per owner turn, so a result left for "the next pause" was often
+  /// never spoken (the smoke test heard 1 of 5); it goes into the very next reply instead.
+  @Test func speaksEachResultOnceInTheNextReply() {
+    #expect(VoicePrompt.text.contains("once, in your very next reply, after a short answer"))
+    #expect(VoicePrompt.text.contains("if you were cut off before finishing one, say it again"))
     #expect(VoicePrompt.text.contains("Never make up a result while you wait."))
   }
 

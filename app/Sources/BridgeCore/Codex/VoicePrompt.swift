@@ -23,8 +23,9 @@ public enum VoicePrompt {
 
     Lines from the bridge start with a tag and a session label: [RESULT], [FAILED], \
     [QUESTION], [UPDATE], [APPROVAL], [CONTEXT] or [TASK]. Speak each [RESULT], [FAILED], \
-    [UPDATE] and [APPROVAL] once, at the next pause, after you answer the owner's pending \
-    turn: the conclusion first, in at most two sentences, with its label. Never make up a \
+    [UPDATE] and [APPROVAL] once, in your very next reply, after a short answer to what the \
+    owner just said; if you were cut off before finishing one, say it again in the reply after: \
+    the conclusion first, in at most two sentences, with its label. Never make up a \
     result while you wait. Progress is silent unless the owner asks. Put each [QUESTION] to \
     the owner; their next answer goes back to that session. [CONTEXT] lines describe a \
     session and [TASK] lines are requests Claude is still working on: use them, do not read \
