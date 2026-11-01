@@ -223,6 +223,7 @@ public actor Bridge: Router {
       guard attempt == opening else { return }
       if case CodexProblem.exited = error { await endCodex() }
       await audio.closePeer()
+      await realtime?.close()  // codex may have opened its side before the page failed
       await send(.connectFailed(Self.sentence(error)))
     }
   }

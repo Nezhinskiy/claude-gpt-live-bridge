@@ -7,6 +7,7 @@ actor FakeVoice: RealtimeControlling {
   var opens: [[InitialItem]] = []
   var added: [String] = []
   var failure: CodexProblem?
+  var closes = 0
   nonisolated let events: AsyncStream<RealtimeEvent>
   private let emitter: AsyncStream<RealtimeEvent>.Continuation
 
@@ -17,7 +18,7 @@ actor FakeVoice: RealtimeControlling {
     opens.append(items)
     return "answer"
   }
-  func close() {}
+  func close() { closes += 1 }
   func addContext(_ text: String) { added.append(text) }
   func shutdown() {}
   func fail(with problem: CodexProblem?) { failure = problem }
@@ -37,11 +38,14 @@ actor FakeAudio: AudioSide {
   var calls: [String] = []
   /// Connecting takes a second, which the meter must not count.
   let time: TestTime
+  var answerFails = false
   init(time: TestTime) { self.time = time }
+  func failAnswers() { answerFails = true }
   func startListening() { calls.append("startListening") }
   func stopListening() { calls.append("stopListening") }
   func makeOffer() -> String { "offer" }
-  func applyAnswer(_ sdp: String) {
+  func applyAnswer(_ sdp: String) throws {
+    if answerFails { throw CodexProblem.protocolMismatch("no session.started") }
     calls.append("applyAnswer")
     time.advance(by: .seconds(1))
   }
@@ -299,6 +303,14 @@ struct BridgeTests {
     await bridge.perform(.start)
     #expect(await bridge.status.minutesThisCall == 0)
     #expect(await bridge.status.minutesToday == 5.0 / 60)
+  }
+
+  /// A connect that fails after codex answered closes codex's session too, so none stays open.
+  @Test func failedConnectClosesTheVoiceSession() async throws {
+    await audio.failAnswers()
+    await live()
+    #expect(await bridge.status.call == .listening)
+    #expect(await voice.closes == 1)
   }
 
   @Test func audioFailureSurfacesProblem() async throws {
