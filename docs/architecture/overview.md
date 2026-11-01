@@ -11,7 +11,7 @@ platform facts behind these choices are in [ADR 0001](../adr/0001-platform-findi
 flowchart LR
   subgraph Mac
     subgraph App["LiveBridge.app (menu bar)"]
-      UI["Menu bar glyph and popover"]
+      UI["Menu bar glyph and menu"]
       Bridge["Bridge actor<br/>call machine, session registry,<br/>continuity, usage meter"]
       Server["HTTP on a Unix socket<br/>(0700 run directory)"]
       Codex["RealtimeSession + JSON-RPC client"]
@@ -104,7 +104,7 @@ Every reply carries the status: phase, target, sessions with labels (`Title · a
 titles are the same), minutes, the problem sentence, the target's context line and the last
 three lines of its conversation, and the count of unheard results.
 
-A session the owner removed with the popover's × is gone as if it had left, and until it joins
+A session the owner removed with the menu's × is gone as if it had left, and until it joins
 again every call from it answers `410` with `"code": "removed"`. The mod then turns itself off
 for that session and logs "Removed from LiveBridge. /live on joins again." instead of joining
 again, as it does after a `404` (the app restarted).
@@ -274,10 +274,10 @@ sequenceDiagram
 
 ## Failure behaviour
 
-- **No session joined:** Start is disabled in the popover. From the band or the socket, Start
+- **No session joined:** Start is disabled in the menu. From the band or the socket, Start
   does nothing but report "No Claude Code session has joined: run /live on in a session, then
   start."; the sentence goes when a session joins.
-- **Codex missing or signed out:** Start reports why in one sentence, in the popover and the
+- **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
   gives no answer within 10 s.
 - **A plan without realtime voice, or any realtime error:** the first connect reports codex's
@@ -292,7 +292,7 @@ sequenceDiagram
 - **Codex exits under the app:** the next speech reports it once, and the speech after that
   starts a fresh codex.
 - **The microphone is denied, missing, busy or lost:** the call goes to `off` with the reason.
-  Denied says where to allow it, and the popover offers to open that setting. Busy means it
+  Denied says where to allow it, and the menu offers to open that setting. Busy means it
   could not be opened, perhaps because another app holds it; a request still pending after
   10 s fails with its own sentence instead of listening to nothing. When the
   default input changes mid-call, the page takes the new one and keeps the peer.

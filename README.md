@@ -60,7 +60,7 @@ asks for the microphone again after each upgrade. To keep the permission, run
 code-signing certificate in your login keychain, and later release builds are signed with it.
 
 The first Start asks macOS for the microphone. If it was refused, the call stops with a
-sentence and the popover's **Open Microphone Settings** opens Privacy & Security > Microphone,
+sentence and the menu bar menu's **Open Microphone Settings** opens Privacy & Security > Microphone,
 where you allow LiveBridge. With the ad hoc signature macOS asks again after every upgrade (see
 above). macOS may also ask whether LiveBridge may find devices on your local network. The voice
 line needs that second permission too; without it the call stops with a sentence that says where
@@ -87,22 +87,24 @@ The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voic
 session's summary is also sent whenever it becomes the target is not a command: it is one setting
 for every session, in LiveBridge's Settings window (see below).
 
-Then press **Start**, in the band above the prompt or in the menu bar popover, and talk. The
+Then press **Start**, in the band above the prompt or in the menu bar menu, and talk. The
 band's Start makes its session the target, starts the call and sends the voice the session's
 summary, with "Loading context…" and then "Context sent" in the band while it goes. A new
 session with no prompt yet has nothing to summarise, and when no turn has completed since the
 last summary, Start sends that one again instead of asking the model for another. While the
-call talks to another session, the band shows **Talk here** beside Stop. Start stays disabled
-in the popover until a session has joined; until then the popover has **Copy /live on**, to
-paste into a session. The
-popover lists the joined sessions, five at a time with the rest scrolling (click one to make it the target; its × asks first, then
-removes it and erases its conversation, and `/live on` in that session joins it again), shows
-the last lines of the conversation (each cut to four lines) and the context line exactly as it
-was sent, and has **Load context** (it waits, as **Loading context…**, until the target's summary
-arrives or a minute passes), **New conversation** (it asks before it erases what the voice
-remembers of the target and its loaded context), the minutes the voice line was open today and
-**Settings…**. Both erasing buttons ask first, with Cancel as the default. The popover never
-grows past the screen: its lists scroll inside it. When Start fails because codex is not
+call talks to another session, the band shows **Talk here** beside Stop. The menu bar
+item opens a native macOS menu, with the system's own corners, material and shadow. Its first
+row is the call: Start stays disabled there until a session has joined, and until then the menu
+has **Copy /live on**, to paste into a session. The menu lists the joined sessions, five of them
+with the rest under **More sessions** (click one to make it the target, and the menu stays open
+as the marker moves; its × asks first, then removes it and erases its conversation, and
+`/live on` in that session joins it again). It has **Load context** (it waits, as **Loading
+context…**, until the target's summary arrives or a minute passes), **New conversation…** (it
+asks before it erases what the voice remembers of the target and its loaded context) and a
+**Conversation** submenu with the last lines of the conversation (each cut to four lines) and
+the context line exactly as it was sent; then the minutes the voice line was open this call and
+today, **Settings…** (⌘,) and **Quit LiveBridge** (⌘Q). Both erasing items ask first, with
+Cancel as the default. When Start fails because codex is not
 installed or not signed in, the problem has **How to install codex** or **How to sign in**: the
 steps, and a button that copies the command to run in Terminal.
 
@@ -117,7 +119,7 @@ steps, and a button that copies the command to run in Terminal.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it", or "2 sessions have new results"), never the result itself. A newer one
-  replaces the last; clicking it opens the menu bar popover, which shows who answered. macOS asks for permission the first time
+  replaces the last; clicking it opens the menu bar menu, which shows who answered. macOS asks for permission the first time
   a notification is posted; if it is refused, Settings says so and opens the Notifications
   settings.
 - **Open at login** (off by default).
@@ -148,14 +150,14 @@ talking:
 - The line closes after 20 seconds of silence, or as soon as the voice has acknowledged a
   handoff. Sound without words (music, a TV) closes it after 90 seconds.
 - A result that arrives while the line is closed plays a chime and waits: the band and the
-  popover show it as unheard, and the voice tells you when you next speak. A result counts as
+  menu show it as unheard, and the voice tells you when you next speak. A result counts as
   heard only once a reply of the voice has said it ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed));
   if the line closes first, it chimes and waits again.
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
   ago. A new target switches the conversation: an open line closes, and your next words open it
   with the new target's.
-- The popover shows the minutes the line was open, as measured by the app; how your plan meters
+- The menu shows the minutes the line was open, as measured by the app; how your plan meters
   realtime voice is not published.
 
 ## Privacy
@@ -175,7 +177,7 @@ session:
   background task's notification, for up to 10 minutes after a voice request and until any other
   turn starts in the session;
 - a session's context summary when you load it, as one line of at most 1,500 characters. The
-  popover shows that line exactly as it was sent;
+  menu's Conversation submenu shows that line exactly as it was sent;
 - with every line above, its session's label: the Claude Code session title, or the session
   folder's name when it has none;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
