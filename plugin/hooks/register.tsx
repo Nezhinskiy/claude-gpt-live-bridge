@@ -23,7 +23,7 @@ const ANSWER_LIMIT = 32_000
 const AUTO_CONTEXT = 'autoContext'
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
-const USAGE = 'Usage: /voicemod on | off | target | status | context [auto|manual]'
+const USAGE = 'Usage: /live on | off | target | status | context [auto|manual]'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
 const joinedKey = (sessionId: string) => `joined:${sessionId}`
@@ -177,7 +177,7 @@ async function contextAsked($: EngineInterface): Promise<void> {
 
 async function statusText($: EngineInterface): Promise<string> {
   const state = await read($, band)
-  if (state === null) return 'Voice is off for this session. /voicemod on joins LiveBridge.'
+  if (state === null) return 'Voice is off for this session. /live on joins LiveBridge.'
   const status = state.status
   if (!state.isOffline && status === undefined) return 'LiveBridge: joining…'
   if (state.isOffline || status === undefined) return `LiveBridge is not reachable. ${state.problem ?? ''}`.trim()
@@ -185,8 +185,8 @@ async function statusText($: EngineInterface): Promise<string> {
     `${Math.round(status.minutesToday)} min today.${status.problem ? ` ${status.problem}` : ''}`
 }
 
-/** `/voicemod on|off|target|status|context [auto|manual]`. */
-async function voicemod($: EngineInterface, args: string): Promise<string> {
+/** `/live on|off|target|status|context [auto|manual]`. */
+async function live($: EngineInterface, args: string): Promise<string> {
   // ''.split(/\s+/) is [''], which would leave the default unused.
   const [verb = 'status', option] = args.trim() === '' ? [] : args.trim().split(/\s+/)
   const joined = link?.session
@@ -223,13 +223,28 @@ function settles(e: { tool_name: string; agent_id?: string }): boolean {
   return true
 }
 
-export const register: Register = on => {
-  on('session.start', async ($, e, next) => {
+/**
+ * Declares `/live`. Not `/voice`: that is Claude Code's own command (voice mode), and the engine
+ * refuses a built-in's name. Declaring again replaces the command, so this may run any number of
+ * times; a refusal is logged and stops nothing else.
+ */
+async function declareCommand($: EngineInterface): Promise<void> {
+  try {
     await $.command.register({
-      name: 'voicemod',
+      name: 'live',
       description: 'Talk to this session by voice through LiveBridge',
       argumentHint: 'on|off|target|status|context [auto|manual]',
     })
+  } catch (error) {
+    $.ui.log(`LiveBridge could not declare /live: ${String(error)}`)
+  }
+}
+
+export const register: Register = on => {
+  // Runs at the session's start and again whenever this module loads into a running session
+  // (enabled, reloaded or its worker respawned), so a session open before the mod has /live too.
+  on('session.start', async ($, e, next) => {
+    await declareCommand($)
     home = (await $.env.get('HOME')) ?? ''
     link = new BridgeLink({
       fetch: (url, init) => $.http.fetch(url, init),
@@ -249,7 +264,14 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'voicemod' }, async ($, e) => ({ text: await voicemod($, e.args) }))
+  on('command.run', { command: 'live' }, async ($, e) => ({ text: await live($, e.args) }))
+
+  // A client that attaches after the command was declared (the desktop app opening a session
+  // the mod loaded into earlier) hears it announced again.
+  on('session.attach', async ($, e, next) => {
+    await declareCommand($)
+    return next(e)
+  })
 
   on('prompt.submit', ($, e, next) => {
     // A delivery into a running turn starts no turn of its own.

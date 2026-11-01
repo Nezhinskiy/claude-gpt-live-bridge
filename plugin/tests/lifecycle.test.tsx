@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { fakeWorld, ID, VOICEMOD } from './fake-bridge.ts'
+import { fakeWorld, ID, LIVE } from './fake-bridge.ts'
 
 const START = { cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true } as const
 const OTHER = '22222222-0000-0000-0000-000000000003'
@@ -17,7 +17,7 @@ test('reloadResumesPolling', async ($, on) => {
 test('clearRejoinsWithNewId', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.take('join')
   await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
   world.sessionId = OTHER
@@ -33,7 +33,7 @@ test('clearRejoinsWithNewId', async ($, on) => {
 test('renameRejoins', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.take('join')
   world.title = 'Renamed session'
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
@@ -43,10 +43,10 @@ test('renameRejoins', async ($, on) => {
 test('offTurnsContextAutoAndLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
-  await $.command.run({ ...VOICEMOD, args: 'on' })
-  await $.command.run({ ...VOICEMOD, args: 'context auto' })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'context auto' })
   expect(world.take('join').at(-1)).toEqual({ sessionId: ID, title: 'Example session', autoContext: true })
-  expect((await $.command.run({ ...VOICEMOD, args: 'off' })).text).toContain('Left')
+  expect((await $.command.run({ ...LIVE, args: 'off' })).text).toContain('Left')
   expect(world.take('leave')).toEqual([{ sessionId: ID }])
   await world.clock.advance(3000)
   expect(world.take('next')).toEqual([])
@@ -57,7 +57,7 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
   const world = fakeWorld(on)
   world.otherRecords = { '1.json': '', '2.json': '{"sessionId": "', '3.json': 'null' }
   await $.session.start(START)
-  expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('Example session')
+  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Example session')
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
@@ -66,7 +66,7 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
 test('bareCommandShowsTheStatus', async ($, on) => {
   fakeWorld(on)
   await $.session.start(START)
-  for (const args of ['', '   ']) expect((await $.command.run({ ...VOICEMOD, args })).text).toContain('Voice is off')
+  for (const args of ['', '   ']) expect((await $.command.run({ ...LIVE, args })).text).toContain('Voice is off')
 })
 
 test('offDuringAPollSubmitsNothing', async ($, on) => {
@@ -74,14 +74,14 @@ test('offDuringAPollSubmitsNothing', async ($, on) => {
   // reports the request failed, so the session must not act on it.
   const world = fakeWorld(on)
   await $.session.start(START)
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.work.push({ kind: 'request', id: '00000000-0000-0000-0000-00000000000a', brief: 'Delete the build folder', transcript: [] })
   let release = () => {}
   world.holdNext = new Promise(resolve => { release = resolve })
   const held = new Promise<void>(resolve => { world.onNextHeld = resolve })
   const poll = world.clock.advance(1000)
   await held
-  await $.command.run({ ...VOICEMOD, args: 'off' })
+  await $.command.run({ ...LIVE, args: 'off' })
   release()
   await poll
   expect(world.submitted).toEqual([])
@@ -92,6 +92,32 @@ test('aFixedHomeMovesTheSocketOnly', async ($, on) => {
   const world = fakeWorld(on, {}, { CFFIXED_USER_HOME: '/tmp/lb' })
   world.socket = '/tmp/lb/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
   await $.session.start(START)
-  expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('Example session')
+  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Example session')
   expect(world.read.every(path => path.startsWith('/Users/example/.claude/sessions/'))).toBe(true)
+})
+
+test('theCommandIsLive', async ($, on) => {
+  // `/voice` is Claude Code's own command (voice mode), so the engine refuses that name.
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  expect(world.commands).toEqual(['live'])
+  expect((await $.command.run({ ...LIVE, args: 'help' })).text).toBe('Usage: /live on | off | target | status | context [auto|manual]')
+  expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('/live on')
+})
+
+test('aRefusedCommandStillResumesTheJoin', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: { pending: null, followUp: null, turns: [] } })
+  world.isCommandRefused = true
+  await $.session.start(START)
+  expect(world.take('join')).toHaveLength(1)
+  expect(world.logs.some(line => line.includes('/live'))).toBe(true)
+})
+
+test('aSurfaceThatAttachesLaterIsToldOfTheCommand', async ($, on) => {
+  // The desktop app attaches to a session the mod may have loaded into before; declaring the
+  // command again announces it to every attached client.
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.session.attach({ surface: 'desktop', clientId: 'desktop:default' })
+  expect(world.commands).toEqual(['live', 'live'])
 })

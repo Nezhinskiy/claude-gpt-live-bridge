@@ -16,7 +16,7 @@ export const BAND = {
     scroll: { offset: 0, bodyRows: 10 }, view: {},
   },
 } as const
-export const VOICEMOD = { command: 'voicemod', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
+export const LIVE = { command: 'live', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
 export type Call = { route: string; body?: Record<string, unknown> }
 
@@ -36,6 +36,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
     isSubmitRefused: false,
+    /** The engine refuses the command's name (as it does a built-in's). */
+    isCommandRefused: false,
+    /** Every slash command the mod declared, in order. */
+    commands: [] as string[],
     /** The session's model fails the summary request. */
     isForkFailing: false,
     logs: [] as string[],
@@ -64,7 +68,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('session.id', () => ({ value: world.sessionId }))
   on('session.cwd', () => ({ value: '/Users/example/Dev/example-project' }))
-  on('command.register', () => ({ value: { command: 'voicemod' } }))
+  on('command.register', (_, e) => {
+    if (world.isCommandRefused) return { deny: `"/${e.name}" refused: it is the built-in /${e.name}` }
+    world.commands.push(e.name)
+    return { value: { command: e.name } }
+  })
+  on('session.attach', (_, e) => ({ clientId: e.clientId }))
   on('fs.list', () => ({
     value: [...Object.keys(world.otherRecords), '12345.json', '12345.key']
       .map(name => ({ name, kind: 'file', size: 1, mtimeMs: 0, isLink: false }) as const),

@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { BAND, fakeWorld, framed, ID, VOICEMOD } from './fake-bridge.ts'
+import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
 
 const REQUEST: VoiceRequest = {
   id: '00000000-0000-0000-0000-00000000000a',
@@ -14,7 +14,7 @@ const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
 test('roundtrip', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true })
-  const reply = await $.command.run({ ...VOICEMOD, args: 'on' })
+  const reply = await $.command.run({ ...LIVE, args: 'on' })
   expect(reply.text).toContain('Example session')
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', autoContext: false }])
   expect(world.read.every(path => path.endsWith('.json'))).toBe(true)
@@ -35,8 +35,8 @@ test('roundtrip', async ($, on) => {
 test('rejectedAnswerIsShownNotDropped', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('Joined')
-  expect((await $.command.run({ ...VOICEMOD, args: 'status' })).text).toContain('joining')
+  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
+  expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('joining')
   world.work.push({ kind: 'request', ...REQUEST })
   await world.clock.advance(1000)
   world.answerStatus = 409
@@ -51,7 +51,7 @@ test('rejectedAnswerIsShownNotDropped', async ($, on) => {
 test('refusedPromptFailsTheRequestAtOnce', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.isSubmitRefused = true
   world.work.push({ kind: 'request', ...REQUEST })
   await world.clock.advance(1000)
@@ -68,7 +68,7 @@ test('refusedPromptFailsTheRequestAtOnce', async ($, on) => {
 test('approvalIsReported', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.work.push({ kind: 'request', ...REQUEST })
   await world.clock.advance(1000)
   await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
@@ -86,7 +86,7 @@ test('approvalIsReported', async ($, on) => {
 test('bandShowsTheCallAndStartsIt', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.status = {
     ...world.status, call: 'listening', unheard: 2,
     sessions: [{ sessionId: ID, label: 'Example session', activity: 'idle', isTarget: true }],
@@ -108,9 +108,9 @@ test('bandShowsTheCallAndStartsIt', async ($, on) => {
 test('aFailedSummaryIsReportedNotThrown', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.isForkFailing = true
-  expect((await $.command.run({ ...VOICEMOD, args: 'context' })).text).toContain('could not summarise')
+  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('could not summarise')
   world.work.push({ kind: 'context' })
   await world.clock.advance(1000)
   expect(world.take('context')).toEqual([])
@@ -122,8 +122,8 @@ test('theSummaryIsSentWholeForTheAppToRedactAndCap', async ($, on) => {
   // Cutting before the app redacts could shorten a token past what its patterns match.
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   world.summary = `${'x'.repeat(1495)} sk-${'a'.repeat(30)}`
-  await $.command.run({ ...VOICEMOD, args: 'context' })
+  await $.command.run({ ...LIVE, args: 'context' })
   expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary }])
 })

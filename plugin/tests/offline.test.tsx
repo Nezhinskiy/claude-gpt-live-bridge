@@ -1,12 +1,12 @@
 import { expect, test } from 'claude-code/testing'
 
-import { BAND, fakeWorld, VOICEMOD } from './fake-bridge.ts'
+import { BAND, fakeWorld, LIVE } from './fake-bridge.ts'
 
 test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   const world = fakeWorld(on)
   world.isAppUp = false
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  expect((await $.command.run({ ...VOICEMOD, args: 'on' })).text).toContain('not running')
+  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('not running')
 
   await world.clock.advance(1000)
   // Where build-app.sh installs it first, a folder only the owner writes; then whatever app
@@ -36,11 +36,11 @@ test('joiningAgainOpensTheAppAgain', async ($, on) => {
   const world = fakeWorld(on)
   world.isAppUp = false
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   await world.clock.advance(11_000)
   const opened = world.launches.length
-  await $.command.run({ ...VOICEMOD, args: 'off' })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'off' })
+  await $.command.run({ ...LIVE, args: 'on' })
   await world.clock.advance(1000)
   expect(world.launches.length).toBeGreaterThan(opened)
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
@@ -53,7 +53,7 @@ test('anInstalledAppIsOpenedByItsPath', async ($, on) => {
   world.isAppUp = false
   world.isAppInstalled = true
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...VOICEMOD, args: 'on' })
+  await $.command.run({ ...LIVE, args: 'on' })
   await world.clock.advance(1000)
   expect(world.launches).toEqual([['open', '-g', '/Users/example/Applications/LiveBridge.app']])
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
