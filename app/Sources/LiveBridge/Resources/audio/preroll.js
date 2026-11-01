@@ -2,7 +2,7 @@
 // microphone; `createCatchUp` queues what is said while the line connects and lets the line
 // catch up with the speaker by dropping silence while it lags (ADR 0001 (c)). Pure.
 
-import { dbfs, rms } from './vad.js';
+import { THRESHOLD_DB, dbfs, rms } from './vad.js';
 
 export function createPreroll({ seconds = 2, sampleRate = 48000 } = {}) {
   const ring = new Float32Array(Math.round(seconds * sampleRate));
@@ -28,7 +28,7 @@ export function createPreroll({ seconds = 2, sampleRate = 48000 } = {}) {
 }
 
 
-export function createCatchUp({ sampleRate = 48000, thresholdDb = -45, keepMs = 40 } = {}) {
+export function createCatchUp({ sampleRate = 48000, thresholdDb = THRESHOLD_DB, keepMs = 40 } = {}) {
   const queue = [];
   const keep = (keepMs / 1000) * sampleRate;
   let silentRun = 0; // samples of the current silent run already sent

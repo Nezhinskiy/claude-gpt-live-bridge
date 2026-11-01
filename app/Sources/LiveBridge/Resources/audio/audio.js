@@ -3,9 +3,11 @@
 // `audioFailed` to `window.webkit.messageHandlers.bridge`.
 //
 // The microphone runs through one 1024-sample processor. While the line is closed it feeds the
-// voice detector and the pre-roll; from `makeOffer` on, the pre-roll and everything said while
-// connecting queue up, and from `flushPreroll` the queue plays into the peer's track, dropping
-// silence until it has caught up (ADR 0001 (c)).
+// voice detector and the pre-roll; from the first word (or `makeOffer`) on, the pre-roll and
+// everything said while codex starts and the line connects queue up, and from `flushPreroll`
+// the queue plays into the peer's track, dropping silence until it has caught up (ADR 0001 (c)).
+// A timer or a promise outlives neither its peer nor its microphone: each checks it is still
+// the current one before it reports anything.
 
 import { createVad, dbfs, rms } from './vad.js';
 import { createCatchUp, createPreroll } from './preroll.js';
@@ -15,6 +17,7 @@ const say = {
   denied:
     'LiveBridge cannot use the microphone. Allow it in System Settings > Privacy & Security > Microphone.',
   noDevice: 'No microphone is connected.',
+  busy: 'The microphone could not be opened; another app may be using it.',
   lost: 'The microphone stopped and no other input was found.',
   localNetwork:
     'The voice line could not reach the network. Allow LiveBridge in System Settings > Privacy & Security > Local Network, then start again.',
@@ -42,6 +45,7 @@ function process(event) {
   const frame = new Float32Array(event.inputBuffer.getChannelData(0));
   const level = rms(frame);
   const decision = vad.push(level, ctx.currentTime * 1000);
+  if (decision === 'start') hold();
   if (decision) post({ type: decision === 'start' ? 'speechStarted' : 'speechEnded' });
   if (holding) catchUp.push(frame);
   else preroll.write(frame);
@@ -53,18 +57,34 @@ function process(event) {
   if (++frames % 4 === 0) post({ type: 'level', value: Math.min(1, Math.max(0, (dbfs(level) + 60) / 50)) });
 }
 
-/** Connects the default input, or the debug WAV, to the processor. */
+/** From the first word on, the pre-roll and what follows queue for the line. */
+function hold() {
+  if (holding) return;
+  holding = true;
+  const kept = preroll.drain();
+  for (let i = kept.length % FRAME; i < kept.length; i += FRAME) catchUp.push(kept.subarray(i, i + FRAME));
+}
+
+/** Connects the default input, or the debug WAV, to the processor; false when the microphone
+ * was stopped meanwhile. */
 async function attachInput(fake) {
+  const mine = ctx;
   let node;
   if (fake) {
     const data = await (await fetch('fake-mic.wav')).arrayBuffer();
+    if (ctx !== mine) return false;
     node = ctx.createBufferSource();
     node.buffer = await ctx.decodeAudioData(data);
+    if (ctx !== mine) return false;
     node.start();
   } else {
     const next = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
+    if (ctx !== mine) {
+      next.getTracks().forEach((track) => track.stop());
+      return false;
+    }
     stream?.getTracks().forEach((track) => track.stop());
     stream = next;
     stream.getAudioTracks()[0].onended = reacquire;
@@ -73,16 +93,18 @@ async function attachInput(fake) {
   input?.disconnect();
   input = node;
   input.connect(pump);
+  return true;
 }
 
 /** The input device changed or went away: take the new default and keep the peer. */
 function reacquire() {
-  if (ctx) attachInput(false).catch(() => fail(say.lost));
+  const mine = ctx;
+  if (ctx) attachInput(false).catch(() => ctx === mine && fail(say.lost));
 }
 
 async function listen(fake) {
   if (ctx) return;
-  ctx = new AudioContext({ sampleRate: 48000 });
+  const mine = (ctx = new AudioContext({ sampleRate: 48000 }));
   vad = createVad();
   preroll = createPreroll({ sampleRate: ctx.sampleRate });
   catchUp = createCatchUp({ sampleRate: ctx.sampleRate });
@@ -92,14 +114,15 @@ async function listen(fake) {
   mute.gain.value = 0;
   pump.connect(mute).connect(ctx.destination);
   try {
-    await attachInput(fake);
+    if (!(await attachInput(fake))) return;
     await ctx.resume();
   } catch (error) {
+    if (ctx !== mine) return;
     stop();
-    fail(error?.name === 'NotFoundError' ? say.noDevice : say.denied);
+    fail({ NotAllowedError: say.denied, NotFoundError: say.noDevice }[error?.name] ?? say.busy);
     return;
   }
-  if (!fake) navigator.mediaDevices.ondevicechange = reacquire;
+  if (ctx === mine && !fake) navigator.mediaDevices.ondevicechange = reacquire;
 }
 
 function stop() {
@@ -110,61 +133,75 @@ function stop() {
   ctx = stream = input = null;
 }
 
-/** Resolves once ICE gathering is done; no candidate within 2 s means Local Network is blocked
- * (ADR 0001 (a)). */
+/** Resolves once ICE gathering is done, with whether any candidate came; none within 2 s
+ * means Local Network is blocked (ADR 0001 (a)). */
 function gathered(peer) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     let candidates = 0;
-    const settle = () => (candidates ? resolve() : reject(fail(say.localNetwork)));
-    const timer = setTimeout(settle, 2000);
+    const timer = setTimeout(() => resolve(candidates > 0), 2000);
     peer.onicecandidate = (event) => {
       if (event.candidate) return candidates++;
       clearTimeout(timer);
-      settle();
+      resolve(candidates > 0);
     };
   });
 }
 
+const closed = () => new Error('The voice line was closed.');
+
 async function makeOffer() {
-  closePeer();
-  holding = true;
-  const kept = preroll.drain();
-  for (let i = kept.length % FRAME; i < kept.length; i += FRAME) catchUp.push(kept.subarray(i, i + FRAME));
+  dropPeer();
+  hold();
   out = ctx.createMediaStreamDestination();
   pump.connect(out);
-  pc = new RTCPeerConnection();
-  pc.addTrack(out.stream.getAudioTracks()[0], out.stream);
-  pc.ontrack = (event) => {
+  const peer = (pc = new RTCPeerConnection());
+  peer.addTrack(out.stream.getAudioTracks()[0], out.stream);
+  peer.ontrack = (event) => {
+    if (peer !== pc) return;
     remote = new Audio();
     remote.srcObject = event.streams[0] ?? new MediaStream([event.track]);
     remote.play().catch(() => {});
   };
-  channel = pc.createDataChannel('oai-events');
-  const ice = gathered(pc);
-  await pc.setLocalDescription(await pc.createOffer());
-  await ice;
-  return pc.localDescription.sdp;
+  channel = peer.createDataChannel('oai-events');
+  const ice = gathered(peer);
+  await peer.setLocalDescription(await peer.createOffer());
+  const reached = await ice;
+  if (peer !== pc) throw closed();
+  if (!reached) throw fail(say.localNetwork);
+  return peer.localDescription.sdp;
 }
 
 /** Applies the answer and resolves at the data channel's `session.started` (ADR 0001 (d)). */
 async function applyAnswer(sdp) {
+  const peer = pc;
+  if (!peer) throw closed();
+  let timer;
   const ready = new Promise((resolve, reject) => {
     channel.onmessage = (event) => {
       if (event.data.includes('"session.started"')) resolve();
     };
-    setTimeout(() => reject(new Error(say.timeout)), 10000);
+    timer = setTimeout(() => reject(peer === pc ? new Error(say.timeout) : closed()), 10000);
   });
-  await pc.setRemoteDescription({ type: 'answer', sdp });
-  await ready;
+  try {
+    await peer.setRemoteDescription({ type: 'answer', sdp });
+    await ready;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function flushPreroll() {
   sending = true;
 }
 
+/** Ends the line: the peer, and the queue held for it. */
 function closePeer() {
   holding = sending = false;
   catchUp?.clear();
+  dropPeer();
+}
+
+function dropPeer() {
   channel?.close();
   pc?.close();
   remote?.pause();
