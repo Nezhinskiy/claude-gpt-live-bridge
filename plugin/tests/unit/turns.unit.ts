@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { FRAMING, voicePrompt } from '../../hooks/prompt.ts'
-import { FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
+import { clip, FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
 
 const ID = '00000000-0000-0000-0000-00000000000a'
 const framed = (id: string) =>
@@ -91,4 +91,13 @@ test('aRefusedSubmissionIsNoLongerPending', () => {
   assert.equal(tracker.current, ID, 'another id leaves it')
   tracker.refused(ID)
   assert.equal(tracker.current, null)
+})
+
+test('clipCutsWholeCharactersOnly', () => {
+  // Cut by UTF-16 units, an emoji would leave a lone surrogate the app's JSON decoder may refuse.
+  assert.equal(clip('ab😀cd', 3), 'ab😀')
+  assert.equal(clip('😀😀😀', 2), '😀😀')
+  assert.equal(clip('short', 10), 'short')
+  // In a `u` pattern a pair is one character, so only a lone surrogate matches.
+  for (let limit = 0; limit < 8; limit++) assert.ok(!/[\uD800-\uDFFF]/u.test(clip('a😀'.repeat(4), limit)))
 })

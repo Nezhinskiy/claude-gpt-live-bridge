@@ -9,12 +9,15 @@ import { summarize } from './context.ts'
 import { BridgeLink } from './link.ts'
 import { PLUGIN_NAME, voicePrompt } from './prompt.ts'
 import { fallbackTitle, titleFromRegistry } from './title.ts'
-import { originOf, TurnTracker } from './turns.ts'
+import { clip, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
-/** Well under the app's 131,072-byte body limit; the app shortens answers for speech itself. */
+/**
+ * In characters: under the app's 131,072-byte body limit even at four UTF-8 bytes each; the app
+ * shortens answers for speech itself.
+ */
 const ANSWER_LIMIT = 32_000
 const AUTO_CONTEXT = 'autoContext'
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
@@ -269,7 +272,7 @@ export const register: Register = on => {
       const post = tracker.turnCompleted(e.turnId, answer, e.reason)
       approval = null
       await save($)
-      if (post && !(await link?.answer({ ...post, text: post.text.slice(0, ANSWER_LIMIT) })) && post.status !== 'update') {
+      if (post && !(await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) })) && post.status !== 'update') {
         note = LOST_ANSWER  // an update to a request a newer one replaced is refused by design
         $.ui.log(LOST_ANSWER)
       }

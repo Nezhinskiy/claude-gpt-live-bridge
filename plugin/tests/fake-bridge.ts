@@ -35,6 +35,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     /** The session's model fails the summary request. */
     isForkFailing: false,
     logs: [] as string[],
+    summary: 'Goal: tidy the example project.',
     joined: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
     work: [] as Work[],
@@ -109,7 +110,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
   })
   on('model.fork', () => world.isForkFailing ? { deny: 'the model is unavailable' } : ({
     value: {
-      isAnswered: true, text: 'Goal: tidy the example project.',
+      isAnswered: true, text: world.summary,
       usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
     },
   }))

@@ -117,3 +117,13 @@ test('aFailedSummaryIsReportedNotThrown', async ($, on) => {
   expect(world.logs.some(line => line.includes('could not summarise'))).toBe(true)
   expect(world.logs.some(line => line.includes('poll failed'))).toBe(false)
 })
+
+test('theSummaryIsSentWholeForTheAppToRedactAndCap', async ($, on) => {
+  // Cutting before the app redacts could shorten a token past what its patterns match.
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...VOICEMOD, args: 'on' })
+  world.summary = `${'x'.repeat(1495)} sk-${'a'.repeat(30)}`
+  await $.command.run({ ...VOICEMOD, args: 'context' })
+  expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary }])
+})

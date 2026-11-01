@@ -1,16 +1,16 @@
 // The session summary the voice model is given as context, written by the session's own model
-// over its own transcript (the app redacts it on arrival).
+// over its own transcript. It is sent whole: the app redacts it on arrival and then caps it, so
+// a cut here could shorten a secret past what the redaction matches.
 import type { EngineInterface } from 'claude-code'
 
-export const CONTEXT_LIMIT = 1500
-
+/** Asks for what the app keeps (`Bridge.maxContext` in BridgeCore); the app enforces it. */
 const PROMPT =
   'Summarise this session for a voice assistant that will talk with its owner about it: the ' +
   'goals, where the work stands, and the open questions. Plain sentences, no code, no file ' +
-  `paths unless they matter, at most ${CONTEXT_LIMIT} characters. Reply with the summary alone.`
+  'paths unless they matter, at most 1500 characters. Reply with the summary alone.'
 
 /** The summary, or "" when there is nothing to summarise yet or the model gave no answer. */
 export async function summarize($: EngineInterface): Promise<string> {
   const reply = await $.model.fork({ prompt: PROMPT })
-  return reply.isAnswered ? reply.text.trim().slice(0, CONTEXT_LIMIT) : ''
+  return reply.isAnswered ? reply.text.trim() : ''
 }

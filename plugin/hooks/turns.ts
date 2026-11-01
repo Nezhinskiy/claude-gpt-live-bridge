@@ -31,6 +31,18 @@ const FAILURE: Record<Exclude<TurnOutcome, 'answer'>, string> = {
   error: 'the turn ended with an error',
 }
 
+/** The first `limit` characters of `text`, counted as code points, so no surrogate pair is cut. */
+export function clip(text: string, limit: number): string {
+  let end = 0
+  let count = 0
+  for (const char of text) {
+    if (count === limit) return text.slice(0, end)
+    end += char.length
+    count += 1
+  }
+  return text
+}
+
 /** A turn's origin from the `origin` of the `prompt.submit` before it (ADR 0001, item m). */
 export function originOf(origin: { kind: string; name?: string }, self: string): TurnOrigin {
   if (origin.kind === 'plugin' && origin.name === self) return 'voice'
