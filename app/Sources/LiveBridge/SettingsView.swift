@@ -21,6 +21,16 @@ struct SettingsView: View {
         Text("A new voice is heard from the next time the voice line opens.")
           .font(.caption).foregroundStyle(.secondary)
       }
+      Section("Notifications") {
+        Toggle("Notify when a result is waiting", isOn: $model.notifyResults)
+        Text("With the chime, a notification names the session; it never shows the result.")
+          .font(.caption).foregroundStyle(.secondary)
+        if model.notifyResults, model.notificationsDenied {
+          Label(Notifier.deniedSentence, systemImage: "exclamationmark.triangle.fill")
+            .font(.caption).symbolRenderingMode(.multicolor)
+          Button("Open Notifications Settings") { NSWorkspace.shared.open(Notifier.settingsURL) }
+        }
+      }
       Section("Context") {
         Toggle(
           "Load a session's context automatically when it becomes the target",
@@ -44,6 +54,9 @@ struct SettingsView: View {
       NSApp.activate()
       model.listVoices()
     }
+    .task { await model.refreshNotificationStatus() }
+    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
+    { _ in Task { await model.refreshNotificationStatus() } }
   }
 
   /// codex's voices; until they are listed, the choice already made, so the picker shows it.

@@ -74,6 +74,21 @@ final class AppModel {
       Task { [autoContext] in await bridge?.setAutoContext(autoContext) }
     }
   }
+  /// Post a notification with the chime for a result waiting while the line is closed.
+  var notifyResults = true {
+    didSet {
+      settings?.update { [notifyResults] in $0.notifyResults = notifyResults }
+      let turnedOn = notifyResults && !oldValue  // permission is asked then, not at launch
+      Task { [notifyResults] in
+        await bridge?.setNotifies(notifyResults)
+        if turnedOn { await notifier.authorize() }
+        await refreshNotificationStatus()
+      }
+    }
+  }
+  /// The owner refused notifications in System Settings.
+  private(set) var notificationsDenied = false
+  @ObservationIgnored let notifier = Notifier()
   private(set) var voices = VoiceListing.idle
   /// Why the chosen voice was set back to codex's default.
   private(set) var voiceNote: String?
@@ -99,16 +114,18 @@ final class AppModel {
       codexCwd = cwd
       voice = settings.current.voice
       autoContext = settings.current.autoContext
+      notifyResults = settings.current.notifyResults
       let time = SystemTime()
       let registry = SessionRegistry(time: time, autoContext: settings.current.autoContext)
       let bridge = Bridge(
         registry: registry,
         realtime: { try await Self.voice(cwd: cwd, voice: { settings.current.voice }) },
         audio: audio, meter: UsageMeterStore(file: data.appending(path: "usage.json"), time: time),
-        continuityFile: data.appending(path: "continuity.json"), time: time)
+        continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       try server.start()
       self.bridge = bridge
+      Task { [notifyResults] in await bridge.setNotifies(notifyResults) }
       self.server = server
       let (events, sink) = AsyncStream.makeStream(of: AudioEvent.self)
       audio.onEvent = { sink.yield($0) }
@@ -193,6 +210,12 @@ final class AppModel {
       refreshLoads()
     }
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
+  }
+
+  /// Reads whether notifications are refused, for Settings.
+  func refreshNotificationStatus() async {
+    let denied = await notifier.isDenied
+    if denied != notificationsDenied { notificationsDenied = denied }
   }
 
   /// Asks codex for its voices, once per run unless it failed. A chosen voice codex no longer

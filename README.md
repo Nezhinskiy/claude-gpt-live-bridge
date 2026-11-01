@@ -106,6 +106,12 @@ steps, and a button that copies the command to run in Terminal.
   voice codex no longer offers goes back to the default.
 - **Load a session's context automatically when it becomes the target** (off by default): one
   setting for every session, kept by the app.
+- **Notify when a result is waiting** (on by default): with the chime for a result that waits
+  while the line is closed, a macOS notification names the session ("Alpha has a new result —
+  speak to hear it", or "2 sessions have new results"), never the result itself. A newer one
+  replaces the last, and clicking it opens the popover. macOS asks for permission the first time
+  a notification is posted; if it is refused, Settings says so and opens the Notifications
+  settings.
 - **Open at login** (off by default).
 
 What the voice does:
@@ -183,8 +189,8 @@ can become a request that Claude runs under the session's own permission mode.
 ## Known limitations
 
 - When your next words reopen the line, the voice sometimes answers only them and does not say
-  the waiting result. The result is not lost: it stays waiting, chimes when the line closes, and
-  goes to the voice again the next time the line opens.
+  the waiting result. The result is not lost: it stays waiting, chimes and posts a notification
+  when the line closes, and goes to the voice again the next time the line opens.
 - A Claude Code session that was already open before the mod loaded may need to be reopened
   before `/live` works in it.
 - In the Claude desktop app, `/live` typed in a session whose Claude Code process has not
