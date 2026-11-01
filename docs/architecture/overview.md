@@ -133,7 +133,7 @@ sequenceDiagram
   Owner->>Page: stops talking
   Page->>Bridge: speechEnded
   Bridge->>Bridge: arm the 20 s silence timer
-  Note over Bridge: speech in the meantime cancels the timer
+  Note over Bridge: speech, recognised words and the voice's own speech re-arm it (90 s while sound goes on)
   Bridge->>Bridge: silence elapsed (live → listening)
   Bridge->>Page: closePeer
   Bridge->>Codex: thread/realtime/stop
@@ -159,9 +159,13 @@ sequenceDiagram
   Page->>Bridge: speechStarted
   Bridge->>Codex: open a realtime session
   Bridge->>Page: flushPreroll
-  Bridge->>Codex: appendText each pending line (unheard 0)
-  Codex-->>Owner: reply to the owner, then the result
+  Bridge->>Codex: appendText each pending line
+  Codex-->>Owner: reply to the owner, then the result (unheard 0)
 ```
+
+A result stays unheard until the voice has finished a reply after it, the handoff's own
+acknowledgement aside. If the line closes first, the result chimes and waits again: it may be
+said twice, but it is never lost.
 
 A newer request to the same session withdraws its older unheard result, so the voice never reads
 an answer that has been superseded.

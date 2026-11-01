@@ -157,7 +157,20 @@ struct BridgeTests {
     #expect(await bridge.status.unheard == 1)
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.added == ["[RESULT] Alpha: Done."])
-    #expect(await bridge.status.unheard == 0)
+    #expect(await bridge.status.unheard == 1)  // until the voice has replied after it
+    voice.emit(.assistantUtterance("Alpha is done."))
+    #expect(await eventually { await bridge.status.unheard == 0 })
+  }
+
+  /// With no session joined, the failure arrives with the handoff; the ack must not hang up on it.
+  @Test func failureWithNoSessionIsHeard() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    voice.emit(.handoff(request(1)))
+    voice.emit(.assistantUtterance("On it."))
+    #expect(await eventually { await bridge.status.unheard == 1 })
+    #expect(await voice.added == ["[FAILED] LiveBridge: no Claude Code session is joined."])
+    #expect(await bridge.status.call == .live)
   }
 
   @Test func newerRequestSupersedesAnUnheardResult() async throws {

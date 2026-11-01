@@ -5,9 +5,10 @@ public enum RealtimeEvent: Sendable, Equatable {
   /// The voice handed a request off (a codex `handoff_request` item), once per handoff id.
   case handoff(VoiceRequest)
   case userUtterance(String)
-  case assistantUtterance(String)
   /// The voice finished a reply.
-  case assistantDone
+  case assistantUtterance(String)
+  /// The voice is saying something (a transcript delta).
+  case assistantSpeaking
   /// codex closed the session; the reason is a sentence for the owner.
   case closed(String)
 }
@@ -205,10 +206,9 @@ public actor RealtimeSession: RealtimeControlling {
     case "thread/realtime/transcript/done":
       let text = (params["text"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
       if params["role"] == "user" { emit.yield(.userUtterance(text)) }
-      if params["role"] == "assistant" {
-        emit.yield(.assistantUtterance(text))
-        emit.yield(.assistantDone)
-      }
+      if params["role"] == "assistant" { emit.yield(.assistantUtterance(text)) }
+    case "thread/realtime/transcript/delta":
+      if params["role"] == "assistant" { emit.yield(.assistantSpeaking) }
     case "turn/started":
       guard let turn = params["turn"]?["id"] else { return }
       Task {

@@ -195,7 +195,6 @@ public actor Bridge: Router {
         try? await time.sleep(for: .seconds(seconds))
         await self.silenceElapsed(timer)
       }
-    case .cancelSilenceTimer: silenceTimer += 1
     case .chime: await audio.chime()
     case .problem(let sentence): problem = sentence
     }
@@ -250,9 +249,13 @@ public actor Bridge: Router {
     case .handoff(let request):
       await send(.handedOff)
       await route(request)
-    case .userUtterance(let text): record(.user, text)
-    case .assistantUtterance(let text): record(.assistant, text)
-    case .assistantDone: await send(.assistantFinishedSpeaking)
+    case .userUtterance(let text):
+      record(.user, text)
+      await send(.userTranscribed)
+    case .assistantUtterance(let text):
+      record(.assistant, text)
+      await send(.assistantFinishedSpeaking)
+    case .assistantSpeaking: await send(.assistantSpeaking)
     case .closed(let reason):
       opening += 1
       await audio.closePeer()
@@ -293,9 +296,7 @@ public actor Bridge: Router {
   }
 
   private func deliver(_ line: String, from session: SessionID?) async {
-    if let session, [.listening, .connecting].contains(machine.phase) {
-      unheard.append((session, line))
-    }
+    if let session { unheard.append((session, line)) }
     await send(.deliver(line))
   }
 

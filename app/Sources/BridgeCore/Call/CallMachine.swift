@@ -3,6 +3,8 @@ public enum CallEvent: Equatable, Sendable {
   case start, stop, speechStarted, speechEnded, connected
   case connectFailed(String)
   case assistantFinishedSpeaking, silenceElapsed, handedOff
+  /// The voice is saying something (a transcript delta); the owner's words were recognised.
+  case assistantSpeaking, userTranscribed
   case deliver(String)
   case remoteClosed(String)
   case audioFailed(String)
@@ -12,8 +14,9 @@ public enum CallEvent: Equatable, Sendable {
 public enum CallEffect: Equatable, Sendable {
   case openRealtime, closeRealtime, startLocalVAD, stopLocalVAD, flushPreroll
   case addContext(String)
+  /// Replaces any armed timer; when it elapses the bridge sends `silenceElapsed`.
   case armSilenceTimer(seconds: Int)
-  case cancelSilenceTimer, chime
+  case chime
   case problem(String?)
 }
 
@@ -22,18 +25,34 @@ public enum CallEffect: Equatable, Sendable {
 /// local voice detection in between. A result that arrives while it is closed is announced by a
 /// chime and waits in `pending` until the owner next speaks. Pure: the bridge runs the effects.
 public struct CallMachine: Sendable {
+  public static let noiseSentence =
+    "The voice hung up: the microphone heard sound but no words for 90 seconds."
   public private(set) var phase: CallPhase = .off
-  /// Results the voice has not heard yet; each is added as context once a session connects.
+  /// Results the voice has not replied after: waiting for the owner to speak, or given to the
+  /// open session. A hang-up keeps them, so none is lost; one may be spoken twice.
   public private(set) var pending: [String] = []
-  /// The voice is saying its short acknowledgement of a handoff; the session closes after it.
-  /// The silence timer stays armed meanwhile, so a lost acknowledgement still hangs up.
+  /// The line closes once the voice's acknowledgement of a handoff ends, unless a result or the
+  /// owner's speech came after the handoff. The silence timer stays armed meanwhile.
   public private(set) var awaitingAck = false
+  /// The next finished reply is the handoff's acknowledgement, which says no result.
+  private var isAckUnfinished = false
+  /// Local voice detection hears sound; the timer then allows `noiseCapSeconds`.
+  private var isSoundOn = false
   public let silenceSeconds: Int
+  public let noiseCapSeconds: Int
 
-  public init(silenceSeconds: Int = 20) { self.silenceSeconds = silenceSeconds }
+  public init(silenceSeconds: Int = 20, noiseCapSeconds: Int = 90) {
+    self.silenceSeconds = silenceSeconds
+    self.noiseCapSeconds = noiseCapSeconds
+  }
+
+  /// Silence is counted from the last speech, recognised words or reply; while sound goes on
+  /// without words, the line still closes after `noiseCapSeconds`.
+  private var armSilence: CallEffect {
+    .armSilenceTimer(seconds: isSoundOn ? noiseCapSeconds : silenceSeconds)
+  }
 
   public mutating func handle(_ event: CallEvent) -> [CallEffect] {
-    let armSilence = CallEffect.armSilenceTimer(seconds: silenceSeconds)
     switch (phase, event) {
     case (_, .stop):
       return end(with: [.closeRealtime, .stopLocalVAD])
@@ -42,7 +61,13 @@ public struct CallMachine: Sendable {
     case (.off, .start):
       phase = .listening
       return [.startLocalVAD, .problem(nil)]
+    case (.off, _):
+      return []
+    case (_, .speechEnded):
+      isSoundOn = false
+      return phase == .live ? [armSilence] : []
     case (.listening, .speechStarted):
+      isSoundOn = true
       phase = .connecting
       return [.openRealtime]
     case (.listening, .deliver(let result)):
@@ -53,28 +78,34 @@ public struct CallMachine: Sendable {
       return []
     case (.connecting, .connected):
       phase = .live
-      defer { pending = [] }
-      return [.flushPreroll] + pending.map(CallEffect.addContext) + [armSilence]
+      return [.flushPreroll] + pending.map(CallEffect.addContext) + [armSilence, .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
-      hangUp()
-      return [.problem(reason)]
+      return [.problem(reason)] + hangUp()
     case (.live, .deliver(let result)):  // a result the voice never speaks still hangs up
+      pending.append(result)
+      awaitingAck = false
       return [.addContext(result), armSilence]
     case (.live, .speechStarted):
-      return [.cancelSilenceTimer]
-    case (.live, .speechEnded):
+      isSoundOn = true
+      awaitingAck = false
+      return [armSilence]
+    case (.live, .assistantSpeaking), (.live, .userTranscribed):
       return [armSilence]
     case (.live, .handedOff):
       awaitingAck = true
+      isAckUnfinished = true
       return []
     case (.live, .assistantFinishedSpeaking):
-      guard awaitingAck else { return [armSilence] }
-      hangUp()
-      return [.closeRealtime]
+      if !isAckUnfinished {
+        pending = []
+      } else if awaitingAck {
+        return [.closeRealtime] + hangUp()
+      }
+      isAckUnfinished = false
+      return [armSilence]
     case (.live, .silenceElapsed):
-      hangUp()
-      return [.closeRealtime]
+      return [.closeRealtime] + (isSoundOn ? [.problem(Self.noiseSentence)] : []) + hangUp()
     default:
       return []
     }
@@ -85,14 +116,18 @@ public struct CallMachine: Sendable {
     pending.removeAll(where: isSuperseded)
   }
 
-  /// Back to local listening; `pending` is kept.
-  private mutating func hangUp() {
-    phase = .listening
-    awaitingAck = false
+  /// Back to local listening; `pending` is kept, and a chime says so when the line was open.
+  private mutating func hangUp() -> [CallEffect] {
+    defer {
+      phase = .listening
+      awaitingAck = false
+      isAckUnfinished = false
+    }
+    return phase == .live && !pending.isEmpty ? [.chime] : []
   }
 
   private mutating func end(with effects: [CallEffect]) -> [CallEffect] {
-    self = CallMachine(silenceSeconds: silenceSeconds)
+    self = CallMachine(silenceSeconds: silenceSeconds, noiseCapSeconds: noiseCapSeconds)
     return effects
   }
 }

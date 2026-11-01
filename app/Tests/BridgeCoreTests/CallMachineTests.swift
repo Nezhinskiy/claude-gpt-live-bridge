@@ -14,9 +14,11 @@ struct Transition: CustomTestStringConvertible, Sendable {
 
 struct CallMachineTests {
   static let connecting: [CallEvent] = [.start, .speechStarted]
-  static let live: [CallEvent] = [.start, .speechStarted, .connected]
+  /// The owner has finished the utterance that opened the line.
+  static let live: [CallEvent] = [.start, .speechStarted, .connected, .speechEnded]
   static let unheard: [CallEvent] = [.start, .deliver("a"), .speechStarted]
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
+  static let cap = CallEffect.armSilenceTimer(seconds: 90)
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
@@ -38,10 +40,14 @@ struct CallMachineTests {
       pending: ["a"]),
     row(
       "deliverWhileConnectingIsSentAfterConnect", connecting + [.deliver("a")], .connected,
-      .live, [.flushPreroll, .addContext("a"), arm]),
+      .live, [.flushPreroll, .addContext("a"), cap, .problem(nil)], pending: ["a"]),
     row(
       "pendingIsSpokenAfterOwnerSpeaks", unheard + [.deliver("b")], .connected, .live,
-      [.flushPreroll, .addContext("a"), .addContext("b"), arm]),
+      [.flushPreroll, .addContext("a"), .addContext("b"), cap, .problem(nil)],
+      pending: ["a", "b"]),
+    row(
+      "connectAfterSpeechEndedArmsSilence", connecting + [.speechEnded], .connected, .live,
+      [.flushPreroll, arm, .problem(nil)]),
     row(
       "failedConnectKeepsResultsUnheard", unheard, .connectFailed("r"), .listening,
       [.problem("r")], pending: ["a"]),
@@ -50,22 +56,45 @@ struct CallMachineTests {
       [.problem("r")], pending: ["a"]),
     row(
       "deliverWhileLiveIsAddedAndReArmsSilence", live, .deliver("a"), .live,
-      [.addContext("a"), arm]),
-    row("speechHoldsTheLine", live, .speechStarted, .live, [.cancelSilenceTimer]),
+      [.addContext("a"), arm], pending: ["a"]),
+    row(
+      "replyAfterAResultMarksItHeard", live + [.deliver("a")], .assistantFinishedSpeaking, .live,
+      [arm]),
+    row(
+      "silenceAfterUnspokenResultReturnsItToPending", live + [.deliver("a")], .silenceElapsed,
+      .listening, [.closeRealtime, .chime], pending: ["a"]),
+    row(
+      "unrepliedConnectReturnsResultsToPending", unheard + [.connected, .speechEnded],
+      .silenceElapsed, .listening, [.closeRealtime, .chime], pending: ["a"]),
+    row(
+      "remoteCloseReturnsResultsToPending", live + [.deliver("a")], .remoteClosed("r"),
+      .listening, [.problem("r"), .chime], pending: ["a"]),
+    row("speechHoldsTheLineUpToTheCap", live, .speechStarted, .live, [cap]),
     row("speechWithoutReplyStillHangsUp", live, .speechEnded, .live, [arm]),
+    row("wordsReArmTheTimer", live + [.speechStarted], .userTranscribed, .live, [cap]),
+    row(
+      "noiseWithoutWordsHangsUp", live + [.speechStarted], .silenceElapsed, .listening,
+      [.closeRealtime, .problem(CallMachine.noiseSentence)]),
     row("replyArmsTheSilenceTimer", live, .assistantFinishedSpeaking, .live, [arm]),
+    row("speakingVoiceReArmsTheTimer", live, .assistantSpeaking, .live, [arm]),
     row("handoffAwaitsTheAck", live, .handedOff, .live, []),
     row(
       "handoffWaitsForAckThenHangsUp", live + [.handedOff], .assistantFinishedSpeaking,
       .listening, [.closeRealtime]),
+    row(
+      "deliverDuringAckKeepsTheLineOpen", live + [.handedOff, .deliver("a")],
+      .assistantFinishedSpeaking, .live, [arm], pending: ["a"]),
+    row(
+      "speechDuringAckKeepsTheLineOpen", live + [.handedOff, .speechStarted],
+      .assistantFinishedSpeaking, .live, [cap]),
     row("silenceHangsUp", live, .silenceElapsed, .listening, [.closeRealtime]),
     row(
       "lostAckStillHangsUpOnSilence", live + [.handedOff], .silenceElapsed, .listening,
       [.closeRealtime]),
     row(
       "ackDoesNotOutliveItsSession",
-      live + [.handedOff, .remoteClosed("r"), .speechStarted, .connected], .silenceElapsed,
-      .listening, [.closeRealtime]),
+      live + [.handedOff, .remoteClosed("r"), .speechStarted, .connected, .speechEnded],
+      .silenceElapsed, .listening, [.closeRealtime]),
     row("remoteCloseFallsBackToListening", live, .remoteClosed("r"), .listening, [.problem("r")]),
     row("stopEndsEverything", unheard, .stop, .off, [.closeRealtime, .stopLocalVAD]),
     row(

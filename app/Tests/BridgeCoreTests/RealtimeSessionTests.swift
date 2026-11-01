@@ -180,7 +180,14 @@ struct RealtimeSessionTests {
     #expect(request.id.rawValue.wholeMatch(of: /[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/) != nil)
     #expect(request.brief == words && request.transcript == [Utterance(role: .user, text: words)])
     #expect(await events.next() == .assistantUtterance("I'm pulling up the folder now."))
-    #expect(await events.next() == .assistantDone)
+  }
+
+  @Test func assistantDeltaMeansTheVoiceIsSpeaking() async throws {
+    _ = try await session.open(offerSDP: "offer", items: [])
+    rpc.push(try adrJSON("realtime-transcript-delta-user"))  // the owner's words are not
+    rpc.push(try adrJSON("realtime-transcript-delta-user", params: ["role": "assistant"]))
+    var events = session.events.makeAsyncIterator()
+    #expect(await events.next() == .assistantSpeaking)
   }
 
   @Test func resultsAreAddedAsUserText() async throws {
