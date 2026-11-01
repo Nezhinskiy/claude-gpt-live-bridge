@@ -2,6 +2,8 @@
 /// at most `maxCharacters`, tagged with its status and the session's label.
 public enum AnswerShaper {
   public static let maxCharacters = 2000
+  /// The longest label a line carries, so a session title cannot crowd out the body.
+  public static let maxLabel = 120
 
   public static func forVoice(_ text: String, status: AnswerStatus, label: String) -> String {
     let prose = text.replacing(/```[\s\S]*?(```|\z)/, with: "\n")
@@ -20,13 +22,14 @@ public enum AnswerShaper {
         ? "the answer is code or a table only; it is in the session." : prose)
   }
 
-  /// `[TAG] label: body` as exactly one line of at most `limit` characters, the body redacted,
+  /// `[TAG] label: body` as exactly one line of at most `limit` characters, the label cut to
+  /// `maxLabel` and the body redacted,
   /// so a session's text cannot pose as another delivery: every opening or closing bracket of
   /// any script becomes `(` or `)`, and every line break a space.
   public static func line(
     tag: String, label: String, body: String, limit: Int = maxCharacters
   ) -> String {
-    let head = "[\(tag)] \(flat(label)): "
+    let head = "[\(tag)] \(flat(label).prefix(maxLabel)): "
     return head + cap(Redaction.redact(flat(body)), to: limit - head.count)
   }
 
@@ -47,8 +50,10 @@ public enum AnswerShaper {
     ).split(whereSeparator: \.isWhitespace).joined(separator: " ")
   }
 
-  /// `text` cut to `limit` characters after its last whole sentence, else with an ellipsis.
+  /// `text` cut to `limit` characters after its last whole sentence, else with an ellipsis;
+  /// empty for a limit below 1.
   public static func cap(_ text: String, to limit: Int) -> String {
+    guard limit > 0 else { return "" }
     guard text.count > limit else { return text }
     let head = text.prefix(limit + 1)
     let ends = head.indices.dropLast().filter {

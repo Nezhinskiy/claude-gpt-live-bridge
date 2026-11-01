@@ -26,6 +26,16 @@ struct AnswerShaperTests {
     #expect(voice.hasPrefix("[RESULT] Example session: "))
   }
 
+  /// A session title of any length cannot crowd out the body or break the line.
+  @Test func longLabelIsBounded() {
+    let label = String(repeating: "Title ", count: 500)
+    for limit in [AnswerShaper.maxCharacters, Bridge.maxContext] {
+      let line = AnswerShaper.line(tag: "CONTEXT", label: label, body: "Done.", limit: limit)
+      #expect(line.count <= limit && line.hasSuffix(": Done."), "\(line.count)")
+    }
+    #expect(AnswerShaper.cap("Done.", to: 0).isEmpty && AnswerShaper.cap("Done.", to: -3).isEmpty)
+  }
+
   @Test func redactsSecretsInAnswers() {
     let voice = AnswerShaper.forVoice(
       "Use sk-abcdefghijklmnopqrstuvwx now.", status: .ok, label: "Example session")
