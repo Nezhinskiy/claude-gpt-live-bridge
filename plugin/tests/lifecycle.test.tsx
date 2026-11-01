@@ -68,3 +68,21 @@ test('bareCommandShowsTheStatus', async ($, on) => {
   await $.session.start(START)
   for (const args of ['', '   ']) expect((await $.command.run({ ...VOICEMOD, args })).text).toContain('Voice is off')
 })
+
+test('offDuringAPollSubmitsNothing', async ($, on) => {
+  // The app hands out a request, then the owner leaves before the reply is read: leaving
+  // reports the request failed, so the session must not act on it.
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...VOICEMOD, args: 'on' })
+  world.work.push({ kind: 'request', id: '00000000-0000-0000-0000-00000000000a', brief: 'Delete the build folder', transcript: [] })
+  let release = () => {}
+  world.holdNext = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onNextHeld = resolve })
+  const poll = world.clock.advance(1000)
+  await held
+  await $.command.run({ ...VOICEMOD, args: 'off' })
+  release()
+  await poll
+  expect(world.submitted).toEqual([])
+})

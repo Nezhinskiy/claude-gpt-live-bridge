@@ -39,6 +39,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     submitted: [] as string[],
     launches: [] as (readonly string[])[],
     read: [] as string[],
+    /** While set, the app's reply to a poll is held until it resolves (built before, as the app does). */
+    holdNext: null as Promise<void> | null,
+    /** Called once a poll is being held. */
+    onNextHeld: () => {},
     /** The registry's other `*.json` files, by name: Claude Code rewrites them, so one may be half written. */
     otherRecords: {} as Record<string, string>,
     /** The calls to one route since the last look, then forgets them. */
@@ -66,7 +70,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
     world.launches.push(e.argv)
     return { value: { exitCode: 1, stdout: '', stderr: 'no such application', isStdoutTruncated: false, isStderrTruncated: false } }
   })
-  on('http.fetch', (_, e) => {
+  on('http.fetch', async (_, e) => {
     if (!world.isAppUp || e.init?.socketPath !== SOCKET) throw new Error('connect ENOENT')
     const route = new URL(e.url).pathname.replace('/v1/', '')
     const body = e.init.body === undefined ? undefined : JSON.parse(e.init.body)
@@ -83,6 +87,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
         ? { status: world.status, ...(world.work.length > 0 && { work: world.work.shift() }) }
         : undefined
     const text = JSON.stringify(reply ?? { error: 'unknown session' })
+    if (route === 'next' && world.holdNext !== null) {
+      world.onNextHeld()
+      await world.holdNext
+    }
     return { value: { status: reply ? 200 : 404, ok: reply !== undefined, headers: {}, text } }
   })
   on('prompt.submit', (_, e) => {

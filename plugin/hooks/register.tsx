@@ -34,6 +34,11 @@ let approval: { tool: string; agent: string | undefined } | null = null
 let offlineSince: number | null = null
 /** The mod's own sentence while online; it lasts until the next voice request. */
 let note: string | null = null
+/**
+ * Counts joins and leaves. Work that awaited across one (a poll in flight when the owner left)
+ * belongs to a join that is over, so it stops there instead of acting on the app's reply.
+ */
+let generation = 0
 
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
@@ -70,6 +75,7 @@ function parseRecord(text: string): unknown {
 }
 
 async function turnOn($: EngineInterface): Promise<boolean> {
+  generation += 1
   const sessionId = await $.session.id()
   const autoContext = (await $.store.get(AUTO_CONTEXT)) === true
   const isJoined = (await link?.join({ sessionId, title: await readTitle($, sessionId), autoContext })) === true
@@ -80,6 +86,7 @@ async function turnOn($: EngineInterface): Promise<boolean> {
 }
 
 async function turnOff($: EngineInterface): Promise<void> {
+  generation += 1
   link?.stop()
   if (link?.session) await $.store.delete(joinedKey(link.session.sessionId))
   await link?.leave()
@@ -92,12 +99,13 @@ async function turnOff($: EngineInterface): Promise<void> {
  */
 async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void> {
   const joined = link?.session
+  const live = generation
   if (!link || !joined) return
   const sessionId = await $.session.id()
   const isNewId = sessionId !== joined.sessionId
   if (!isNewId && !isTitleChecked) return
   const title = await readTitle($, sessionId)
-  if (!isNewId && title === joined.title) return
+  if (live !== generation || (!isNewId && title === joined.title)) return
   if (isNewId) await $.store.delete(joinedKey(joined.sessionId))
   await link.join({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
   await save($)
@@ -105,15 +113,19 @@ async function follow($: EngineInterface, isTitleChecked: boolean): Promise<void
 
 /** One poll: status into the band, a voice request into a prompt, a context request answered. */
 async function tick($: EngineInterface): Promise<void> {
+  const live = generation
   await follow($, false)
   const reply = await link?.next()
+  if (live !== generation) return
   if (!reply) {
     const now = await $.clock.now()
     if (offlineSince === null) {
       offlineSince = now
-      if (link && !(await link.ensureApp())) await setBand($, { problem: OPEN_APP })
+      const isOpened = await link?.ensureApp()
+      if (live !== generation) return
+      if (!isOpened) await setBand($, { problem: OPEN_APP })
     }
-    await setBand($, { isOffline: now - offlineSince >= OFFLINE_AFTER_MS })
+    if (live === generation) await setBand($, { isOffline: now - offlineSince >= OFFLINE_AFTER_MS })
     return
   }
   offlineSince = null
