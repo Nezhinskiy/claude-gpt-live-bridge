@@ -122,8 +122,9 @@ struct RealtimeSessionTests {
     #expect(await rpc.params("mcpServerStatus/list").map { $0["cursor"] } == [nil, "page-2"])
   }
 
-  /// A reply this version cannot read, a configured server codex does not report, or a status
-  /// list that never ends each refuse the session (fail closed).
+  /// A reply this version cannot read, a configured server codex does not report, a status
+  /// list that never ends, or a config without an MCP server table each refuse the session
+  /// (fail closed).
   @Test func mcpCheckFailsClosed() async throws {
     let open = { try await session.open(offerSDP: "offer", items: []) }
     let disabled = try #require(adrJSON("mcp-server-status-list-all-disabled")["result"]?.object)
@@ -138,8 +139,14 @@ struct RealtimeSessionTests {
       "mcpServerStatus/list", [.object(disabled.merging(["nextCursor": "again"]) { $1 })])
     await #expect(throws: CodexProblem.self) { try await open() }
     #expect(await rpc.params("mcpServerStatus/list").count == 2 + RealtimeSession.maxStatusPages)
-    await rpc.set("config/read", [["settings": [:]]])
-    await #expect(throws: CodexProblem.self) { try await open() }
+    await rpc.set("mcpServerStatus/list", [.object(disabled)])  // only the config can fail now
+    let noTable = CodexProblem.protocolMismatch("config/read without an MCP server table")
+    for config: JSONValue in [
+      ["settings": [:]], ["config": "none"], ["config": ["mcp_servers": []]],
+    ] {
+      await rpc.set("config/read", [config])
+      await #expect(throws: noTable) { try await open() }
+    }
     #expect(await rpc.params("thread/realtime/start").isEmpty)
   }
 

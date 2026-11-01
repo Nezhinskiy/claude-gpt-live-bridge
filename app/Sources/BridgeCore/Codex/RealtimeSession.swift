@@ -59,7 +59,8 @@ public actor RealtimeSession: RealtimeControlling {
     await listen()
     let config: JSONValue = try await client.request(
       "config/read", ["cwd": .string(cwd.path)] as JSONValue, timeout: timeout)
-    guard let servers = (config["config"]?["mcp_servers"] ?? [:]).object else {
+    guard let table = config["config"]?.object, let servers = (table["mcp_servers"] ?? [:]).object
+    else {
       throw CodexProblem.protocolMismatch("config/read without an MCP server table")
     }
     let names = servers.keys
