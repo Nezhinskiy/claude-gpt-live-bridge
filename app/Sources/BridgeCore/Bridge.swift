@@ -25,6 +25,9 @@ public protocol AudioSide: Sendable {
 /// handoffs to sessions and their answers back to the voice.
 public actor Bridge: Router {
   public static let maxContext = 1500
+  /// Why Start did nothing: there is no session to talk to.
+  public static let noSession =
+    "No Claude Code session has joined: run /voice on in a session, then start."
 
   private let registry: SessionRegistry
   private let makeRealtime: @Sendable () async throws -> any RealtimeControlling
@@ -94,6 +97,10 @@ public actor Bridge: Router {
     switch action {
     case .start:
       guard machine.phase == .off, !starting else { return }
+      guard await registry.target != nil else {
+        problem = Self.noSession
+        return await changed()
+      }
       starting = true
       do { _ = try await controller() } catch is CancellationError {
         return  // a Stop came first
@@ -150,7 +157,9 @@ public actor Bridge: Router {
         guard let id = req.query["sessionId"] else { return .error(400, "sessionId is missing") }
         let work = try await registry.poll(SessionID(id))
         return .json(PollReply(status: await status, work: work))
-      case ("POST", "/v1/join"): await registry.join(try req.decodeBody(JoinBody.self))
+      case ("POST", "/v1/join"):
+        await registry.join(try req.decodeBody(JoinBody.self))
+        if problem == Self.noSession { problem = nil }
       case ("POST", "/v1/leave"):
         let delivery = await registry.leave(try req.decodeBody(LeaveBody.self).sessionId)
         if let delivery { await deliver(delivery, from: nil) }

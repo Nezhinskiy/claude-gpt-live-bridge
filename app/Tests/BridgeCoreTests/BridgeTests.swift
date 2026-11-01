@@ -114,7 +114,9 @@ struct BridgeTests {
       AnswerBody(sessionId: session, id: request.id, status: status, text: text, reason: nil))
   }
 
+  /// Starts the call, with `Alpha` joined if no session is, and opens the line.
   func live() async {
+    if await registry.target == nil { try? await join(a, "Alpha") }
     await bridge.perform(.start)
     await bridge.audioEvent(.speechStarted)
   }
@@ -140,6 +142,17 @@ struct BridgeTests {
     await test.bridge.perform(.start)  // the next Start launches a fresh codex
     #expect(await test.bridge.status.call == .listening)
     #expect(await voices.made.count == 2)
+  }
+
+  /// With no session there is nothing to talk to: Start (from the band or the socket) does
+  /// nothing but say so, and the sentence goes once a session joins.
+  @Test func startWithNoSessionDoesNothing() async throws {
+    await bridge.perform(.start)
+    #expect(await bridge.status.call == .off)
+    #expect(await bridge.status.problem == Bridge.noSession)
+    #expect(await audio.calls.isEmpty)
+    try await join(a, "Alpha")
+    #expect(await bridge.status.problem == nil)
   }
 
   /// The sentence of a failed Start goes once a Start succeeds.
@@ -262,6 +275,7 @@ struct BridgeTests {
   /// With no session joined, the failure arrives with the handoff; the ack must not hang up on it.
   @Test func failureWithNoSessionIsHeard() async throws {
     await live()
+    try await post("/v1/leave", LeaveBody(sessionId: a))
     await bridge.audioEvent(.speechEnded)
     voice.emit(.handoff(request(1)))
     voice.emit(.assistantUtterance("On it."))
@@ -298,6 +312,7 @@ struct BridgeTests {
 
   @Test func realtimeFailureSurfacesProblemSentence() async throws {
     let missing = try BridgeTests { throw CodexProblem.notInstalled }
+    try await missing.join(a, "Alpha")
     await missing.bridge.perform(.start)
     #expect(await missing.bridge.status.call == .off)
     #expect(await missing.bridge.status.problem == CodexProblem.notInstalled.sentence)

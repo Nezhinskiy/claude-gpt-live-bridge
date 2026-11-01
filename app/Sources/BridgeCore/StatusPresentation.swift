@@ -33,6 +33,8 @@ public struct StatusPresentation: Sendable, Equatable {
   public let detail: String
   /// What the call button does.
   public let action: CallAction
+  /// Start needs a joined session to talk to; Stop is always possible.
+  public let canAct: Bool
   public let rows: [SessionRowPresentation]
   public let problem: String?
   public let unheard: Int
@@ -58,10 +60,16 @@ public struct StatusPresentation: Sendable, Equatable {
       default: [.connecting, .live].contains(s.call) ? .active : .quiet
       }
     action = s.call == .off ? .start : .stop
+    canAct = action == .stop || !s.sessions.isEmpty
     let target = s.sessions.first(where: \.isTarget)?.label
     (headline, detail) =
       switch s.call {
-      case .off: ("Off", "Start to talk to your sessions.")
+      case .off:
+        (
+          "Off",
+          s.sessions.isEmpty
+            ? "Run /voice on in a Claude Code session to start." : "Start to talk to your sessions."
+        )
       case .listening: ("Listening — line closed", "The line opens when you speak.")
       case .connecting: ("Connecting…", "Opening the voice line.")
       case .live: ("Live", target.map { "Talking to \($0)" } ?? "No session has joined yet.")

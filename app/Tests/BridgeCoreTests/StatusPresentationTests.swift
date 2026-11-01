@@ -74,6 +74,17 @@ struct StatusPresentationTests {
     #expect(working.detail == "Claude working")
   }
 
+  /// Start is disabled until a session joins, and the line under it names the command.
+  @Test func startNeedsASession() {
+    var empty = Self.status(.off)
+    empty.sessions = []
+    let shown = StatusPresentation(empty)
+    #expect(!shown.canAct && shown.detail.contains("/voice on"))
+    #expect(StatusPresentation(Self.status(.off)).canAct)
+    empty.call = .listening
+    #expect(StatusPresentation(empty).canAct)  // Stop always works
+  }
+
   @Test func minutesAreRounded() {
     #expect(StatusPresentation(Self.status(.live)).minutes == "4 min this call · 31 min today")
   }

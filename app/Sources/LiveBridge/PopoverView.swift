@@ -45,6 +45,7 @@ struct PopoverView: View {
       Spacer()
       Button(shown.action == .start ? "Start" : "Stop") { model.perform(shown.action) }
         .capsule(prominent: shown.action == .start)
+        .disabled(!shown.canAct)
     }
     .card()
   }
@@ -59,7 +60,7 @@ struct PopoverView: View {
     VStack(alignment: .leading, spacing: 4) {
       Text("Sessions").font(.caption).foregroundStyle(.secondary)
       if shown.rows.isEmpty {
-        Text("No session has joined. Run /voicemod on in a Claude Code session.")
+        Text("No session has joined.")
           .font(.callout).foregroundStyle(.secondary)
       }
       ForEach(shown.rows) { row in
