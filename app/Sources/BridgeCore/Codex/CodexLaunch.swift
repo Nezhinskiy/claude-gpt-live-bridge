@@ -51,7 +51,10 @@ public enum CodexLaunch {
   /// this narrows what an uninterrupted turn has. Derived against codex 0.166.0: the realtime
   /// voice works with every feature off (`scripts/smoke.sh`). `secret_auth_storage` only says
   /// where codex keeps the login: turning it off would hide a keychain login, and it runs no tool.
-  public static let allowed: Set<String> = ["secret_auth_storage"]
+  /// The two proxy features only choose how codex reaches OpenAI behind a proxy.
+  public static let allowed: Set<String> = [
+    "respect_system_proxy", "secret_auth_storage", "system_proxy_fallback",
+  ]
 
   /// The first `codex` in `searchPath`.
   public static func locate(searchPath: [String]) -> URL? {

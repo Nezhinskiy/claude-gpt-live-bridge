@@ -79,8 +79,9 @@ acting:
   (approvals, tool calls, input requests and the rest) **is declined**.
 - **Every codex feature is off except an allow-list.** At launch the app runs
   `codex features list` and turns off every feature it reports, except those in
-  `CodexLaunch.allowed`, which holds only `secret_auth_storage` (where codex keeps your login;
-  it runs nothing). A feature a later codex adds under a new name is therefore off too. This
+  `CodexLaunch.allowed`: `secret_auth_storage` (where codex keeps your login) and
+  `respect_system_proxy` / `system_proxy_fallback` (how codex reaches OpenAI behind a proxy).
+  None of them runs anything. A feature a later codex adds under a new name is therefore off too. This
   narrows what a turn could use if one were not interrupted.
 - **Every MCP server is off.** The app turns off every server codex's configuration names when
   it starts the thread, then requires codex to report each one disabled before every session. It

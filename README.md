@@ -141,7 +141,7 @@ first (private keys, JWTs, common API tokens, URL passwords, `password=`-style f
 list of patterns, not a guarantee.
 
 The codex thread that carries the voice is ephemeral and read-only, with every codex feature
-but one (where codex keeps your login) and every MCP server turned off; it is there only to talk.
+turned off except where it keeps your login and how it uses your proxy, and every MCP server off; it is there only to talk.
 Claude's work goes to Anthropic as your Claude Code session always does. On your Mac the app
 keeps the usage meter, and the recent conversation and the context line last loaded until you
 press **New conversation**, in `~/Library/Application Support/claude-gpt-live-bridge`.
