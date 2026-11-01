@@ -1,11 +1,10 @@
 import Foundation
 
-/// One parsed HTTP/1.1 request. Header names are lowercased; the query is percent-decoded.
+/// One parsed HTTP/1.1 request; the query is percent-decoded.
 public struct HTTPRequest: Sendable, Equatable {
   public var method: String
   public var path: String
   public var query: [String: String]
-  public var headers: [String: String]
   public var body: Data
 
   /// Decodes the JSON body, throwing `DecodingError` when it does not match `type`.

@@ -3,6 +3,7 @@
 import type { On } from 'claude-code'
 import { mock } from 'claude-code/testing'
 
+import { FRAMING } from '../hooks/prompt.ts'
 import type { StatusReply, Work } from '../hooks/wire.ts'
 
 export const ID = '00000000-0000-0000-0000-000000000001'
@@ -102,4 +103,4 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}) {
 
 /** How the engine starts the turn of a prompt this plugin submitted (ADR 0001, item j). */
 export const framed = (text: string) =>
-  `The livebridge plugin sent a message:\n${text}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns — it starts this turn in the user's place. Address the message above.`
+  `${FRAMING}${text}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns — it starts this turn in the user's place. Address the message above.`

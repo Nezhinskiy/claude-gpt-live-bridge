@@ -2,7 +2,7 @@
 // microphone; `createCatchUp` queues what is said while the line connects and lets the line
 // catch up with the speaker by dropping silence while it lags (ADR 0001 (c)). Pure.
 
-import { dbfs } from './vad.js';
+import { dbfs, rms } from './vad.js';
 
 export function createPreroll({ seconds = 2, sampleRate = 48000 } = {}) {
   const ring = new Float32Array(Math.round(seconds * sampleRate));
@@ -27,7 +27,6 @@ export function createPreroll({ seconds = 2, sampleRate = 48000 } = {}) {
   };
 }
 
-const rms = (f32) => Math.sqrt(f32.reduce((sum, x) => sum + x * x, 0) / Math.max(1, f32.length));
 
 export function createCatchUp({ sampleRate = 48000, thresholdDb = -45, keepMs = 40 } = {}) {
   const queue = [];

@@ -16,9 +16,12 @@ const PHASE: Record<CallPhase, [color: string, label: string]> = {
 
 /** The band's view of a poll reply, as this session sees it. */
 export function bandStatus(status: StatusReply, self: SessionId): BandStatus {
-  const target = status.sessions.find(row => row.sessionId === status.target)?.label ?? 'none'
+  const target = status.sessions.find(row => row.isTarget)
   const { call, unheard, minutesToday, problem } = status
-  return { call, target, isTarget: status.target === self, unheard, minutesToday, ...(problem && { problem }) }
+  return {
+    call, target: target?.label ?? 'none', isTarget: target?.sessionId === self, unheard, minutesToday,
+    ...(problem && { problem }),
+  }
 }
 
 export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, state: Band, act: BandActions) {

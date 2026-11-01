@@ -78,7 +78,7 @@ public actor Bridge: Router {
     get async {
       let minutesThisCall = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
       return StatusReply(
-        call: machine.phase, target: await registry.target, sessions: await registry.rows(),
+        call: machine.phase, sessions: await registry.rows(),
         minutesToday: await meter.minutesToday(), minutesThisCall: minutesThisCall,
         problem: problem, lastContext: lastContext,
         recentTranscript: continuity.utterances.suffix(3).map {

@@ -162,7 +162,7 @@ extension HTTPRequest {
     return .complete(
       HTTPRequest(
         method: String(requestLine[0]), path: target.path,
-        query: Dictionary(query, uniquingKeysWith: { _, last in last }), headers: headers,
+        query: Dictionary(query, uniquingKeysWith: { _, last in last }),
         body: Data(buffer[headEnd.upperBound..<headEnd.upperBound + length])))
   }
 }

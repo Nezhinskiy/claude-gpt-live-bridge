@@ -7,7 +7,7 @@
 // connecting queue up, and from `flushPreroll` the queue plays into the peer's track, dropping
 // silence until it has caught up (ADR 0001 (c)).
 
-import { createVad, dbfs } from './vad.js';
+import { createVad, dbfs, rms } from './vad.js';
 import { createCatchUp, createPreroll } from './preroll.js';
 
 const FRAME = 1024;
@@ -22,7 +22,6 @@ const say = {
 };
 
 const post = (message) => window.webkit.messageHandlers.bridge.postMessage(message);
-const rms = (f32) => Math.sqrt(f32.reduce((sum, x) => sum + x * x, 0) / f32.length);
 
 let ctx = null;
 let pump, input, stream, vad, preroll, catchUp;

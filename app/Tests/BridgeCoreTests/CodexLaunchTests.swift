@@ -127,8 +127,10 @@ struct FakeCodex {
     try adrFixture("codex-features-list", extension: "txt").write(
       to: dir.appending(path: "features.txt"))
     try write("initialize.json", #"{"userAgent":"fake","codexHome":"/Users/example/.codex"}"#)
-    let account = loggedIn ? #"{"type":"chatgpt","planType":"plus"}"# : "null"
-    try write("account_read.json", #"{"account":\#(account),"requiresOpenaiAuth":true}"#)
+    let account =
+      loggedIn ? try #require(adrJSON("account-read-result")["result"]) : ["account": .null]
+    try write(
+      "account_read.json", String(decoding: try JSONEncoder().encode(account), as: UTF8.self))
   }
 
   static func executable(_ url: URL, _ text: String) throws {

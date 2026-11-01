@@ -24,7 +24,6 @@ const ROW = fields<Wire.SessionRow>({
 })
 const STATUS = fields<Wire.StatusReply>({
   call: { oneOf: ['off', 'listening', 'connecting', 'live'] },
-  target: optional(S),
   sessions: { list: ROW },
   minutesToday: 'number',
   minutesThisCall: 'number',

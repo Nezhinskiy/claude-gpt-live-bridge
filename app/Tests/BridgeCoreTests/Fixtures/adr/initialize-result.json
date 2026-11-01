@@ -1,9 +1,0 @@
-{
-  "id": 1,
-  "result": {
-    "userAgent": "claude-gpt-live-bridge/0.166.0 (Mac OS 27.0.1; arm64) unknown (claude-gpt-live-bridge; 0.0.0)",
-    "platformFamily": "unix",
-    "platformOs": "macos",
-    "codexHome": "/Users/example/.codex"
-  }
-}

@@ -11,7 +11,7 @@ struct StatusPresentationTests {
     unheard: Int = 0
   ) -> StatusReply {
     StatusReply(
-      call: call, target: target,
+      call: call,
       sessions: [
         SessionRow(sessionId: target, label: "Example session", activity: .idle, isTarget: true),
         SessionRow(

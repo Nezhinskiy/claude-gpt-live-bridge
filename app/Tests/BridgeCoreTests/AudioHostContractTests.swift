@@ -17,8 +17,6 @@ struct AudioHostContractTests {
   @Test func audioFailedMessageBecomesAudioEvent() {
     #expect(PageMessage.audioFailed("No microphone.").audioEvent == .failed("No microphone."))
     #expect(PageMessage(body: ["type": "audioFailed"])?.audioEvent != nil)
-    #expect(PageMessage.speechStarted.audioEvent == .speechStarted)
-    #expect(PageMessage.speechEnded.audioEvent == .speechEnded)
     #expect(PageMessage.level(0.5).audioEvent == nil)
   }
 

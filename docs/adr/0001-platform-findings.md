@@ -294,9 +294,9 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
   fire for a permission dialog, the origin of a task-notification turn, `$.process.run` in a
   desktop Code tab session, and the realtime error on a plan without realtime.
 - Fixtures under `app/Tests/BridgeCoreTests/Fixtures/adr/` and `plugin/tests/fixtures/adr/` are
-  the observed messages with every id, path, address and title replaced by a placeholder, so
-  parsers are tested against real shapes. A codex upgrade that changes them should change this
-  record first.
+  the observed messages with every id, path, address and title replaced by a placeholder; each
+  is read by a test, so parsers are tested against real shapes, or cited above as evidence. A
+  codex upgrade that changes them should change this record first.
 
 ## Status
 

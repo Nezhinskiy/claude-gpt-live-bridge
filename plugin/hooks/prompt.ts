@@ -9,7 +9,7 @@ export const PLUGIN_NAME = 'livebridge'
 export const VOICE_TAG = '⟦voice⟧'
 
 /** The first line the engine puts above a prompt this plugin submits (ADR 0001, item j). */
-const FRAMING = `The ${PLUGIN_NAME} plugin sent a message:\n`
+export const FRAMING = `The ${PLUGIN_NAME} plugin sent a message:\n`
 /**
  * The marker line with a request id of the shape the app issues (a UUID), ending the prompt:
  * at the end of the text, or where the engine's own paragraph follows it.
@@ -54,10 +54,6 @@ export function voicePrompt(request: VoiceRequest): string {
 export function voiceRequestId(text: string): string | null {
   const at = text.lastIndexOf(`\n${VOICE_TAG} `)
   return text.startsWith(FRAMING) && at >= 0 ? (MARKER.exec(text.slice(at + 1))?.[1] ?? null) : null
-}
-
-export function isVoicePrompt(text: string): boolean {
-  return voiceRequestId(text) !== null
 }
 
 /**

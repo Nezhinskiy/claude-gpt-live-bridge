@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { voicePrompt } from '../../hooks/prompt.ts'
+import { FRAMING, voicePrompt } from '../../hooks/prompt.ts'
 import { FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
 
 const ID = '00000000-0000-0000-0000-00000000000a'
 const framed = (id: string) =>
-  `The livebridge plugin sent a message:\n${voicePrompt({ id, brief: 'List the files', transcript: [] })}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns.`
+  `${FRAMING}${voicePrompt({ id, brief: 'List the files', transcript: [] })}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns.`
 
 function voiceTurn(answer: string, outcome: 'answer' | 'aborted' | 'error' = 'answer') {
   const tracker = new TurnTracker()

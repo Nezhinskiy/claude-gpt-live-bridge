@@ -42,7 +42,6 @@ export type SessionRow =
 
 export type StatusReply = {
   call: CallPhase;
-  target?: SessionId;
   sessions: SessionRow[];
   minutesToday: number;
   minutesThisCall: number;

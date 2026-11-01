@@ -1,8 +1,0 @@
-{
-  "emittedAtMs": 1700000000000,
-  "method": "account/updated",
-  "params": {
-    "planType": "plus",
-    "authMode": "chatgpt"
-  }
-}

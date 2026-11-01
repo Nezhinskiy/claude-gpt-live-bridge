@@ -71,7 +71,7 @@ test('bandShowsTheCallAndStartsIt', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...VOICEMOD, args: 'on' })
   world.status = {
-    ...world.status, call: 'listening', target: ID, unheard: 2,
+    ...world.status, call: 'listening', unheard: 2,
     sessions: [{ sessionId: ID, label: 'Example session', activity: 'idle', isTarget: true }],
   }
   await world.clock.advance(1000)

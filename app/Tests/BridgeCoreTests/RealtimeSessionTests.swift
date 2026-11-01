@@ -75,7 +75,7 @@ struct RealtimeSessionTests {
 
   init() throws {
     rpc = try FakeRPC()
-    session = RealtimeSession(client: rpc, voice: nil, cwd: cwd)
+    session = RealtimeSession(client: rpc, cwd: cwd)
   }
 
   @Test func openSendsPinnedParams() async throws {

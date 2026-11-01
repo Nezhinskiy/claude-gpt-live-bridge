@@ -74,7 +74,7 @@ struct BridgeTests {
   func post(_ path: String, _ body: some Encodable) async throws -> HTTPResponse {
     let body = try JSONEncoder().encode(body)
     return await bridge.handle(
-      HTTPRequest(method: "POST", path: path, query: [:], headers: [:], body: body))
+      HTTPRequest(method: "POST", path: path, query: [:], body: body))
   }
 
   func join(_ id: SessionID, _ title: String, autoContext: Bool = false) async throws {
@@ -132,9 +132,9 @@ struct BridgeTests {
   @Test func popoverSetsTheTarget() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
-    #expect(await bridge.status.target == a)
+    #expect(await registry.target == a)
     await bridge.setTarget(b)
-    #expect(await bridge.status.target == b)
+    #expect(await bridge.status.sessions.map(\.isTarget) == [false, true])
   }
 
   @Test func questionReplyGoesToAskingSession() async throws {

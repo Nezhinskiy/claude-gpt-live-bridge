@@ -33,7 +33,6 @@ public protocol RealtimeControlling: Sendable {
 /// session.
 public actor RealtimeSession: RealtimeControlling {
   private let client: any RPCClient
-  private let voice: String?
   private let cwd: URL
   private let timeout = Duration.seconds(20)
   /// More `mcpServerStatus/list` pages than this is a reply this version does not understand.
@@ -50,9 +49,8 @@ public actor RealtimeSession: RealtimeControlling {
   private let emit: AsyncStream<RealtimeEvent>.Continuation
 
   /// `cwd` is an empty directory the app owns (`<data dir>/codex-cwd`).
-  public init(client: any RPCClient, voice: String?, cwd: URL) {
+  public init(client: any RPCClient, cwd: URL) {
     self.client = client
-    self.voice = voice
     self.cwd = cwd
     (events, emit) = AsyncStream.makeStream()
   }
@@ -118,13 +116,12 @@ public actor RealtimeSession: RealtimeControlling {
   /// `thread/realtime/start` answers `{}`; the SDP answer or an error follows as a notification.
   private func start(thread: String, offerSDP: String, items: [InitialItem]) async throws -> String
   {
-    var params: [String: JSONValue] = [
+    let params: JSONValue = [
       "threadId": .string(thread), "version": "v3", "outputModality": "audio",
       "transport": ["type": "webrtc", "sdp": .string(offerSDP)],
       "includeStartupContext": false, "clientManagedHandoffs": true, "delegationAckFiller": true,
       "prompt": .string(VoicePrompt.text), "initialItems": try JSONValue(encoding: items),
     ]
-    params["voice"] = voice.map(JSONValue.string)
     lastError = nil
     attempt += 1
     let mine = attempt
@@ -133,7 +130,7 @@ public actor RealtimeSession: RealtimeControlling {
       Task {
         do {
           let _: JSONValue = try await client.request(
-            "thread/realtime/start", JSONValue.object(params), timeout: timeout)
+            "thread/realtime/start", params, timeout: timeout)
           try await Task.sleep(for: timeout)
           fail(CodexProblem.protocolMismatch("no SDP answer"), attempt: mine)
         } catch { fail(error, attempt: mine) }

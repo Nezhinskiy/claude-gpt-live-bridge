@@ -1,8 +1,0 @@
-{
-  "session": {
-    "id": "rtc_000000000000000000000000",
-    "status": "active",
-    "expires_at": 1700007200
-  },
-  "type": "session.started"
-}

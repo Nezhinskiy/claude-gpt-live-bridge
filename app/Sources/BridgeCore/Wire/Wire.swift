@@ -129,7 +129,6 @@ public struct SessionRow: Codable, Sendable, Equatable {
 /// What the band and the popover show.
 public struct StatusReply: Codable, Sendable, Equatable {
   public var call: CallPhase
-  public var target: SessionID?
   public var sessions: [SessionRow]
   public var minutesToday: Double
   public var minutesThisCall: Double

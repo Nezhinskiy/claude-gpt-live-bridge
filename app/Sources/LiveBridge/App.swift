@@ -114,7 +114,7 @@ final class AppModel {
     let path = CodexLaunch.defaultSearchPath()
     guard let codex = CodexLaunch.locate(searchPath: path) else { throw CodexProblem.notInstalled }
     let client = try await JSONRPCClient.launchVerified(codex: codex, cwd: cwd, searchPath: path)
-    return RealtimeSession(client: client, voice: nil, cwd: cwd)
+    return RealtimeSession(client: client, cwd: cwd)
   }
 
   /// `--fake-mic <wav>`: debug builds play the file as the microphone.
