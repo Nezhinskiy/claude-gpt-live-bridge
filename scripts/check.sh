@@ -5,6 +5,8 @@ cd "$(dirname "$0")/.."
 
 swift format lint --strict -r app
 (cd app && swift build && swift test)
+# The audio page's pure modules (voice detection, pre-roll and catch-up).
+node --test app/Tests/AudioJSTests
 
 # The mod: type check and unit tests (typescript is the one dev dependency). The engine-facing
 # files type-check against the API types Claude Code lays in plugin/.claude-plugin/types once

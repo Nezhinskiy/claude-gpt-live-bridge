@@ -10,7 +10,8 @@ let package = Package(
   ],
   targets: [
     .target(name: "BridgeCore"),
-    .executableTarget(name: "LiveBridge", dependencies: ["BridgeCore"]),
+    .executableTarget(
+      name: "LiveBridge", dependencies: ["BridgeCore"], resources: [.copy("Resources/audio")]),
     .testTarget(
       name: "BridgeCoreTests",
       dependencies: ["BridgeCore"],
