@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LiveBridge: talk to Claude Code by voice</title>
+  <meta name="description" content="LiveBridge is an open-source macOS menu bar app that lets you talk to an open Claude Code session by voice. Unofficial; not affiliated with Anthropic or OpenAI.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1f5d65">
+  <link rel="canonical" href="https://getlivebridge.com/">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="LiveBridge">
+  <meta property="og:url" content="https://getlivebridge.com/">
+  <meta property="og:title" content="LiveBridge: talk to Claude Code by voice">
+  <meta property="og:description" content="An open-source macOS menu bar app that lets you talk to an open Claude Code session by voice.">
+  <meta property="og:image" content="https://getlivebridge.com/assets/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="The LiveBridge icon and the line: Talk to your Claude Code sessions out loud.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="LiveBridge: talk to Claude Code by voice">
+  <meta name="twitter:description" content="An open-source macOS menu bar app that lets you talk to an open Claude Code session by voice.">
+  <meta name="twitter:image" content="https://getlivebridge.com/assets/social-preview.png">
+  <meta name="twitter:image:alt" content="The LiveBridge icon and the line: Talk to your Claude Code sessions out loud.">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="hero">
+  <div class="hero-inner">
+    <img class="hero-icon" src="assets/icon.png" width="112" height="112" alt="LiveBridge app icon: white bars standing on a bridge deck, on a teal tile">
+    <h1>LiveBridge</h1>
+    <p class="tagline">Talk to an open Claude Code session by voice.</p>
+    <p class="lede">A macOS menu bar app that keeps a GPT-Live voice line ready through codex on your ChatGPT login, with no API key. The voice chats, asks what you mean, and hands real work to your Claude Code session. Claude does the work with its own model, tools and permission mode, and the voice tells you the result.</p>
+    <div class="actions">
+      <a class="button primary" href="/download/LiveBridge.dmg" download>
+        <svg class="button-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download for macOS
+      </a>
+      <a class="button secondary" href="https://github.com/getLiveBridge/livebridge">View on GitHub</a>
+    </div>
+    <p class="platform">macOS 14+ · Apple Silicon · v0.1.0</p>
+  </div>
+  <svg class="span" viewBox="0 0 1000 190" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="bar-fill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff"/>
+        <stop offset="1" stop-color="#ffffff" stop-opacity=".72"/>
+      </linearGradient>
+    </defs>
+    <g fill="url(#bar-fill)">
+      <rect class="bar" style="--i:0" x="16.5" y="150.3" width="7" height="23.7" rx="3.5"/>
+      <rect class="bar" style="--i:1" x="40.5" y="149.3" width="7" height="24.7" rx="3.5"/>
+      <rect class="bar" style="--i:2" x="64.5" y="146.4" width="7" height="27.6" rx="3.5"/>
+      <rect class="bar" style="--i:3" x="88.5" y="141.6" width="7" height="32.4" rx="3.5"/>
+      <rect class="bar" style="--i:4" x="112.5" y="134.7" width="7" height="39.3" rx="3.5"/>
+      <rect class="bar" style="--i:5" x="136.5" y="126.0" width="7" height="48.0" rx="3.5"/>
+      <rect class="bar" style="--i:6" x="160.5" y="115.3" width="7" height="58.7" rx="3.5"/>
+      <rect class="bar" style="--i:7" x="184.5" y="102.6" width="7" height="71.4" rx="3.5"/>
+      <rect class="bar" style="--i:8" x="208.5" y="6.0" width="7" height="168.0" rx="3.5"/>
+      <rect class="bar" style="--i:9" x="232.5" y="83.2" width="7" height="90.8" rx="3.5"/>
+      <rect class="bar" style="--i:10" x="256.5" y="96.5" width="7" height="77.5" rx="3.5"/>
+      <rect class="bar" style="--i:11" x="280.5" y="108.3" width="7" height="65.7" rx="3.5"/>
+      <rect class="bar" style="--i:12" x="304.5" y="118.7" width="7" height="55.3" rx="3.5"/>
+      <rect class="bar" style="--i:13" x="328.5" y="127.5" width="7" height="46.5" rx="3.5"/>
+      <rect class="bar" style="--i:14" x="352.5" y="135.0" width="7" height="39.0" rx="3.5"/>
+      <rect class="bar" style="--i:15" x="376.5" y="141.2" width="7" height="32.8" rx="3.5"/>
+      <rect class="bar" style="--i:16" x="400.5" y="146.0" width="7" height="28.0" rx="3.5"/>
+      <rect class="bar" style="--i:17" x="424.5" y="149.6" width="7" height="24.4" rx="3.5"/>
+      <rect class="bar" style="--i:18" x="448.5" y="151.9" width="7" height="22.1" rx="3.5"/>
+      <rect class="bar" style="--i:19" x="472.5" y="153.2" width="7" height="20.8" rx="3.5"/>
+      <rect class="bar" style="--i:20" x="496.5" y="153.6" width="7" height="20.4" rx="3.5"/>
+      <rect class="bar" style="--i:21" x="520.5" y="153.2" width="7" height="20.8" rx="3.5"/>
+      <rect class="bar" style="--i:22" x="544.5" y="151.9" width="7" height="22.1" rx="3.5"/>
+      <rect class="bar" style="--i:23" x="568.5" y="149.6" width="7" height="24.4" rx="3.5"/>
+      <rect class="bar" style="--i:24" x="592.5" y="146.0" width="7" height="28.0" rx="3.5"/>
+      <rect class="bar" style="--i:25" x="616.5" y="141.2" width="7" height="32.8" rx="3.5"/>
+      <rect class="bar" style="--i:26" x="640.5" y="135.0" width="7" height="39.0" rx="3.5"/>
+      <rect class="bar" style="--i:27" x="664.5" y="127.5" width="7" height="46.5" rx="3.5"/>
+      <rect class="bar" style="--i:28" x="688.5" y="118.7" width="7" height="55.3" rx="3.5"/>
+      <rect class="bar" style="--i:29" x="712.5" y="108.3" width="7" height="65.7" rx="3.5"/>
+      <rect class="bar" style="--i:30" x="736.5" y="96.5" width="7" height="77.5" rx="3.5"/>
+      <rect class="bar" style="--i:31" x="760.5" y="83.2" width="7" height="90.8" rx="3.5"/>
+      <rect class="bar" style="--i:32" x="784.5" y="6.0" width="7" height="168.0" rx="3.5"/>
+      <rect class="bar" style="--i:33" x="808.5" y="102.6" width="7" height="71.4" rx="3.5"/>
+      <rect class="bar" style="--i:34" x="832.5" y="115.3" width="7" height="58.7" rx="3.5"/>
+      <rect class="bar" style="--i:35" x="856.5" y="126.0" width="7" height="48.0" rx="3.5"/>
+      <rect class="bar" style="--i:36" x="880.5" y="134.7" width="7" height="39.3" rx="3.5"/>
+      <rect class="bar" style="--i:37" x="904.5" y="141.6" width="7" height="32.4" rx="3.5"/>
+      <rect class="bar" style="--i:38" x="928.5" y="146.4" width="7" height="27.6" rx="3.5"/>
+      <rect class="bar" style="--i:39" x="952.5" y="149.3" width="7" height="24.7" rx="3.5"/>
+      <rect class="bar" style="--i:40" x="976.5" y="150.3" width="7" height="23.7" rx="3.5"/>
+    </g>
+    <rect class="deck" x="4" y="170" width="992" height="14" rx="7"/>
+  </svg>
+</header>
+
+<p class="unofficial"><strong>Unofficial.</strong> Not affiliated with, endorsed by or supported by Anthropic or OpenAI. LiveBridge relies on codex’s experimental realtime API, which can change with any codex release.</p>
+
+<main id="main">
+
+  <section class="demo" aria-labelledby="demo-title">
+    <!-- Demo: when /assets/demo.gif exists, replace the .flow list below with:
+    <img src="/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="720">
+    -->
+    <h2 id="demo-title" class="card-title">One request, start to finish</h2>
+    <ol class="flow">
+      <li>
+        <h3>You speak</h3>
+        <p>Say what you need. The voice answers small talk itself and asks what you mean when it is not sure.</p>
+      </li>
+      <li>
+        <h3>The voice hands it over</h3>
+        <p>Anything that needs the repository or the session goes to your Claude Code session as a prompt.</p>
+      </li>
+      <li>
+        <h3>Claude does the work</h3>
+        <p>Claude works as it always does. The voice tells you the result in a sentence or two; code blocks and tables stay in the session.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="how-it-works" aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+    <p class="section-lede">Three parts, all on your Mac, each with one job.</p>
+    <div class="roles">
+      <article class="role">
+        <h3>The voice</h3>
+        <p class="role-sub">GPT-Live, through <code>codex app-server</code> on your ChatGPT login</p>
+        <p>The front desk. It chats, answers explanations itself and hands off tasks, questions about the code, decisions and corrections. Its codex thread is ephemeral and read-only, with every MCP server off: it is there only to talk.</p>
+      </article>
+      <article class="role role-app">
+        <h3>LiveBridge</h3>
+        <p class="role-sub">The menu bar app</p>
+        <p>Holds the call. Voice detection runs on your Mac, and the line to the voice opens only while someone is talking. It keeps each session’s conversation and routes each request to the session you picked.</p>
+      </article>
+      <article class="role">
+        <h3>The Claude Code mod</h3>
+        <p class="role-sub"><code>livebridge</code>, joined with <code>/live on</code></p>
+        <p>Submits each voice request to your session as a prompt and posts the answer back. It draws a band above the prompt with Start and Stop. The mod and the app talk over a Unix socket only your user can open.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="install" aria-labelledby="install-title">
+    <h2 id="install-title">Install</h2>
+    <p class="requirements">You need macOS 14 or later on Apple Silicon, Claude Code 2.1.289 or later, and <a href="https://github.com/openai/codex">codex</a> signed in with <code>codex login</code> to a ChatGPT plan that includes realtime voice. The <a href="https://github.com/getLiveBridge/livebridge#requirements">README</a> has the details.</p>
+
+    <ol class="steps">
+      <li class="step">
+        <h3>Install the app</h3>
+        <p><a href="/download/LiveBridge.dmg" download>Download LiveBridge.dmg</a>, open it, and drag LiveBridge to Applications.</p>
+        <p>The app is not notarized, so macOS blocks it the first time you open it. To allow it:</p>
+        <ol class="substeps">
+          <li>Open LiveBridge once and close the warning.</li>
+          <li>Open <strong>System Settings</strong> › <strong>Privacy &amp; Security</strong>, scroll down to <strong>Security</strong>, and click <strong>Open Anyway</strong> next to the message about LiveBridge.</li>
+          <li>Confirm with <strong>Open</strong>, and enter your Mac password if asked.</li>
+        </ol>
+        <p class="aside">On macOS 14 you can also Control-click LiveBridge in Applications, choose <strong>Open</strong>, then <strong>Open</strong> again.</p>
+        <p class="aside">Prefer to build it yourself? With Xcode and a Swift 6.0 toolchain, clone the repository and run <code>scripts/build-app.sh --release</code>. It builds the app, installs it in <code>~/Applications</code> and opens it. See <a href="https://github.com/getLiveBridge/livebridge#install">Install</a> in the README.</p>
+      </li>
+      <li class="step">
+        <h3>Install the mod</h3>
+        <p>In Terminal, add the marketplace and install the mod:</p>
+        <div class="code">
+          <pre><code>claude plugin marketplace add getLiveBridge/livebridge
+claude plugin install livebridge@livebridge</code></pre>
+          <button class="copy" type="button" hidden>Copy</button>
+        </div>
+      </li>
+      <li class="step">
+        <h3>Start talking</h3>
+        <p>In the Claude Code session you want to talk to, type:</p>
+        <div class="code code-short">
+          <pre><code>/live on</code></pre>
+          <button class="copy" type="button" hidden>Copy</button>
+        </div>
+        <p>Press <strong>Start</strong> in the band above the prompt, allow the microphone, and talk.</p>
+        <p class="aside">If <code>/live</code> is not found in a session that was already open, reopen the session. macOS may also ask whether LiveBridge may find devices on your local network; the voice line needs that permission too.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="highlights" aria-labelledby="highlights-title">
+    <h2 id="highlights-title">Built to stay out of the way</h2>
+    <dl class="highlights">
+      <div>
+        <dt>Local by design</dt>
+        <dd>No telemetry and no server of its own. The app listens on no network port. The only traffic that leaves your Mac is what codex and Claude Code already send: the voice line to OpenAI while it is open, and Claude’s work to Anthropic. The README’s <a href="https://github.com/getLiveBridge/livebridge#privacy">Privacy</a> section lists exactly what reaches OpenAI.</dd>
+      </div>
+      <div>
+        <dt>Billing-aware</dt>
+        <dd>While nobody is talking, the microphone feeds only a voice detector on your Mac and nothing is sent. The line opens when you speak and closes after 20 seconds of silence. After a handoff it stays open up to 2 minutes for Claude’s answer.</dd>
+      </div>
+      <div>
+        <dt>Memory per session</dt>
+        <dd>Each Claude Code session has its own conversation with the voice, carried across Stop and Start, so the voice remembers what you said a minute ago.</dd>
+      </div>
+      <div>
+        <dt>Your Claude keeps its permissions</dt>
+        <dd>Requests run under the session’s own permission mode. When Claude waits for a permission prompt, the voice tells you, and you answer it in Claude Code; LiveBridge never answers it for you. Anything the microphone hears can become a request, so read <a href="https://github.com/getLiveBridge/livebridge/blob/main/SECURITY.md">SECURITY.md</a> before using voice with a mode that acts without asking.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section id="open-source" aria-labelledby="oss-title">
+    <h2 id="oss-title">Open source</h2>
+    <p>LiveBridge is MIT-licensed and open to contributors. For anything larger than a fix, open an issue first so the shape can be agreed before the work starts. <a href="https://github.com/getLiveBridge/livebridge/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> has the layout, the toolchain and the checks.</p>
+    <p>Today it is one Mac app, one worker and one voice provider. They meet at narrow seams, and each of these directions needs help:</p>
+    <ul class="directions">
+      <li>
+        <h3>Windows and Linux</h3>
+        <p>The wire between the mod and the app is portable. A port starts with an app for the new platform that speaks the same wire.</p>
+      </li>
+      <li>
+        <h3>Other agents as the worker</h3>
+        <p>Codex CLI, Hermes Agent or Gemini CLI, each through its own adapter that speaks the same wire as the Claude Code mod.</p>
+      </li>
+      <li>
+        <h3>Other voice providers</h3>
+        <p>The OpenAI Realtime API with your own key, or Google’s Gemini Live API, as another implementation of the realtime protocol.</p>
+      </li>
+    </ul>
+    <p><a class="button tertiary" href="https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">See help-wanted issues</a></p>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <nav aria-label="Project links">
+    <ul>
+      <li><a href="https://github.com/getLiveBridge/livebridge">GitHub</a></li>
+      <li><a href="https://github.com/getLiveBridge/livebridge/blob/main/LICENSE">License</a></li>
+      <li><a href="https://github.com/getLiveBridge/livebridge/blob/main/SECURITY.md">Security</a></li>
+      <li><a href="https://github.com/getLiveBridge/livebridge/blob/main/README.ru.md" hreflang="ru" lang="ru">README на русском</a></li>
+    </ul>
+  </nav>
+  <p>LiveBridge is an unofficial project, not affiliated with, endorsed by or supported by Anthropic or OpenAI.</p>
+</footer>
+
+<script>
+  // Copy buttons for the install commands. Without JavaScript they stay hidden.
+  if (navigator.clipboard) {
+    document.querySelectorAll(".code").forEach(function (block) {
+      var button = block.querySelector(".copy");
+      var code = block.querySelector("code");
+      button.hidden = false;
+      button.setAttribute("aria-label", "Copy: " + code.textContent.split("\n")[0]);
+      button.addEventListener("click", function () {
+        navigator.clipboard.writeText(code.textContent).then(function () {
+          button.textContent = "Copied";
+          setTimeout(function () { button.textContent = "Copy"; }, 1600);
+        });
+      });
+    });
+  }
+</script>
+</body>
+</html>
