@@ -74,7 +74,7 @@ body:
       label: Logs (optional)
       description: |
         The app's log for the last minutes, after you remove anything personal:
-        `/usr/bin/log show --last 10m --info --predicate 'subsystem == "io.github.nezhinskiy.livebridge"'`
+        `/usr/bin/log show --last 10m --info --predicate 'subsystem == "com.getlivebridge.livebridge"'`
       render: text
   - type: checkboxes
     id: checks

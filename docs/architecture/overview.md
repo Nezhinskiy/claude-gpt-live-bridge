@@ -79,11 +79,12 @@ makes the session the target, starts the call and sends the session's summary (n
 session with no prompt yet; the last one again, with no model call, while no turn has completed
 since it was written), with a short note in the band while it goes. Talk here shows only while
 the call talks to another session, and moves it here. When the socket does not answer, it opens
-`~/Applications/LiveBridge.app` with `open -g`, and falls back to `open -g -b <bundle id>`.
+`/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
+to `open -g -b <bundle id>`.
 
 ## The wire
 
-HTTP/1.1 over `~/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock`, JSON
+HTTP/1.1 over `~/Library/Application Support/LiveBridge/run/bridge.sock`, JSON
 bodies, no other access control than the run directory's mode. The app finds that folder through
 Foundation, which honours `CFFIXED_USER_HOME`; the mod builds the path from `CFFIXED_USER_HOME`
 when it is set, else from `HOME`. `Wire.swift` and
@@ -100,9 +101,10 @@ that both test suites parse.
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
-Every reply carries the status: phase, target, sessions with labels (`Title · ab12` when two
-titles are the same), minutes, the problem sentence, the target's context line and the last
-three lines of its conversation, and the count of unheard results.
+Every reply carries the status: the phase, the sessions with their labels (`Title · ab12` when
+two titles are the same) and which one is the target, the minutes today, the problem sentence
+and the count of unheard results. What only the app's menu shows (the minutes this call, the
+target's context line and its conversation) is not on the wire.
 
 A session the owner removed with the menu's × is gone as if it had left, and until it joins
 again every call from it answers `410` with `"code": "removed"`. The mod then turns itself off
@@ -302,8 +304,9 @@ sequenceDiagram
 - **The app not running:** the mod opens it; while the socket does not answer for 10 s the band
   says "bridge offline". After the app restarts, the mod joins again on its next poll; the call
   starts off.
-- **Codex exits under the app:** the next speech reports it once, and the speech after that
-  starts a fresh codex.
+- **Codex exits or stops answering under the app:** the next speech reports it once, and the
+  speech after that starts a fresh codex. A request codex leaves unanswered past its timeout
+  ends that codex as an exit does.
 - **The microphone is denied, missing, busy or lost:** the call goes to `off` with the reason.
   Denied says where to allow it, and the menu offers to open that setting. Busy means it
   could not be opened, perhaps because another app holds it; a request still pending after

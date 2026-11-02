@@ -4,7 +4,7 @@
 #   scripts/build-app.sh                          debug build: app/.build/app/LiveBridge.app, ad hoc
 #   scripts/build-app.sh --run [--fake-mic WAV]   debug build, quit its running copy, open it
 #   scripts/build-app.sh --release                release build, signed, installed in
-#                                                 ~/Applications and opened; run it again to upgrade
+#                                                 /Applications and opened; run it again to upgrade
 #   scripts/build-app.sh --make-signing-identity  create a self-signed code-signing certificate,
 #                                                 so the microphone permission survives upgrades
 #   scripts/build-app.sh --uninstall              remove the app and every file it keeps
@@ -12,14 +12,16 @@
 #                                                 the committed HEAD, signed ad hoc, not notarized
 #
 # --fake-mic (debug builds only) plays WAV as the microphone. If CFFIXED_USER_HOME is set, the
-# app keeps its files under that directory instead of your home folder.
+# app keeps its files under that directory instead of your home folder. The disk image is
+# dragged to /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS
+# names another folder for it (the uninstall test's scratch one).
 set -eu
 : "${HOME:?HOME is not set}" # an empty HOME would aim every path below at the system's folders
 cd "$(dirname "$0")/.."
 
-BUNDLE_ID=io.github.nezhinskiy.livebridge
+BUNDLE_ID=com.getlivebridge.livebridge
 IDENTITY="LiveBridge Local Signing"
-INSTALLED="$HOME/Applications/LiveBridge.app"
+INSTALLED="${LIVEBRIDGE_APPLICATIONS:-/Applications}/LiveBridge.app"
 
 usage() {
   sed -n '4,12s/^# \{0,1\}//p' "$0" >&2
@@ -108,7 +110,6 @@ release() {
       "scripts/build-app.sh --make-signing-identity keeps the permission"
   fi
   quit "$INSTALLED"
-  mkdir -p "$HOME/Applications"
   rm -rf "$INSTALLED"
   ditto "$stage" "$INSTALLED"
   open "$INSTALLED"
@@ -156,13 +157,15 @@ EOF
 
 # Builds the downloadable disk image from the committed HEAD in a scratch copy under /tmp, so no
 # path of this Mac ends up in the binary, strips the debug symbols, signs ad hoc (a local signing
-# identity means nothing on another Mac) and writes dist/LiveBridge.dmg with its SHA-256.
+# identity means nothing on another Mac) and writes dist/LiveBridge.dmg. The version is read
+# from that copy, so the volume name matches the app inside it. The release workflow
+# (.github/workflows/release.yml) runs this on a tag and attests the image.
 package() {
-  version=$(plutil -extract CFBundleShortVersionString raw app/Support/Info.plist)
   out="$PWD/dist"
   src=$(mktemp -d /tmp/livebridge-package.XXXXXX)
   trap 'rm -rf "$src"' EXIT
   git archive HEAD | tar -x -C "$src"
+  version=$(plutil -extract CFBundleShortVersionString raw "$src/app/Support/Info.plist")
   (
     cd "$src"
     assemble release "$src/stage/LiveBridge.app"
@@ -178,7 +181,6 @@ package() {
   rm -f "$out/LiveBridge.dmg"
   hdiutil create -quiet -volname "LiveBridge $version" -srcfolder "$src/stage" -ov \
     -format UDZO "$out/LiveBridge.dmg"
-  (cd "$out" && shasum -a 256 LiveBridge.dmg >LiveBridge.dmg.sha256)
   echo "packaged $out/LiveBridge.dmg ($version, $(git rev-parse --short HEAD))"
 }
 
@@ -189,7 +191,7 @@ uninstall() {
     "$INSTALLED/Contents/MacOS/LiveBridge" --unregister-login-item || true
   fi
   lib="$HOME/Library"
-  for path in "$INSTALLED" "$lib/Application Support/claude-gpt-live-bridge" \
+  for path in "$INSTALLED" "$lib/Application Support/LiveBridge" \
     "$lib/Caches/$BUNDLE_ID" "$lib/WebKit/$BUNDLE_ID" "$lib/HTTPStorages/$BUNDLE_ID" \
     "$lib/HTTPStorages/$BUNDLE_ID.binarycookies" "$lib/Preferences/$BUNDLE_ID.plist"; do
     if [ -e "$path" ]; then
