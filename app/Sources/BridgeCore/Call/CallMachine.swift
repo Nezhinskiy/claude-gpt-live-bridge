@@ -44,8 +44,9 @@ public enum CallEvent: Equatable, Sendable {
   case deliver(VoiceLine)
   case remoteClosed(Problem)
   case audioFailed(Problem)
-  /// Another session became the target; an open line carries the previous one's conversation.
-  case targetChanged
+  /// The open line carries a conversation that is not the target's any more: another session
+  /// became the target, or the target's conversation was erased.
+  case conversationChanged
 }
 
 /// What the bridge does in reply, in order.
@@ -191,7 +192,7 @@ public struct CallMachine: Sendable {
       guard !awaited.isEmpty else { return [] }
       awaited = []
       return isSilenceDue ? [.closeRealtime] + hangUp() : []
-    case (.connecting, .targetChanged), (.live, .targetChanged):
+    case (.connecting, .conversationChanged), (.live, .conversationChanged):
       return [.closeRealtime] + hangUp()
     case (.live, .silenceElapsed):
       if !awaited.isEmpty, !isSoundOn {
@@ -208,6 +209,19 @@ public struct CallMachine: Sendable {
   /// one held to be said.
   public mutating func withdraw(where isSuperseded: (VoiceLine) -> Bool) {
     unheard.removeAll { isSuperseded($0.line) }
+  }
+
+  /// A session got a new id (`/clear`): the line waits for it, and its results stay its own,
+  /// under the new id.
+  public mutating func rename(_ old: SessionID, to new: SessionID) {
+    if awaited.remove(old) != nil { awaited.insert(new) }
+    let moved = { (line: VoiceLine) in
+      var line = line
+      if line.session == old { line.session = new }
+      return line
+    }
+    unheard = unheard.map { Unheard(line: moved($0.line), isHeld: $0.isHeld) }
+    replyCanSay = replyCanSay?.map(moved)
   }
 
   /// Back to local listening; `pending` is kept, and a chime says so when the line was open.

@@ -781,6 +781,40 @@ struct BridgeTests {
     #expect(!FileManager.default.fileExists(atPath: file.path))
   }
 
+  /// New conversation erases what the voice remembers: a line open with that conversation
+  /// closes, and the next speech opens it fresh.
+  @Test func newConversationClosesTheOpenLine() async throws {
+    await live()
+    voice.emit(.userUtterance("Remember the colour teal."))
+    #expect(await eventually { await lines().count == 1 })
+    await bridge.newConversation()
+    #expect(await bridge.status.call == .listening)
+    #expect(await voice.closes == 1)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.last == [])
+  }
+
+  /// After `/clear` the line still waits for the request it handed off, now under the new id:
+  /// its answer is said, and a question's reply goes to the new id.
+  @Test func clearedSessionKeepsWhatTheLineWaitsFor() async throws {
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
+    try await post(
+      "/v1/answer",
+      AnswerBody(
+        sessionId: cleared, id: request(1).id, status: .question, text: "Which branch?",
+        reason: nil))
+    #expect(await eventually { await voice.spoken == ["[QUESTION] Alpha: Which branch?"] })
+    try await join(b, "Beta")
+    try await post("/v1/target", TargetBody(sessionId: b))
+    await bridge.audioEvent(.speechStarted)
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(cleared) == .request(request(2)) })
+  }
+
   @Test func stopThenStartResumesConversation() async throws {
     await live()
     voice.emit(.userUtterance("Remember the colour teal."))

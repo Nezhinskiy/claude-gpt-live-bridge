@@ -36,6 +36,8 @@ public actor Bridge: Router {
   private var callStart: Date?
   /// What was last published, so an unchanged status and conversation are not published again.
   private var published: BridgeUpdate?
+  /// Counts `changed()` calls; only the latest one publishes.
+  private var changes = 0
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
   /// The sessions whose summary just arrived (`POST /v1/context`), so the menu's Load
@@ -168,6 +170,7 @@ public actor Bridge: Router {
   /// Forgets the target's conversation; its next realtime session starts fresh.
   public func newConversation() async {
     guard let target = await registry.target else { return }
+    if isLineOpen, lineKnowsSession, lineSession == target { await send(.conversationChanged) }
     await forgetConversation(of: target)
   }
 
@@ -200,9 +203,11 @@ public actor Bridge: Router {
         let body = try req.decodeBody(JoinBody.self)
         let replaced = await registry.rows().contains { $0.sessionId == body.replaces }
         try await registry.join(body)
-        if let old = body.replaces, replaced {
-          continuity.move(old, to: body.sessionId)  // after /clear: the same session, a new id
+        if let old = body.replaces, replaced {  // after /clear: the same session, a new id
+          continuity.move(old, to: body.sessionId)
+          machine.rename(old, to: body.sessionId)
           if lineSession == old { lineSession = body.sessionId }
+          if questionRoute == old { questionRoute = body.sessionId }
           save()
         }
         if problem == .noSession { problem = nil }
@@ -392,11 +397,12 @@ public actor Bridge: Router {
   /// opens it with the target's. With no session left there is no conversation to switch to,
   /// so the line stays open.
   private func followTarget() async {
-    guard machine.phase == .connecting || machine.phase == .live, lineKnowsSession,
-      let target = await registry.target, target != lineSession
+    guard isLineOpen, lineKnowsSession, let target = await registry.target, target != lineSession
     else { return }
-    await send(.targetChanged)
+    await send(.conversationChanged)
   }
+
+  private var isLineOpen: Bool { machine.phase == .connecting || machine.phase == .live }
 
   // MARK: Routing
 
@@ -468,9 +474,14 @@ public actor Bridge: Router {
   }
 
   /// Publishes the status if it changed; every change of the target passes through here.
+  /// Two changes can interleave across the awaits, so only the latest one publishes: an older
+  /// one finishing last would show the status from before the newer change.
   @discardableResult private func changed() async -> StatusReply {
     await followTarget()
+    changes += 1
+    let mine = changes
     let update = await current
+    guard mine == changes else { return update.status }
     if update != published { publish.yield(update) }
     published = update
     return update.status

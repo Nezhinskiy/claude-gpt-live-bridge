@@ -8,11 +8,17 @@ test('aPromiseThatNeverSettlesFailsAtTheDeadline', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const never = new Promise(() => {});
-    const result = within(never, 10000, late).then(() => 'resolved', (error) => error.message);
+    let settled = 'pending';
+    const result = within(never, 10000, late).then(
+      () => (settled = 'resolved'),
+      (error) => (settled = error.message),
+    );
     mock.timers.tick(9999);
-    await Promise.resolve();
+    await new Promise(setImmediate); // every reaction to a deadline that fired has run by now
+    assert.equal(settled, 'pending', 'still waiting 1 ms before the deadline');
     mock.timers.tick(1);
-    assert.equal(await result, 'late');
+    await result;
+    assert.equal(settled, 'late');
   } finally {
     mock.timers.reset();
   }

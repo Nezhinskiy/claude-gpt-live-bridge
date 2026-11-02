@@ -227,11 +227,12 @@ struct CallMachineTests {
       [.closeRealtime, .stopLocalVAD, .problem(r)]),
     row("deliverWhileOffIsIgnored", [], deliver(a), .off, []),
     row(
-      "targetChangeClosesTheOpenLine", live + [deliver(a)], .targetChanged, .listening,
+      "targetChangeClosesTheOpenLine", live + [deliver(a)], .conversationChanged, .listening,
       [.closeRealtime, .chime], pending: [a]),
     row(
-      "targetChangeWhileConnectingCloses", connecting, .targetChanged, .listening, [.closeRealtime]),
-    row("targetChangeWhileListeningChangesNothing", [.start], .targetChanged, .listening, []),
+      "targetChangeWhileConnectingCloses", connecting, .conversationChanged, .listening,
+      [.closeRealtime]),
+    row("targetChangeWhileListeningChangesNothing", [.start], .conversationChanged, .listening, []),
   ]
 
   @Test(arguments: table) func transition(_ row: Transition) {
@@ -240,6 +241,19 @@ struct CallMachineTests {
     #expect(machine.handle(row.event) == row.effects)
     #expect(machine.phase == row.phase)
     #expect(machine.pending == row.pending)
+  }
+
+  /// After `/clear` the line waits for the session under its new id, and its unheard results
+  /// are the new id's.
+  @Test func aRenamedSessionKeepsItsWaitAndItsResults() {
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    var machine = CallMachine()
+    for event in Self.waiting + [Self.deliver(Self.update)] { _ = machine.handle(event) }
+    machine.rename(Self.alpha, to: cleared)
+    #expect(machine.awaited == [cleared] && machine.pending.map(\.session) == [cleared])
+    var answer = Self.result
+    answer.session = cleared
+    #expect(machine.handle(.deliver(answer)) == [.speak(answer), Self.arm])
   }
 
   /// A result held while the owner spoke is withdrawn with the rest: nothing is left to say.
