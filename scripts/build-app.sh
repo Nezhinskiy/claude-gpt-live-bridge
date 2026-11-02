@@ -35,6 +35,27 @@ assemble() {
   cp app/Support/Info.plist "$2/Contents/Info.plist"
   cp -R "$bin/LiveBridge_LiveBridge.bundle" "$2/Contents/Resources/"
   cp app/Support/AppIcon.icns "$2/Contents/Resources/"
+  compile_icon "$2"
+}
+
+# Compiles the layered Liquid Glass icon, app/Support/AppIcon.icon, into Assets.car in bundle $1
+# and names it in CFBundleIconName, which macOS 26 and later draw in every appearance;
+# AppIcon.icns (CFBundleIconFile) stays as the fallback. An actool that cannot compile it (before
+# Xcode 26, or the Command Line Tools alone) leaves the .icns as the only icon. The path is
+# absolute because actool resolves a relative one against its server's directory.
+compile_icon() {
+  car=$(mktemp -d)
+  if xcrun actool "$PWD/app/Support/AppIcon.icon" --compile "$car" --app-icon AppIcon \
+    --platform macosx --minimum-deployment-target 14.0 --target-device mac \
+    --standalone-icon-behavior none --output-partial-info-plist "$car/partial.plist" \
+    >"$car/actool.log" 2>&1 && [ -f "$car/Assets.car" ]; then
+    cp "$car/Assets.car" "$1/Contents/Resources/"
+    plutil -replace CFBundleIconName -string AppIcon "$1/Contents/Info.plist"
+  else
+    echo "note: this actool cannot compile app/Support/AppIcon.icon (it needs Xcode 26 or" \
+      "later), so the app shows AppIcon.icns on every macOS"
+  fi
+  rm -rf "$car"
 }
 
 # Signs bundle $1 with identity $2 (`-` is ad hoc), hardened runtime and the entitlements.
