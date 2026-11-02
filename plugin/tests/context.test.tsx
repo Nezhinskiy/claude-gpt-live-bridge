@@ -67,7 +67,13 @@ test('startAgainWithNoNewTurnAsksTheModelForNothing', async ($, on) => {
   expect(world.take('context')).toEqual([SUMMARY])
   // Stop, then Start again: the summary the model wrote still holds, so it is sent as it was (the
   // app may have erased it with New conversation) and the model is not asked again.
+  world.status = { ...world.status, call: 'live' }
+  await world.clock.advance(1000)
   await band.press({ key: 'call' })
+  world.status = { ...world.status, call: 'off' }
+  await world.clock.advance(1000)
+  await band.press({ key: 'call' })
+  expect(world.take('call')).toEqual([{ action: 'start' }, { action: 'stop' }, { action: 'start' }])
   expect(world.take('context')).toEqual([SUMMARY])
   expect(world.forks).toBe(1)
   // A turn completes: the next Start asks for a new summary.
