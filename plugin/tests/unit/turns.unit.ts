@@ -11,11 +11,8 @@ const framed = (id: string) =>
 function voiceTurn(answer: string, outcome: 'answer' | 'aborted' | 'error' = 'answer') {
   const tracker = new TurnTracker()
   tracker.submitted(ID)
-  assert.equal(tracker.current, ID)
   tracker.turnStarted('t1', framed(ID), 'background', 0)
-  assert.equal(tracker.current, ID)
   const post = tracker.turnCompleted('t1', answer, outcome)
-  assert.equal(tracker.current, null)
   return { tracker, post }
 }
 
@@ -88,9 +85,21 @@ test('aRefusedSubmissionIsNoLongerPending', () => {
   const tracker = new TurnTracker()
   tracker.submitted(ID)
   tracker.refused('11111111-0000-0000-0000-00000000000b')
-  assert.equal(tracker.current, ID, 'another id leaves it')
+  assert.equal(tracker.snapshot().pending, ID, 'another id leaves it')
   tracker.refused(ID)
-  assert.equal(tracker.current, null)
+  assert.equal(tracker.snapshot().pending, null)
+})
+
+test('onlyARunningVoiceTurnIsRunning', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'Rename the folder', 'typed', 0)
+  tracker.submitted(ID)
+  assert.equal(tracker.running, null, 'a request waiting behind a typed turn')
+  tracker.turnCompleted('t1', 'Renamed.', 'answer')
+  tracker.turnStarted('t2', framed(ID), 'background', 1000)
+  assert.equal(tracker.running, ID)
+  tracker.turnCompleted('t2', 'Done.', 'answer')
+  assert.equal(tracker.running, null)
 })
 
 test('clipCutsWholeCharactersOnly', () => {

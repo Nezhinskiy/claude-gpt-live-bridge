@@ -450,7 +450,7 @@ export const register: Register = on => {
   // free text, so the owner may ask back instead of choosing; returning before the dialog's
   // own answer closes it.
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
-    if (e.agentId !== undefined || tracker.current === null || !link?.session) return next(e)
+    if (e.agentId !== undefined || tracker.running === null || !link?.session) return next(e)
     const answered = next(e)
     const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
     try {
@@ -466,7 +466,7 @@ export const register: Register = on => {
   // ADR 0001 (i): a permission request that reaches the person during a voice turn. Claude's
   // question has its own report above.
   on('classic.PermissionRequest', async ($, e, next) => {
-    if (tracker.current !== null && e.tool_name !== 'AskUserQuestion') {
+    if (tracker.running !== null && e.tool_name !== 'AskUserQuestion') {
       approval = { tool: e.tool_name, agent: e.agent_id }
       await link?.activity('approval')
     }

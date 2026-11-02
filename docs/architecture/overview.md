@@ -73,7 +73,8 @@ desktop's own, read from Claude Code's session registry, or the folder's name wh
 and joins again when that title changes, polls it once a second, submits each voice request to
 the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
-origin. It draws a band above the prompt with the call's phase, the target, the unheard count
+origin. A voice turn is one that has started: while a voice request waits for the running turn
+to end, that turn's questions and permission prompts stay out of the voice. It draws a band above the prompt with the call's phase, the target, the unheard count
 and the buttons Start/Stop and Talk here, with the problem sentence on a row of its own. Start
 makes the session the target, starts the call and sends the session's summary (none for a
 session with no prompt yet; the last one again, with no model call, while no turn has completed

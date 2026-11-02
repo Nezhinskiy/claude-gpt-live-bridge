@@ -84,6 +84,20 @@ test('approvalIsReported', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
 
+/** A voice request waiting for the next turn does not make the typed turn's approval the voice's. */
+test('aTypedTurnsApprovalIsNotReportedWhileAVoiceRequestWaits', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  expect(world.submitted).toHaveLength(1)
+  world.take('activity')
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([])
+})
+
 const ASKED = [{
   question: 'Which name should the folder get?', header: 'Name', multiSelect: false,
   options: [{ label: 'build', description: 'the default' }, { label: 'out', description: 'shorter' }],
@@ -138,6 +152,23 @@ test('aTypedTurnsQuestionStaysInClaudeCode', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...LIVE, args: 'on' })
   await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('activity')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([])
+  world.answerDialog('build')
+  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' } })
+})
+
+/** A voice request waiting for the next turn does not make the typed turn's question the voice's. */
+test('aTypedTurnsQuestionStaysInClaudeCodeWhileAVoiceRequestWaits', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  expect(world.submitted).toHaveLength(1)
   world.take('activity')
   const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
   await world.clock.advance(1000)
