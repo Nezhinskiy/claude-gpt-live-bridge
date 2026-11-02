@@ -185,19 +185,6 @@ test('theJoinNamesNoTitleTheAppWillReplace', async ($, on) => {
   expect(world.take('join').at(-1)).toEqual({ sessionId: ID, title: 'Live on' })
 })
 
-test('automaticContextIsTheAppsSetting', async ($, on) => {
-  // The app decides it for every session (LiveBridge Settings); the join carries no flag.
-  const world = fakeWorld(on)
-  await $.session.start(START)
-  await $.command.run({ ...LIVE, args: 'on' })
-  for (const option of ['auto', 'manual']) {
-    expect((await $.command.run({ ...LIVE, args: `context ${option}` })).text).toContain('LiveBridge Settings')
-  }
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
-  expect(world.take('context')).toEqual([])
-  expect(world.forks).toBe(0)
-})
-
 test('offWhileAPollIsAtWorkNeverSubmitsAfterTheLeave', async ($, on) => {
   // Off lands while the poll that took a request is still writing: the leave fails the request
   // in the app, so a prompt for it may only come before that, never after.

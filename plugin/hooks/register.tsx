@@ -31,8 +31,6 @@ const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will n
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
 const USAGE = 'Usage: /live on | off | target | status | context'
-/** What `/live context auto` and `manual`, the options before the app's own setting, answer now. */
-const CONTEXT_SETTING = 'Loading context automatically is now one setting for every session: LiveBridge Settings, from the menu bar popover.'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
 const joinedKey = (sessionId: string) => `joined:${sessionId}`
@@ -321,7 +319,6 @@ async function live($: EngineInterface, args: string): Promise<string> {
         : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
     })
   }
-  if (verb === 'context' && (option === 'auto' || option === 'manual')) return CONTEXT_SETTING
   if (!['off', 'target', 'context'].includes(verb) || option !== undefined) return USAGE
   if (!joined) return 'This session has not joined LiveBridge.'
   if (verb === 'off') {
