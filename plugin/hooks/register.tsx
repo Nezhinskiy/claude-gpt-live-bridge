@@ -404,11 +404,12 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // The hooks at sites that can refuse only observe: one that fails lets the event go on.
   on('prompt.submit', ($, e, next) => {
     // A delivery into a running turn starts no turn of its own.
     if (e.turnId === undefined) lastOrigin = originOf(e.origin, PLUGIN_NAME)
     return next(e)
-  })
+  }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
@@ -446,10 +447,13 @@ export const register: Register = on => {
       await link?.activity('approval')
     }
     return next(e)
-  })
+  }).catch(($, e, next) => next(e))
   on('classic.PostToolUse', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+    .catch(($, e, next) => next(e))
   on('classic.PostToolUseFailure', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+    .catch(($, e, next) => next(e))
   on('classic.PermissionDenied', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+    .catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {
     // After /clear the session goes on under a new id: the next poll leaves the old one and joins.
