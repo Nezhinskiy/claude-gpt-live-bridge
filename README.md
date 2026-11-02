@@ -115,6 +115,9 @@ steps, and a button that copies the command to run in Terminal.
   **Codex default**. A new voice is heard from the next time the voice line opens. If codex
   cannot list its voices, the window says why and the line keeps the voice already chosen; a
   voice codex no longer offers goes back to the default.
+- **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
+  Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
+  which win where the two disagree, and apply from the next time the line opens.
 - **Load a session's context automatically when it becomes the target** (off by default): one
   setting for every session, kept by the app.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits

@@ -1,5 +1,20 @@
+import Foundation
+
 /// The instructions of the realtime voice model. Each paragraph is one rule.
 public enum VoicePrompt {
+  /// The most characters of the owner's own prompt that are sent.
+  public static let ownerLimit = 2_000
+
+  /// The instructions with the owner's prompt from Settings, trimmed and capped, as the last
+  /// paragraph; an empty prompt adds nothing. The rules above it still come first.
+  public static func composed(owner: String) -> String {
+    let trimmed = owner.trimmingCharacters(in: .whitespacesAndNewlines)
+    let capped = String(trimmed.prefix(ownerLimit)).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !capped.isEmpty else { return text }
+    return text + "\n\nThe owner's own preferences follow. Follow them unless they conflict with "
+      + "the rules above.\n" + capped
+  }
+
   public static let text = """
     You are the voice front desk for the owner's Claude Code session. Claude, the model in \
     that session, does the work; you talk with the owner and pass work to Claude by handing \

@@ -120,6 +120,21 @@ struct RealtimeSessionTests {
     #expect(await rpc.params("thread/realtime/start").map { $0["voice"] } == ["cedar", "viola"])
   }
 
+  /// The owner's prompt from Settings is read at each open and goes last in the instructions;
+  /// an empty one sends the built-in instructions alone.
+  @Test func openUsesTheOwnersPrompt() async throws {
+    let chosen = Chosen()
+    let session = RealtimeSession(client: rpc, cwd: cwd, prompt: { chosen.prompt })
+    chosen.prompt = "Speak with me in Spanish."
+    _ = try await session.open(offerSDP: "offer", items: [])
+    await session.close()
+    chosen.prompt = ""
+    _ = try await session.open(offerSDP: "offer", items: [])
+    #expect(
+      await rpc.params("thread/realtime/start").map { $0["prompt"]?.string }
+        == [VoicePrompt.composed(owner: "Speak with me in Spanish."), VoicePrompt.text])
+  }
+
   @Test func openRefusesWhenAServerIsEnabled() async throws {
     let enabled = try #require(adrJSON("mcp-server-status-list-one-connected")["result"])
     await rpc.set("mcpServerStatus/list", [enabled])
@@ -268,4 +283,5 @@ struct RealtimeSessionTests {
 
 final class Chosen: @unchecked Sendable {
   var voice: String?
+  var prompt = ""
 }

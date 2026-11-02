@@ -2,7 +2,8 @@ import AppKit
 import BridgeCore
 import SwiftUI
 
-/// LiveBridge's Settings window: the voice, automatic context and Open at login.
+/// LiveBridge's Settings window: the voice and its prompt, notifications, automatic
+/// context and Open at login.
 struct SettingsView: View {
   @Bindable var model: AppModel
 
@@ -20,6 +21,19 @@ struct SettingsView: View {
         }
         Text("A new voice is heard from the next time the voice line opens.")
           .font(.caption).foregroundStyle(.secondary)
+      }
+      Section("Prompt") {
+        TextField(
+          "Prompt", text: $model.prompt, prompt: Text("Speak with me in Spanish"), axis: .vertical
+        )
+        .lineLimit(3...8)
+        .labelsHidden()
+        Text(
+          "Optional, up to \(VoicePrompt.ownerLimit.formatted()) characters. The voice follows it "
+            + "after LiveBridge's own rules, which win where they disagree. It applies from the "
+            + "next time the voice line opens."
+        )
+        .font(.caption).foregroundStyle(.secondary)
       }
       Section("Notifications") {
         Toggle("Notify when a result is waiting", isOn: $model.notifyResults)

@@ -77,6 +77,16 @@ final class AppModel {
   var voice: String? {
     didSet { settings?.update { [voice] in $0.voice = voice } }
   }
+  /// The owner's own prompt for the voice, at most `VoicePrompt.ownerLimit` characters; empty
+  /// adds nothing. It applies from the next opening.
+  var prompt = "" {
+    didSet {
+      if prompt.count > VoicePrompt.ownerLimit {
+        prompt = String(prompt.prefix(VoicePrompt.ownerLimit))
+      }
+      settings?.update { [prompt] in $0.prompt = prompt }
+    }
+  }
   /// Load a session's context automatically when it becomes the target.
   var autoContext = false {
     didSet {
@@ -123,13 +133,14 @@ final class AppModel {
       self.settings = settings
       codexCwd = cwd
       voice = settings.current.voice
+      prompt = settings.current.prompt
       autoContext = settings.current.autoContext
       notifyResults = settings.current.notifyResults
       let time = SystemTime()
       let registry = SessionRegistry(time: time, autoContext: settings.current.autoContext)
       let bridge = Bridge(
         registry: registry,
-        realtime: { try await Self.voice(cwd: cwd, voice: { settings.current.voice }) },
+        realtime: { try await Self.voice(cwd: cwd, settings: settings) },
         audio: audio, meter: UsageMeterStore(file: data.appending(path: "usage.json"), time: time),
         continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
@@ -256,11 +267,14 @@ final class AppModel {
     }
   }
 
-  /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed` off.
-  nonisolated private static func voice(cwd: URL, voice: @escaping @Sendable () -> String?)
+  /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed`
+  /// off. The voice and prompt chosen in Settings are read at each opening.
+  nonisolated private static func voice(cwd: URL, settings: SettingsStore)
     async throws -> any RealtimeControlling
   {
-    RealtimeSession(client: try await launchCodex(cwd: cwd), cwd: cwd, voice: voice)
+    RealtimeSession(
+      client: try await launchCodex(cwd: cwd), cwd: cwd, voice: { settings.current.voice },
+      prompt: { settings.current.prompt })
   }
 
   /// The voices, from a codex app-server started for the question and ended after it.

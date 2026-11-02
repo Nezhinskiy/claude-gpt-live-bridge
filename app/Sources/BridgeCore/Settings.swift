@@ -9,11 +9,18 @@ public struct Settings: Codable, Sendable, Equatable {
   public var autoContext: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
+  /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
+  /// empty adds nothing.
+  public var prompt: String
 
-  public init(voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true) {
+  public init(
+    voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true,
+    prompt: String = ""
+  ) {
     self.voice = voice
     self.autoContext = autoContext
     self.notifyResults = notifyResults
+    self.prompt = prompt
   }
 
   /// A field the file lacks keeps its default, so an older file still reads.
@@ -22,11 +29,12 @@ public struct Settings: Codable, Sendable, Equatable {
     voice = try container.decodeIfPresent(String.self, forKey: .voice)
     autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? false
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
+    prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
   }
 }
 
-/// The settings, read once and written on each change. Safe from any thread: the voice is read
-/// each time the line opens.
+/// The settings, read once and written on each change. Safe from any thread: the voice and the
+/// prompt are read each time the line opens.
 public final class SettingsStore: Sendable {
   private let file: URL
   private let state: OSAllocatedUnfairLock<Settings>
