@@ -263,6 +263,30 @@ struct UpdateRig {
 
   func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
 
+  /// The first swap the updater asked for.
+  var swap: (staged: URL, installed: URL)? {
+    log.all.lazy.compactMap { event -> (URL, URL)? in
+      guard case .swap(let staged, let installed) = event else { return nil }
+      return (staged, installed)
+    }.first
+  }
+
+  /// Answers `codesign -dvvv` for the staged copy with `stagedHash(n)` on its `n`th call (from
+  /// 1), and with the image's CDHash for the app in the image.
+  func answerStagedCDHash(_ stagedHash: @escaping @Sendable (Int) -> String) {
+    let calls = OSAllocatedUnfairLock(initialState: 0)
+    env.answer("codesign -dvvv") { arguments in
+      guard arguments[1].contains(".LiveBridge-update-") else {
+        return ProgramResult(status: 0, output: "CDHash=0123456789\n")
+      }
+      let call = calls.withLock { count in
+        count += 1
+        return count
+      }
+      return ProgramResult(status: 0, output: "CDHash=\(stagedHash(call))\n")
+    }
+  }
+
   /// The record the install left.
   var record: UpdateRecord? { UpdateRecord.read(paths.updates.appending(path: "record.json")) }
 
@@ -551,6 +575,7 @@ struct UpdaterTests {
     rig.env.change { $0.programs["claude"] = nil }
     _ = try await rig.install()
     #expect(rig.record?.mod == .byHand(commands: UpdateRecord.byHandCommands))
+    #expect(rig.log.index { if case .swap = $0 { true } else { false } } != nil)
   }
 
   @Test func aFailingClaudeLeavesTheAppUpdated() async throws {
@@ -604,7 +629,132 @@ struct UpdaterTests {
     #expect(seen.all == [.waiting])
     let wait = try #require(rig.log.index { $0 == .sleep })
     #expect(try #require(rig.log.lastRun("claude", ["plugin", "update"])) < wait)
-    let swap = rig.log.index { if case .swap = $0 { true } else { false } }
-    #expect(wait < swap ?? .max)
+    #expect(try wait < #require(rig.log.index { if case .swap = $0 { true } else { false } }))
+  }
+
+  // MARK: Swap, record, relaunch and the launch cleanup
+
+  @Test func theSwapExchangesTheBundles() async throws {
+    let rig = try UpdateRig()
+    #expect(try await rig.install() == .installing)
+    let swap = try #require(rig.swap)
+    #expect(swap.staged.path == rig.paths.applications.path + "/" + swap.staged.lastPathComponent)
+    #expect(swap.staged.lastPathComponent.hasPrefix(".LiveBridge-update-"))
+    #expect(swap.installed == rig.paths.installed)
+    #expect(
+      rig.record
+        == UpdateRecord(
+          from: try #require(AppVersion("0.1.2")), to: try #require(AppVersion("0.1.3")),
+          mod: .updated, noticePosted: false))
+    let relaunch = try #require(
+      rig.log.index { $0 == .relaunch(pid: 4242, app: rig.paths.installed) })
+    #expect(try relaunch < #require(rig.log.index { $0 == .quit }))
+  }
+
+  @Test func theCallStopsOnlyAtTheSwap() async throws {
+    let rig = try UpdateRig()
+    _ = try await rig.install()
+    #expect(rig.log.all.filter { $0 == .stopCall }.count == 1)
+    let stop = try #require(rig.log.index { $0 == .stopCall })
+    #expect(try #require(rig.log.lastRun("claude")) < stop)
+    #expect(try stop < #require(rig.log.index { if case .swap = $0 { true } else { false } }))
+  }
+
+  @Test func aStagedCopyWithAnotherCDHashIsNotSwapped() async throws {
+    let rig = try UpdateRig()
+    rig.answerStagedCDHash { $0 == 1 ? "0123456789" : "feedface" }
+    #expect(try await rig.install() == .failed(.stagedChanged))
+    #expect(rig.swap == nil)
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test func aStagedSymlinkIsNotSwapped() async throws {
+    let rig = try UpdateRig()
+    let elsewhere = rig.root.appending(path: "elsewhere")
+    try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+    let applications = rig.paths.applications
+    rig.env.answer("claude plugin list") { _ in
+      let files = FileManager.default
+      for name in (try? files.contentsOfDirectory(atPath: applications.path)) ?? []
+      where name.hasPrefix(".LiveBridge-update-") {
+        let staged = applications.appending(path: name)
+        try? files.removeItem(at: staged)
+        try? files.createSymbolicLink(at: staged, withDestinationURL: elsewhere)
+      }
+      return ProgramResult(status: 0, output: "[]")
+    }
+    #expect(try await rig.install() == .failed(.stagedChanged))
+    #expect(rig.swap == nil)
+    #expect(rig.stagedCopies.isEmpty)
+    #expect(rig.exists(elsewhere))
+  }
+
+  @Test func aFailedSwapLeavesTheInstalledApp() async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.swapError = CocoaError(.fileWriteNoPermission) }
+    let status = try await rig.install()
+    guard case .failed(.swapFailed) = status else {
+      Issue.record("status \(status)")
+      return
+    }
+    #expect(!rig.log.all.contains(.quit))
+    #expect(!rig.log.all.contains { if case .relaunch = $0 { true } else { false } })
+    #expect(rig.installedMarker == "old")
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test func theRecordIsReadAfterARelaunch() async throws {
+    let rig = try UpdateRig()
+    _ = try await rig.install()
+    let written = try #require(rig.record)
+    #expect(Updater.cleanUp(paths: rig.paths) == written)
+  }
+
+  @Test func cleanupRemovesLeftovers() throws {
+    let rig = try UpdateRig()
+    let files = FileManager.default
+    let leftovers = [
+      rig.paths.applications.appending(
+        path: ".LiveBridge-update-00000000-0000-0000-0000-000000000001.app"),
+      rig.paths.applications.appending(
+        path: ".LiveBridge-update-00000000-0000-0000-0000-000000000002.app"),
+      rig.paths.updates.appending(path: "0.1.3"),
+    ]
+    for folder in leftovers {
+      try files.createDirectory(
+        at: folder.appending(path: "Contents"), withIntermediateDirectories: true)
+    }
+    let kept = ["record.json", "state.json"].map { rig.paths.updates.appending(path: $0) }
+    for file in kept { try Data("{}".utf8).write(to: file) }
+    try Data().write(to: rig.paths.updates.appending(path: "lock"))
+    _ = Updater.cleanUp(paths: rig.paths)
+    for folder in leftovers { #expect(!rig.exists(folder), "\(folder.lastPathComponent)") }
+    #expect(!rig.exists(rig.paths.updates.appending(path: "lock")))
+    for file in kept { #expect(rig.exists(file), "\(file.lastPathComponent)") }
+    #expect(rig.installedMarker == "old")
+  }
+
+  @Test func cleanupRefusesAnUpdatesSymlink() throws {
+    let rig = try UpdateRig()
+    let files = FileManager.default
+    let target = rig.root.appending(path: "elsewhere")
+    try files.createDirectory(
+      at: target.appending(path: "0.1.3"), withIntermediateDirectories: true)
+    try files.createSymbolicLink(at: rig.paths.updates, withDestinationURL: target)
+    _ = Updater.cleanUp(paths: rig.paths)
+    #expect(rig.exists(target.appending(path: "0.1.3")))
+  }
+
+  @Test func cleanupUnlinksASymlinkWithoutFollowingIt() throws {
+    let rig = try UpdateRig()
+    let files = FileManager.default
+    let target = rig.root.appending(path: "elsewhere")
+    try files.createDirectory(at: target, withIntermediateDirectories: true)
+    try Data("kept".utf8).write(to: target.appending(path: "file"))
+    let link = rig.paths.applications.appending(path: ".LiveBridge-update-planted.app")
+    try files.createSymbolicLink(at: link, withDestinationURL: target)
+    _ = Updater.cleanUp(paths: rig.paths)
+    #expect((try? files.destinationOfSymbolicLink(atPath: link.path)) == nil)
+    #expect(rig.exists(target.appending(path: "file")))
   }
 }

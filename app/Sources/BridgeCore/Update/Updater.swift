@@ -35,6 +35,8 @@ public actor Updater {
   static let ditto = URL(filePath: "/usr/bin/ditto")
   static let xattr = URL(filePath: "/usr/bin/xattr")
   static let quarantine = "com.apple.quarantine"
+  /// The start of a staged copy's name in `/Applications`.
+  static let stagedPrefix = ".LiveBridge-update-"
   /// The commands that update the mod, run in this order; `UpdateRecord.byHandCommands` are
   /// the same for the owner.
   static let modCommands = [
@@ -121,12 +123,38 @@ public actor Updater {
       set(.updatingMod)
       let mod = await updateMod(to: version)
       await waitForQuiet()
+      set(.installing)
+      await stopCall()
+      try await swapIn(checked)
+      staged = nil
       try? UpdateRecord(from: running, to: version, mod: mod, noticePosted: false)
         .write(paths.updates.appending(path: "record.json"))
     } catch {
       if let staged { try? FileManager.default.removeItem(at: staged) }
       set(.failed(error))
+      return
     }
+    try? environment.relaunch(pid: pid, app: paths.installed)
+    quit()
+  }
+
+  /// What the app does at launch: removes every staged copy in `/Applications` (the previous
+  /// bundle, or a copy a failed run left) and every image folder and lock in `updates`, and
+  /// returns the record an update left. An `updates` that is a symbolic link is left alone and
+  /// gives no record; a staged name that is a symbolic link is unlinked, never followed.
+  public static func cleanUp(paths: UpdatePaths) -> UpdateRecord? {
+    let files = FileManager.default
+    for name in (try? files.contentsOfDirectory(atPath: paths.applications.path)) ?? []
+    where name.hasPrefix(stagedPrefix) && name.hasSuffix(".app") {
+      try? files.removeItem(at: paths.applications.appending(path: name))
+    }
+    guard UpdateBundleCheck.isDirectory(paths.updates) else { return nil }
+    let record = UpdateRecord.read(paths.updates.appending(path: "record.json"))
+    for name in (try? files.contentsOfDirectory(atPath: paths.updates.path)) ?? []
+    where name == "lock" || AppVersion(name) != nil {
+      try? files.removeItem(at: paths.updates.appending(path: name))
+    }
+    return record
   }
 
   // MARK: The run
@@ -225,7 +253,7 @@ public actor Updater {
     guard let mountPoint = volume.mountPoint else { throw .noApp }
     let app = mountPoint.appending(path: "LiveBridge.app")
     let cdhash = try await checkBundle(app, version: version)
-    let copy = paths.applications.appending(path: ".LiveBridge-update-\(UUID().uuidString).app")
+    let copy = paths.applications.appending(path: "\(Self.stagedPrefix)\(UUID().uuidString).app")
     guard mkdir(copy.path, 0o755) == 0 else { throw .notWritable }
     let ditto = await environment.run(
       Self.ditto, [app.path, copy.path], cwd: nil, timeout: Self.checkTimeout)
@@ -267,6 +295,19 @@ public actor Updater {
     }
     _ = await environment.run(
       Self.xattr, ["-d", Self.quarantine, staged.copy.path], cwd: nil, timeout: Self.checkTimeout)
+  }
+
+  /// Puts the staged copy in place of the installed app in one exchange, once it is still a
+  /// directory (not a symbolic link) with the image's CDHash and a valid signature.
+  private func swapIn(_ staged: Staged) async throws(UpdateProblem) {
+    guard UpdateBundleCheck.isDirectory(staged.copy),
+      await cdhash(of: staged.copy) == staged.cdhash, await signatureIsValid(staged.copy)
+    else { throw .stagedChanged }
+    do {
+      try environment.swap(staged.copy, paths.installed)
+    } catch {
+      throw .swapFailed(error.localizedDescription)
+    }
   }
 
   /// `codesign --verify --deep --strict` passes for `app`.
