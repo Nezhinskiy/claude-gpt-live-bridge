@@ -101,8 +101,9 @@ as the marker moves; its × asks first, then removes it and erases its conversat
 `/live on` in that session joins it again). It has **Load context** (it waits, as **Loading
 context…**, until the target's summary arrives or a minute passes), **New conversation…** (it
 asks before it erases what the voice remembers of the target and its loaded context) and a
-**Conversation** submenu with the last lines of the conversation (each cut to four lines) and
-the context line exactly as it was sent; then the minutes the voice line was open this call and
+**Conversation** submenu with the whole conversation LiveBridge keeps for the target, every
+line in full, in a list that scrolls and opens at the newest line, and the context line exactly
+as it was sent; then the minutes the voice line was open this call and
 today, **Settings…** (⌘,) and **Quit LiveBridge** (⌘Q). Both erasing items ask first, with
 Cancel as the default. When Start fails because codex is not
 installed or not signed in, the problem has **How to install codex** or **How to sign in**: the

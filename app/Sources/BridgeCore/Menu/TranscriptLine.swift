@@ -1,10 +1,8 @@
 import Foundation
 
-/// One of the menu's last lines, `"<speaker>: <text>"` as the status carries it, with the
-/// text on one line and capped, so a long answer cannot take over the menu.
+/// One line of the target's conversation in the menu, `"<speaker>: <text>"` as the bridge lists
+/// it: who said it, and the whole of what they said, its line breaks kept for the view to wrap.
 public struct TranscriptLine: Sendable, Equatable {
-  public static let maxCharacters = 280
-
   public let speaker: String
   public let text: String
 
@@ -18,7 +16,6 @@ public struct TranscriptLine: Sendable, Equatable {
       speaker = ""
       body = Substring(raw)
     }
-    let flat = body.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    text = flat.count <= Self.maxCharacters ? flat : flat.prefix(Self.maxCharacters - 1) + "…"
+    text = body.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

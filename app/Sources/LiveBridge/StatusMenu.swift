@@ -5,14 +5,16 @@ import SwiftUI
 
 /// The menu bar item and its menu: an `NSStatusItem` whose button shows the animated glyph, and
 /// a real `NSMenu`, so its corners, material and shadow are the system's own. `MenuContent`
-/// says what it holds; this renders it: the call card, the session rows and the conversation's
-/// lines are hosted SwiftUI views (`MenuRows.swift`), the rest native items. The menu follows
+/// says what it holds; this renders it: the call card, the session rows and the conversation
+/// are hosted SwiftUI views (`MenuRows.swift`), the rest native items. The menu follows
 /// the model while it is open: items are updated in place, and rebuilt only when the content's
 /// shape changes; hosted views keep their state across updates.
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate {
   /// The menu's width; every custom row fills it.
   static let width: CGFloat = 320
+  /// The tallest the conversation's item grows; past it, it scrolls.
+  static let conversationHeight: CGFloat = 360
 
   private let model: AppModel
   private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -24,7 +26,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var submenus: [String: NSMenu] = [:]
   private var card: HostedItem<CallCardView>?
   private var rows: [SessionID: HostedItem<SessionRowView>] = [:]
-  private var lines: [Int: HostedItem<LineView>] = [:]
+  private var transcript: ScrollingItem<TranscriptView>?
   private var sent: HostedItem<SentView>?
   /// What a hosted session row's item is, for the menu's highlight.
   private var rowKeys: [ObjectIdentifier: String] = [:]
@@ -67,15 +69,22 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   // MARK: - Rendering
 
+  /// What the model says the menu holds now.
+  private var content: MenuContent {
+    MenuContent(
+      status: model.status, problem: model.problem, contextLoad: model.contextLoad,
+      conversation: model.conversation)
+  }
+
   /// Renders the model's current content, and again whenever it changes. Only the content is
   /// read under observation; the hosted views observe what they show themselves.
   private func observe() {
-    let content = withObservationTracking {
-      MenuContent(status: model.status, problem: model.problem, contextLoad: model.contextLoad)
+    let now = withObservationTracking {
+      content
     } onChange: { [weak self] in
       Task { @MainActor in self?.observe() }
     }
-    show(content)
+    show(now)
   }
 
   private func show(_ content: MenuContent) {
@@ -86,7 +95,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     natives = natives.filter { used.contains($0.key) }
     submenus = submenus.filter { used.contains($0.key) }
     rows = rows.filter { used.contains("row|\($0.key.rawValue)") }
-    lines = lines.filter { used.contains("line|\($0.key)") }
+    if !used.contains("transcript") { transcript = nil }
     if !used.contains("sent") { sent = nil }
     rowKeys = Dictionary(
       uniqueKeysWithValues: rows.map { (ObjectIdentifier($0.value.item), "row|\($0.key.rawValue)") }
@@ -98,7 +107,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   ) {
     var separators = 0
     var notes = 0
-    var lineCount = 0
     let built = entries.map { entry -> NSMenuItem in
       switch entry {
       case .call(let shown):
@@ -154,14 +162,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         rows[shown.id] = row
         return row.item
 
-      case .line(let line):
-        let index = lineCount
-        lineCount += 1
-        used.insert("line|\(index)")
-        let row = lines[index] ?? HostedItem(LineView(line: line), enabled: false)
-        row.show(LineView(line: line))
-        lines[index] = row
-        return row.item
+      case .transcript(let lines):
+        used.insert("transcript")
+        let view = TranscriptView(lines: lines)
+        let shown =
+          transcript ?? ScrollingItem(view, width: Self.width, maxHeight: Self.conversationHeight)
+        if transcript != nil { shown.show(view) }
+        transcript = shown
+        return shown.item
 
       case .sent(let text):
         used.insert("sent")
@@ -265,7 +273,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   func menuNeedsUpdate(_ menu: NSMenu) {
     guard menu === self.menu else { return }
-    show(MenuContent(status: model.status, problem: model.problem, contextLoad: model.contextLoad))
+    show(content)
   }
 
   /// A custom row draws the highlight the menu gives it, by mouse or by keyboard.

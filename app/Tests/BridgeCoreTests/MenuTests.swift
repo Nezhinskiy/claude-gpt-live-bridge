@@ -76,14 +76,10 @@ struct TranscriptLineTests {
     #expect(TranscriptLine("no speaker here").text == "no speaker here")
   }
 
-  @Test func aLongLineIsFlattenedAndCapped() {
-    let paragraph = String(repeating: "word ", count: 200)
-    let line = TranscriptLine("Claude: [QUESTION] Alpha: \(paragraph)\n\n\(paragraph)")
-    #expect(!line.text.contains("\n"))
-    #expect(!line.text.contains("  "))
-    #expect(line.text.count == TranscriptLine.maxCharacters)
-    #expect(line.text.hasSuffix("…"))
-    #expect(line.text.hasPrefix("[QUESTION] Alpha: word word"))
+  @Test func aLongLineIsKeptWhole() {
+    let paragraph = Array(repeating: "word", count: 200).joined(separator: " ")
+    let line = TranscriptLine("Claude: [QUESTION] Alpha: \(paragraph)\n\n\(paragraph)\n")
+    #expect(line.text == "[QUESTION] Alpha: \(paragraph)\n\n\(paragraph)")
   }
 
   @Test func aShortLineIsKeptAsItIs() {
@@ -130,10 +126,14 @@ struct MenuContentTests {
       recentTranscript: lines, unheard: unheard)
   }
 
+  /// The conversation is the status's last lines unless the test gives the whole of it.
   static func menu(
-    _ status: StatusReply?, problem: String? = nil, load: ContextLoadState = .ready
+    _ status: StatusReply?, problem: String? = nil, load: ContextLoadState = .ready,
+    conversation: [String]? = nil
   ) -> MenuContent {
-    MenuContent(status: status, problem: problem ?? status?.problem, contextLoad: load)
+    MenuContent(
+      status: status, problem: problem ?? status?.problem, contextLoad: load,
+      conversation: conversation ?? status?.recentTranscript ?? [])
   }
 
   @Test func withNoSessionsItOffersTheJoinCommand() {
@@ -171,9 +171,10 @@ struct MenuContentTests {
         "Load context",
         "New conversation…",
         "Conversation ▸",
-        "  # Last lines with Session 2",
-        "  [line] Voice: Hello.",
-        "  [line] You: Hi.",
+        "  # Session 2",
+        "  [transcript]",
+        "  | Voice: Hello.",
+        "  | You: Hi.",
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
@@ -208,6 +209,25 @@ struct MenuContentTests {
 
   static func card(_ menu: MenuContent) -> MenuContent.CallCard? {
     if case .call(let card)? = menu.items.first { card } else { nil }
+  }
+
+  /// Every line the app keeps, whole, in one item that scrolls, not the status's last three.
+  @Test func theConversationSubmenuHoldsTheWholeConversation() throws {
+    let long = String(repeating: "word ", count: 120) + "end."
+    let whole = (1...12).map { "You: Line \($0)." } + ["Claude: \(long)"]
+    let menu = Self.menu(
+      Self.status(sessions: 1, lines: Array(whole.suffix(3)), context: "[CONTEXT] Alpha: Tidy."),
+      conversation: whole)
+    let items = try #require(
+      menu.items.lazy.compactMap { item -> [MenuContent.Item]? in
+        if case .submenu("Conversation", true, let items) = item { items } else { nil }
+      }.first)
+    let lines = try #require(
+      items.lazy.compactMap { if case .transcript(let lines) = $0 { lines } else { nil } }.first)
+    #expect(lines == whole.map(TranscriptLine.init))
+    #expect(lines.last?.text == long)
+    #expect(items.filter { if case .transcript = $0 { true } else { false } }.count == 1)
+    #expect(items.suffix(2) == [.header("What was sent"), .sent("[CONTEXT] Alpha: Tidy.")])
   }
 
   @Test func theConversationSubmenuHoldsWhatWasSent() throws {

@@ -38,10 +38,10 @@ public actor Bridge: Router {
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
   private var callStart: Date?
-  /// The status last published, so an unchanged one is not published again.
-  private var published: StatusReply?
-  public nonisolated let updates: AsyncStream<StatusReply>
-  private let publish: AsyncStream<StatusReply>.Continuation
+  /// What was last published, so an unchanged status and conversation are not published again.
+  private var published: BridgeUpdate?
+  public nonisolated let updates: AsyncStream<BridgeUpdate>
+  private let publish: AsyncStream<BridgeUpdate>.Continuation
   /// The sessions whose summary just arrived (`POST /v1/context`), so the menu's Load
   /// context stops waiting for it.
   public nonisolated let contextArrivals: AsyncStream<SessionID>
@@ -94,6 +94,15 @@ public actor Bridge: Router {
         problem: problem, lastContext: shown.context,
         recentTranscript: shown.lines.suffix(3).map { Self.speaker($0.speaker) + $0.text },
         unheard: machine.pending.count)
+    }
+  }
+
+  /// The target's whole conversation as the menu lists it, oldest first: every line the app
+  /// keeps, each `"<Speaker>: <text>"` as the status's last lines are. Empty with no target.
+  public var conversation: [String] {
+    get async {
+      guard let target = await registry.target else { return [] }
+      return continuity[target].lines.map { Self.speaker($0.speaker) + $0.text }
     }
   }
 
@@ -443,8 +452,9 @@ public actor Bridge: Router {
   @discardableResult private func changed() async -> StatusReply {
     await followTarget()
     let now = await status
-    if now != published { publish.yield(now) }
-    published = now
+    let update = BridgeUpdate(status: now, conversation: await conversation)
+    if update != published { publish.yield(update) }
+    published = update
     return now
   }
 
@@ -454,7 +464,7 @@ public actor Bridge: Router {
 
   private static func sentence(_ error: any Error) -> String { error.localizedDescription }
 
-  /// How the menu's last lines name who said each.
+  /// How the menu's lines name who said each.
   private static func speaker(_ speaker: Conversation.Line.Speaker) -> String {
     switch speaker {
     case .owner: "You: "
@@ -462,4 +472,11 @@ public actor Bridge: Router {
     case .claude: "Claude: "
     }
   }
+}
+
+/// What the app shows of the bridge: the status, and the target's whole conversation, which
+/// the menu lists and the status, carried by every poll, does not.
+public struct BridgeUpdate: Sendable, Equatable {
+  public let status: StatusReply
+  public let conversation: [String]
 }

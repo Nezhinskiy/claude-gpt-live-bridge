@@ -190,7 +190,19 @@ struct SessionRowView: View {
   }
 }
 
-/// One of the target's last lines, wrapped: who said it, then what.
+/// The target's whole conversation, oldest first; its item scrolls (`ScrollingItem`).
+struct TranscriptView: View {
+  let lines: [TranscriptLine]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(lines.indices, id: \.self) { LineView(line: lines[$0]) }
+    }
+    .padding(.vertical, 2)
+  }
+}
+
+/// One line of the conversation, whole and wrapped: who said it, then what.
 struct LineView: View {
   let line: TranscriptLine
 
@@ -199,10 +211,8 @@ struct LineView: View {
       if !line.speaker.isEmpty {
         Text(line.speaker).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
       }
-      Text(line.text).lineLimit(4).truncationMode(.tail).fixedSize(
-        horizontal: false, vertical: true
-      )
-      .frame(maxWidth: .infinity, alignment: .leading)
+      Text(line.text).fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     .font(.system(size: 12))
     .padding(.horizontal, MenuStyle.inset)

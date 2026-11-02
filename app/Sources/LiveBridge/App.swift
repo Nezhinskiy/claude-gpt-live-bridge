@@ -54,6 +54,8 @@ enum VoiceListing: Equatable {
 @MainActor @Observable
 final class AppModel {
   private(set) var status: StatusReply?
+  /// The target's whole conversation, which the menu's Conversation submenu lists.
+  private(set) var conversation: [String] = []
   private(set) var presentation: StatusPresentation?
   /// Where the menu's Load context stands for the target.
   private(set) var contextLoad = ContextLoadState.ready
@@ -140,7 +142,7 @@ final class AppModel {
       audio.onLevel = { [weak self] in self?.showLevel($0) }
       Task { for await event in events { await bridge.audioEvent(event) } }
       Task { [weak self] in
-        for await status in bridge.updates { self?.show(status) }
+        for await update in bridge.updates { self?.show(update) }
       }
       Task { [weak self] in
         for await id in bridge.contextArrivals { self?.contextArrived(id) }
@@ -204,7 +206,9 @@ final class AppModel {
     if let presentation { glyph.show(presentation.bars, badge: presentation.badge, level: value) }
   }
 
-  private func show(_ next: StatusReply) {
+  private func show(_ update: BridgeUpdate) {
+    let next = update.status
+    if update.conversation != conversation { conversation = update.conversation }
     if next.call != status?.call || next.problem != status?.problem {
       Self.log.info(
         "call \(next.call.rawValue, privacy: .public), problem: \(next.problem != nil, privacy: .public)"

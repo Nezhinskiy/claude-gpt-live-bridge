@@ -468,6 +468,25 @@ struct BridgeTests {
       await voice.opens.last == [InitialItem(role: .user, text: "Remember the colour teal.")])
   }
 
+  /// The menu lists the target's whole conversation, as the app keeps it; the status, which
+  /// every poll carries, its last three lines.
+  @Test func theMenuGetsTheTargetsWholeConversation() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    let said = (1...5).map { "Remember line \($0)." }
+    for line in said { voice.emit(.userUtterance(line)) }
+    #expect(await eventually { await bridge.conversation.count == 5 })
+    #expect(await bridge.conversation == said.map { "You: \($0)" })
+    #expect(await bridge.status.recentTranscript == said.suffix(3).map { "You: \($0)" })
+    var updates = bridge.updates.makeAsyncIterator()
+    let update = await updates.next()
+    #expect(update?.conversation == said.map { "You: \($0)" })
+    #expect(update?.status == (await bridge.status))
+    await bridge.setTarget(b)
+    #expect(await bridge.conversation.isEmpty)
+  }
+
   /// A line is seeded with its own session's open tasks only, not another session's.
   @Test func lineIsSeededOnlyWithItsSessionsTasks() async throws {
     try await join(a, "Alpha")

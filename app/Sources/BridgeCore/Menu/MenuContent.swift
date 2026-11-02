@@ -1,5 +1,5 @@
 /// What the menu bar menu holds for one status, top to bottom, as a plain value: the call card,
-/// the sessions, the target's conversation, the minutes, Settings and Quit. The app renders it
+/// the sessions, the target's whole conversation, the minutes, Settings and Quit. The app renders it
 /// into an `NSMenu`, the custom rows as hosted SwiftUI views and the rest as native items, so
 /// the menu has the system's own corners, material and shadow. Pure.
 public struct MenuContent: Sendable, Equatable {
@@ -54,8 +54,9 @@ public struct MenuContent: Sendable, Equatable {
     case note(String)
     case command(Command, title: String, isEnabled: Bool)
     case submenu(String, isEnabled: Bool, items: [Item])
-    /// A custom view, wrapped.
-    case line(TranscriptLine)
+    /// A custom view: every line of the target's conversation, whole and wrapped, oldest
+    /// first; it scrolls inside the menu and opens at the newest.
+    case transcript([TranscriptLine])
     /// The target's context line as it was sent: a custom view, wrapped.
     case sent(String)
   }
@@ -63,7 +64,11 @@ public struct MenuContent: Sendable, Equatable {
   public let items: [Item]
 
   /// `problem` is the app's own or the status's; `status` is nil while there is no bridge.
-  public init(status: StatusReply?, problem: String?, contextLoad: ContextLoadState) {
+  /// `conversation` is the target's, as the bridge lists it (`Bridge.conversation`).
+  public init(
+    status: StatusReply?, problem: String?, contextLoad: ContextLoadState,
+    conversation: [String]
+  ) {
     let footer: [Item] = [
       .command(.settings, title: "Settings…", isEnabled: true),
       .command(.quit, title: "Quit LiveBridge", isEnabled: true),
@@ -102,21 +107,21 @@ public struct MenuContent: Sendable, Equatable {
     }
 
     let target = status.sessions.first(where: \.isTarget)?.label
-    var conversation: [Item] = []
-    if !status.recentTranscript.isEmpty {
-      conversation.append(.header(target.map { "Last lines with \($0)" } ?? "Last lines"))
-      conversation += status.recentTranscript.map { .line(TranscriptLine($0)) }
+    var talk: [Item] = []
+    if !conversation.isEmpty {
+      if let target { talk.append(.header(target)) }
+      talk.append(.transcript(conversation.map(TranscriptLine.init)))
     }
     if let sent = status.lastContext {
-      if !conversation.isEmpty { conversation.append(.separator) }
-      conversation += [.header("What was sent"), .sent(Self.capped(sent))]
+      if !talk.isEmpty { talk.append(.separator) }
+      talk += [.header("What was sent"), .sent(Self.capped(sent))]
     }
     let context: [Item] = [
       .command(
         .loadContext, title: contextLoad.title, isEnabled: target != nil && contextLoad.isEnabled
       ),
       .command(.newConversation, title: "New conversation…", isEnabled: target != nil),
-      .submenu("Conversation", isEnabled: !conversation.isEmpty, items: conversation),
+      .submenu("Conversation", isEnabled: !talk.isEmpty, items: talk),
     ]
 
     items =
@@ -129,7 +134,8 @@ public struct MenuContent: Sendable, Equatable {
   }
 
   /// The menu as plain lines, one per item; a submenu's items follow it, indented. For tests and
-  /// logs: "---" is a separator, "#" a section header, "▸" a submenu, "(•)" the target.
+  /// logs: "---" is a separator, "#" a section header, "▸" a submenu, "(•)" the target, "|"
+  /// a line of the conversation.
   public var outline: [String] { Self.outline(items, indent: "") }
 
   private static func outline(_ items: [Item], indent: String) -> [String] {
@@ -149,8 +155,9 @@ public struct MenuContent: Sendable, Equatable {
       case .submenu(let title, let isEnabled, let items):
         guard isEnabled else { return [indent + "\(title) (disabled)"] }
         return [indent + "\(title) ▸"] + outline(items, indent: indent + "  ")
-      case .line(let line):
-        return [indent + "[line] " + (line.speaker.isEmpty ? "" : "\(line.speaker): ") + line.text]
+      case .transcript(let lines):
+        return [indent + "[transcript]"]
+          + lines.map { indent + "| " + ($0.speaker.isEmpty ? "" : "\($0.speaker): ") + $0.text }
       case .sent(let text): return [indent + "[sent] \(text)"]
       }
     }
