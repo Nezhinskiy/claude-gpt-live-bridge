@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/icon.png" alt="LiveBridge app icon" width="144"></p>
+<p align="center"><img src="site/assets/icon.png" alt="LiveBridge app icon" width="144"></p>
 
 <h1 align="center">LiveBridge</h1>
 
@@ -30,8 +30,8 @@ voice tells you the result.
 
 *Русская версия: [README.ru.md](README.ru.md).*
 
-<!-- Demo: when docs/assets/demo.gif is committed, put it here:
-<p align="center"><img src="docs/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="720"></p>
+<!-- Demo: when site/assets/demo.gif is committed, put it here:
+<p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="720"></p>
 -->
 
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
