@@ -38,7 +38,7 @@
     <p class="tagline">Talk to an open Claude Code session by voice.</p>
     <p class="lede">A macOS menu bar app that keeps a GPT-Live voice line ready through codex on your ChatGPT login, with no API key. The voice chats, asks what you mean, and hands real work to your Claude Code session. Claude does the work with its own model, tools and permission mode, and the voice tells you the result.</p>
     <div class="actions">
-      <a class="button primary" href="/download/LiveBridge.dmg" download>
+      <a class="button primary" href="https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg">
         <svg class="button-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Download for macOS
       </a>
@@ -154,7 +154,12 @@
     <ol class="steps">
       <li class="step">
         <h3>Install the app</h3>
-        <p><a href="/download/LiveBridge.dmg" download>Download LiveBridge.dmg</a>, open it, and drag LiveBridge to Applications.</p>
+        <p><a href="https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg">Download LiveBridge.dmg</a> from the latest GitHub Release. GitHub Actions builds it from the release’s tagged commit and attests it; to check that your file is that build, run this with the <a href="https://cli.github.com">GitHub CLI</a> in the folder you saved it to:</p>
+        <div class="code">
+          <pre><code>gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge</code></pre>
+          <button class="copy" type="button" hidden>Copy</button>
+        </div>
+        <p>Then open it and drag LiveBridge to Applications.</p>
         <p>The app is not notarized, so macOS blocks it the first time you open it. To allow it:</p>
         <ol class="substeps">
           <li>Open LiveBridge once and close the warning.</li>
@@ -162,7 +167,7 @@
           <li>Confirm with <strong>Open</strong>, and enter your Mac password if asked.</li>
         </ol>
         <p class="aside">On macOS 14 you can also Control-click LiveBridge in Applications, choose <strong>Open</strong>, then <strong>Open</strong> again.</p>
-        <p class="aside">Prefer to build it yourself? With Xcode and a Swift 6.0 toolchain, clone the repository and run <code>scripts/build-app.sh --release</code>. It builds the app, installs it in <code>~/Applications</code> and opens it. See <a href="https://github.com/getLiveBridge/livebridge#install">Install</a> in the README.</p>
+        <p class="aside">Prefer to build it yourself? With Xcode and a Swift 6.0 toolchain, clone the repository and run <code>scripts/build-app.sh --release</code>. It builds the app, installs it in <code>/Applications</code> and opens it. See <a href="https://github.com/getLiveBridge/livebridge#install">Install</a> in the README, which also says how to uninstall.</p>
       </li>
       <li class="step">
         <h3>Install the mod</h3>
@@ -195,7 +200,7 @@ claude plugin install livebridge@livebridge</code></pre>
       </div>
       <div>
         <dt>Billing-aware</dt>
-        <dd>While nobody is talking, the microphone feeds only a voice detector on your Mac and nothing is sent. The line opens when you speak and closes after 20 seconds of silence. After a handoff it stays open up to 2 minutes for Claude’s answer.</dd>
+        <dd>While nobody is talking, the microphone feeds only a voice detector on your Mac and nothing is sent. The line opens when you speak, closes once the talk goes quiet, and after a handoff stays open a little longer for Claude’s answer. The README’s <a href="https://github.com/getLiveBridge/livebridge#billing-aware-by-design">Billing</a> section has the timings.</dd>
       </div>
       <div>
         <dt>Memory per session</dt>
