@@ -47,16 +47,17 @@ does and does not protect against.
 
 ## Quick start
 
-You need macOS 14+ on Apple Silicon, Claude Code 2.1.289+, Xcode with Swift 6.0+, and
+You need macOS 14+ on Apple Silicon, Claude Code 2.1.289+, and
 [codex](https://github.com/openai/codex) signed in (`codex login`) to a ChatGPT plan with
-realtime voice. The details are under [Requirements](#requirements).
+realtime voice; to build the app yourself, also Xcode with Swift 6.0+. The details are under
+[Requirements](#requirements).
 
 ```sh
 # 1. The mod, from this repository's marketplace
 claude plugin marketplace add getLiveBridge/livebridge
 claude plugin install livebridge@livebridge
 
-# 2. The app, built from source, installed in ~/Applications and opened
+# 2. The app, built from source, installed in /Applications and opened
 git clone https://github.com/getLiveBridge/livebridge.git
 cd livebridge
 scripts/build-app.sh --release
@@ -65,10 +66,10 @@ scripts/build-app.sh --release
 3. In the Claude Code session you want to talk to, type `/live on`.
 4. Press **Start** in the band above the prompt, allow the microphone, and talk.
 
-Rather not build it? [getlivebridge.com](https://getlivebridge.com) has the app as a disk image
-(`scripts/build-app.sh --package` makes it from a commit). It is signed ad hoc and not
-notarized, so on first launch macOS blocks it until you allow it under System Settings >
-Privacy & Security > **Open Anyway**. The mod is installed the same way either way.
+Rather not build it? Each [release](https://github.com/getLiveBridge/livebridge/releases/latest)
+has the app as a disk image, built and attested by GitHub Actions;
+[From the disk image](#from-the-disk-image) says how to check it and open it. The mod is
+installed the same way either way.
 
 If `/live` is not found in a session that was already open, reopen the session
 ([why](#known-limitations)). Upgrading, permissions, keeping the microphone permission across
@@ -88,16 +89,39 @@ upgrades and uninstalling are under [Install](#install).
 
 ## Install
 
-The [Quick start](#quick-start) commands install the mod from this repository's marketplace and
-build the app from source: `scripts/build-app.sh --release` installs it in `~/Applications` and
-opens it.
+The mod comes from this repository's marketplace (the [Quick start](#quick-start) commands).
+The app goes in `/Applications` either way: from the disk image, or built from source. Either
+way it is signed ad hoc and not notarized.
 
-### Upgrade and signing
+### From the disk image
 
-Run `scripts/build-app.sh --release` again to upgrade. The build is signed ad hoc, so macOS
-asks for the microphone again after each upgrade. To keep the permission, run
-`scripts/build-app.sh --make-signing-identity` once: it asks first, then creates a self-signed
-code-signing certificate in your login keychain, and later release builds are signed with it.
+1. Download
+   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   from the latest release.
+2. Check it with the [GitHub CLI](https://cli.github.com), in the folder you saved it to:
+
+   ```sh
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   ```
+
+   This passes only for an image this repository's
+   [release workflow](.github/workflows/release.yml) built from the release's tag. It is the
+   image's one proof of origin: the ad hoc signature names no one.
+3. Open it and drag LiveBridge to Applications.
+4. On first launch macOS blocks the app until you allow it under System Settings > Privacy &
+   Security > **Open Anyway**.
+
+To upgrade, replace the app with the one from a newer release. macOS asks for the microphone
+again after each upgrade.
+
+### From source
+
+`scripts/build-app.sh --release` builds the app, installs it in `/Applications` (your account
+must be able to write there, as an administrator's can) and opens it. Run it again to upgrade.
+The build is signed ad hoc, so macOS asks for the microphone again after each upgrade. To keep
+the permission, run `scripts/build-app.sh --make-signing-identity` once: it asks first, then
+creates a self-signed code-signing certificate in your login keychain, and later release builds
+are signed with it.
 
 ### Permissions
 
@@ -110,9 +134,22 @@ sentence that says where to allow it.
 
 ### Uninstall
 
-`scripts/build-app.sh --uninstall` removes the app, its login item and every file it keeps, and
-prints the two commands it leaves to you: `tccutil reset Microphone
-io.github.nezhinskiy.livebridge` and `claude plugin uninstall livebridge@livebridge`.
+From a clone, `scripts/build-app.sh --uninstall` removes `/Applications/LiveBridge.app`,
+however it was installed, its login item and every file it keeps, and prints the two commands
+it leaves to you: `tccutil reset Microphone com.getlivebridge.livebridge` and
+`claude plugin uninstall livebridge@livebridge`.
+
+Without a clone, turn off **Open at login** in LiveBridge's Settings, quit LiveBridge, and run
+the same steps in Terminal:
+
+```sh
+rm -rf /Applications/LiveBridge.app ~/Library/Application\ Support/LiveBridge \
+  ~/Library/{Caches,WebKit}/com.getlivebridge.livebridge \
+  ~/Library/HTTPStorages/com.getlivebridge.livebridge{,.binarycookies} \
+  ~/Library/Preferences/com.getlivebridge.livebridge.plist
+tccutil reset Microphone com.getlivebridge.livebridge
+claude plugin uninstall livebridge@livebridge
+```
 
 ## Use
 
@@ -137,42 +174,21 @@ for every session, in LiveBridge's [Settings](#settings) window.
 Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 - **The band's Start** makes its session the target, starts the call and sends the voice the
-  session's summary, with "Loading context…" and then "Context sent" in the band while it goes.
-  A new session with no prompt yet has nothing to summarise, and when no turn has completed
-  since the last summary, Start sends that one again instead of asking the model for another.
-  While the call talks to another session, the band shows **Talk here** beside Stop.
-- **The menu bar item** opens a native macOS menu, with the system's own corners, material and
-  shadow. Its first row is the call: Start stays disabled there until a session has joined, and
-  until then the menu has **Copy /live on**, to paste into a session.
-- **Sessions:** the menu lists the joined sessions, five of them with the rest under **More
-  sessions**. Click one to make it the target; the menu stays open as the marker moves. A
-  session's × asks first, then removes it and erases its conversation; `/live on` in that
-  session joins it again.
-- **Load context** waits, as **Loading context…**, until the target's summary arrives or a
-  minute passes.
-- **New conversation…** asks before it erases what the voice remembers of the target and its
-  loaded context. Both erasing items (this one and ×) ask first, with Cancel as the default.
-- **Conversation** is a submenu with the whole conversation LiveBridge keeps for the target,
-  every line in full, in a list that scrolls and opens at the newest line, and the context line
-  exactly as it was sent.
-- Then come the minutes the voice line was open this call and today, **Settings…** (⌘,) and
-  **Quit LiveBridge** (⌘Q).
-- When Start fails because codex is not installed or not signed in, the problem has **How to
-  install codex** or **How to sign in**: the steps, and a button that copies the command to run
-  in Terminal.
+  session's summary ([details](docs/architecture/overview.md#components)). While the call talks
+  to another session, the band shows **Talk here**.
+- **The menu bar menu** has the call, the joined sessions (click one to make it the target),
+  **Load context**, the target's **Conversation** as LiveBridge keeps it, the minutes,
+  **Settings…** and **Quit LiveBridge**.
+- **New conversation…** erases the target's conversation and its loaded context, and a
+  session's × removes it and erases its own; both ask first. The voice starts afresh from the
+  next time the line opens, and `/live on` in a removed session joins it again.
 
 ### Settings
 
 **Settings…** opens LiveBridge's Settings window:
 
-- **Voice**: the realtime voices your codex offers (codex lists them when the window opens), or
-  **Codex default**. A new voice is heard from the next time the voice line opens. If codex
-  cannot list its voices, the window says why and the line keeps the voice already chosen; a
-  voice codex no longer offers goes back to the default.
-- **Model**: **Codex default** (the realtime model codex is set to use) or **Named model**, a
-  realtime model name you type, so a newer model can be used without a LiveBridge update. Codex
-  does not list its realtime models, so the name is not checked in advance: if codex refuses
-  it, the line shows codex's error. Used from the next time the line opens.
+- **Voice**: one of the realtime voices your codex offers, which codex lists when the window
+  opens, or **Codex default**. It is heard from the next time the line opens.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
@@ -180,10 +196,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   setting for every session, kept by the app.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
-  speak to hear it", or "2 sessions have new results"), never the result itself. A newer one
-  replaces the last; clicking it opens the menu bar menu, which shows who answered. macOS asks
-  for permission the first time a notification is posted; if it is refused, Settings says so
-  and opens the Notifications settings.
+  speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
 - **Open at login** (off by default).
 
 ### What the voice does
@@ -212,17 +225,12 @@ talking, or while Claude's answer to a request you just made may still come:
 - The line closes after 20 seconds of silence. Sound without words (music, a TV) closes it after
   90 seconds.
 - When the voice hands a request to Claude (a handoff), the line stays open for up to 2 minutes
-  after that handoff, waiting for Claude's answer, and the voice says the answer as soon as it
-  arrives and nobody is talking; if you or the voice are talking, it waits until both of you
-  stop. Those up to 2 minutes are billed like any open line, once per handoff, and a later
-  handoff starts them again. They apply only to handoffs: a plain exchange with the voice that
-  sends nothing to Claude closes the line after the usual 20 seconds of silence and costs almost
-  nothing.
+  after that handoff, billed like any open line, and the voice says Claude's answer once nobody
+  is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
+  Claude closes after the usual 20 seconds of silence.
 - A result that arrives later, while the line is closed, plays a chime and waits: the band and
-  the menu show it as unheard, and the voice tells you when you next speak. A result counts as
-  heard only once a reply of the voice has said it
-  ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed)); if the line
-  closes first, it chimes and waits again.
+  the menu show it as unheard, and the voice tells you when you next speak
+  ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
   ago. A new target switches the conversation: an open line closes, and your next words open it
@@ -238,7 +246,8 @@ session:
 
 - microphone audio while the line is open, from 2 seconds before you started speaking until it
   closes;
-- the voice's instructions;
+- the voice's instructions: LiveBridge's own rules, then your Settings **Prompt** if you wrote
+  one;
 - the target session's recent conversation (up to the last 24 lines) to continue it in a new
   realtime session;
 - the target session's requests still open, as their one-line briefs;
@@ -246,8 +255,10 @@ session:
   with code blocks and tables removed. An update is Claude's answer in a later turn started by a
   background task's notification, for up to 10 minutes after a voice request and until any other
   turn starts in the session;
-- a session's context summary when you load it, as one line of at most 1,500 characters. The
-  menu's Conversation submenu shows that line exactly as it was sent;
+- the target session's context summary, as one line of at most 1,500 characters. It is saved
+  when it is loaded and sent every time the line opens while that session is the target, across
+  Stop and Start and app restarts. The menu's Conversation submenu shows that line exactly as it
+  is sent;
 - with every line above, its session's label: the Claude Code session title, or the session
   folder's name when it has none;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
@@ -259,10 +270,14 @@ list of patterns, not a guarantee.
 The codex thread that carries the voice is ephemeral and read-only, with every codex feature
 turned off except where it keeps your login and how it uses your proxy, and every MCP server
 off; it is there only to talk. Claude's work goes to Anthropic as your Claude Code session
-always does. On your Mac the app keeps its settings, the usage meter and, for each of the 20
-sessions used last, its recent conversation and the context line last loaded from it, until you
-press **New conversation** with it as the target or remove it, in
-`~/Library/Application Support/claude-gpt-live-bridge`.
+always does.
+
+On your Mac the app keeps its settings, the usage meter and, for each of the 20 sessions used
+last, its recent conversation and the context line last loaded from it, in
+`~/Library/Application Support/LiveBridge`. A session's lines go when you press **New
+conversation** with it as the target or remove it with ×. A session that has left keeps them
+until 20 sessions used since push them out; to erase them sooner, run `/live on` in it again and
+press **New conversation**. Uninstalling removes them all.
 
 [SECURITY.md](SECURITY.md) has the threat model: in short, anything your microphone can hear
 can become a request that Claude runs under the session's own permission mode.
@@ -285,9 +300,10 @@ can become a request that Claude runs under the session's own permission mode.
   running, the desktop takes its list from the session itself. The mod has no fix for this: a
   static command file would be listed as `/livebridge:live`, not `/live`, and with hooks off it
   would send its text to the model instead of running the mod.
-- Whether a reply has said a waiting result is judged by its words, against a list of common
-  words in English and Russian only. In another language a result can count as heard when the
-  voice only mentioned it.
+- Whether a reply has said a waiting result is judged by its words, with a list of common words
+  in English and Russian only
+  ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed)). In another
+  language a result can count as heard when the voice only mentioned it.
 
 ## How it works
 
@@ -303,29 +319,13 @@ contributors. Issues for them carry the
 [help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 label; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) points to the files to read first.
 
-**Windows and Linux.** Today LiveBridge runs only on macOS. Tied to macOS: the Swift/AppKit menu
-bar app (`app/Sources/LiveBridge`), the invisible WKWebView audio page that runs the microphone,
-voice detection and WebRTC, the macOS microphone permission, the login item, and the app's
-socket server, which uses Apple's Network framework. The mod also finds the socket under
-`~/Library/Application Support` and opens the app with macOS's `open`. Portable: the wire
-between the mod and the app (HTTP/1.1 with JSON bodies on a Unix socket, one fixture per message
-in `wire/fixtures/`), the mod itself (TypeScript), and in principle `BridgeCore`'s rules (the
-call machine, session registry and continuity: Swift on Foundation, built only for macOS so
-far). A port starts with an app for the new platform that speaks the same wire.
-
-**Other agents as the worker.** Today the worker is Claude Code, through the mod in `plugin/`: it
-joins a session to the app, polls it, submits each voice request to the session as a prompt and
-posts the turn's answer back, all through Claude Code's mod API. Another agent, such as Codex
-CLI, Hermes Agent or Gemini CLI, needs its own adapter that speaks the same wire. The voice's
-instructions name Claude Code, so they would have to name the worker instead.
-
-**Other voice providers.** Today the voice is codex on a ChatGPT login:
-`app/Sources/BridgeCore/Codex/`, where `RealtimeSession` drives `codex app-server`. Another
-provider, such as the OpenAI Realtime API with your own API key or Google's Gemini Live API,
-would be another implementation of the `RealtimeControlling` protocol. That protocol takes the
-audio page's WebRTC offer, so a provider without a WebRTC offer and answer also needs changes to
-the audio page. The Billing and Privacy sections above describe codex's session and would change
-with the provider.
+- **Windows and Linux.** The menu bar app, its audio page and the socket server are tied to
+  macOS; the wire between the mod and the app, and the mod itself, are portable. A port starts
+  with an app for the new platform that speaks the same wire.
+- **Other agents as the worker**, such as Codex CLI, Hermes Agent or Gemini CLI: each needs its
+  own adapter that speaks the same wire as the Claude Code mod.
+- **Other voice providers**, such as the OpenAI Realtime API with your own API key or Google's
+  Gemini Live API: each would be another implementation of the app's realtime protocol.
 
 ## Contributing
 
