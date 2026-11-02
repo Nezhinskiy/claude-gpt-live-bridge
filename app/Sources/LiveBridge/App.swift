@@ -117,6 +117,9 @@ final class AppModel {
   /// Nil for a copy that does not update: outside `/Applications`, or a version that is not
   /// `X.Y.Z`.
   @ObservationIgnored private(set) var updater: Updater?
+  /// When the last automatic check ran and which releases were announced.
+  @ObservationIgnored private var updateState: UpdateStateStore?
+  @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
   private static let log = Logger(subsystem: Paths.bundleID, category: "call")
 
   var problem: Problem? { appProblem ?? update?.problem }
@@ -173,7 +176,8 @@ final class AppModel {
   }
 
   /// For the installed copy: makes the updater, follows its status, cleans up after the last
-  /// update and posts its notice once. Other copies leave `updates/` to the installed one.
+  /// update and posts its notice once, then checks when due on launch, every
+  /// `UpdatePolicy.tick` and on wake. Other copies leave `updates/` to the installed one.
   private func startUpdates(dataDir: URL?) {
     guard isInstalledCopy, let running = AppVersion(versionText), let dataDir else { return }
     let paths = UpdatePaths(
@@ -190,12 +194,32 @@ final class AppModel {
     Task { [weak self] in
       for await status in updater.statuses { self?.showUpdate(status) }
     }
-    guard let record = Updater.cleanUp(paths: paths) else { return }
-    updateRecord = record
-    guard !record.noticePosted else { return }
+    if let record = Updater.cleanUp(paths: paths) {
+      updateRecord = record
+      if !record.noticePosted {
+        announceInstalled(record, file: paths.updates.appending(path: "record.json"))
+      }
+    }
+    updateState = UpdateStateStore(file: paths.updates.appending(path: "state.json"))
+    Task { [weak self] in
+      while !Task.isCancelled {
+        await self?.checkIfDue()
+        try? await Task.sleep(for: UpdatePolicy.tick)
+      }
+    }
+    wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in await self?.checkIfDue() }
+    }
+  }
+
+  /// Posts `LiveBridge updated to X.Y.Z` once: the record is marked first, so a crash cannot
+  /// post it twice.
+  private func announceInstalled(_ record: UpdateRecord, file: URL) {
     var posted = record
     posted.noticePosted = true
-    try? posted.write(paths.updates.appending(path: "record.json"))
+    try? posted.write(file)
     let body =
       switch record.mod {
       case .updated:
@@ -209,6 +233,25 @@ final class AppModel {
         identifier: "update-installed-\(record.to)", title: "LiveBridge updated to \(record.to)",
         body: body, installs: nil)
     }
+  }
+
+  /// The automatic check: a newer release not announced before is announced with a notice
+  /// whose Install installs it, and the menu offers it. The notice says when the image cannot
+  /// be verified on this Mac yet.
+  private func checkIfDue() async {
+    guard let updater, let updateState else { return }
+    let enabled = UpdatePolicy.checksAutomatically(
+      setting: settings.current.checkUpdatesAutomatically, isSourceBuild: isSourceBuild)
+    guard
+      let release = await updater.checkIfDue(now: Date(), enabled: enabled, state: updateState)
+    else { return }
+    available = release
+    let problem = await updater.verifierProblem()
+    let body = ["Install updates LiveBridge and its Claude Code mod.", problem?.sentence]
+      .compactMap { $0 }.joined(separator: " ")
+    await notifier.postUpdate(
+      identifier: "update-available-\(release.version)",
+      title: "LiveBridge \(release.version) is available", body: body, installs: release.version)
   }
 
   private func showUpdate(_ status: UpdateStatus) {

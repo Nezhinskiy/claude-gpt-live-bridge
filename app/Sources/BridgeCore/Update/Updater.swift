@@ -93,6 +93,24 @@ public actor Updater {
     return status
   }
 
+  /// The automatic check: when one is due (`UpdatePolicy.isCheckDue`), checks and stores its
+  /// time, whatever the outcome. Returns a newer release the owner has not been told about yet,
+  /// and records it as told; nil otherwise.
+  public func checkIfDue(now: Date, enabled: Bool, state: UpdateStateStore) async -> Release? {
+    guard UpdatePolicy.isCheckDue(now: now, lastCheck: state.current.lastCheck, enabled: enabled)
+    else { return nil }
+    let outcome = await check()
+    var isNew = false
+    state.update { state in
+      state.lastCheck = now
+      if case .available(let release) = outcome {
+        isNew = state.announced.insert(release.version).inserted
+      }
+    }
+    guard isNew, case .available(let release) = outcome else { return nil }
+    return release
+  }
+
   /// Why the image could not be verified on this Mac: `gh` missing or signed out; nil when it
   /// can be.
   public func verifierProblem() async -> UpdateProblem? {

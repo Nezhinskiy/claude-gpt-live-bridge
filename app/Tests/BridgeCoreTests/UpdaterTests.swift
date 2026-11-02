@@ -720,6 +720,38 @@ struct UpdaterTests {
     #expect(try await rig.install() == .failed(.swapFailed("Example reason")))
   }
 
+  // MARK: The schedule
+
+  static let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+  @Test func aDueCheckRecordsItsTime() async throws {
+    let rig = try UpdateRig()
+    let state = UpdateStateStore(file: rig.paths.updates.appending(path: "state.json"))
+    _ = try await rig.updater().checkIfDue(now: Self.t0, enabled: true, state: state)
+    #expect(state.current.lastCheck == Self.t0)
+  }
+
+  @Test func aReleaseIsAnnouncedOnce() async throws {
+    let rig = try UpdateRig()
+    let state = UpdateStateStore(file: rig.paths.updates.appending(path: "state.json"))
+    let updater = try rig.updater()
+    let first = await updater.checkIfDue(now: Self.t0, enabled: true, state: state)
+    let later = Self.t0 + UpdatePolicy.interval
+    let second = await updater.checkIfDue(now: later, enabled: true, state: state)
+    #expect(first == (try rig.release))
+    #expect(second == nil)
+  }
+
+  @Test func aCheckThatIsNotDueDoesNothing() async throws {
+    let rig = try UpdateRig()
+    let state = UpdateStateStore(file: rig.paths.updates.appending(path: "state.json"))
+    state.update { $0.lastCheck = Self.t0 }
+    let found = try await rig.updater().checkIfDue(
+      now: Self.t0 + 60, enabled: true, state: state)
+    #expect(found == nil)
+    #expect(!rig.log.all.contains(.fetch))
+  }
+
   @Test func theRecordIsReadAfterARelaunch() async throws {
     let rig = try UpdateRig()
     _ = try await rig.install()
