@@ -70,11 +70,7 @@ final class SystemUpdateEnvironment: UpdateEnvironment {
   func relaunch(pid: Int32, app: URL) throws {
     let process = Process()
     process.executableURL = URL(filePath: "/bin/sh")
-    process.arguments = [
-      "-c",
-      "while /bin/kill -0 \"$1\" 2>/dev/null; do /bin/sleep 0.2; done; exec /usr/bin/open \"$2\"",
-      "sh", String(pid), app.path,
-    ]
+    process.arguments = RelaunchScript.arguments(pid: pid, app: app.path)
     process.standardInput = FileHandle.nullDevice
     process.standardOutput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice

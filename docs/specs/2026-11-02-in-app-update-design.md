@@ -133,9 +133,11 @@ command.
    bundle is now at the staged path. The running process keeps its binary by inode, so any launch
    of the path from now on, the mod's included, starts the new version.
 9. **Record and relaunch.** Write `updates/record.json`: the old and new versions, the mod's
-   outcome and the commands to show. Start
-   `/bin/sh -c 'while /bin/kill -0 "$1" 2>/dev/null; do /bin/sleep 0.2; done; exec /usr/bin/open "$2"' sh <pid> /Applications/LiveBridge.app`,
-   the pid and path as arguments, then quit.
+   outcome and the commands to show. Start `RelaunchScript`'s `/bin/sh`, which waits for this
+   pid to exit with `/bin/kill -0`, then, until `/usr/bin/pgrep -x` finds a `LiveBridge` of this
+   user, runs `/usr/bin/open /Applications/LiveBridge.app` and waits a second, at most ten times
+   (one `open` right after the quit can target the quitting instance, fail and still exit 0),
+   every value a positional argument; then quit.
 
 A failure at any step before 8 leaves `/Applications/LiveBridge.app` as it was and removes the
 staged copy and the image.

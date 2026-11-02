@@ -369,8 +369,9 @@ Install runs only from the owner's click, one run at a time (the actor's flag, a
    not a symlink, the same CDHash, `codesign` passes) and swapped with the installed app by
    `renamex_np(…, RENAME_SWAP)`. From here any launch of the path, the mod's included, starts the
    new version; the running process keeps its binary.
-8. `updates/record.json` is written, a `/bin/sh` loop waits for this process to exit and then
-   `open`s the app, and the app quits.
+8. `updates/record.json` is written, a `/bin/sh` loop (`RelaunchScript`) waits for this process
+   to exit and then `open`s the app, a second apart, until a `LiveBridge` process runs or ten
+   attempts have passed, and the app quits.
 
 A failure before the swap, step 7's own re-check included, leaves the installed app as it was
 and removes the staged copy; the image folder is removed on every path. Why the install waits for
