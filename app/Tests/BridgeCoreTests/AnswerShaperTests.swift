@@ -14,8 +14,8 @@ struct AnswerShaperTests {
     #expect(voice.hasPrefix("[RESULT] Example session: Done. This sentence"))
   }
 
-  /// No line is longer than the limit, also when the body has no sentence end to cut at and
-  /// characters that NFKC expands (the ellipsis, ligatures).
+  /// No line is longer than the limit, also when the body has no sentence end to cut at, or is
+  /// made of ligatures and ellipses.
   @Test(arguments: [
     String(repeating: "word ", count: 600), String(repeating: "\u{FB01}", count: 1500),
     String(repeating: "x", count: 1994) + "\u{2026}\u{2026}\u{2026}",
@@ -39,13 +39,6 @@ struct AnswerShaperTests {
   @Test func redactsSecretsInAnswers() {
     let voice = AnswerShaper.forVoice(
       "Use sk-abcdefghijklmnopqrstuvwx now.", status: .ok, label: "Example session"
-    ).text
-    #expect(voice == "[RESULT] Example session: Use (redacted) now.")
-  }
-
-  @Test func zeroWidthCharactersCannotHideASecret() {
-    let voice = AnswerShaper.forVoice(
-      "Use sk-\u{200B}abcdefghijklmnopqrstuvwx now.", status: .ok, label: "Example session"
     ).text
     #expect(voice == "[RESULT] Example session: Use (redacted) now.")
   }

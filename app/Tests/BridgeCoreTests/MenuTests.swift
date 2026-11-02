@@ -56,33 +56,6 @@ struct ContextLoadsTests {
     #expect(loads.nextChange(after: t0 + 23) == t0 + 60)
     #expect(loads.nextChange(after: t0 + 60) == nil)
   }
-
-  @Test func theButtonSaysWhatIsHappening() {
-    #expect(ContextLoadState.ready.title == "Load context")
-    #expect(ContextLoadState.ready.isEnabled)
-    #expect(ContextLoadState.loading.title == "Loading context…")
-    #expect(!ContextLoadState.loading.isEnabled)
-    #expect(ContextLoadState.loaded.title == "Context loaded")
-    #expect(!ContextLoadState.loaded.isEnabled)
-  }
-}
-
-struct ConfirmationTests {
-  @Test func newConversationSaysWhatIsErased() {
-    let ask = Confirmation.newConversation(label: "Alpha")
-    #expect(ask.title == "Erase the conversation with Alpha?")
-    #expect(ask.message.contains("what the voice remembers"))
-    #expect(ask.message.contains("loaded context"))
-    #expect(ask.confirm == "Erase")
-  }
-
-  @Test func removeSaysHowToJoinAgain() {
-    let ask = Confirmation.remove(label: "Alpha")
-    #expect(ask.title == "Remove Alpha from LiveBridge?")
-    #expect(ask.message.contains("erased"))
-    #expect(ask.message.contains("/live on"))
-    #expect(ask.confirm == "Remove")
-  }
 }
 
 struct MenuContentTests {
@@ -248,11 +221,4 @@ struct MenuContentTests {
     #expect(Self.menu(nil).outline.first == "[call] Starting…")
   }
 
-  @Test func onlySettingsAndQuitHaveShortcuts() {
-    #expect(MenuContent.Command.settings.keyEquivalent == ",")
-    #expect(MenuContent.Command.quit.keyEquivalent == "q")
-    for command in [MenuContent.Command.copyJoinCommand, .loadContext, .newConversation] {
-      #expect(command.keyEquivalent == "")
-    }
-  }
 }

@@ -21,7 +21,7 @@ public struct Confirmation: Sendable, Equatable {
       title: "Remove \(label) from LiveBridge?",
       message:
         "\(label) leaves LiveBridge and its conversation with the voice is erased. "
-        + "Run /live on in that session to join again.",
+        + "Run \(StatusPresentation.joinCommand) in that session to join again.",
       confirm: "Remove")
   }
 }

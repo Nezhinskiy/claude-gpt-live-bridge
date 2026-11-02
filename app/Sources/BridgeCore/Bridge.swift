@@ -61,18 +61,10 @@ public actor Bridge: Router {
     self.meter = meter
     self.continuityFile = continuityFile
     self.time = time
-    // A file that does not decode, such as the single conversation an earlier build kept, is
-    // discarded rather than left on disk.
-    if let data = try? Data(contentsOf: continuityFile) {
-      if let saved = try? JSONDecoder().decode(Continuity.self, from: data) {
-        continuity = saved
-      } else {
-        try? FileManager.default.removeItem(at: continuityFile)
-        continuity = Continuity()
-      }
-    } else {
-      continuity = Continuity()
-    }
+    // a file that does not decode starts empty
+    continuity =
+      (try? JSONDecoder().decode(Continuity.self, from: Data(contentsOf: continuityFile)))
+      ?? Continuity()
     (updates, publish) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
     (contextArrivals, announceContext) = AsyncStream.makeStream(
       bufferingPolicy: .bufferingNewest(8))
@@ -144,11 +136,9 @@ public actor Bridge: Router {
   }
 
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
-  /// Returns the session asked, or nil when there is no target.
-  @discardableResult public func loadContext() async -> SessionID? {
-    guard let target = await registry.target else { return nil }
+  public func loadContext() async {
+    guard let target = await registry.target else { return }
     await registry.requestContext(for: target)
-    return target
   }
 
   /// The menu's choice of target, which also ends a question's route; a session that left is
@@ -175,7 +165,7 @@ public actor Bridge: Router {
   }
 
   /// Forgets a session's conversation, as when the session is removed from the app.
-  public func forgetConversation(of id: SessionID) async {
+  private func forgetConversation(of id: SessionID) async {
     continuity.forget(id)
     save()
     await changed()

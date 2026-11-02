@@ -161,7 +161,10 @@ struct SessionRowView: View {
           .frame(width: 20, height: 20).contentShape(.rect)
       }
       .buttonStyle(.plain)
-      .help("Remove from LiveBridge and erase its conversation; /live on joins it again")
+      .help(
+        "Remove from LiveBridge and erase its conversation; \(StatusPresentation.joinCommand) "
+          + "joins it again"
+      )
       .accessibilityLabel("Remove \(row.label) from LiveBridge")
     }
     .foregroundStyle(lit ? Self.selected : .primary)

@@ -73,7 +73,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   }
 
   /// Renders the model's current content, and again whenever it changes. Only the content is
-  /// read under observation; the hosted views observe what they show themselves.
+  /// read under observation; the hosted views are given what they show.
   private func observe() {
     let now = withObservationTracking {
       content
@@ -162,7 +162,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         used.insert("transcript")
         let view = TranscriptView(lines: lines)
         let shown =
-          transcript ?? ScrollingItem(view, width: Self.width, maxHeight: Self.conversationHeight)
+          transcript ?? ScrollingItem(view, maxHeight: Self.conversationHeight)
         if transcript != nil { shown.show(view) }
         transcript = shown
         return shown.item
@@ -304,23 +304,27 @@ final class MenuHighlight {
 @MainActor
 final class HostedItem<Content: View> {
   let item = NSMenuItem()
-  private let host: NSHostingView<Fitted<Content>>
+  let host: NSHostingView<Fitted<Content>>
   private let fit = Fit()
+  /// Told after the host took a new height, for a view around it (`ScrollingItem`).
+  var resized: () -> Void = {}
 
   init(_ content: Content, enabled: Bool = true) {
-    let host = NSHostingView(rootView: Fitted(content: content, fit: fit))
-    self.host = host
-    fit.resize = { [weak host] height in
-      guard let host, height > 0, abs(host.frame.height - height) > 0.5 else { return }
-      host.setFrameSize(NSSize(width: StatusMenu.width, height: height))
-    }
-    host.setFrameSize(NSSize(width: StatusMenu.width, height: max(host.fittingSize.height, 1)))
+    host = NSHostingView(rootView: Fitted(content: content, fit: fit))
+    fit.resize = { [weak self] in self?.fit(height: $0) }
+    fit(height: max(host.fittingSize.height, 1))
     item.view = host
     item.isEnabled = enabled
   }
 
   /// The new content; the view's own state (an open help, a "Copied") is kept.
   func show(_ content: Content) { host.rootView = Fitted(content: content, fit: fit) }
+
+  private func fit(height: CGFloat) {
+    guard height > 0, abs(host.frame.height - height) > 0.5 else { return }
+    host.setFrameSize(NSSize(width: StatusMenu.width, height: height))
+    resized()
+  }
 }
 
 @MainActor

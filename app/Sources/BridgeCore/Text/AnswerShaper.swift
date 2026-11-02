@@ -39,15 +39,12 @@ public enum AnswerShaper {
     return VoiceLine(kind: kind, label: label, body: body, session: session)
   }
 
-  /// NFKC with format characters (zero-width and the like) removed, so redaction sees a token
-  /// whole; brackets made plain and whitespace runs one space.
+  /// Brackets made plain and whitespace runs, line breaks among them, one space.
   static func flat(_ text: String) -> String {
     String(
       String.UnicodeScalarView(
-        text.precomposedStringWithCompatibilityMapping.unicodeScalars.compactMap {
-          scalar -> Unicode.Scalar? in
+        text.unicodeScalars.map { scalar in
           switch scalar.properties.generalCategory {
-          case .format: nil
           case .openPunctuation: "("
           case .closePunctuation: ")"
           default: scalar

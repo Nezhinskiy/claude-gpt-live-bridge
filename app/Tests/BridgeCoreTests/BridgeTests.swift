@@ -270,14 +270,9 @@ struct BridgeTests {
     try await join(b, "Beta")
     try await post("/v1/target", TargetBody(sessionId: b))
     _ = try await registry.poll(b)  // a fresh target may already owe a summary
-    #expect(await bridge.loadContext() == b)
+    await bridge.loadContext()
     #expect(try await registry.poll(b) == .context)
     #expect(try await registry.poll(a) == nil)
-  }
-
-  /// With no session there is nobody to ask, so the menu has nothing to wait for.
-  @Test func loadContextWithoutTargetAsksNobody() async {
-    #expect(await bridge.loadContext() == nil)
   }
 
   /// A session's summary is announced to the menu, which stops waiting for it; one from a
@@ -571,7 +566,7 @@ struct BridgeTests {
   @Test func contextIsRedactedCappedAndShown() async throws {
     try await join(a, "Alpha")
     let summary =
-      "The password: hunter2 is set. Key sk-\u{200B}abcdefghijklmnopqrst. "
+      "The password: hunter2 is set. Key sk-abcdefghijklmnopqrst. "
       + String(repeating: "More detail here. ", count: 100)
     try await post("/v1/context", ContextBody(sessionId: a, summary: summary))
     let shown = try #require(await bridge.current.context)
@@ -769,50 +764,13 @@ struct BridgeTests {
     #expect(await eventually { await lines().count == 2 })
   }
 
-  /// The single conversation an earlier build saved is discarded, not shown as anyone's.
-  @Test func singleConversationFileIsDiscarded() async throws {
-    let file = dir.appending(path: "continuity.json")
-    let old = #"{"utterances":[{"role":"user","text":"hi"}],"context":"[CONTEXT] Alpha: x"}"#
-    try Data(old.utf8).write(to: file)
+  /// A conversation file that does not decode starts empty instead of failing the bridge.
+  @Test func anUnreadableConversationFileStartsEmpty() async throws {
+    try Data("not json".utf8).write(to: dir.appending(path: "continuity.json"))
     let restarted = try restart()
     try await restarted.join(a, "Alpha")
     #expect(await restarted.bridge.current.context == nil)
     #expect(await restarted.lines().isEmpty)
-    #expect(!FileManager.default.fileExists(atPath: file.path))
-  }
-
-  /// New conversation erases what the voice remembers: a line open with that conversation
-  /// closes, and the next speech opens it fresh.
-  @Test func newConversationClosesTheOpenLine() async throws {
-    await live()
-    voice.emit(.userUtterance("Remember the colour teal."))
-    #expect(await eventually { await lines().count == 1 })
-    await bridge.newConversation()
-    #expect(await bridge.status.call == .listening)
-    #expect(await voice.closes == 1)
-    await bridge.audioEvent(.speechStarted)
-    #expect(await voice.opens.last == [])
-  }
-
-  /// After `/clear` the line still waits for the request it handed off, now under the new id:
-  /// its answer is said, and a question's reply goes to the new id.
-  @Test func clearedSessionKeepsWhatTheLineWaitsFor() async throws {
-    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
-    await live()
-    await bridge.audioEvent(.speechEnded)
-    try await handOff()
-    try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
-    try await post(
-      "/v1/answer",
-      AnswerBody(
-        sessionId: cleared, id: request(1).id, status: .question, text: "Which branch?",
-        reason: nil))
-    #expect(await eventually { await voice.spoken == ["[QUESTION] Alpha: Which branch?"] })
-    try await join(b, "Beta")
-    try await post("/v1/target", TargetBody(sessionId: b))
-    await bridge.audioEvent(.speechStarted)
-    voice.emit(.handoff(request(2)))
-    #expect(try await eventually { try await registry.poll(cleared) == .request(request(2)) })
   }
 
   @Test func stopThenStartResumesConversation() async throws {

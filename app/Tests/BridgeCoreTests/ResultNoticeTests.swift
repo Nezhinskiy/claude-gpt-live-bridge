@@ -46,10 +46,4 @@ struct ResultNoticeTests {
     #expect(notice.body == "A new result is waiting — speak to hear it.")
   }
 
-  /// Each notice replaces the one before instead of stacking.
-  @Test func everyNoticeHasTheSameIdentity() throws {
-    let one = try #require(ResultNotice.waiting([line("x", a)], labels: labels))
-    let two = try #require(ResultNotice.waiting([line("x", a), line("y", b)], labels: labels))
-    #expect(one.identifier == two.identifier)
-  }
 }

@@ -17,14 +17,6 @@ public enum ContextLoadState: Sendable, Equatable {
     }
   }
 
-  public var symbol: String {
-    switch self {
-    case .ready: "square.and.arrow.down"
-    case .loading: "hourglass"
-    case .loaded: "checkmark.circle"
-    }
-  }
-
   /// Pressing again while a summary is on its way would only ask for it twice.
   public var isEnabled: Bool { self == .ready }
 }
