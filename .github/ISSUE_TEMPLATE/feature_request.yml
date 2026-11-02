@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a change or a new direction for LiveBridge.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For anything sizeable, agree on the shape here before you write the code. The README's
+        "Roadmap and help wanted" section lists the larger directions already open: Windows and
+        Linux, other agents as the worker, and other voice providers.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: What LiveBridge would do differently, from the owner's side (the voice, the band, the menu, Settings).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: textarea
+    id: cost
+    attributes:
+      label: Billing, privacy and security
+      description: Would it keep the voice line open longer, send anything new to OpenAI or Anthropic, or let the voice do more? See the README's Billing and Privacy sections and SECURITY.md.
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you work on it?
+      options:
+        - "Yes"
+        - "With some guidance"
+        - "No"
+    validations:
+      required: true
