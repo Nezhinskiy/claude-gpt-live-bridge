@@ -1,4 +1,4 @@
-<p align="center"><a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <b>简体中文</b> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.uk.md">Українська</a></p>
+<p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="README.hi.md">हिन्दी</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
 
 <p align="center"><img src="site/assets/icon.png" alt="LiveBridge 应用图标" width="144"></p>
 
@@ -7,7 +7,7 @@
 <p align="center"><strong>用语音与已打开的 Claude Code 会话对话。</strong></p>
 
 <p align="center">
-  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="许可证：MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="平台：Apple Silicon 上的 macOS 14+">
 </p>
@@ -48,11 +48,11 @@ Claude Code。应用与模组之间通过只有你的用户才能打开的 Unix 
 
 ```sh
 # 1. The mod, from this repository's marketplace
-claude plugin marketplace add getLiveBridge/livebridge
+claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 
 # 2. The app, built from source, installed in /Applications and opened
-git clone https://github.com/getLiveBridge/livebridge.git
+git clone https://github.com/getLiveBridge/LiveBridge.git
 cd livebridge
 scripts/build-app.sh --release
 ```
@@ -60,7 +60,7 @@ scripts/build-app.sh --release
 3. 在你想与之对话的 Claude Code 会话中，输入 `/live on`。
 4. 点击提示输入框上方状态条中的 **Start**，允许使用麦克风，然后开始说话。
 
-不想自己构建？每个[发布版本](https://github.com/getLiveBridge/livebridge/releases/latest)都附有磁盘映像形式的应用，
+不想自己构建？每个[发布版本](https://github.com/getLiveBridge/LiveBridge/releases/latest)都附有磁盘映像形式的应用，
 由 GitHub Actions 构建并出具证明；[通过磁盘映像安装](#通过磁盘映像安装)说明了如何验证并打开它。无论哪种方式，模组的安装方法都相同。
 
 如果在已经打开的会话中找不到 `/live`，请重新打开该会话（[原因](#已知限制)）。升级、权限、升级后保留麦克风权限以及卸载，见[安装](#安装)。
@@ -84,11 +84,11 @@ scripts/build-app.sh --release
 ### 通过磁盘映像安装
 
 1. 从最新发布版本下载
-   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)。
+   [LiveBridge.dmg](https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg)。
 2. 在保存该文件的文件夹中，用 [GitHub CLI](https://cli.github.com) 验证：
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
    ```
 
    只有由本仓库的[发布工作流](.github/workflows/release.yml)根据该发布版本的标签构建的映像才能通过验证。
@@ -248,7 +248,7 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
 
 目前的 LiveBridge 是一个 Mac 应用、一个执行者（Claude Code）和一个语音提供方（使用 ChatGPT 登录的 codex）。三者在狭窄的接缝处相接，
 下面的每个方向都欢迎贡献者参与。相关议题带有
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 标签；[CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) 指出了应先阅读的文件。
 
 - **Windows 和 Linux。** 菜单栏应用、它的音频页面和套接字服务器都与 macOS 绑定；模组与应用之间的协议以及模组本身是可移植的。
@@ -259,7 +259,7 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
 ## 参与贡献
 
 欢迎贡献。对于比一次修复更大的改动，请先开一个议题，以便在开工前商定方案。适合入手的地方有
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 议题、[已知限制](#已知限制)以及[上文](#路线图与欢迎协助)的各个方向。
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)：目录布局、工具链、检查（`scripts/check.sh`）和约定。

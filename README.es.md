@@ -1,4 +1,4 @@
-<p align="center"><a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a> · <b>Español</b> · <a href="README.fr.md">Français</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.uk.md">Українська</a></p>
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.hi.md">हिन्दी</a> · <b>Español</b> · <a href="README.fr.md">Français</a> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
 
 <p align="center"><img src="site/assets/icon.png" alt="Icono de la aplicación LiveBridge" width="144"></p>
 
@@ -7,7 +7,7 @@
 <p align="center"><strong>Habla por voz con una sesión abierta de Claude Code.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licencia: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plataforma: macOS 14+ en Apple Silicon">
 </p>
@@ -54,11 +54,11 @@ aplicación tú mismo, también Xcode con Swift 6.0+. Los detalles están en
 
 ```sh
 # 1. The mod, from this repository's marketplace
-claude plugin marketplace add getLiveBridge/livebridge
+claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 
 # 2. The app, built from source, installed in /Applications and opened
-git clone https://github.com/getLiveBridge/livebridge.git
+git clone https://github.com/getLiveBridge/LiveBridge.git
 cd livebridge
 scripts/build-app.sh --release
 ```
@@ -66,7 +66,7 @@ scripts/build-app.sh --release
 3. En la sesión de Claude Code con la que quieras hablar, escribe `/live on`.
 4. Pulsa **Start** en la banda situada sobre el prompt, permite el micrófono y habla.
 
-¿Prefieres no compilarla? Cada [versión](https://github.com/getLiveBridge/livebridge/releases/latest)
+¿Prefieres no compilarla? Cada [versión](https://github.com/getLiveBridge/LiveBridge/releases/latest)
 incluye la aplicación como imagen de disco, compilada y atestada por GitHub Actions;
 [Desde la imagen de disco](#desde-la-imagen-de-disco) explica cómo comprobarla y abrirla. El mod se
 instala igual en ambos casos.
@@ -98,12 +98,12 @@ código fuente. En ambos casos está firmada ad hoc y no está notarizada.
 ### Desde la imagen de disco
 
 1. Descarga
-   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   [LiveBridge.dmg](https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg)
    de la última versión.
 2. Compruébala con la [GitHub CLI](https://cli.github.com), en la carpeta donde la guardaste:
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
    ```
 
    Solo se supera con una imagen que el
@@ -328,7 +328,7 @@ Hoy LiveBridge es una aplicación de Mac, un agente de trabajo (Claude Code) y u
 (codex con un inicio de sesión de ChatGPT). Los tres se unen en interfaces estrechas, y cada
 dirección siguiente está abierta a colaboradores. Las incidencias correspondientes llevan la
 etiqueta
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
 [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) indica los archivos que conviene leer primero.
 
 - **Windows y Linux.** La aplicación de la barra de menús, su página de audio y el servidor de
@@ -346,7 +346,7 @@ etiqueta
 Las contribuciones son bienvenidas. Para cualquier cosa mayor que una corrección, abre antes una
 incidencia para acordar el planteamiento antes de empezar el trabajo. Buenos lugares para empezar
 son las incidencias
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
 las [limitaciones conocidas](#limitaciones-conocidas) y las direcciones de la
 [hoja de ruta](#hoja-de-ruta-y-ayuda-buscada) anterior.
 

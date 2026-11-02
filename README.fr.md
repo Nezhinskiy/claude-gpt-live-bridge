@@ -1,4 +1,4 @@
-<p align="center"><a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <b>Français</b> · <a href="README.hi.md">हिन्दी</a> · <a href="README.uk.md">Українська</a></p>
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.es.md">Español</a> · <b>Français</b> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
 
 <p align="center"><img src="site/assets/icon.png" alt="Icône de l'application LiveBridge" width="144"></p>
 
@@ -7,7 +7,7 @@
 <p align="center"><strong>Parlez à voix haute à une session Claude Code ouverte.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence : MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plateforme : macOS 14+ sur Apple Silicon">
 </p>
@@ -57,11 +57,11 @@ Le détail se trouve sous [Prérequis](#prérequis).
 
 ```sh
 # 1. The mod, from this repository's marketplace
-claude plugin marketplace add getLiveBridge/livebridge
+claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 
 # 2. The app, built from source, installed in /Applications and opened
-git clone https://github.com/getLiveBridge/livebridge.git
+git clone https://github.com/getLiveBridge/LiveBridge.git
 cd livebridge
 scripts/build-app.sh --release
 ```
@@ -69,7 +69,7 @@ scripts/build-app.sh --release
 3. Dans la session Claude Code à laquelle vous voulez parler, tapez `/live on`.
 4. Appuyez sur **Start** dans la bande au-dessus du prompt, autorisez le microphone, et parlez.
 
-Vous préférez ne pas compiler ? Chaque [version](https://github.com/getLiveBridge/livebridge/releases/latest)
+Vous préférez ne pas compiler ? Chaque [version](https://github.com/getLiveBridge/LiveBridge/releases/latest)
 fournit l'application sous forme d'image disque, compilée et attestée par GitHub Actions ;
 [Depuis l'image disque](#depuis-limage-disque) explique comment la vérifier et l'ouvrir. Le mod
 s'installe de la même manière dans les deux cas.
@@ -102,13 +102,13 @@ depuis les sources. Dans les deux cas, elle est signée ad hoc et non notarisée
 ### Depuis l'image disque
 
 1. Téléchargez
-   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   [LiveBridge.dmg](https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg)
    depuis la dernière version.
 2. Vérifiez-la avec la [GitHub CLI](https://cli.github.com), dans le dossier où vous l'avez
    enregistrée :
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
    ```
 
    La vérification ne réussit que pour une image compilée à partir du tag de la version par le
@@ -343,7 +343,7 @@ LiveBridge est aujourd'hui une application Mac, un exécutant (Claude Code) et u
 voix (codex avec une connexion ChatGPT). Les trois se rencontrent à des jointures étroites, et
 chacune des directions ci-dessous est ouverte aux contributeurs. Les tickets qui les concernent
 portent le label
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) ;
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) ;
 [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) indique les fichiers à lire en premier.
 
 - **Windows et Linux.** L'application de barre des menus, sa page audio et le serveur de socket
@@ -360,7 +360,7 @@ portent le label
 
 Les contributions sont les bienvenues. Pour tout ce qui dépasse un correctif, ouvrez d'abord un
 ticket afin de s'accorder sur la forme avant de commencer le travail. Bons points de départ : les
-tickets [help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+tickets [help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
 les [limitations connues](#limitations-connues) et les directions
 [ci-dessus](#feuille-de-route-et-aide-recherchée).
 

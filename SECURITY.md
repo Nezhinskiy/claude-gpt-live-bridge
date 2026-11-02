@@ -7,7 +7,7 @@ Only the latest release gets fixes. Before 1.0, that is the latest `0.x` tag.
 ## Reporting a vulnerability
 
 Please report a vulnerability privately, through GitHub's
-[private vulnerability reporting](https://github.com/getLiveBridge/livebridge/security/advisories/new)
+[private vulnerability reporting](https://github.com/getLiveBridge/LiveBridge/security/advisories/new)
 for this repository; do not open a public issue. Say what an attacker can do, what they need
 first, and how to reproduce it. You should hear back within a week. Once a fix is released, the
 advisory is published with credit to you unless you ask otherwise.

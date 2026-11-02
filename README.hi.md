@@ -1,4 +1,4 @@
-<p align="center"><a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <b>हिन्दी</b> · <a href="README.uk.md">Українська</a></p>
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <b>हिन्दी</b> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
 
 <p align="center"><img src="site/assets/icon.png" alt="LiveBridge ऐप आइकन" width="144"></p>
 
@@ -7,7 +7,7 @@
 <p align="center"><strong>खुले Claude Code session से voice में बात करें।</strong></p>
 
 <p align="center">
-  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="लाइसेंस: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="प्लेटफ़ॉर्म: Apple Silicon पर macOS 14+">
 </p>
@@ -54,11 +54,11 @@ app को खुद build करने के लिए Swift 6.0+ वाला
 
 ```sh
 # 1. The mod, from this repository's marketplace
-claude plugin marketplace add getLiveBridge/livebridge
+claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 
 # 2. The app, built from source, installed in /Applications and opened
-git clone https://github.com/getLiveBridge/livebridge.git
+git clone https://github.com/getLiveBridge/LiveBridge.git
 cd livebridge
 scripts/build-app.sh --release
 ```
@@ -66,7 +66,7 @@ scripts/build-app.sh --release
 3. जिस Claude Code session से बात करनी है, उसमें `/live on` टाइप करें।
 4. prompt के ऊपर वाले band में **Start** दबाएँ, microphone की अनुमति दें, और बोलें।
 
-खुद build नहीं करना चाहते? हर [release](https://github.com/getLiveBridge/livebridge/releases/latest)
+खुद build नहीं करना चाहते? हर [release](https://github.com/getLiveBridge/LiveBridge/releases/latest)
 में app एक disk image के रूप में मिलता है, जिसे GitHub Actions ने build और attest किया है;
 उसे कैसे जाँचें और खोलें, यह [डिस्क इमेज से](#डिस्क-इमेज-से) में है। mod दोनों तरीकों में एक ही
 तरह install होता है।
@@ -97,12 +97,12 @@ App दोनों तरीकों में `/Applications` में ज�
 ### डिस्क इमेज से
 
 1. नवीनतम release से
-   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   [LiveBridge.dmg](https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg)
    डाउनलोड करें।
 2. उसे [GitHub CLI](https://cli.github.com) से जाँचें, उसी folder में जहाँ आपने उसे सेव किया है:
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
    ```
 
    यह जाँच सिर्फ़ ऐसी image के लिए पास होती है जिसे इस repository के
@@ -315,7 +315,7 @@ session हमेशा भेजता है।
 
 LiveBridge आज एक Mac app, एक worker (Claude Code) और एक voice provider (ChatGPT login पर codex) है।
 ये तीनों संकरे जोड़ों (seams) पर मिलते हैं, और नीचे की हर दिशा contributors के लिए खुली है। उनके issues पर
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 label लगा होता है; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) बताता है कि पहले कौन-सी फ़ाइलें पढ़ें।
 
 - **Windows और Linux।** Menu bar app, उसका audio page और socket server macOS से बँधे हैं; mod और app के
@@ -329,7 +329,7 @@ label लगा होता है; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-
 
 योगदान का स्वागत है। किसी fix से बड़ी चीज़ के लिए पहले एक issue खोलें, ताकि काम शुरू होने से पहले उसका
 स्वरूप तय हो सके। शुरू करने की अच्छी जगहें हैं
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 issues, [ज्ञात सीमाएँ](#ज्ञात-सीमाएँ) और [ऊपर](#रोडमैप-और-सहयोग-चाहिए) बताई गई दिशाएँ।
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): layout, toolchain, checks (`scripts/check.sh`) और conventions।

@@ -1,4 +1,4 @@
-<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.uk.md">Українська</a></p>
+<p align="center"><b>English</b> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
 
 <p align="center"><img src="site/assets/icon.png" alt="LiveBridge app icon" width="144"></p>
 
@@ -7,7 +7,7 @@
 <p align="center"><strong>Talk to an open Claude Code session by voice.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Platform: macOS 14+ on Apple Silicon">
 </p>
@@ -52,11 +52,11 @@ realtime voice; to build the app yourself, also Xcode with Swift 6.0+. The detai
 
 ```sh
 # 1. The mod, from this repository's marketplace
-claude plugin marketplace add getLiveBridge/livebridge
+claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 
 # 2. The app, built from source, installed in /Applications and opened
-git clone https://github.com/getLiveBridge/livebridge.git
+git clone https://github.com/getLiveBridge/LiveBridge.git
 cd livebridge
 scripts/build-app.sh --release
 ```
@@ -64,7 +64,7 @@ scripts/build-app.sh --release
 3. In the Claude Code session you want to talk to, type `/live on`.
 4. Press **Start** in the band above the prompt, allow the microphone, and talk.
 
-Rather not build it? Each [release](https://github.com/getLiveBridge/livebridge/releases/latest)
+Rather not build it? Each [release](https://github.com/getLiveBridge/LiveBridge/releases/latest)
 has the app as a disk image, built and attested by GitHub Actions;
 [From the disk image](#from-the-disk-image) says how to check it and open it. The mod is
 installed the same way either way.
@@ -94,12 +94,12 @@ way it is signed ad hoc and not notarized.
 ### From the disk image
 
 1. Download
-   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   [LiveBridge.dmg](https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg)
    from the latest release.
 2. Check it with the [GitHub CLI](https://cli.github.com), in the folder you saved it to:
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
    ```
 
    This passes only for an image this repository's
@@ -314,7 +314,7 @@ wire between the mod and the app, and the message flows;
 LiveBridge today is one Mac app, one worker (Claude Code) and one voice provider (codex on a
 ChatGPT login). The three meet at narrow seams, and each direction below is open to
 contributors. Issues for them carry the
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 label; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) points to the files to read first.
 
 - **Windows and Linux.** The menu bar app, its audio page and the socket server are tied to
@@ -329,7 +329,7 @@ label; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) points to the files to 
 
 Contributions are welcome. For anything larger than a fix, open an issue first so the shape can
 be agreed before the work starts. Good places to begin are the
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 issues, the [known limitations](#known-limitations) and the directions
 [above](#roadmap-and-help-wanted).
 

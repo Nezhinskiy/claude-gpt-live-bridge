@@ -1,4 +1,4 @@
-<p align="center"><a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.hi.md">हिन्दी</a> · <b>Українська</b></p>
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.ru.md">Русский</a> · <b>Українська</b></p>
 
 <p align="center"><img src="site/assets/icon.png" alt="Значок застосунку LiveBridge" width="144"></p>
 
@@ -7,7 +7,7 @@
 <p align="center"><strong>Розмовляйте голосом з відкритою сесією Claude Code.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Ліцензія: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Платформа: macOS 14+ на Apple Silicon">
 </p>
@@ -56,11 +56,11 @@ realtime-голосом; щоб зібрати застосунок самост
 
 ```sh
 # 1. The mod, from this repository's marketplace
-claude plugin marketplace add getLiveBridge/livebridge
+claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 
 # 2. The app, built from source, installed in /Applications and opened
-git clone https://github.com/getLiveBridge/livebridge.git
+git clone https://github.com/getLiveBridge/LiveBridge.git
 cd livebridge
 scripts/build-app.sh --release
 ```
@@ -68,7 +68,7 @@ scripts/build-app.sh --release
 3. У сесії Claude Code, з якою хочете розмовляти, введіть `/live on`.
 4. Натисніть **Start** у смузі над полем введення, дозвольте доступ до мікрофона й говоріть.
 
-Не хочете збирати? У кожному [випуску](https://github.com/getLiveBridge/livebridge/releases/latest)
+Не хочете збирати? У кожному [випуску](https://github.com/getLiveBridge/LiveBridge/releases/latest)
 є застосунок у вигляді образу диска, який збирає й засвідчує GitHub Actions; як його перевірити
 й відкрити, сказано в розділі [«З образу диска»](#з-образу-диска). Мод встановлюється однаково в
 обох випадках.
@@ -100,12 +100,12 @@ scripts/build-app.sh --release
 ### З образу диска
 
 1. Завантажте
-   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   [LiveBridge.dmg](https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg)
    з останнього випуску.
 2. Перевірте його за допомогою [GitHub CLI](https://cli.github.com) у теці, куди збережено файл:
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
    ```
 
    Перевірка проходить лише для образу, який зібрав із тега випуску
@@ -325,7 +325,7 @@ conversation**, поки вона є ціллю, або прибираєте ї�
 Сьогодні LiveBridge — це один застосунок для Mac, один виконавець (Claude Code) і один постачальник
 голосу (codex на вході в ChatGPT). Ці три частини стикуються вузькими швами, і кожен із напрямів
 нижче відкритий для учасників. Завдання щодо них мають мітку
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
 з яких файлів почати, сказано в [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start).
 
 - **Windows і Linux.** Застосунок у рядку меню, його аудіосторінка та сервер сокета прив'язані до
@@ -340,7 +340,7 @@ conversation**, поки вона є ціллю, або прибираєте ї�
 
 Внески вітаються. Для всього, що більше за виправлення, спершу відкрийте задачу, щоб узгодити
 форму до початку роботи. Добре почати із задач
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
 [відомих обмежень](#відомі-обмеження) та напрямів
 [вище](#плани-та-де-потрібна-допомога).
 
