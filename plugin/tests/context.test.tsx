@@ -119,7 +119,7 @@ test('aSummaryThatNeverComesStopsLoadingAfterAMinute', async ($, on) => {
 
 test('aFailedSummaryClearsTheNoteAndSaysSo', async ($, on) => {
   const world = await joined($, on)
-  world.isForkFailing = true
+  world.forkFails = 'api-error'
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await band.press({ key: 'call' })
   expect(world.take('call')).toEqual([{ action: 'start' }])
@@ -153,4 +153,14 @@ test('liveContextAsksTheModelEachTime', async ($, on) => {
   world.turns = 0
   expect((await $.command.run({ ...LIVE, args: 'context' })).text).toBe('Nothing to summarise yet.')
   expect(world.forks).toBe(2)
+})
+
+test('onlyNothingToForkIsNothingToSummarise', async ($, on) => {
+  // The engine answers an outage as a resolved api-error, which is a failure, not an empty session.
+  const world = await joined($, on)
+  world.forkFails = 'nothing-to-fork'
+  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toBe('Nothing to summarise yet.')
+  world.forkFails = 'api-error'
+  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('could not summarise')
+  expect(world.take('context')).toEqual([])
 })

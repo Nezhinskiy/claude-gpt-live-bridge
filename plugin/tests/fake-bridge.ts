@@ -40,8 +40,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isCommandRefused: false,
     /** Every slash command the mod declared, in order. */
     commands: [] as string[],
-    /** The session's model fails the summary request. */
-    isForkFailing: false,
+    /** Why the session's model writes no summary (the fork's `reason`), or null when it writes one. */
+    forkFails: null as null | 'api-error' | 'nothing-to-fork',
     logs: [] as string[],
     /** Every event the mod asked the engine to run again (`$.ui.invalidate`), in order. */
     invalidated: [] as string[],
@@ -144,12 +144,13 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('model.fork', async () => {
     world.forks += 1
     if (world.forkMs > 0) await world.clock.sleep(world.forkMs)
-    return world.isForkFailing ? { deny: 'the model is unavailable' } : ({
-      value: {
-        isAnswered: true, text: world.summary,
-        usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
-      },
-    })
+    const usage = { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
+    // The engine resolves every outcome, an API error included; it does not throw.
+    if (world.forkFails === 'api-error') {
+      return { value: { isAnswered: false, reason: 'api-error', status: 529, error: 'overloaded', usage } } as const
+    }
+    if (world.forkFails === 'nothing-to-fork') return { value: { isAnswered: false, reason: 'nothing-to-fork' } } as const
+    return { value: { isAnswered: true, text: world.summary, usage } } as const
   })
   on('tool.check', () => ({ decision: 'ask' }))
   on('classic.PermissionRequest', () => ({}))

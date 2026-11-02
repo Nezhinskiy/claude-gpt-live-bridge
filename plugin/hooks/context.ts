@@ -9,8 +9,13 @@ const PROMPT =
   'goals, where the work stands, and the open questions. Plain sentences, no code, no file ' +
   'paths unless they matter, at most 1500 characters. Reply with the summary alone.'
 
-/** The summary, or "" when there is nothing to summarise yet or the model gave no answer. */
+/**
+ * The summary, or "" when the session has nothing to summarise yet. Rejects when the model gave
+ * none: the engine resolves an API error, an empty reply or an abort rather than throwing.
+ */
 export async function summarize($: EngineInterface): Promise<string> {
   const reply = await $.model.fork({ prompt: PROMPT })
-  return reply.isAnswered ? reply.text.trim() : ''
+  if (reply.isAnswered) return reply.text.trim()
+  if (reply.reason === 'nothing-to-fork') return ''
+  throw new Error(`the model wrote no summary (${reply.reason})`)
 }
