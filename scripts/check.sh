@@ -7,6 +7,8 @@ swift format lint --strict -r app
 (cd app && swift build && swift test)
 # build-app.sh --uninstall removes exactly what the app keeps.
 sh scripts/tests/uninstall.test.sh
+# The marketplace pins the mod to the app's release tag; a release binary has no test-only switch.
+sh scripts/tests/release-guards.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
 node --test app/Tests/AudioJSTests
 

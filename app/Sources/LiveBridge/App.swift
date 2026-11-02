@@ -123,7 +123,6 @@ final class AppModel {
         continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier,
         notifies: { settings.current.notifyResults })
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
-      try server.start()
       self.bridge = bridge
       self.server = server
       let (events, sink) = AsyncStream.makeStream(of: AudioEvent.self)
@@ -136,10 +135,22 @@ final class AppModel {
       Task { [weak self] in
         for await id in bridge.contextArrivals { self?.contextArrived(id) }
       }
+      // A relaunch after an update starts while the old instance may still hold the socket.
+      Task { [weak self] in
+        do { try await server.start(retryFor: .seconds(10)) } catch {
+          self?.bridgeFailed(error)
+        }
+      }
     } catch {
-      appProblem = .other("LiveBridge could not start its bridge: \(error.localizedDescription)")
-      glyph.show(.off, badge: .problem, level: 0)
+      bridgeFailed(error)
     }
+  }
+
+  private func bridgeFailed(_ error: any Error) {
+    bridge = nil
+    server = nil
+    appProblem = .other("LiveBridge could not start its bridge: \(error.localizedDescription)")
+    glyph.show(.off, badge: .problem, level: 0)
   }
 
   func perform(_ action: CallAction) { Task { await bridge?.perform(action) } }
