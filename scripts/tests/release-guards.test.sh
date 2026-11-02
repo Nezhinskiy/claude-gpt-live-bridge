@@ -14,8 +14,15 @@ if [ "$ref" != "v$version" ]; then
   fail=1
 fi
 
-(cd app && swift build -c release >/dev/null)
+if ! (cd app && swift build -c release >/dev/null); then
+  echo "the release build failed" >&2
+  exit 1
+fi
 binary="$(cd app && swift build -c release --show-bin-path)/LiveBridge"
+if [ ! -s "$binary" ]; then
+  echo "the release binary $binary is missing or empty" >&2
+  exit 1
+fi
 if grep -a -q LIVEBRIDGE_RELEASES_URL "$binary"; then
   echo "the release binary contains LIVEBRIDGE_RELEASES_URL" >&2
   fail=1
