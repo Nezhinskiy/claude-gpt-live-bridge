@@ -16,6 +16,7 @@ flowchart LR
       Server["HTTP on a Unix socket<br/>(0700 run directory)"]
       Codex["RealtimeSession + JSON-RPC client"]
       Audio["Invisible WKWebView<br/>mic, voice detection, pre-roll, WebRTC"]
+      Updater["Updater actor<br/>check, verify, swap"]
     end
     CodexProc["codex app-server<br/>(read-only, tools off)"]
     subgraph Engine["Claude Code session"]
@@ -24,7 +25,10 @@ flowchart LR
     end
   end
   OpenAI[("OpenAI realtime")]
+  GitHub[("GitHub")]
   UI --- Bridge
+  UI --- Updater
+  Updater -- "release check; on Install: image, gh, claude plugin" --> GitHub
   Server --- Bridge
   Bridge --- Codex
   Bridge --- Audio
@@ -58,6 +62,14 @@ microphone or Claude:
   text`, of at most 2,000 characters, with the label cut to 120 characters, without code blocks
   or tables, and with credentials redacted.
 - `UnixHTTPServer` and `Wire`: the mod's routes (below).
+- `Update/`: the in-app update ([below](#update)). `AppVersion` and `Release` parse a version
+  and GitHub's `releases/latest` reply strictly; `UpdatePolicy` says when a check is due and
+  which copy may update; `DownloadRules` limits redirects to GitHub's hosts and the size of a
+  download; `UpdateBundleCheck` reads the image's app and the programs' output; `UpdateRecord`
+  and `UpdateState` are what a run leaves for the next launch; `UpdateProblem` gives each failure
+  its sentence. `Updater` is the actor that runs a check or an install through
+  `UpdateEnvironment`, a protocol over the network, the programs, the swap and the relaunch, so
+  the tests use a fake.
 
 **`LiveBridge`** (the app target) wires `BridgeCore` to the menu bar, to `SMAppService` for Open at
 login, and to `AudioHost`: one `WKWebView` in an invisible window (one point, fully transparent,
@@ -66,7 +78,11 @@ does not consider visible), serving the bundled audio page under its own URL sch
 page opens the microphone, the app asks macOS for it itself (WebKit's request never shows the
 prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
 for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
-queued audio into the peer, dropping silence until it has caught up.
+queued audio into the peer, dropping silence until it has caught up. For updates,
+`SystemUpdateEnvironment` is the real `UpdateEnvironment` (an ephemeral `URLSession`, `gh`,
+`hdiutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
+`UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced
+release's Install.
 
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
 desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
@@ -315,6 +331,58 @@ sequenceDiagram
   Mod->>Claude: the dialog's answer (free text)
   Mod->>Bridge: POST /v1/activity working
 ```
+
+### Update
+
+Only the copy at `/Applications/LiveBridge.app` (the bundle, symlinks resolved, is that path, and
+the path is not a symlink) makes an `Updater`; any other copy says so in Settings and never
+checks. A check asks `https://api.github.com/repos/getLiveBridge/LiveBridge/releases/latest`
+and reports `available` for a plain `vX.Y.Z` tag newer than the running version. With
+**Check for updates automatically** on (`Settings.checkUpdatesAutomatically`, nil meaning on for a
+release build and off for one with `LBSourceBuild`), the app asks at launch, every
+`UpdatePolicy.tick` (15 minutes) and on wake whether a check is due: 24 hours since the last
+one, or a clock that moved back. A newer release is announced once per version, by a
+notification with an Install action and a menu item; `updates/state.json` keeps the last check's
+time and the versions announced.
+
+Install runs only from the owner's click, one run at a time (the actor's flag, and the lock file
+`updates/lock` against a second instance). Programs start by absolute path except `gh` and
+`claude`, which are found on the owner's shell `PATH` as `codex` is, and each has a timeout
+(30 s, 120 s for `claude`):
+
+1. `gh` is found and `gh auth status` passes, or nothing is downloaded.
+2. The image is downloaded from the release URL built from the version into
+   `updates/<X.Y.Z>/`, following redirects only to GitHub's asset hosts, and at most 100 MB.
+3. `gh attestation verify`, pinned to `release.yml`, the tag and GitHub-hosted runners, passes,
+   and its attested digest equals the image's SHA-256.
+4. The image is attached read-only; its `LiveBridge.app` has the bundle id, the version and a
+   minimum macOS this Mac meets, and passes `codesign --verify --deep --strict`; its CDHash is
+   kept. It is copied with `ditto` to `/Applications/.LiveBridge-update-<uuid>.app`, the image is
+   detached on every path, and the staged copy must have the same CDHash before a quarantine
+   attribute on it is removed.
+5. While any joined session has a request queued or in flight (`Bridge.hasOpenRequests`), the
+   run waits (`waiting`).
+6. `claude plugin marketplace update livebridge` and `claude plugin update livebridge@livebridge`
+   run in the data folder; `claude plugin list --json` must then report the release's version,
+   or the record carries the two commands for the owner.
+7. The wait of step 5 again, then the call stops, the staged copy is checked again (a directory,
+   not a symlink, the same CDHash, `codesign` passes) and swapped with the installed app by
+   `renamex_np(…, RENAME_SWAP)`. From here any launch of the path, the mod's included, starts the
+   new version; the running process keeps its binary.
+8. `updates/record.json` is written, a `/bin/sh` loop waits for this process to exit and then
+   `open`s the app, and the app quits.
+
+A failure before step 7 leaves the installed app as it was and removes the staged copy; the image
+folder is removed on every path.
+
+**At launch**, the installed copy removes every `/Applications/.LiveBridge-update-*.app` (the old
+bundle, or a copy a crashed run left) and, unless `updates` is a symlink, every version folder and
+the lock in it. It reads `updates/record.json`: Settings shows it until the next update, and
+`LiveBridge updated to X.Y.Z` is posted once (the record is marked first). With automatic checks
+on, a release announced before and newer than the running app is looked up again so the menu
+keeps offering it. The bridge's socket is bound in the meantime, retrying every 200 ms for up to
+10 s while the old instance still answers on it; an instance that stops removes the socket file
+only if it is still the one it bound.
 
 ## Failure behaviour
 

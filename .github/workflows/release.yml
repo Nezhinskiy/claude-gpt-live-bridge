@@ -1,7 +1,12 @@
 # Builds the disk image on a version tag (v0.1.0 and on), attaches it to that tag's GitHub
-# Release and attests its build provenance, so a downloader can check with
-# `gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge` that this workflow built
-# it from the tagged commit. The image is signed ad hoc and not notarized; no secret is used.
+# Release and attests its build provenance. A downloader checks it, with vX.Y.Z the release's tag:
+#   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge \
+#     --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
+#     --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners
+# That proves this workflow built the image from that tag of this repository, on a GitHub-hosted
+# runner, and that it is unchanged since; it does not prove that anyone reviewed the code. The
+# app's in-app update runs the same check. The image is signed ad hoc and not notarized; no
+# secret is used.
 name: Release
 
 on:
