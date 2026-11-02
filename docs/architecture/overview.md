@@ -106,8 +106,9 @@ two titles are the same) and which one is the target, the minutes today, the pro
 and the count of unheard results. What only the app's menu shows (the minutes this call, the
 target's context line and its conversation) is not on the wire.
 
-A session the owner removed with the menu's × is gone as if it had left, and until it joins
-again every call from it answers `410` with `"code": "removed"`. The mod then turns itself off
+A session the owner removed with the menu's × is gone as if it had left, and until the owner
+joins it again (`/live on`, the only join that sends `"owner": true`) every call from it,
+its own automatic joins included, answers `410` with `"code": "removed"`. The mod then turns itself off
 for that session and logs "Removed from LiveBridge. /live on joins again." instead of joining
 again, as it does after a `404` (the app restarted).
 
