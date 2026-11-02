@@ -1,0 +1,381 @@
+<p align="center"><a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <b>Français</b> · <a href="README.hi.md">हिन्दी</a> · <a href="README.uk.md">Українська</a></p>
+
+<p align="center"><img src="site/assets/icon.png" alt="Icône de l'application LiveBridge" width="144"></p>
+
+<h1 align="center">LiveBridge</h1>
+
+<p align="center"><strong>Parlez à voix haute à une session Claude Code ouverte.</strong></p>
+
+<p align="center">
+  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence : MIT"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plateforme : macOS 14+ sur Apple Silicon">
+</p>
+
+<p align="center">
+  <a href="https://getlivebridge.com">getlivebridge.com</a> ·
+  <a href="#démarrage-rapide">Démarrage rapide</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#utilisation">Utilisation</a> ·
+  <a href="#facturation-maîtrisée-par-conception">Facturation</a> ·
+  <a href="#confidentialité">Confidentialité</a> ·
+  <a href="#limitations-connues">Limitations</a> ·
+  <a href="#feuille-de-route-et-aide-recherchée">Aide recherchée</a> ·
+  <a href="#contribuer">Contribuer</a>
+</p>
+
+LiveBridge est une application de barre des menus macOS qui garde une ligne vocale GPT-Live
+prête à l'emploi via `codex app-server`, avec votre connexion ChatGPT (sans clé d'API). La voix
+fait office d'accueil : elle discute, demande ce que vous voulez dire, et confie le vrai travail
+à votre session Claude Code par l'intermédiaire d'un petit mod Claude Code, `livebridge`. Claude
+fait le travail avec son propre modèle, ses propres outils et son propre mode de permissions, et
+la voix vous annonce le résultat.
+
+*Le texte anglais fait foi ([README.md](README.md)) ; cette traduction peut avoir du retard.*
+
+<p align="center"><img src="site/assets/demo.gif" alt="Conversation avec une session Claude Code via LiveBridge" width="100%"></p>
+
+**Local par conception.** Pas de télémétrie et pas de serveur propre : LiveBridge est un pont sur
+votre Mac entre votre propre codex et votre propre Claude Code. L'application et le mod
+communiquent uniquement par un socket Unix que seul votre utilisateur peut ouvrir, et
+l'application n'écoute sur aucun port réseau. Seul ce que ces deux outils envoient déjà quitte
+votre Mac : la ligne vocale vers OpenAI via votre codex, uniquement tant qu'elle est ouverte, et
+le travail de Claude vers Anthropic via votre session Claude Code.
+[Confidentialité](#confidentialité) liste précisément ce qui parvient à OpenAI ;
+[SECURITY.md](SECURITY.md) explique ce que cela protège et ce que cela ne protège pas.
+
+> **Non officiel.** Sans lien avec Anthropic ou OpenAI, qui ne l'approuvent ni ne le prennent en
+> charge. Il s'appuie sur l'API temps réel expérimentale de codex, qui peut changer à chaque
+> version de codex.
+
+## Démarrage rapide
+
+Il vous faut macOS 14+ sur Apple Silicon, Claude Code 2.1.289+, et
+[codex](https://github.com/openai/codex) connecté (`codex login`) à une offre ChatGPT incluant la
+voix en temps réel ; pour compiler l'application vous-même, il faut aussi Xcode avec Swift 6.0+.
+Le détail se trouve sous [Prérequis](#prérequis).
+
+```sh
+# 1. The mod, from this repository's marketplace
+claude plugin marketplace add getLiveBridge/livebridge
+claude plugin install livebridge@livebridge
+
+# 2. The app, built from source, installed in /Applications and opened
+git clone https://github.com/getLiveBridge/livebridge.git
+cd livebridge
+scripts/build-app.sh --release
+```
+
+3. Dans la session Claude Code à laquelle vous voulez parler, tapez `/live on`.
+4. Appuyez sur **Start** dans la bande au-dessus du prompt, autorisez le microphone, et parlez.
+
+Vous préférez ne pas compiler ? Chaque [version](https://github.com/getLiveBridge/livebridge/releases/latest)
+fournit l'application sous forme d'image disque, compilée et attestée par GitHub Actions ;
+[Depuis l'image disque](#depuis-limage-disque) explique comment la vérifier et l'ouvrir. Le mod
+s'installe de la même manière dans les deux cas.
+
+Si `/live` est introuvable dans une session déjà ouverte, rouvrez la session
+([pourquoi](#limitations-connues)). La mise à jour, les autorisations, la conservation de
+l'autorisation du microphone d'une mise à jour à l'autre et la désinstallation sont décrites sous
+[Installation](#installation).
+
+## Prérequis
+
+- macOS 14 ou ultérieur sur Apple Silicon.
+- Claude Code 2.1.289 ou ultérieur (mods).
+- [Codex CLI](https://github.com/openai/codex) (`codex`, testé avec 0.166.0), installé avec
+  Homebrew (`brew install --cask codex`) ou npm (`npm install -g @openai/codex`), présent dans le
+  `PATH` que votre shell définit dans une fenêtre Terminal, et connecté avec `codex login` à une
+  offre ChatGPT incluant la voix en temps réel. LiveBridge refuse un codex dont il ne peut pas
+  lire le `codex features list`, donc une autre version peut ne pas démarrer tant que LiveBridge
+  n'a pas été mis à jour.
+- Pour compiler l'application : Xcode avec une chaîne d'outils Swift 6.0 ou ultérieure. Les
+  versions testées sont indiquées dans [CONTRIBUTING.md](CONTRIBUTING.md#toolchain).
+  L'application compilée fonctionne sur macOS 14 ou ultérieur.
+
+## Installation
+
+Le mod provient de la marketplace de ce dépôt (les commandes du [Démarrage rapide](#démarrage-rapide)).
+L'application va dans `/Applications` dans les deux cas : depuis l'image disque, ou compilée
+depuis les sources. Dans les deux cas, elle est signée ad hoc et non notarisée.
+
+### Depuis l'image disque
+
+1. Téléchargez
+   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   depuis la dernière version.
+2. Vérifiez-la avec la [GitHub CLI](https://cli.github.com), dans le dossier où vous l'avez
+   enregistrée :
+
+   ```sh
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   ```
+
+   La vérification ne réussit que pour une image compilée à partir du tag de la version par le
+   [workflow de publication](.github/workflows/release.yml) de ce dépôt. C'est l'unique preuve
+   d'origine de l'image : la signature ad hoc ne désigne personne.
+3. Ouvrez-la et faites glisser LiveBridge dans Applications.
+4. Au premier lancement, macOS bloque l'application jusqu'à ce que vous l'autorisiez dans
+   Réglages Système > Confidentialité et sécurité > **Open Anyway**.
+
+Pour mettre à jour, remplacez l'application par celle d'une version plus récente. macOS
+redemande l'accès au microphone après chaque mise à jour.
+
+### Depuis les sources
+
+`scripts/build-app.sh --release` compile l'application, l'installe dans `/Applications` (votre
+compte doit pouvoir y écrire, comme celui d'un administrateur) et l'ouvre. Relancez-le pour
+mettre à jour. La compilation est signée ad hoc, donc macOS redemande l'accès au microphone après
+chaque mise à jour. Pour conserver l'autorisation, exécutez une fois
+`scripts/build-app.sh --make-signing-identity` : il demande d'abord confirmation, puis crée dans
+votre trousseau de session un certificat de signature de code auto-signé, et les compilations
+release suivantes sont signées avec lui.
+
+### Autorisations
+
+Le premier Start demande à macOS l'accès au microphone. S'il a été refusé, l'appel s'arrête avec
+une phrase d'explication, et **Open Microphone Settings** dans le menu de la barre des menus
+ouvre Confidentialité et sécurité > Microphone, où vous autorisez LiveBridge. Avec la signature
+ad hoc, macOS redemande après chaque mise à jour (voir ci-dessus). macOS peut aussi demander si
+LiveBridge peut trouver des appareils sur votre réseau local. La ligne vocale a besoin de cette
+seconde autorisation également ; sans elle, l'appel s'arrête avec une phrase qui indique où
+l'accorder.
+
+### Désinstallation
+
+Depuis un clone, `scripts/build-app.sh --uninstall` supprime `/Applications/LiveBridge.app`,
+quelle que soit la manière dont il a été installé, son élément d'ouverture de session et tous les
+fichiers qu'il conserve, puis affiche les deux commandes qu'il vous laisse exécuter :
+`tccutil reset Microphone com.getlivebridge.livebridge` et
+`claude plugin uninstall livebridge@livebridge`.
+
+Sans clone, désactivez **Open at login** dans les Settings de LiveBridge, quittez LiveBridge, puis
+exécutez les mêmes étapes dans Terminal :
+
+```sh
+rm -rf /Applications/LiveBridge.app ~/Library/Application\ Support/LiveBridge \
+  ~/Library/{Caches,WebKit}/com.getlivebridge.livebridge \
+  ~/Library/HTTPStorages/com.getlivebridge.livebridge{,.binarycookies} \
+  ~/Library/Preferences/com.getlivebridge.livebridge.plist
+tccutil reset Microphone com.getlivebridge.livebridge
+claude plugin uninstall livebridge@livebridge
+```
+
+## Utilisation
+
+### Commandes
+
+Dans la session Claude Code à laquelle vous voulez parler :
+
+| Commande | Ce qu'elle fait |
+|---|---|
+| `/live on` | Rejoint LiveBridge sous le titre de la session, et ouvre l'application si elle n'est pas lancée. |
+| `/live off` | Quitte LiveBridge. |
+| `/live target` | Fait de cette session celle à qui la voix confie le travail. |
+| `/live status` (ou simplement `/live`) | Une ligne : l'appel, la cible, les résultats non entendus, les minutes du jour. |
+| `/live context` | Envoie à la voix un nouveau résumé de cette session, rédigé par le modèle de la session. |
+
+La commande est `/live`, et non `/voice`, car `/voice` est le mode vocal propre à Claude Code.
+Envoyer ou non le résumé d'une session chaque fois qu'elle devient la cible n'est pas une
+commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
+[Settings](#réglages) de LiveBridge.
+
+### La bande et le menu
+
+Appuyez sur **Start**, dans la bande au-dessus du prompt ou dans le menu de la barre des menus, et
+parlez.
+
+- **Le Start de la bande** fait de sa session la cible, démarre l'appel et envoie à la voix le
+  résumé de la session ([détails](docs/architecture/overview.md#components)). Tant que l'appel
+  parle à une autre session, la bande affiche **Talk here**.
+- **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
+  pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
+  la conserve, les minutes, **Settings…** et **Quit LiveBridge**.
+- **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
+  session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
+  repart de zéro à la prochaine ouverture de la ligne, et `/live on` dans une session retirée la
+  rejoint de nouveau.
+
+### Réglages
+
+**Settings…** ouvre la fenêtre Settings de LiveBridge :
+
+- **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
+  de la fenêtre, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.
+- **Prompt** (vide par défaut) : vos propres instructions pour la voix, par exemple « Parle-moi
+  en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
+  LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
+  ouverture de la ligne.
+- **Load a session's context automatically when it becomes the target** (désactivé par défaut) :
+  un réglage unique pour toutes les sessions, conservé par l'application.
+- **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
+  attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
+  new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
+  la barre des menus.
+- **Open at login** (désactivé par défaut).
+
+### Ce que fait la voix
+
+- Elle répond elle-même aux bavardages et aux explications, et transmet tout ce qui requiert le
+  dépôt ou la session : tâches, questions sur le code, décisions, corrections et arrêts.
+- Avant de transmettre quoi que ce soit de destructeur ou tourné vers l'extérieur (supprimer,
+  pousser, publier, envoyer, déployer, payer), elle répète la demande et demande « oui ? ». C'est
+  une habitude que la voix a pour consigne de garder, pas une garantie de sécurité ;
+  [SECURITY.md](SECURITY.md) explique ce qui en est une.
+- Elle relit les résultats en une phrase ou deux, avec le nom de la session. Les blocs de code et
+  les tableaux restent dans la session, et les identifiants qu'elle reconnaît sont masqués.
+- Quand Claude pose une question, la voix vous la pose et renvoie votre réponse à cette session.
+  Le travail que Claude termine plus tard en arrière-plan est signalé comme une mise à jour.
+- Quand Claude attend une demande de permission, la voix le dit. Vous répondez à la demande dans
+  Claude Code ; LiveBridge n'y répond jamais à votre place.
+
+## Facturation maîtrisée par conception
+
+Une session vocale en temps réel coûte tant qu'elle est ouverte, donc LiveBridge ne l'ouvre que
+pendant que quelqu'un parle, ou pendant que la réponse de Claude à une demande que vous venez de
+faire peut encore arriver :
+
+- Tant qu'un appel est en cours et que personne ne parle, le microphone alimente uniquement un
+  détecteur de voix sur votre Mac. Rien n'est envoyé nulle part.
+- Quand vous commencez à parler, la ligne s'ouvre. Les 2 secondes précédant votre prise de parole
+  sont conservées et envoyées en premier, afin que vos premiers mots ne soient pas perdus.
+- La ligne se ferme après 20 secondes de silence. Un son sans paroles (musique, télévision) la
+  ferme après 90 secondes.
+- Quand la voix transmet une demande à Claude (un transfert), la ligne reste ouverte jusqu'à
+  2 minutes après ce transfert, facturée comme n'importe quelle ligne ouverte, et la voix annonce
+  la réponse de Claude dès que plus personne ne parle. Un transfert ultérieur relance les
+  2 minutes ; un échange qui n'envoie rien à Claude se ferme après les 20 secondes de silence
+  habituelles.
+- Un résultat qui arrive plus tard, alors que la ligne est fermée, joue un carillon et attend : la
+  bande et le menu l'affichent comme non entendu, et la voix vous le dit la prochaine fois que
+  vous parlez
+  ([quand il compte comme entendu](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
+- Chaque session Claude Code a sa propre conversation avec la voix. Elle est reportée sur la
+  session temps réel suivante, et d'un Stop à un Start, de sorte que la voix se souvient de ce que
+  vous avez dit il y a une minute. Une nouvelle cible change de conversation : une ligne ouverte
+  se ferme, et vos prochains mots l'ouvrent avec la conversation de la nouvelle cible.
+- Le menu affiche les minutes pendant lesquelles la ligne a été ouverte, mesurées par
+  l'application ; la manière dont votre offre mesure la voix en temps réel n'est pas publiée.
+
+## Confidentialité
+
+LiveBridge n'a pas de télémétrie et n'écoute sur aucun port réseau ; le mod parle à l'application
+par un socket Unix situé dans un dossier que seul votre utilisateur peut ouvrir. Ce qui part vers
+OpenAI, via la session temps réel de codex :
+
+- l'audio du microphone tant que la ligne est ouverte, de 2 secondes avant que vous ne commenciez
+  à parler jusqu'à sa fermeture ;
+- les instructions de la voix : les règles propres de LiveBridge, puis le **Prompt** de vos
+  Settings si vous en avez écrit un ;
+- la conversation récente de la session cible (jusqu'aux 24 dernières lignes) pour la poursuivre
+  dans une nouvelle session temps réel ;
+- les demandes encore ouvertes de la session cible, sous forme de résumés d'une ligne ;
+- chaque résultat, question, mise à jour et avis d'approbation, en une ligne d'au plus
+  2 000 caractères, blocs de code et tableaux retirés. Une mise à jour est la réponse de Claude
+  dans un tour ultérieur déclenché par la notification d'une tâche d'arrière-plan, pendant au plus
+  10 minutes après une demande vocale et jusqu'à ce qu'un autre tour démarre dans la session ;
+- le résumé de contexte de la session cible, en une ligne d'au plus 1 500 caractères. Il est
+  enregistré quand il est chargé et envoyé à chaque ouverture de la ligne tant que cette session
+  est la cible, d'un Stop à un Start et d'un redémarrage de l'application à l'autre. Le
+  sous-menu Conversation du menu affiche cette ligne exactement telle qu'elle est envoyée ;
+- avec chacune des lignes ci-dessus, le libellé de sa session : le titre de la session Claude
+  Code, ou le nom du dossier de la session si elle n'en a pas ;
+- l'offre WebRTC, qui liste les adresses réseau locales du Mac comme candidats de connexion.
+
+Les résultats, questions, mises à jour et résumés passent d'abord par un masqueur de formes
+connues d'identifiants (clés privées, JWT, jetons d'API courants, mots de passe dans les URL,
+champs de type `password=`). C'est une liste de motifs, pas une garantie.
+
+Le thread codex qui porte la voix est éphémère et en lecture seule, avec toutes les
+fonctionnalités de codex désactivées sauf celles qui conservent votre connexion et gèrent
+l'utilisation de votre proxy, et tous les serveurs MCP désactivés ; il ne sert qu'à parler. Le
+travail de Claude va vers Anthropic comme le fait toujours votre session Claude Code.
+
+Sur votre Mac, l'application conserve ses réglages, le compteur d'utilisation et, pour chacune des
+20 dernières sessions utilisées, sa conversation récente et la ligne de contexte chargée en
+dernier depuis elle, dans `~/Library/Application Support/LiveBridge`. Les lignes d'une session
+disparaissent quand vous appuyez sur **New conversation** avec elle comme cible ou que vous la
+retirez avec ×. Une session qui est partie les conserve jusqu'à ce que 20 sessions utilisées
+ensuite les évincent ; pour les effacer plus tôt, exécutez de nouveau `/live on` dans cette
+session et appuyez sur **New conversation**. La désinstallation les supprime toutes.
+
+[SECURITY.md](SECURITY.md) contient le modèle de menace : en bref, tout ce que votre microphone
+peut entendre peut devenir une demande que Claude exécute avec le mode de permissions propre à la
+session.
+
+## Limitations connues
+
+- Un résultat qui arrive pendant que la ligne l'attend est transmis à la voix sous forme de texte
+  à dire ; codex n'a aucun appel qui fasse parler la voix immédiatement, c'est donc le modèle qui
+  décide du moment. Lors des tests, elle a parlé en quelques secondes. Si ce n'est pas le cas, le
+  résultat reste non entendu : la voix le dit après vos prochains mots, ou un carillon retentit
+  à la fermeture de la ligne.
+- Quand vos prochains mots rouvrent la ligne, la voix répond parfois uniquement à ceux-ci sans
+  dire le résultat en attente. Le résultat n'est pas perdu : il reste en attente, déclenche un
+  carillon et publie une notification à la fermeture de la ligne, et il est de nouveau transmis à
+  la voix à la prochaine ouverture de la ligne.
+- Une session Claude Code déjà ouverte avant le chargement du mod peut devoir être rouverte pour
+  que `/live` y fonctionne.
+- Dans l'application de bureau Claude, `/live` saisi dans une session dont le processus Claude
+  Code n'a pas encore démarré (une nouvelle session, ou une session à peine rouverte) peut
+  afficher « /live isn't a command here. ». La commande s'exécute quand même. L'application de
+  bureau établit la liste des commandes d'une telle session à partir d'une vérification qu'elle
+  lance avec les hooks désactivés, donc le code du mod, qui déclare `/live`, ne s'y exécute pas ;
+  une fois la session lancée, l'application de bureau prend sa liste dans la session elle-même. Le
+  mod n'a pas de correctif : un fichier de commande statique serait listé comme
+  `/livebridge:live` et non `/live`, et, hooks désactivés, il enverrait son texte au modèle au
+  lieu d'exécuter le mod.
+- Le fait qu'une réponse ait dit un résultat en attente est jugé d'après ses mots, avec une liste
+  de mots courants en anglais et en russe seulement
+  ([la règle](docs/architecture/overview.md#a-result-while-the-line-is-closed)). Dans une autre
+  langue, un résultat peut compter comme entendu alors que la voix l'a seulement mentionné.
+
+## Fonctionnement
+
+[docs/architecture/overview.md](docs/architecture/overview.md) décrit les composants, le protocole
+entre le mod et l'application, et les flux de messages ;
+l'[ADR 0001](docs/adr/0001-platform-findings.md) consigne les faits de plateforme sur lesquels
+repose la conception.
+
+## Feuille de route et aide recherchée
+
+LiveBridge est aujourd'hui une application Mac, un exécutant (Claude Code) et un fournisseur de
+voix (codex avec une connexion ChatGPT). Les trois se rencontrent à des jointures étroites, et
+chacune des directions ci-dessous est ouverte aux contributeurs. Les tickets qui les concernent
+portent le label
+[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) ;
+[CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) indique les fichiers à lire en premier.
+
+- **Windows et Linux.** L'application de barre des menus, sa page audio et le serveur de socket
+  sont liés à macOS ; le protocole entre le mod et l'application, ainsi que le mod lui-même, sont
+  portables. Un portage commence par une application pour la nouvelle plateforme qui parle le même
+  protocole.
+- **D'autres agents comme exécutant**, tels que Codex CLI, Hermes Agent ou Gemini CLI : chacun
+  nécessite son propre adaptateur parlant le même protocole que le mod Claude Code.
+- **D'autres fournisseurs de voix**, tels que l'API OpenAI Realtime avec votre propre clé d'API ou
+  l'API Gemini Live de Google : chacun serait une autre implémentation du protocole temps réel de
+  l'application.
+
+## Contribuer
+
+Les contributions sont les bienvenues. Pour tout ce qui dépasse un correctif, ouvrez d'abord un
+ticket afin de s'accorder sur la forme avant de commencer le travail. Bons points de départ : les
+tickets [help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+les [limitations connues](#limitations-connues) et les directions
+[ci-dessus](#feuille-de-route-et-aide-recherchée).
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) : l'organisation du dépôt, la chaîne d'outils, les
+  vérifications (`scripts/check.sh`) et les conventions.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) : comment nous nous traitons ici.
+- [SECURITY.md](SECURITY.md) : signalez une vulnérabilité en privé, pas dans un ticket public.
+- [CHANGELOG.md](CHANGELOG.md) : ce qui a changé dans chaque version.
+
+## Crédits
+
+Le protocole entre le mod et l'application s'est inspiré de
+[claude-code-voice-mod](https://github.com/ldk00315-jpg/claude-code-voice-mod). Aucun code ni
+texte n'en a été copié.
+
+## Licence
+
+[MIT](LICENSE).
