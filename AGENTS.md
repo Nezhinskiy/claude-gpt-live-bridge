@@ -1,4 +1,4 @@
-# claude-gpt-live-bridge
+# LiveBridge
 
 LiveBridge lets you talk to an open Claude Code session by voice. It has two halves: a macOS
 menu bar app (Swift, `app/`) that runs a GPT-Live voice line through `codex app-server`, and a

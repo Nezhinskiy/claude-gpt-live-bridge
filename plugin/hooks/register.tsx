@@ -121,13 +121,15 @@ function parseRecord(text: string): unknown {
   }
 }
 
-async function turnOn($: EngineInterface): Promise<boolean> {
+/** Joins; `byOwner` when the owner typed /live on (a reload's resume is not their decision). */
+async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   // What the last join learnt about the app is stale: the owner may have opened or installed it.
   offlineSince = null
   note = null
   const sessionId = await $.session.id()
   const title = (await readTitle($, sessionId)) ?? ''
-  const isJoined = (await link?.join({ sessionId, title })) === true
+  // Only the owner's own join brings back a session they removed.
+  const isJoined = (await link?.join({ sessionId, title, ...(byOwner && { owner: true }) })) === true
   await save($)
   await setBand($, {})
   // Writing the band redraws only the instances that read it. A surface that asked for the
@@ -314,7 +316,7 @@ async function live($: EngineInterface, args: string): Promise<string> {
       if (link?.session) return 'This session has already joined LiveBridge.'
       // No title here: a new session's is still the one Claude Code derives from its folder, and
       // the app shows the name the session is given next, once the poll follows it.
-      return (await turnOn($))
+      return (await turnOn($, true))
         ? 'Joined LiveBridge.'
         : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
     })
@@ -387,7 +389,7 @@ export const register: Register = on => {
     const saved = await $.store.get(joinedKey(await $.session.id()))
     if (saved !== undefined) {
       tracker = new TurnTracker(saved as TurnSnapshot)
-      await serial(() => turnOn($))
+      await serial(() => turnOn($, false))
     }
     return next(e)
   })

@@ -27,10 +27,7 @@ const STATUS = fields<Wire.StatusReply>({
   call: { oneOf: ['off', 'listening', 'connecting', 'live'] },
   sessions: { list: ROW },
   minutesToday: 'number',
-  minutesThisCall: 'number',
   problem: optional(S),
-  lastContext: optional(S),
-  recentTranscript: { list: S },
   unheard: 'number',
 })
 const WORK: Shape = {
@@ -51,7 +48,7 @@ const SHAPES: Record<string, Shape> = {
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop'] } }),
   'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
-  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S) }),
+  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean') }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
   'target': fields<Wire.TargetBody>({ sessionId: S }),
@@ -100,7 +97,7 @@ test('theCheckRejectsADriftedShape', () => {
 
 test('socketFollowsTheHomeFoundationUses', () => {
   // The app finds Application Support through Foundation, which honours CFFIXED_USER_HOME.
-  const rel = 'Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
+  const rel = 'Library/Application Support/LiveBridge/run/bridge.sock'
   assert.equal(socketPath('/Users/example', undefined), `/Users/example/${rel}`)
   assert.equal(socketPath('/Users/example', ''), `/Users/example/${rel}`)
   assert.equal(socketPath('/Users/example', '/tmp/lb'), `/tmp/lb/${rel}`)

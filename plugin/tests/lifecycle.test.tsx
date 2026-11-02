@@ -62,7 +62,7 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
   world.otherRecords = { '1.json': '', '2.json': '{"sessionId": "', '3.json': 'null' }
   await $.session.start(START)
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true }])
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
@@ -150,7 +150,7 @@ test('aRemovedSessionTurnsItselfOffAndDoesNotRejoin', async ($, on) => {
   await $.session.start(START)
   expect(world.take('join')).toEqual([])
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true }])
 })
 
 test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
@@ -160,7 +160,7 @@ test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
   world.title = ''
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'example-project' }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'example-project', owner: true }])
   world.title = 'Live mode'
   await world.clock.advance(1000)
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Live mode' }])

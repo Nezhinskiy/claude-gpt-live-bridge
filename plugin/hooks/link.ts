@@ -58,7 +58,9 @@ export class BridgeLink {
 
   /** Joins; true when the app took it. */
   async join(body: JoinBody): Promise<boolean> {
-    const { replaces: _, ...kept } = body  // a later join (after an app restart) replaces nothing
+    // A later join (after an app restart, or following the title) replaces nothing and is not the
+    // owner's: it must not bring back a session the owner removed.
+    const { replaces: _, owner: __, ...kept } = body
     this.#joined = kept
     this.#isKnown = (await this.#send('join', body))?.ok === true
     return this.#isKnown

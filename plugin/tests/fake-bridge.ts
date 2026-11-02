@@ -66,9 +66,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     /** How long the session's model takes over a summary, on the mocked clock. */
     forkMs: 0,
     joined: new Set<string>(),
-    /** Sessions the owner removed in the menu; joining again clears the mark. */
+    /** Sessions the owner removed in the menu; only the owner's join (`/live on`) clears the mark. */
     removed: new Set<string>(),
-    status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
+    status: { call: 'off', sessions: [], minutesToday: 0, unheard: 0 } as StatusReply,
     work: [] as Work[],
     calls: [] as Call[],
     submitted: [] as string[],
@@ -125,7 +125,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     const route = new URL(e.url).pathname.replace('/v1/', '')
     const body = e.init.body === undefined ? undefined : JSON.parse(e.init.body)
     world.calls.push({ route, body })
-    if (route === 'join') world.removed.delete(body.sessionId)
+    if (route === 'join' && body.owner === true) world.removed.delete(body.sessionId)
     if (route === 'join') world.joined.add(body.sessionId)
     if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
     if (route === 'leave') world.joined.delete(body.sessionId)
@@ -133,7 +133,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'answer' && world.answerStatus !== 200) {
       return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
     }
-    // The app answers every call from a removed session so, until it joins again.
+    // The app answers every call from a removed session so, its own joins included, until the owner joins it again.
     if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {
       return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
     }

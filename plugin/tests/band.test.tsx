@@ -84,7 +84,7 @@ test('joiningAsksEverySurfaceToDrawTheBandAgain', async ($, on) => {
 
 const OTHER = '11111111-0000-0000-0000-000000000002'
 const elsewhere = (call: 'off' | 'listening'): StatusReply => ({
-  call, unheard: 0, minutesToday: 0, minutesThisCall: 0, recentTranscript: [],
+  call, unheard: 0, minutesToday: 0,
   sessions: [
     { sessionId: OTHER, label: 'Other session', activity: 'idle', isTarget: true },
     { sessionId: ID, label: 'Example session', activity: 'idle', isTarget: false },
