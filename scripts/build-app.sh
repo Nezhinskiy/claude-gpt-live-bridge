@@ -8,6 +8,8 @@
 #   scripts/build-app.sh --make-signing-identity  create a self-signed code-signing certificate,
 #                                                 so the microphone permission survives upgrades
 #   scripts/build-app.sh --uninstall              remove the app and every file it keeps
+#   scripts/build-app.sh --package                the download: dist/LiveBridge.dmg, built from
+#                                                 the committed HEAD, signed ad hoc, not notarized
 #
 # --fake-mic (debug builds only) plays WAV as the microphone. If CFFIXED_USER_HOME is set, the
 # app keeps its files under that directory instead of your home folder.
@@ -20,7 +22,7 @@ IDENTITY="LiveBridge Local Signing"
 INSTALLED="$HOME/Applications/LiveBridge.app"
 
 usage() {
-  sed -n '4,10s/^# \{0,1\}//p' "$0" >&2
+  sed -n '4,12s/^# \{0,1\}//p' "$0" >&2
   exit 2
 }
 
@@ -152,6 +154,34 @@ EOF
   echo "created \"$IDENTITY\"; scripts/build-app.sh --release now signs with it"
 }
 
+# Builds the downloadable disk image from the committed HEAD in a scratch copy under /tmp, so no
+# path of this Mac ends up in the binary, strips the debug symbols, signs ad hoc (a local signing
+# identity means nothing on another Mac) and writes dist/LiveBridge.dmg with its SHA-256.
+package() {
+  version=$(plutil -extract CFBundleShortVersionString raw app/Support/Info.plist)
+  out="$PWD/dist"
+  src=$(mktemp -d /tmp/livebridge-package.XXXXXX)
+  trap 'rm -rf "$src"' EXIT
+  git archive HEAD | tar -x -C "$src"
+  (
+    cd "$src"
+    assemble release "$src/stage/LiveBridge.app"
+    strip -S -x "$src/stage/LiveBridge.app/Contents/MacOS/LiveBridge"
+    sign "$src/stage/LiveBridge.app" -
+    ln -s /Applications "$src/stage/Applications"
+  )
+  if grep -a -q -e "$HOME" "$src/stage/LiveBridge.app/Contents/MacOS/LiveBridge"; then
+    echo "the binary still names $HOME; nothing packaged" >&2
+    return 1
+  fi
+  mkdir -p "$out"
+  rm -f "$out/LiveBridge.dmg"
+  hdiutil create -quiet -volname "LiveBridge $version" -srcfolder "$src/stage" -ov \
+    -format UDZO "$out/LiveBridge.dmg"
+  (cd "$out" && shasum -a 256 LiveBridge.dmg >LiveBridge.dmg.sha256)
+  echo "packaged $out/LiveBridge.dmg ($version, $(git rev-parse --short HEAD))"
+}
+
 # Removes exactly these paths; the microphone permission is macOS's, so its reset is printed.
 uninstall() {
   if [ -x "$INSTALLED/Contents/MacOS/LiveBridge" ]; then
@@ -176,5 +206,6 @@ case "${1:-}" in
   --release) release ;;
   --make-signing-identity) make_identity ;;
   --uninstall) uninstall ;;
+  --package) package ;;
   *) usage ;;
 esac
