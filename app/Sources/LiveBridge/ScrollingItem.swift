@@ -22,8 +22,10 @@ final class ScrollingItem<Content: View> {
     scroll.hasVerticalScroller = true
     scroll.autohidesScrollers = true
     scroll.scrollerStyle = .overlay
-    scroll.documentView = hosted.host
+    // The item takes the scroll view before the scroll view takes the host: replacing an item's
+    // view takes the old one out of its superview (macOS 27 does), which would empty the scroll.
     hosted.item.view = scroll
+    scroll.documentView = hosted.host
     hosted.resized = { [weak self] in self?.fit() }
     fit()
   }
