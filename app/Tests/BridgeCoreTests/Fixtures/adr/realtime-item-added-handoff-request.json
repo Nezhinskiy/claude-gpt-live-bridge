@@ -1,0 +1,19 @@
+{
+  "emittedAtMs": 1700000000000,
+  "method": "thread/realtime/itemAdded",
+  "params": {
+    "threadId": "00000000-0000-0000-0000-000000000001",
+    "item": {
+      "active_transcript": [
+        {
+          "role": "user",
+          "text": "Please list the files in this folder"
+        }
+      ],
+      "handoff_id": "item_000000000000000000001",
+      "input_transcript": "Please list the files in this folder",
+      "type": "handoff_request",
+      "item_id": "item_000000000000000000001"
+    }
+  }
+}

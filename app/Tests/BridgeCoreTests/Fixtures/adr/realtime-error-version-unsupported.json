@@ -1,0 +1,8 @@
+{
+  "emittedAtMs": 1700000000000,
+  "method": "thread/realtime/error",
+  "params": {
+    "message": "AVAS realtime calls require realtime v1 or v3",
+    "threadId": "00000000-0000-0000-0000-000000000005"
+  }
+}

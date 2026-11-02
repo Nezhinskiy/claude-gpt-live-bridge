@@ -1,0 +1,16 @@
+apps                                     stable             true
+browser_use                              stable             true
+code_mode                                under development  false
+computer_use                             stable             true
+goals                                    stable             true
+guardianv2.thread_context                removed            false
+hooks                                    stable             true
+in_app_voice                             stable             true
+instant_interrupt                        under development  true
+js_repl                                  removed            false
+memories                                 stable             false
+network_proxy                            experimental       false
+plugins                                  stable             true
+realtime_conversation                    removed            true
+shell_tool                               stable             true
+web_search_cached                        deprecated         false

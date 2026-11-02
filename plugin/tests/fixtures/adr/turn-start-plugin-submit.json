@@ -1,0 +1,4 @@
+{
+  "text": "The claude-gpt-live-bridge plugin sent a message:\nExample voice request.\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns — it starts this turn in the user's place. Address the message above.",
+  "turnId": "00000000-0000-0000-0000-000000000007"
+}

@@ -1,0 +1,7 @@
+{
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "LSCopyApplicationURLsForBundleIdentifier() failed while trying to determine the application with bundle identifier io.github.example.nonexistent.\n",
+  "isStdoutTruncated": false,
+  "isStderrTruncated": false
+}

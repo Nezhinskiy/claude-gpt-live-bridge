@@ -1,0 +1,317 @@
+# Architecture overview
+
+LiveBridge lets the owner of a Mac talk to an open Claude Code session. A voice model (GPT-Live,
+reached through `codex app-server`) talks with the owner; the session's own Claude model does the
+work. This document names the parts, what each promises, and how the messages flow. The
+platform facts behind these choices are in [ADR 0001](../adr/0001-platform-findings.md).
+
+## Components
+
+```mermaid
+flowchart LR
+  subgraph Mac
+    subgraph App["LiveBridge.app (menu bar)"]
+      UI["Menu bar glyph and menu"]
+      Bridge["Bridge actor<br/>call machine, session registry,<br/>continuity, usage meter"]
+      Server["HTTP on a Unix socket<br/>(0700 run directory)"]
+      Codex["RealtimeSession + JSON-RPC client"]
+      Audio["Invisible WKWebView<br/>mic, voice detection, pre-roll, WebRTC"]
+    end
+    CodexProc["codex app-server<br/>(read-only, tools off)"]
+    subgraph Engine["Claude Code session"]
+      Mod["livebridge mod<br/>poll, prompts, band"]
+      Claude["Claude (the session's model)"]
+    end
+  end
+  OpenAI[("OpenAI realtime")]
+  UI --- Bridge
+  Server --- Bridge
+  Bridge --- Codex
+  Bridge --- Audio
+  Codex -- stdio --> CodexProc
+  CodexProc -- signalling --> OpenAI
+  Audio -- "WebRTC audio + data channel" --> OpenAI
+  Mod -- "HTTP/1.1, 1 poll per second" --> Server
+  Mod -- "prompt.submit" --> Claude
+```
+
+**`BridgeCore`** (Swift library, no UI) holds every rule, so it is tested without codex, a
+microphone or Claude:
+
+- `CallMachine`: the call's phase — `off`, `listening` (microphone and local voice detection
+  only), `connecting`, `live` (a realtime session is open) — and the effects of each event. It
+  is pure; `Bridge` runs the effects in order.
+- `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
+  request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
+  flight for 10 minutes fails; either is reported to the voice as `[FAILED]`.
+- `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
+  (the owner's, the voice's and the lines the session sent the voice) and the context loaded
+  from it. Each new realtime session is seeded with the target's conversation and only the
+  target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
+  mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
+  own session's conversation. New conversation forgets the target's, removing a session forgets
+  its own, and only the 20 conversations used last are kept.
+- `RealtimeSession`: one ephemeral, read-only codex thread per realtime session; it refuses to go
+  on unless codex reports every MCP server disabled, interrupts every codex turn and declines
+  every request codex sends.
+- `AnswerShaper` and `Redaction`: each delivery to the voice becomes one line, `[TAG] label:
+  text`, of at most 2,000 characters, with the label cut to 120 characters, without code blocks
+  or tables, and with credentials redacted.
+- `UnixHTTPServer` and `Wire`: the mod's routes (below).
+
+**`LiveBridge`** (the app target) wires `BridgeCore` to the menu bar, to `SMAppService` for Open at
+login, and to `AudioHost`: one `WKWebView` in an invisible window (one point, fully transparent,
+click-through, ordered in on every Space, because WebKit holds back the microphone of a page it
+does not consider visible), serving the bundled audio page under its own URL scheme. Before the
+page opens the microphone, the app asks macOS for it itself (WebKit's request never shows the
+prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
+for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
+queued audio into the peer, dropping silence until it has caught up.
+
+**The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
+desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
+and joins again when that title changes, polls it once a second, submits each voice request to
+the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
+background ones by the request marker on the prompt's last line and by the `prompt.submit`
+origin. It draws a band above the prompt with the call's phase, the target, the unheard count
+and the buttons Start/Stop and Talk here, with the problem sentence on a row of its own. Start
+makes the session the target, starts the call and sends the session's summary (none for a
+session with no prompt yet; the last one again, with no model call, while no turn has completed
+since it was written), with a short note in the band while it goes. Talk here shows only while
+the call talks to another session, and moves it here. When the socket does not answer, it opens
+`/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
+to `open -g -b <bundle id>`.
+
+## The wire
+
+HTTP/1.1 over `~/Library/Application Support/LiveBridge/run/bridge.sock`, JSON
+bodies, no other access control than the run directory's mode. The app finds that folder through
+Foundation, which honours `CFFIXED_USER_HOME`; the mod builds the path from `CFFIXED_USER_HOME`
+when it is set, else from `HOME`. `Wire.swift` and
+`plugin/hooks/wire.ts` mirror each other, and `wire/fixtures/` holds one example of every message
+that both test suites parse.
+
+| Route | Body or reply |
+|---|---|
+| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`; an upsert that also refreshes liveness |
+| `POST /v1/leave` | `sessionId`; a request it leaves open fails |
+| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request or a context ask |
+| `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
+| `POST /v1/activity` | `idle`, `working` or `approval` |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
+| `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
+
+Every reply carries the status: the phase, the sessions with their labels (`Title · ab12` when
+two titles are the same) and which one is the target, the minutes today, the problem sentence
+and the count of unheard results. What only the app's menu shows (the minutes this call, the
+target's context line and its conversation) is not on the wire.
+
+A session the owner removed with the menu's × is gone as if it had left, and until the owner
+joins it again (`/live on`, the only join that sends `"owner": true`) every call from it,
+its own automatic joins included, answers `410` with `"code": "removed"`. The mod then turns itself off
+for that session and logs "Removed from LiveBridge. /live on joins again." instead of joining
+again, as it does after a `404` (the app restarted).
+
+## Flows
+
+### Handoff
+
+The owner speaks; the line opens with the pre-roll, the voice hands the request off, and the line
+stays open for its result up to `CallMachine.resultWindowSeconds` (120 s) after the latest
+handoff, however silent it is (sound without words still closes it after 90 s). A result from a session handed a request in that window is given
+to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the owner
+(local voice detection) nor the voice is speaking; when either was, the bridge waits until both
+are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
+line. A window that passes with no result closes the line once it is silent; that result chimes
+later as below. A line with no handoff waiting keeps the plain silence rule, so an exchange that
+sends nothing to Claude costs no more than before. codex has no request that makes the v3 voice
+respond, so whether it says the speakable text at once is the model's choice
+([ADR 0001](../adr/0001-platform-findings.md) (b)).
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Page as Audio page
+  participant Bridge
+  participant Codex as codex + OpenAI
+  participant Mod
+  participant Claude
+  Owner->>Page: speech
+  Note over Page: holds the pre-roll and every new frame from here
+  Page->>Bridge: speechStarted (listening → connecting)
+  Bridge->>Page: makeOffer
+  Bridge->>Codex: thread/start, MCP check, thread/realtime/start (initialItems)
+  Codex-->>Bridge: SDP answer
+  Bridge->>Page: applyAnswer, then flushPreroll (connecting → live)
+  Page->>Codex: the queued speech, then live audio
+  Codex-->>Bridge: handoff_request (brief + transcript)
+  Bridge->>Bridge: enqueue for the target, arm the 120 s result window
+  Codex-->>Owner: "On it."
+  Mod->>Bridge: GET /v1/next
+  Bridge-->>Mod: work: request
+  Mod->>Claude: prompt.submit (brief, quoted transcript, marker)
+  Claude-->>Mod: turn.complete
+  Mod->>Bridge: POST /v1/answer ok
+  Bridge->>Codex: appendSpeech "[RESULT] label: …" (once nobody is speaking)
+  Codex-->>Owner: the result
+  Bridge->>Bridge: 20 s of silence (live → listening)
+```
+
+### Silent hang-up
+
+The realtime session is billed while open, so silence closes it. Voice detection keeps running
+on the Mac, and the next speech opens a new session seeded with the target's conversation so
+far. A new target closes an open line the same way, so the next speech opens it with the new
+target's conversation.
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Page as Audio page
+  participant Bridge
+  participant Codex as codex + OpenAI
+  Owner->>Page: stops talking
+  Page->>Bridge: speechEnded
+  Bridge->>Bridge: arm the 20 s silence timer
+  Note over Bridge: speech, recognised words and the voice's own speech re-arm it (90 s while sound goes on)
+  Bridge->>Bridge: silence elapsed (live → listening)
+  Bridge->>Page: closePeer
+  Bridge->>Codex: thread/realtime/stop
+  Note over Page: the mic and voice detection stay on, nothing is sent
+```
+
+### A result while the line is closed
+
+A result that arrives while the line is closed (after the window, or after a hang-up) does not
+reopen it. It chimes and waits; the voice gets it when the owner next speaks and says it in a
+reply. A result for a session the open line is not waiting on is added as context and said in
+the voice's next reply.
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Page as Audio page
+  participant Bridge
+  participant Codex as codex + OpenAI
+  participant Mod
+  Mod->>Bridge: POST /v1/answer ok
+  Bridge->>Bridge: "[RESULT] label: …" into pending (unheard 1)
+  Bridge->>Owner: chime
+  Owner->>Page: speech
+  Page->>Bridge: speechStarted
+  Bridge->>Codex: open a realtime session
+  Bridge->>Page: flushPreroll
+  Bridge->>Codex: appendText each pending line
+  Codex-->>Owner: reply to the owner, then the result (unheard 0)
+```
+
+A result stays unheard until the voice finishes a reply that it began after the result and
+that says it. A word counts when it has four letters or more and is not in a short list of
+common words (English and Russian only). The reply must say two of the result's words, or the
+session's label together with one of them. The label alone counts only for a result that has no
+such word, which could not be heard otherwise. The handoff's own acknowledgement never counts,
+nor does a reply the owner cut off before it got there. If the line closes first, the result
+chimes and waits again: it may be said twice, but it is never lost.
+
+This is the one description of the rule; the README links here.
+
+A newer request to the same session withdraws its older unheard result, a timed-out one
+included, so the voice never reads an answer that has been superseded. An `[APPROVAL]` notice is
+withdrawn once the approval is settled.
+
+### Question loop
+
+An answer that ends with a question goes back to the owner, and the owner's reply is handed to
+the session that asked, even if another session is the target.
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Codex as voice
+  participant Bridge
+  participant Mod
+  participant Claude
+  Claude-->>Mod: turn ends with "…?"
+  Mod->>Bridge: POST /v1/answer question
+  Bridge->>Codex: "[QUESTION] label: …"
+  Codex-->>Owner: asks the question
+  Owner->>Codex: answers
+  Codex-->>Bridge: handoff_request
+  Bridge->>Bridge: route to the session that asked
+  Bridge-->>Mod: work: request
+  Mod->>Claude: prompt.submit
+```
+
+### Later update
+
+Work Claude starts from a voice request can finish in a later turn started by a background
+task's notification (a returning background agent included). For 10 minutes after the voice
+request, and until any other turn starts, each such turn's answer is posted as an update to that
+request. A turn of any other origin, one the mod does not know or does not see included, closes
+the window and is never sent to the voice.
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Codex as voice
+  participant Bridge
+  participant Mod
+  participant Claude
+  Claude-->>Mod: voice turn ends ("started the tests in the background")
+  Mod->>Bridge: POST /v1/answer ok
+  Note over Claude: later: a background task notifies, a new turn starts
+  Claude-->>Mod: that turn ends
+  Mod->>Bridge: POST /v1/answer update (same request id)
+  Bridge->>Codex: "[UPDATE] label: …" (or chime and wait if closed)
+  Codex-->>Owner: the update
+  Note over Mod: a typed turn ends the follow-up window
+```
+
+### Approval notice
+
+The bridge never answers a permission prompt. When a voice turn hits one, the voice says that
+Claude is waiting; the owner answers in Claude Code.
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Codex as voice
+  participant Bridge
+  participant Mod
+  participant Claude
+  Claude->>Mod: classic.PermissionRequest (during a voice turn)
+  Mod->>Bridge: POST /v1/activity approval
+  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval"
+  Codex-->>Owner: says so (or a chime if the line is closed)
+  Owner->>Claude: answers the prompt in Claude Code
+  Claude->>Mod: classic.PostToolUse or PermissionDenied
+  Mod->>Bridge: POST /v1/activity working
+```
+
+## Failure behaviour
+
+- **No session joined:** Start is disabled in the menu. From the band or the socket, Start
+  does nothing but report "No Claude Code session has joined: run /live on in a session, then
+  start."; the sentence goes when a session joins.
+- **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
+  band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
+  gives no answer within 10 s.
+- **A plan without realtime voice, or any realtime error:** the first connect reports codex's
+  own words in one sentence, with a hint when they name sign-in or the plan, and the call goes
+  back to `listening`.
+- **Codex installed with npm, or found only through a shell's start-up files:** the app reads
+  `PATH` from the user's own shell (at most 3 s) and starts codex with it; a codex whose runtime
+  is still missing gets its own sentence.
+- **The app not running:** the mod opens it; while the socket does not answer for 10 s the band
+  says "bridge offline". After the app restarts, the mod joins again on its next poll; the call
+  starts off.
+- **Codex exits or stops answering under the app:** the next speech reports it once, and the
+  speech after that starts a fresh codex. A request codex leaves unanswered past its timeout
+  ends that codex as an exit does.
+- **The microphone is denied, missing, busy or lost:** the call goes to `off` with the reason.
+  Denied says where to allow it, and the menu offers to open that setting. Busy means it
+  could not be opened, perhaps because another app holds it; a request still pending after
+  10 s fails with its own sentence instead of listening to nothing. When the
+  default input changes mid-call, the page takes the new one and keeps the peer.
+- **Local Network access blocked:** with no ICE candidate within 2 s, the call goes to `off` with a
+  sentence naming the setting.

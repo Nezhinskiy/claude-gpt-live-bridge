@@ -1,0 +1,8 @@
+{
+  "emittedAtMs": 1700000000000,
+  "method": "thread/realtime/closed",
+  "params": {
+    "threadId": "00000000-0000-0000-0000-000000000004",
+    "reason": "error"
+  }
+}

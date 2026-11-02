@@ -1,0 +1,49 @@
+{
+  "id": 3,
+  "result": {
+    "data": [
+      {
+        "authStatus": "unsupported",
+        "pluginId": null,
+        "httpOrigin": null,
+        "toolsError": null,
+        "toolListMeta": null,
+        "runtimeStatus": "disabled",
+        "resources": [],
+        "tools": {},
+        "serverInfo": null,
+        "resourceTemplates": [],
+        "name": "example-stdio",
+        "serverCapabilities": null
+      },
+      {
+        "name": "example-http",
+        "runtimeStatus": "connected",
+        "pluginId": null,
+        "httpOrigin": "https://mcp.example.com",
+        "serverInfo": {
+          "name": "Example",
+          "title": "Example",
+          "version": "1.0.0"
+        },
+        "serverCapabilities": {
+          "tools": {}
+        },
+        "toolListMeta": null,
+        "tools": {
+          "example-tool": {
+            "name": "example-tool",
+            "inputSchema": {
+              "type": "object"
+            }
+          }
+        },
+        "toolsError": null,
+        "resources": [],
+        "resourceTemplates": [],
+        "authStatus": "notLoggedIn"
+      }
+    ],
+    "nextCursor": null
+  }
+}

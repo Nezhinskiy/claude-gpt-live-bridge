@@ -1,0 +1,9 @@
+{
+  "emittedAtMs": 1700000000000,
+  "method": "thread/realtime/transcript/done",
+  "params": {
+    "text": "Please list the files in this folder",
+    "threadId": "00000000-0000-0000-0000-000000000001",
+    "role": "user"
+  }
+}

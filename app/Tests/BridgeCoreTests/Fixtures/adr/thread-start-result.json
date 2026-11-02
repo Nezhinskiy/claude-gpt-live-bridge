@@ -1,0 +1,69 @@
+{
+  "id": 2,
+  "result": {
+    "reasoningEffort": "low",
+    "thread": {
+      "modelProvider": "openai",
+      "projectId": null,
+      "extra": null,
+      "preview": "",
+      "status": {
+        "type": "idle"
+      },
+      "cliVersion": "0.166.0",
+      "source": "vscode",
+      "agentRole": null,
+      "canAcceptDirectInput": true,
+      "parentThreadId": null,
+      "environments": [
+        {
+          "cwd": "/Users/example/Library/Application Support/LiveBridge/codex-cwd",
+          "runtimeWorkspaceRoots": [
+            "/Users/example/Library/Application Support/LiveBridge/codex-cwd"
+          ],
+          "environmentId": "local"
+        }
+      ],
+      "forkedFromId": null,
+      "sessionId": "00000000-0000-0000-0000-000000000001",
+      "ephemeral": true,
+      "createdAt": 1700000000,
+      "path": null,
+      "historyMode": "paginated",
+      "reasoningEffort": "low",
+      "updatedAt": 1700000000,
+      "id": "00000000-0000-0000-0000-000000000001",
+      "sectionEnteredAt": null,
+      "cwd": "/Users/example/Library/Application Support/LiveBridge/codex-cwd",
+      "originator": "livebridge",
+      "threadSource": null,
+      "gitInfo": null,
+      "name": null,
+      "model": "gpt-6.1-sol",
+      "daybreakEnabled": null,
+      "agentNickname": null,
+      "turns": [],
+      "recencyAt": 1700000000,
+      "section": null
+    },
+    "approvalPolicy": "never",
+    "disabledPluginIds": [],
+    "instructionSources": [
+      "/Users/example/.codex/AGENTS.md"
+    ],
+    "cwd": "/Users/example/Library/Application Support/LiveBridge/codex-cwd",
+    "approvalsReviewer": "user",
+    "sandbox": {
+      "type": "readOnly",
+      "networkAccess": false
+    },
+    "runtimeWorkspaceRoots": [
+      "/Users/example/Library/Application Support/LiveBridge/codex-cwd"
+    ],
+    "multiAgentMode": "explicitRequestOnly",
+    "serviceTier": "default",
+    "modelProvider": "openai",
+    "model": "gpt-6.1-sol",
+    "activePermissionProfile": null
+  }
+}

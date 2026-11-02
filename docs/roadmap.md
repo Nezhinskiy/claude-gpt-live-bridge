@@ -6,11 +6,16 @@ prose above the trail marker.
 
 ## Now
 
-Nothing yet — name the phase this project is in, and what closing it means.
+0.1.0, the first release. Closing it means tagging `v0.1.0` with a short demo recording.
 
 ## Next
 
-Nothing yet.
+The README's [known limitations](../README.md#known-limitations), starting with a reopened line
+that does not always speak a waiting result first.
+
+After that, three directions open to contributors, described in the README's
+[roadmap and help wanted](../README.md#roadmap-and-help-wanted): Windows and Linux, other agents
+as the worker besides Claude Code, and other voice providers besides codex on a ChatGPT login.
 
 <!-- Everything from the next heading to the end-of-trail comment is rewritten by `stayfixed docs
      trail`, the paragraph under it included: stayfixed writes that paragraph, line breaks and

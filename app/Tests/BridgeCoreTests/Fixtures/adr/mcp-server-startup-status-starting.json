@@ -1,0 +1,11 @@
+{
+  "method": "mcpServer/startupStatus/updated",
+  "params": {
+    "threadId": "00000000-0000-0000-0000-000000000002",
+    "name": "example-http",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+  },
+  "emittedAtMs": 1700000000000
+}

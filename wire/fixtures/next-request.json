@@ -1,0 +1,33 @@
+{
+  "status": {
+    "call": "live",
+    "minutesToday": 12.25,
+    "problem": "Example problem sentence.",
+    "sessions": [
+      {
+        "activity": "working",
+        "isTarget": true,
+        "label": "Example session · 0000",
+        "sessionId": "00000000-0000-0000-0000-000000000001"
+      },
+      {
+        "activity": "idle",
+        "isTarget": false,
+        "label": "Example session · 1111",
+        "sessionId": "11111111-0000-0000-0000-000000000002"
+      }
+    ],
+    "unheard": 1
+  },
+  "work": {
+    "brief": "Please list the files in this folder",
+    "id": "00000000-0000-0000-0000-00000000000a",
+    "kind": "request",
+    "transcript": [
+      {
+        "role": "user",
+        "text": "Please list the files in this folder"
+      }
+    ]
+  }
+}

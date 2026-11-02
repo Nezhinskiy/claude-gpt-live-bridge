@@ -1,0 +1,9 @@
+{
+  "emittedAtMs": 1700000000000,
+  "method": "thread/realtime/transcript/delta",
+  "params": {
+    "delta": "Please list",
+    "threadId": "00000000-0000-0000-0000-000000000001",
+    "role": "user"
+  }
+}

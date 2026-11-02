@@ -1,0 +1,18 @@
+{
+  "status": {
+    "call": "listening",
+    "minutesToday": 3,
+    "sessions": [
+      {
+        "activity": "idle",
+        "isTarget": true,
+        "label": "Example session",
+        "sessionId": "00000000-0000-0000-0000-000000000001"
+      }
+    ],
+    "unheard": 0
+  },
+  "work": {
+    "kind": "context"
+  }
+}

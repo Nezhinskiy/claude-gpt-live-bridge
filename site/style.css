@@ -1,0 +1,647 @@
+/* LiveBridge site. No web fonts, no external assets: the page is set in the Mac's own faces. */
+
+:root {
+  --bg: #f1f6f7;
+  --surface: #ffffff;
+  --ink: #142a2e;
+  --muted: #4a5f63;
+  --accent: #0b6f79;
+  --accent-soft: rgba(11, 111, 121, 0.09);
+  --line: rgba(20, 42, 46, 0.12);
+  --hero-top: #2a737c;
+  --hero-bottom: #173f46;
+  --code-bg: #12343a;
+  --code-ink: #e4f2f3;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --shadow: 0 1px 2px rgba(16, 52, 58, 0.06), 0 12px 32px -12px rgba(16, 52, 58, 0.18);
+
+  --display: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --text: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --measure: 40rem;
+  --wide: 66rem;
+  --gutter: 24px;
+  --section-gap: 112px;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1d20;
+    --surface: #152629;
+    --ink: #e6f0f1;
+    --muted: #a2b6b9;
+    --accent: #72d4dc;
+    --accent-soft: rgba(114, 212, 220, 0.1);
+    --line: rgba(230, 240, 241, 0.12);
+    --hero-top: #22626a;
+    --hero-bottom: #102f35;
+    --code-bg: #0a1618;
+    --code-ink: #dcecee;
+    --glass: rgba(255, 255, 255, 0.05);
+    --glass-edge: rgba(255, 255, 255, 0.1);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.55 var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  line-height: 1.15;
+  margin: 0;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 0.1em 0.38em;
+  white-space: nowrap;
+}
+
+.skip {
+  position: absolute;
+  left: 16px;
+  top: -100px;
+  z-index: 10;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px 16px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+.skip:focus {
+  top: 16px;
+}
+
+/* Hero: the app icon's tile, enlarged to hold the page's opening. */
+
+.hero {
+  position: relative;
+  margin: 16px;
+  padding: 72px var(--gutter) 28px;
+  border-radius: 40px;
+  color: #fff;
+  text-align: center;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
+    radial-gradient(70% 50% at 50% 100%, rgba(120, 210, 218, 0.22), rgba(120, 210, 218, 0) 70%),
+    linear-gradient(180deg, var(--hero-top), var(--hero-bottom));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    var(--shadow);
+}
+
+.hero-inner {
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.hero-icon {
+  display: block;
+  width: 112px;
+  height: 112px;
+  margin: 0 auto 12px;
+  filter: drop-shadow(0 10px 24px rgba(0, 20, 24, 0.35));
+}
+
+.hero h1 {
+  font-size: clamp(3.25rem, 8.5vw, 6rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.tagline {
+  margin: 14px 0 20px;
+  font-family: var(--display);
+  font-size: clamp(1.3rem, 2.6vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  max-width: 36rem;
+  margin: 0 auto 32px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+.button-glyph {
+  width: 18px;
+  height: 18px;
+}
+
+.hero .button:focus-visible {
+  outline-color: #fff;
+}
+
+.primary {
+  background: #fff;
+  color: #0d4f57;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 8px 20px -8px rgba(0, 20, 24, 0.5);
+}
+
+.primary:hover {
+  background: #eef9fa;
+}
+
+.secondary {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.platform {
+  margin: 16px 0 0;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+/* The span: bars on a deck, like the icon and the menu bar glyph. */
+
+.span {
+  display: block;
+  width: 100%;
+  max-width: 68rem;
+  height: auto;
+  margin: 48px auto 0;
+}
+
+.span .deck {
+  fill: #fff;
+  opacity: 0.94;
+}
+
+.bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: rise 900ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+  animation-delay: calc(var(--i) * 20ms + 200ms);
+}
+
+@keyframes rise {
+  from {
+    transform: scaleY(0.04);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+  .button {
+    transition: none;
+  }
+}
+
+.unofficial {
+  max-width: 44rem;
+  margin: 20px auto 0;
+  padding: 0 var(--gutter);
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Main column */
+
+main {
+  max-width: var(--wide);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+main > section {
+  margin-top: var(--section-gap);
+}
+
+main > section > h2 {
+  font-size: clamp(2rem, 4.2vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 16px;
+}
+
+.section-lede {
+  font-size: 19px;
+  color: var(--muted);
+  max-width: var(--measure);
+}
+
+main h3 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+
+/* Demo: the recording of one request. */
+
+main > section.demo {
+  margin-top: 56px;
+  padding: 36px 40px 40px;
+  border-radius: 28px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), var(--shadow);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+main > section.demo > .card-title {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 28px;
+}
+
+.demo-gif {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--glass-edge);
+}
+
+.directions p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+/* How it works: the app sits in the middle, carrying the line between the other two. */
+
+.roles {
+  display: grid;
+  grid-template-columns: 1fr 1.08fr 1fr;
+  align-items: stretch;
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.role {
+  padding: 28px 8px 8px;
+  border-top: 2px solid var(--line);
+}
+
+.role p {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.role .role-sub {
+  color: var(--ink);
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.role-app {
+  padding: 28px 28px 20px;
+  border-top: 0;
+  border-radius: 24px;
+  color: #fff;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, var(--hero-top), var(--hero-bottom));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), var(--shadow);
+}
+
+.role-app p,
+.role-app .role-sub {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Install */
+
+.requirements {
+  max-width: var(--measure);
+  color: var(--muted);
+}
+
+.steps {
+  list-style: none;
+  margin: 40px 0 0;
+  padding: 0;
+  counter-reset: step;
+  max-width: 46rem;
+}
+
+.step {
+  position: relative;
+  counter-increment: step;
+  padding: 0 0 40px 64px;
+}
+
+.step + .step {
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+
+.step::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  font: 700 40px/1 var(--display);
+  color: var(--accent);
+  letter-spacing: -0.03em;
+}
+
+.step h3 {
+  font-size: 22px;
+  margin-bottom: 12px;
+  padding-top: 6px;
+}
+
+.substeps {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+}
+
+.substeps li + li {
+  margin-top: 6px;
+}
+
+.aside {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.code {
+  position: relative;
+  margin: 0 0 1em;
+}
+
+.code pre {
+  margin: 0;
+  padding: 16px 20px;
+  padding-right: 88px;
+  border-radius: 14px;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  overflow-x: auto;
+  font: 14.5px/1.7 var(--mono);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.code pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+  white-space: inherit;
+}
+
+.copy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 999px;
+  font: 600 13px/1 var(--text);
+  color: var(--code-ink);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+}
+
+.copy:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.copy:focus-visible {
+  outline-color: var(--code-ink);
+}
+
+/* Highlights */
+
+.highlights {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 40px 56px;
+  margin: 40px 0 0;
+}
+
+.highlights > div {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.highlights dt {
+  font: 650 19px/1.3 var(--display);
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+
+.highlights dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+/* Open source */
+
+#open-source > p {
+  max-width: var(--measure);
+}
+
+.directions {
+  list-style: none;
+  margin: 32px 0 36px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.directions li {
+  padding: 24px;
+  border-radius: 20px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.tertiary {
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.tertiary:hover {
+  background: var(--accent-soft);
+}
+
+/* Footer */
+
+.footer {
+  max-width: var(--wide);
+  margin: var(--section-gap) auto 0;
+  padding: 32px var(--gutter) 48px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.footer ul {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  font-size: 15px;
+}
+
+.footer p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+/* Narrow screens */
+
+@media (max-width: 860px) {
+  .roles {
+    grid-template-columns: 1fr;
+  }
+  .role {
+    padding: 24px 0 4px;
+  }
+  .role-app {
+    padding: 24px;
+  }
+  .directions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --gutter: 20px;
+    --section-gap: 80px;
+  }
+  .hero {
+    margin: 10px;
+    padding-top: 48px;
+    border-radius: 30px;
+  }
+  .hero-icon {
+    width: 88px;
+    height: 88px;
+  }
+  .span {
+    margin-top: 36px;
+  }
+  main > section.demo {
+    padding: 28px 24px;
+    border-radius: 24px;
+  }
+  .highlights {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .step {
+    padding-left: 44px;
+  }
+  .step::before {
+    font-size: 32px;
+  }
+  /* The copy button gets its own row, so it never covers a long command. */
+  .code:not(.code-short) pre {
+    padding: 50px 18px 16px;
+  }
+  .copy {
+    top: 8px;
+    right: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .actions .button {
+    width: 100%;
+  }
+}

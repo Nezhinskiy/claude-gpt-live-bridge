@@ -1,0 +1,26 @@
+{
+  "pid": 12345,
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "cwd": "/Users/example/Dev/example-project",
+  "startedAt": 1700000000000,
+  "procStart": "Mon Jan  1 00:00:00 2024",
+  "version": "2.1.309",
+  "peerProtocol": 1,
+  "peerFeatures": [
+    "notify_idle",
+    "reply_across_default_dirs",
+    "artifact_yield"
+  ],
+  "kind": "interactive",
+  "entrypoint": "claude-desktop",
+  "hostSessionId": "local_00000000-0000-0000-0000-000000000002",
+  "pidDomain": "darwin",
+  "messagingSocketPath": "/Users/example/.claude/run/example.sock",
+  "name": "Example session",
+  "nameSource": "user",
+  "nameSince": 1700000000000,
+  "status": "idle",
+  "updatedAt": 1700000000000,
+  "statusUpdatedAt": 1700000000000,
+  "bridgeSessionId": "session_000000000000000000000000"
+}

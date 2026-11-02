@@ -1,0 +1,4 @@
+# xcode-27 is the Xcode 27 preview image in actions/runner-images, newer than actionlint knows.
+self-hosted-runner:
+  labels:
+    - xcode-27

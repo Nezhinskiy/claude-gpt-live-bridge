@@ -3,3 +3,10 @@
 .stayfixed/local/
 .stayfixed/assessment.json
 # stayfixed:ignore:end
+# SwiftPM build output.
+app/.build/
+# The mod's development dependencies and the types the engine lays beside a loaded mod.
+plugin/node_modules/
+plugin/.claude-plugin/types/
+# The packaged download (scripts/build-app.sh --package).
+dist/
