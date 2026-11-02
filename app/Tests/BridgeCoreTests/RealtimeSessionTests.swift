@@ -106,7 +106,7 @@ struct RealtimeSessionTests {
     #expect(realtime["prompt"]?.string == VoicePrompt.text)
     #expect(realtime["initialItems"] == (try JSONValue(encoding: items)))
     #expect(realtime["voice"] == nil)  // codex's default
-    #expect(realtime["model"] == nil)  // codex's configured realtime model
+    #expect(realtime["model"] == nil)  // codex ignores a model on this route (ADR 0001 (k))
   }
 
   /// The voice chosen in Settings is read at each open, so a change applies from the next one.
@@ -134,29 +134,6 @@ struct RealtimeSessionTests {
     #expect(
       await rpc.params("thread/realtime/start").map { $0["prompt"]?.string }
         == [VoicePrompt.composed(owner: "Speak with me in Spanish."), VoicePrompt.text])
-  }
-
-  /// The model chosen in Settings is read at each open; codex's own is asked for by sending no
-  /// `model`.
-  @Test func openUsesTheChosenModel() async throws {
-    let chosen = Chosen()
-    let session = RealtimeSession(client: rpc, cwd: cwd, model: { chosen.model })
-    chosen.model = "gpt-realtime-example"
-    _ = try await session.open(offerSDP: "offer", items: [])
-    await session.close()
-    chosen.model = nil
-    _ = try await session.open(offerSDP: "offer", items: [])
-    #expect(
-      await rpc.params("thread/realtime/start").map { $0["model"] } == [
-        "gpt-realtime-example", nil,
-      ])
-  }
-
-  /// A model name of only spaces is no choice: codex's default stands.
-  @Test func aBlankModelIsNotSent() async throws {
-    let session = RealtimeSession(client: rpc, cwd: cwd, model: { "  " })
-    _ = try await session.open(offerSDP: "offer", items: [])
-    #expect(await rpc.params("thread/realtime/start").first?["model"] == nil)
   }
 
   @Test func openRefusesWhenAServerIsEnabled() async throws {
@@ -322,6 +299,5 @@ struct RealtimeSessionTests {
 
 final class Chosen: @unchecked Sendable {
   var voice: String?
-  var model: String?
   var prompt = ""
 }

@@ -1,30 +1,41 @@
+import AppKit
 import BridgeCore
 import Foundation
 import Observation
-import SwiftUI
 import os
 
-/// The entry point. `--unregister-login-item` (run by `build-app.sh --uninstall`) removes the
-/// app's login item and exits before anything else starts.
+/// The entry point: LiveBridge.app, a menu bar app with no Dock icon (`LSUIElement`), its menu
+/// bar item and its Settings window AppKit's. `--unregister-login-item` (run by
+/// `build-app.sh --uninstall`) removes the app's login item and exits before anything starts.
 @main
 enum Main {
-  static func main() {
-    guard CommandLine.arguments.contains("--unregister-login-item") else {
-      return LiveBridgeApp.main()
+  @MainActor static func main() {
+    guard !CommandLine.arguments.contains("--unregister-login-item") else {
+      let wasEnabled = LoginItem.isEnabled
+      try? LoginItem.set(false)
+      return print(wasEnabled ? "removed the login item" : "no login item was registered")
     }
-    let wasEnabled = LoginItem.isEnabled
-    try? LoginItem.set(false)
-    print(wasEnabled ? "removed the login item" : "no login item was registered")
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.setActivationPolicy(.accessory)
+    app.mainMenu = editMenu()
+    withExtendedLifetime(delegate) { app.run() }
   }
-}
 
-/// LiveBridge.app: a menu bar app with no Dock icon (`LSUIElement`). The menu bar item and its
-/// menu are AppKit's (`StatusMenu`); Settings is the one SwiftUI scene.
-struct LiveBridgeApp: App {
-  @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-
-  var body: some Scene {
-    Settings { SettingsView(model: delegate.model) }
+  /// The app shows no menu bar, but the Settings window's text fields still take ⌘X, ⌘C, ⌘V,
+  /// ⌘A and ⌘Z through these items, and the window closes with ⌘W.
+  @MainActor private static func editMenu() -> NSMenu {
+    let edit = NSMenu(title: "Edit")
+    for (title, action, key) in [
+      ("Undo", "undo:", "z"), ("Redo", "redo:", "Z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"),
+      ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a"), ("Close", "performClose:", "w"),
+    ] {
+      edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
+    }
+    let menu = NSMenu()
+    menu.addItem(withTitle: "Edit", action: nil, keyEquivalent: "").submenu = edit
+    return menu
   }
 }
 
@@ -73,54 +84,16 @@ final class AppModel {
       }
     }
   }
-  /// The voice chosen in Settings; nil is codex's default. It applies from the next opening.
-  var voice: String? {
-    didSet { settings?.update { [voice] in $0.voice = voice } }
-  }
-  /// The owner's own prompt for the voice, at most `VoicePrompt.ownerLimit` characters; empty
-  /// adds nothing. It applies from the next opening.
-  var prompt = "" {
-    didSet {
-      if prompt.count > VoicePrompt.ownerLimit {
-        prompt = String(prompt.prefix(VoicePrompt.ownerLimit))
-      }
-      settings?.update { [prompt] in $0.prompt = prompt }
-    }
-  }
-  /// Use codex's own realtime model; otherwise `modelName`. It applies from the next opening.
-  var codexModel = true {
-    didSet { saveModel() }
-  }
-  /// The realtime model typed in Settings, kept while Codex default is chosen in this run.
-  var modelName = "" {
-    didSet { saveModel() }
-  }
-  /// Load a session's context automatically when it becomes the target.
-  var autoContext = false {
-    didSet {
-      settings?.update { [autoContext] in $0.autoContext = autoContext }
-      Task { [autoContext] in await bridge?.setAutoContext(autoContext) }
-    }
-  }
-  /// Post a notification with the chime for a result waiting while the line is closed.
-  var notifyResults = true {
-    didSet {
-      settings?.update { [notifyResults] in $0.notifyResults = notifyResults }
-      let turnedOn = notifyResults && !oldValue  // permission is asked then, not at launch
-      Task { [notifyResults] in
-        await bridge?.setNotifies(notifyResults)
-        if turnedOn { await notifier.authorize() }
-        await refreshNotificationStatus()
-      }
-    }
-  }
   /// The owner refused notifications in System Settings.
   private(set) var notificationsDenied = false
   @ObservationIgnored let notifier = Notifier()
   private(set) var voices = VoiceListing.idle
   /// Why the chosen voice was set back to codex's default.
   private(set) var voiceNote: String?
-  @ObservationIgnored private var settings: SettingsStore?
+  /// The settings, which the Settings window shows and changes. Without its data folder the
+  /// app does not start, and the window keeps no change.
+  @ObservationIgnored let settings: SettingsStore
+  @ObservationIgnored private var settingsWindow: SettingsWindow?
   @ObservationIgnored private var codexCwd: URL?
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
@@ -133,30 +106,25 @@ final class AppModel {
   var problem: String? { appProblem ?? status?.problem }
 
   init() {
+    let data = Result { try Paths.dataDir() }
+    let settings = SettingsStore(file: try? data.get().appending(path: "settings.json"))
+    self.settings = settings
     do {
-      let data = try Paths.dataDir()
+      let data = try data.get()
       let cwd = data.appending(path: "codex-cwd")
       try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
-      let settings = SettingsStore(file: data.appending(path: "settings.json"))
-      self.settings = settings
       codexCwd = cwd
-      voice = settings.current.voice
-      prompt = settings.current.prompt
-      modelName = settings.current.model ?? ""
-      codexModel = settings.current.model == nil
-      autoContext = settings.current.autoContext
-      notifyResults = settings.current.notifyResults
       let time = SystemTime()
-      let registry = SessionRegistry(time: time, autoContext: settings.current.autoContext)
+      let registry = SessionRegistry(time: time, autoContext: { settings.current.autoContext })
       let bridge = Bridge(
         registry: registry,
         realtime: { try await Self.voice(cwd: cwd, settings: settings) },
         audio: audio, meter: UsageMeterStore(file: data.appending(path: "usage.json"), time: time),
-        continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier)
+        continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier,
+        notifies: { settings.current.notifyResults })
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       try server.start()
       self.bridge = bridge
-      Task { [notifyResults] in await bridge.setNotifies(notifyResults) }
       self.server = server
       let (events, sink) = AsyncStream.makeStream(of: AudioEvent.self)
       audio.onEvent = { sink.yield($0) }
@@ -175,6 +143,22 @@ final class AppModel {
   }
 
   func perform(_ action: CallAction) { Task { await bridge?.perform(action) } }
+
+  /// Opens the Settings window in front of the other apps' windows.
+  func showSettings() {
+    let window = settingsWindow ?? SettingsWindow(model: self)
+    settingsWindow = window
+    window.show()
+  }
+
+  /// Settings' notifications; macOS asks for permission when they are turned on, not at launch.
+  func setNotifyResults(_ on: Bool) {
+    settings.update { $0.notifyResults = on }
+    Task {
+      if on { await notifier.authorize() }
+      await refreshNotificationStatus()
+    }
+  }
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
 
   /// The session row's ×, once the owner confirms it; the menu has closed by then.
@@ -267,8 +251,8 @@ final class AppModel {
       do {
         let offered = try await Self.offeredVoices(cwd: codexCwd)
         voices = .loaded(offered)
-        if let chosen = voice, Voices.effective(chosen, offered: offered) == nil {
-          voice = nil
+        if let chosen = settings.current.voice, !offered.contains(chosen) {
+          settings.update { $0.voice = nil }
           voiceNote = "Codex no longer offers \(chosen), so its default voice is used."
         }
       } catch {
@@ -277,21 +261,14 @@ final class AppModel {
     }
   }
 
-  /// The model sent to codex: none for Codex default or a blank name.
-  private func saveModel() {
-    let name = modelName.trimmingCharacters(in: .whitespacesAndNewlines)
-    let model = codexModel || name.isEmpty ? nil : name
-    settings?.update { $0.model = model }
-  }
-
   /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed`
-  /// off. The voice, model and prompt chosen in Settings are read at each opening.
+  /// off. The voice and the prompt chosen in Settings are read at each opening.
   nonisolated private static func voice(cwd: URL, settings: SettingsStore)
     async throws -> any RealtimeControlling
   {
     RealtimeSession(
       client: try await launchCodex(cwd: cwd), cwd: cwd, voice: { settings.current.voice },
-      model: { settings.current.model }, prompt: { settings.current.prompt })
+      prompt: { settings.current.prompt })
   }
 
   /// The voices, from a codex app-server started for the question and ended after it.

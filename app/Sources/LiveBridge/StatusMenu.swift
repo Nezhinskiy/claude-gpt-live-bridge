@@ -33,8 +33,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   /// Actions that wait until the menu has closed and its tracking has ended, as an alert does.
   private var afterClose: [() -> Void] = []
   private var pending: [() -> Void] = []
-  /// The Settings scene's opener, taken from the call card's SwiftUI environment.
-  var openSettingsAction: (() -> Void)?
 
   init(model: AppModel) {
     self.model = model
@@ -238,23 +236,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   @objc private func newConversation() { later { [model] in model.newConversation() } }
 
-  /// Opens Settings in front: the app is activated first, as a menu bar app is not active.
-  /// Should no window open, the app menu's own Settings… item opens it.
-  @objc private func showSettings() {
-    later { [weak self] in
-      NSApp.activate()
-      self?.openSettingsAction?()
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-        guard !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }),
-          let item = NSApp.mainMenu?.items.first?.submenu?.items.first(where: {
-            $0.keyEquivalent == "," && $0.keyEquivalentModifierMask == .command
-          }),
-          let action = item.action
-        else { return }
-        NSApp.sendAction(action, to: item.target, from: item)
-      }
-    }
-  }
+  @objc private func showSettings() { later { [model] in model.showSettings() } }
 
   @objc private func quit() { NSApp.terminate(nil) }
 

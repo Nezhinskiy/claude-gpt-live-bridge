@@ -13,11 +13,4 @@ public enum Voices {
     }
     return v3.compactMap(\.string)
   }
-
-  /// The voice to open the line with: the choice, unless codex no longer offers it (then its
-  /// default). Without a list there is nothing to check against, so the choice stands.
-  public static func effective(_ chosen: String?, offered: [String]?) -> String? {
-    guard let chosen, let offered else { return chosen }
-    return offered.contains(chosen) ? chosen : nil
-  }
 }

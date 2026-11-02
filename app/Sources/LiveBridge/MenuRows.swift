@@ -25,7 +25,6 @@ struct CallCardView: View {
   @State private var showHelp = false
   /// The command just copied, which its button says for two seconds.
   @State private var copied: String?
-  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -57,7 +56,6 @@ struct CallCardView: View {
     }
     .padding(.horizontal, MenuStyle.inset)
     .padding(.vertical, 6)
-    .onAppear { menu.openSettingsAction = { openSettings() } }
   }
 
   private func banner(_ problem: String) -> some View {

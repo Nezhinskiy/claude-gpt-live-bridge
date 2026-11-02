@@ -71,11 +71,11 @@ public actor SessionRegistry {
   /// The longest title kept; the label, the band and every voice line carry it.
   public static let maxTitle = 80
   public private(set) var target: SessionID?
-  /// The app's setting: a session that becomes the target is asked for its summary. A join from
-  /// an older mod may still carry an `autoContext` flag; decoding drops it.
-  public private(set) var autoContext = false
+  /// Settings' automatic context, read each time a session becomes the target: it is then asked
+  /// for its summary.
+  private let autoContext: @Sendable () -> Bool
 
-  public init(time: any TimeSource, autoContext: Bool = false) {
+  public init(time: any TimeSource, autoContext: @escaping @Sendable () -> Bool = { false }) {
     self.time = time
     self.autoContext = autoContext
   }
@@ -229,12 +229,10 @@ public actor SessionRegistry {
     return try change(&session)
   }
 
-  public func setAutoContext(_ on: Bool) { autoContext = on }
-
   /// Makes `id` the target; with `autoContext` on it is asked for its summary.
   private func retarget(_ id: SessionID?) {
     target = id
-    if let id, autoContext { sessions[id]?.wantsContext = true }
+    if let id, autoContext() { sessions[id]?.wantsContext = true }
   }
 
   private func drop(_ id: SessionID, labels: [SessionID: String], reason: String) -> Delivery? {

@@ -15,8 +15,8 @@ public actor Bridge: Router {
   private let continuityFile: URL
   private let time: any TimeSource
   private let notifier: (any ResultNotifying)?
-  /// Settings' "Notify when a result is waiting".
-  private var notifies = true
+  /// Settings' "Notify when a result is waiting", read at each chime.
+  private let notifies: @Sendable () -> Bool
   private var machine = CallMachine()
   private var realtime: (any RealtimeControlling)?
   /// Counts controllers made and ended, so events from one already replaced are ignored and a
@@ -56,9 +56,10 @@ public actor Bridge: Router {
     registry: SessionRegistry,
     realtime: @escaping @Sendable () async throws -> any RealtimeControlling, audio: any AudioSide,
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
-    notifier: (any ResultNotifying)? = nil
+    notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true }
   ) {
     self.notifier = notifier
+    self.notifies = notifies
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -145,12 +146,6 @@ public actor Bridge: Router {
     await registry.requestContext(for: target)
     return target
   }
-
-  /// The Settings choice: whether a chime for a waiting result also posts a notification.
-  public func setNotifies(_ on: Bool) { notifies = on }
-
-  /// The Settings choice: whether a session that becomes the target is asked for its summary.
-  public func setAutoContext(_ on: Bool) async { await registry.setAutoContext(on) }
 
   /// The menu's choice of target, which also ends a question's route; a session that left is
   /// ignored.
@@ -283,7 +278,7 @@ public actor Bridge: Router {
 
   /// A chime's notification, naming the sessions whose results wait.
   private func notifyWaiting() async {
-    guard notifies, let notifier else { return }
+    guard notifies(), let notifier else { return }
     let labels = Dictionary(
       await registry.rows().map { ($0.sessionId, $0.label) }, uniquingKeysWith: { $1 })
     if let notice = ResultNotice.waiting(machine.pending, labels: labels) {

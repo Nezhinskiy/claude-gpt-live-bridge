@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import os
 
 /// The app's own settings, kept in `<data dir>/settings.json`.
@@ -12,53 +13,56 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.
   public var prompt: String
-  /// The realtime model; nil leaves the choice to codex (its configured realtime model).
-  public var model: String?
 
   public init(
-    voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true,
-    prompt: String = "", model: String? = nil
+    voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true, prompt: String = ""
   ) {
     self.voice = voice
     self.autoContext = autoContext
     self.notifyResults = notifyResults
     self.prompt = prompt
-    self.model = model
   }
 
-  /// A field the file lacks keeps its default, so an older file still reads.
+  /// A field the file lacks keeps its default, and one it no longer has (`model`) is ignored.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     voice = try container.decodeIfPresent(String.self, forKey: .voice)
     autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? false
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
-    model = try container.decodeIfPresent(String.self, forKey: .model)
   }
 }
 
-/// The settings, read once and written on each change. Safe from any thread: the voice, the
-/// model and the prompt are read each time the line opens.
-public final class SettingsStore: Sendable {
-  private let file: URL
+/// The settings: the one copy the app has, read where each is needed and written on each
+/// change. Observable, so the Settings window follows it; safe from any thread, as the line
+/// reads the voice and the prompt each time it opens.
+public final class SettingsStore: Sendable, Observable {
+  private let file: URL?
   private let state: OSAllocatedUnfairLock<Settings>
+  private let registrar = ObservationRegistrar()
 
-  /// A file that does not decode gives the defaults.
-  public init(file: URL) {
+  /// A file that does not decode gives the defaults; with no file, changes are not kept.
+  public init(file: URL?) {
     self.file = file
-    let saved = (try? Data(contentsOf: file)).flatMap {
+    let saved = file.flatMap { try? Data(contentsOf: $0) }.flatMap {
       try? JSONDecoder().decode(Settings.self, from: $0)
     }
     state = OSAllocatedUnfairLock(initialState: saved ?? Settings())
   }
 
-  public var current: Settings { state.withLock { $0 } }
+  public var current: Settings {
+    registrar.access(self, keyPath: \.current)
+    return state.withLock { $0 }
+  }
 
   public func update(_ change: (inout Settings) -> Void) {
-    let next = state.withLockUnchecked { settings in
-      change(&settings)
-      return settings
+    let next = registrar.withMutation(of: self, keyPath: \.current) {
+      state.withLockUnchecked { settings in
+        change(&settings)
+        return settings
+      }
     }
+    guard let file else { return }
     try? JSONEncoder().encode(next).write(to: file, options: .atomic)
   }
 }

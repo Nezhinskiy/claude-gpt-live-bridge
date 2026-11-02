@@ -89,7 +89,7 @@ struct BridgeTests {
   /// `dir` and `time` are given to restart the app on another test's data.
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
-    time: TestTime = TestTime()
+    time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true }
   ) throws {
     self.time = time
     self.dir = try dir ?? temporaryDirectory()
@@ -99,7 +99,7 @@ struct BridgeTests {
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
-      notifier: notifier)
+      notifier: notifier, notifies: notifies)
   }
 
   @discardableResult
@@ -225,16 +225,6 @@ struct BridgeTests {
     #expect(await arrivals.next() == a)
   }
 
-  /// Settings' automatic context asks each session that becomes the target for its summary.
-  @Test func automaticContextFollowsTheTarget() async throws {
-    await bridge.setAutoContext(true)
-    try await join(a, "Alpha")
-    try await join(b, "Beta")
-    #expect(try await registry.poll(a) == .context)
-    try await post("/v1/target", TargetBody(sessionId: b))
-    #expect(try await registry.poll(b) == .context)
-  }
-
   @Test func theMenuSetsTheTarget() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
@@ -331,13 +321,16 @@ struct BridgeTests {
     #expect(await notifier.posted.isEmpty)
   }
 
+  /// Settings' notifications are read at each chime.
   @Test func noticesCanBeTurnedOff() async throws {
-    await bridge.setNotifies(false)
-    try await join(a, "Alpha")
-    await bridge.perform(.start)
-    try await answer(request(1), from: a)
-    #expect(await audio.calls.contains("chime"))
-    #expect(await notifier.posted.isEmpty)
+    let settings = SettingsStore(file: nil)
+    let test = try BridgeTests(notifies: { settings.current.notifyResults })
+    settings.update { $0.notifyResults = false }
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.answer(request(1), from: a)
+    #expect(await test.audio.calls.contains("chime"))
+    #expect(await test.notifier.posted.isEmpty)
   }
 
   /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.

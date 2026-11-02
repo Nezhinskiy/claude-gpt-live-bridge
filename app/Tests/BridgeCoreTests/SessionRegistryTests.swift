@@ -196,12 +196,15 @@ struct SessionRegistryTests {
   }
 
   /// The app's own setting decides.
+  /// Settings' automatic context is read each time a session becomes the target.
   @Test func becomingTargetWithAutoContextAsksForContext() async throws {
-    await registry.setAutoContext(true)
-    await join(a)
-    #expect(try await registry.poll(a) == .context)  // the first session becomes the target
-    await join(b, "Other session")
-    #expect(try await registry.poll(b) == nil)
+    let settings = SettingsStore(file: nil)
+    let registry = SessionRegistry(time: time, autoContext: { settings.current.autoContext })
+    await registry.join(JoinBody(sessionId: a, title: "Example session"))
+    #expect(try await registry.poll(a) == nil)  // the setting is off
+    settings.update { $0.autoContext = true }
+    await registry.join(JoinBody(sessionId: b, title: "Other session"))
+    #expect(try await registry.poll(b) == nil)  // not the target
     try await registry.setTarget(b)
     #expect(try await registry.poll(b) == .context)
     #expect(try await registry.poll(b) == nil)
