@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://getlivebridge.com">getlivebridge.com</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#install">Install</a> ·
   <a href="#use">Use</a> ·
@@ -63,6 +64,11 @@ scripts/build-app.sh --release
 
 3. In the Claude Code session you want to talk to, type `/live on`.
 4. Press **Start** in the band above the prompt, allow the microphone, and talk.
+
+Rather not build it? [getlivebridge.com](https://getlivebridge.com) has the app as a disk image
+(`scripts/build-app.sh --package` makes it from a commit). It is signed ad hoc and not
+notarized, so on first launch macOS blocks it until you allow it under System Settings >
+Privacy & Security > **Open Anyway**. The mod is installed the same way either way.
 
 If `/live` is not found in a session that was already open, reopen the session
 ([why](#known-limitations)). Upgrading, permissions, keeping the microphone permission across
