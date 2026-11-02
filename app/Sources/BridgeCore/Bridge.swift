@@ -246,8 +246,8 @@ public actor Bridge: Router {
     case .startLocalVAD: await audio.startListening()
     case .stopLocalVAD: await audio.stopListening()
     case .flushPreroll: await audio.flushPreroll()
-    case .addContext(let text): try? await realtime?.addContext(text)
-    case .speak(let text): try? await realtime?.speak(text)
+    case .addContext(let line): try? await realtime?.addContext(line.text)
+    case .speak(let line): try? await realtime?.speak(line.text)
     case .armSilenceTimer(let seconds):
       silenceTimer += 1
       let timer = silenceTimer
@@ -365,9 +365,10 @@ public actor Bridge: Router {
       let session = await route(request)
       await send(.handedOff(session))
       if session == nil {
-        let line = AnswerShaper.line(
-          tag: "FAILED", label: "LiveBridge", body: "no Claude Code session is joined.")
-        await send(.deliver(VoiceLine(text: line)))
+        await send(
+          .deliver(
+            AnswerShaper.line(
+              .failed, label: "LiveBridge", body: "no Claude Code session is joined.")))
       }
     case .userUtterance(let text):
       record(.owner, text, in: lineSession)
@@ -426,8 +427,9 @@ public actor Bridge: Router {
   private func deliver(_ delivery: Delivery) async {
     // only a question the call keeps (not one dropped while off) routes the next handoff
     if delivery.status == .question, machine.phase != .off { questionRoute = delivery.session }
-    let line = AnswerShaper.forVoice(delivery.text, status: delivery.status, label: delivery.label)
-    await say(VoiceLine(text: line, session: delivery.session))
+    await say(
+      AnswerShaper.forVoice(
+        delivery.text, status: delivery.status, label: delivery.label, session: delivery.session))
   }
 
   private func label(of id: SessionID) async throws -> SessionRow {
@@ -444,11 +446,12 @@ public actor Bridge: Router {
     await registry.setActivity(body)
     switch (row.activity == .approval, body.state == .approval) {
     case (false, true):
-      let line = AnswerShaper.line(
-        tag: "APPROVAL", label: row.label, body: "Claude is waiting for your approval")
-      await say(VoiceLine(text: line, session: body.sessionId))
+      await say(
+        AnswerShaper.line(
+          .approval, label: row.label, body: "Claude is waiting for your approval",
+          session: body.sessionId))
     case (true, false):
-      machine.withdraw { $0.session == body.sessionId && $0.text.hasPrefix("[APPROVAL]") }
+      machine.withdraw { $0.session == body.sessionId && $0.kind == .approval }
     default: break
     }
   }
@@ -459,7 +462,8 @@ public actor Bridge: Router {
   private func context(_ body: ContextBody) async throws {
     let row = try await label(of: body.sessionId)
     let line = AnswerShaper.line(
-      tag: "CONTEXT", label: row.label, body: body.summary, limit: Self.maxContext)
+      .context, label: row.label, body: body.summary, limit: Self.maxContext
+    ).text
     continuity.setContext(line, for: body.sessionId)
     save()
     announceContext.yield(body.sessionId)

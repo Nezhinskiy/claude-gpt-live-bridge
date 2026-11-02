@@ -362,9 +362,44 @@ struct BridgeTests {
     try await answerFirstRequest()
     await bridge.audioEvent(.speechEnded)
     #expect(await voice.spoken.isEmpty)
-    #expect(await eventually { time.sleepers >= 5 })  // sweep, 2 silence timers, window, grace
+    #expect(await eventually { time.sleepers >= 6 })  // sweep, 3 silence timers, window, grace
     time.advance(by: .milliseconds(800))
     #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Done."] })
+  }
+
+  /// An approval notice while the line waits for a result is said, and the line still waits:
+  /// silence does not close it while the owner approves, and the result is said when it comes.
+  @Test func anApprovalNoticeKeepsTheLineWaitingForTheResult() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
+    let notice = "[APPROVAL] Alpha: Claude is waiting for your approval"
+    #expect(await eventually { await voice.spoken == [notice] })
+    #expect(await eventually { time.sleepers >= 5 })  // sweep, 3 silence timers, window
+    for _ in 0...CallMachine.silenceSeconds {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)  // the session stays joined
+    }
+    #expect(await bridge.status.call == .live)
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.spoken == [notice, "[RESULT] Alpha: Done."] })
+  }
+
+  /// A result held while the owner speaks is withdrawn like any unheard one when a newer
+  /// request to its session supersedes it, so the grace does not say it.
+  @Test func aSupersededHeldResultIsNotSaid() async throws {
+    await live()  // the owner is still speaking
+    try await handOff()
+    try await answerFirstRequest()
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
+    #expect(await bridge.status.unheard == 0)
+    await bridge.audioEvent(.speechEnded)
+    try await Task.sleep(for: .milliseconds(50))  // a grace timer, if any, is armed by now
+    time.advance(by: .milliseconds(800))
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await voice.spoken.isEmpty)
   }
 
   /// Silence does not close a line that waits for a result; the window does, and a result after

@@ -74,7 +74,7 @@ struct SessionRegistryTests {
     await join(a, String(repeating: "Long title ", count: 300))
     let label = try #require(await registry.rows().first?.label)
     #expect(label.count == SessionRegistry.maxTitle)
-    let line = AnswerShaper.forVoice("Done.", status: .ok, label: label)
+    let line = AnswerShaper.forVoice("Done.", status: .ok, label: label).text
     #expect(line.hasSuffix(": Done.") && line.count <= AnswerShaper.maxCharacters)
   }
 

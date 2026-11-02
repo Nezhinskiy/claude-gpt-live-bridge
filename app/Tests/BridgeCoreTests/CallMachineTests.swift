@@ -9,27 +9,36 @@ struct Transition: CustomTestStringConvertible, Sendable {
   var event: CallEvent
   var phase: CallPhase
   var effects: [CallEffect]
-  var pending: [String]
+  var pending: [VoiceLine]
 }
 
 struct CallMachineTests {
   static let connecting: [CallEvent] = [.start, .speechStarted]
   /// The owner has finished the utterance that opened the line.
   static let live: [CallEvent] = [.start, .speechStarted, .connected, .speechEnded]
-  static let unheard: [CallEvent] = [.start, deliver("a"), .speechStarted]
+  static let unheard: [CallEvent] = [.start, deliver(a), .speechStarted]
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
-  static let result = "[RESULT] Alpha · 0a1b: The build passes on main."
-  static let common = "[RESULT] Beta · 2c3d: That works with the new flag."
-  static let done = "[RESULT] Alpha · 0a1b: Done."
+  static let alpha = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+  static let beta = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
+  /// Lines of the bridge's own, which no session waits for.
+  static let a = VoiceLine(kind: .failed, label: "LiveBridge", body: "a")
+  static let b = VoiceLine(kind: .failed, label: "LiveBridge", body: "b")
+  static func alphas(_ kind: VoiceLine.Kind, _ body: String) -> VoiceLine {
+    VoiceLine(kind: kind, label: "Alpha · 0a1b", body: body, session: alpha)
+  }
+  static let result = alphas(.result, "The build passes on main.")
+  static let common = VoiceLine(
+    kind: .result, label: "Beta · 2c3d", body: "That works with the new flag.", session: beta)
+  static let done = alphas(.result, "Done.")
+  static let approval = alphas(.approval, "Claude is waiting for your approval")
+  static let update = alphas(.update, "Tests pass.")
   /// A result given to the open line, then the voice's next reply under way.
   static let told: [CallEvent] = live + [deliver(result), .assistantSpeaking]
   static func said(_ text: String) -> CallEvent { .assistantFinishedSpeaking(text) }
-  static func deliver(_ text: String) -> CallEvent { .deliver(VoiceLine(text: text)) }
-  static let alpha = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
-  static let beta = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
+  static func deliver(_ line: VoiceLine) -> CallEvent { .deliver(line) }
   /// A line from Alpha, the session the request was handed to.
-  static let fromAlpha = CallEvent.deliver(VoiceLine(text: result, session: alpha))
+  static let fromAlpha = deliver(result)
   static let window = CallEffect.armResultWindow(seconds: 120)
   static let grace = CallEffect.armGrace(milliseconds: 800)
   /// A request handed to Alpha and acknowledged; the owner has stopped talking.
@@ -37,7 +46,7 @@ struct CallMachineTests {
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
-    _ effects: [CallEffect], pending: [String] = []
+    _ effects: [CallEffect], pending: [VoiceLine] = []
   ) -> Transition {
     Transition(
       testDescription: name, given: given, event: event, phase: phase, effects: effects,
@@ -48,30 +57,30 @@ struct CallMachineTests {
     row("startOpensOnlyTheMic", [], .start, .listening, [.startLocalVAD, .problem(nil)]),
     row("speechOpensTheVoice", [.start], .speechStarted, .connecting, [.openRealtime]),
     row(
-      "deliverWhileListeningChimesAndWaits", [.start], deliver("a"), .listening, [.chime],
-      pending: ["a"]),
+      "deliverWhileListeningChimesAndWaits", [.start], deliver(a), .listening, [.chime],
+      pending: [a]),
     row(
-      "deliverWhileConnectingIsQueued", connecting, deliver("a"), .connecting, [],
-      pending: ["a"]),
+      "deliverWhileConnectingIsQueued", connecting, deliver(a), .connecting, [],
+      pending: [a]),
     row(
-      "deliverWhileConnectingIsSentAfterConnect", connecting + [deliver("a")], .connected,
-      .live, [.flushPreroll, .addContext("a"), cap, .problem(nil)], pending: ["a"]),
+      "deliverWhileConnectingIsSentAfterConnect", connecting + [deliver(a)], .connected,
+      .live, [.flushPreroll, .addContext(a), cap, .problem(nil)], pending: [a]),
     row(
-      "pendingIsSpokenAfterOwnerSpeaks", unheard + [deliver("b")], .connected, .live,
-      [.flushPreroll, .addContext("a"), .addContext("b"), cap, .problem(nil)],
-      pending: ["a", "b"]),
+      "pendingIsSpokenAfterOwnerSpeaks", unheard + [deliver(b)], .connected, .live,
+      [.flushPreroll, .addContext(a), .addContext(b), cap, .problem(nil)],
+      pending: [a, b]),
     row(
       "connectAfterSpeechEndedArmsSilence", connecting + [.speechEnded], .connected, .live,
       [.flushPreroll, arm, .problem(nil)]),
     row(
       "failedConnectKeepsResultsUnheard", unheard, .connectFailed("r"), .listening,
-      [.problem("r")], pending: ["a"]),
+      [.problem("r")], pending: [a]),
     row(
       "closeWhileConnectingKeepsResultsUnheard", unheard, .remoteClosed("r"), .listening,
-      [.problem("r")], pending: ["a"]),
+      [.problem("r")], pending: [a]),
     row(
-      "deliverWhileLiveIsAddedAndReArmsSilence", live, deliver("a"), .live,
-      [.addContext("a"), arm], pending: ["a"]),
+      "deliverWhileLiveIsAddedAndReArmsSilence", live, deliver(a), .live,
+      [.addContext(a), arm], pending: [a]),
     row(
       "replyNamingOnlyTheSessionKeepsTheResult", told, said("Alpha is still working."), .live,
       [arm], pending: [result]),
@@ -99,14 +108,14 @@ struct CallMachineTests {
       "ackSayingTheResultKeepsIt", told + [.handedOff(alpha), .speechStarted, .assistantSpeaking],
       said("On it, Alpha."), .live, [cap], pending: [result]),
     row(
-      "silenceAfterUnspokenResultReturnsItToPending", live + [deliver("a")], .silenceElapsed,
-      .listening, [.closeRealtime, .chime], pending: ["a"]),
+      "silenceAfterUnspokenResultReturnsItToPending", live + [deliver(a)], .silenceElapsed,
+      .listening, [.closeRealtime, .chime], pending: [a]),
     row(
       "unrepliedConnectReturnsResultsToPending", unheard + [.connected, .speechEnded],
-      .silenceElapsed, .listening, [.closeRealtime, .chime], pending: ["a"]),
+      .silenceElapsed, .listening, [.closeRealtime, .chime], pending: [a]),
     row(
-      "remoteCloseReturnsResultsToPending", live + [deliver("a")], .remoteClosed("r"),
-      .listening, [.problem("r"), .chime], pending: ["a"]),
+      "remoteCloseReturnsResultsToPending", live + [deliver(a)], .remoteClosed("r"),
+      .listening, [.problem("r"), .chime], pending: [a]),
     row("speechHoldsTheLineUpToTheCap", live, .speechStarted, .live, [cap]),
     row("speechWithoutReplyStillHangsUp", live, .speechEnded, .live, [arm]),
     row("wordsReArmTheTimer", live + [.speechStarted], .userTranscribed, .live, [cap]),
@@ -122,8 +131,8 @@ struct CallMachineTests {
       "ackKeepsTheLineOpenForTheResult", live + [.handedOff(alpha), .assistantSpeaking],
       said("On it."), .live, [arm]),
     row(
-      "deliverFromAnotherSessionDuringTheWindowIsOnlyContext", waiting, deliver("a"), .live,
-      [.addContext("a"), arm], pending: ["a"]),
+      "deliverFromAnotherSessionDuringTheWindowIsOnlyContext", waiting, deliver(a), .live,
+      [.addContext(a), arm], pending: [a]),
     row(
       "speechDuringAckKeepsTheLineOpen", live + [.handedOff(alpha), .speechStarted],
       said("On it."), .live, [cap]),
@@ -136,8 +145,8 @@ struct CallMachineTests {
       "windowExpiryAfterSilenceHangsUp", waiting + [.silenceElapsed], .resultWindowElapsed,
       .listening, [.closeRealtime]),
     row(
-      "windowExpiryKeepsWaitingResultsUnheard", waiting + [deliver("a"), .silenceElapsed],
-      .resultWindowElapsed, .listening, [.closeRealtime, .chime], pending: ["a"]),
+      "windowExpiryKeepsWaitingResultsUnheard", waiting + [deliver(a), .silenceElapsed],
+      .resultWindowElapsed, .listening, [.closeRealtime, .chime], pending: [a]),
     row(
       "windowExpiryWhileTalkingLeavesItToSilence", waiting + [.silenceElapsed, .speechStarted],
       .resultWindowElapsed, .live, []),
@@ -151,6 +160,18 @@ struct CallMachineTests {
     row(
       "earlyResultIsSpokenAtOnce", waiting, fromAlpha, .live, [.speak(result), arm],
       pending: [result]),
+    row(
+      "anApprovalIsSaidAtOnce", waiting, deliver(approval), .live, [.speak(approval), arm],
+      pending: [approval]),
+    row(
+      "anApprovalLeavesTheLineWaiting", waiting + [deliver(approval)], .silenceElapsed, .live, [],
+      pending: [approval]),
+    row(
+      "anUpdateLeavesTheLineWaiting", waiting + [deliver(update)], .silenceElapsed, .live, [],
+      pending: [update]),
+    row(
+      "theResultAfterAnApprovalIsSaid", waiting + [deliver(approval)], fromAlpha, .live,
+      [.speak(result), arm], pending: [approval, result]),
     row(
       "earlyResultEndsTheWindow", waiting + [fromAlpha], .silenceElapsed, .listening,
       [.closeRealtime, .chime], pending: [result]),
@@ -203,10 +224,10 @@ struct CallMachineTests {
     row(
       "audioFailedGoesOff", live, .audioFailed("r"), .off,
       [.closeRealtime, .stopLocalVAD, .problem("r")]),
-    row("deliverWhileOffIsIgnored", [], deliver("a"), .off, []),
+    row("deliverWhileOffIsIgnored", [], deliver(a), .off, []),
     row(
-      "targetChangeClosesTheOpenLine", live + [deliver("a")], .targetChanged, .listening,
-      [.closeRealtime, .chime], pending: ["a"]),
+      "targetChangeClosesTheOpenLine", live + [deliver(a)], .targetChanged, .listening,
+      [.closeRealtime, .chime], pending: [a]),
     row(
       "targetChangeWhileConnectingCloses", connecting, .targetChanged, .listening, [.closeRealtime]),
     row("targetChangeWhileListeningChangesNothing", [.start], .targetChanged, .listening, []),
@@ -217,6 +238,16 @@ struct CallMachineTests {
     for event in row.given { _ = machine.handle(event) }
     #expect(machine.handle(row.event) == row.effects)
     #expect(machine.phase == row.phase)
-    #expect(machine.pending.map(\.text) == row.pending)
+    #expect(machine.pending == row.pending)
+  }
+
+  /// A result held while the owner spoke is withdrawn with the rest: nothing is left to say.
+  @Test func aWithdrawnHeldResultIsNotSaid() {
+    var machine = CallMachine()
+    for event in Self.waiting + [.speechStarted, Self.fromAlpha] { _ = machine.handle(event) }
+    machine.withdraw { $0.session == Self.alpha }
+    #expect(machine.handle(.speechEnded) == [Self.arm])
+    #expect(machine.handle(.graceElapsed) == [])
+    #expect(machine.pending.isEmpty)
   }
 }

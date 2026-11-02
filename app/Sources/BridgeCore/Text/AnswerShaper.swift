@@ -5,21 +5,24 @@ public enum AnswerShaper {
   /// The longest label a line carries, so a session title cannot crowd out the body.
   public static let maxLabel = 120
 
-  public static func forVoice(_ text: String, status: AnswerStatus, label: String) -> String {
+  public static func forVoice(
+    _ text: String, status: AnswerStatus, label: String, session: SessionID? = nil
+  ) -> VoiceLine {
     let prose = text.replacing(/```[\s\S]*?(```|\z)/, with: "\n")
       .split(whereSeparator: \.isNewline).filter { !$0.trimmingPrefix(/\s*/).hasPrefix("|") }
       .joined(separator: " ")
-    let tag =
+    let kind: VoiceLine.Kind =
       switch status {
-      case .ok: "RESULT"
-      case .failed: "FAILED"
-      case .question: "QUESTION"
-      case .update: "UPDATE"
+      case .ok: .result
+      case .failed: .failed
+      case .question: .question
+      case .update: .update
       }
     return line(
-      tag: tag, label: label,
+      kind, label: label,
       body: prose.allSatisfy(\.isWhitespace)
-        ? "the answer is code or a table only; it is in the session." : prose)
+        ? "the answer is code or a table only; it is in the session." : prose,
+      session: session)
   }
 
   /// `[TAG] label: body` as exactly one line of at most `limit` characters, the label cut to
@@ -27,10 +30,13 @@ public enum AnswerShaper {
   /// so a session's text cannot pose as another delivery: every opening or closing bracket of
   /// any script becomes `(` or `)`, and every line break a space.
   public static func line(
-    tag: String, label: String, body: String, limit: Int = maxCharacters
-  ) -> String {
-    let head = "[\(tag)] \(flat(label).prefix(maxLabel)): "
-    return head + cap(Redaction.redact(flat(body)), to: limit - head.count)
+    _ kind: VoiceLine.Kind, label: String, body: String, limit: Int = maxCharacters,
+    session: SessionID? = nil
+  ) -> VoiceLine {
+    let label = String(flat(label).prefix(maxLabel))
+    let head = VoiceLine(kind: kind, label: label, body: "").text
+    let body = cap(Redaction.redact(flat(body)), to: limit - head.count)
+    return VoiceLine(kind: kind, label: label, body: body, session: session)
   }
 
   /// NFKC with format characters (zero-width and the like) removed, so redaction sees a token

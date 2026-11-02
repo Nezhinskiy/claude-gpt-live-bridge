@@ -200,7 +200,7 @@ public actor SessionRegistry {
       let briefs =
         (session.inFlight.map { $0.id == session.latest ? [$0.brief] : [] } ?? [])
         + session.queued.map(\.brief)
-      return briefs.map { AnswerShaper.line(tag: "TASK", label: labels[id] ?? "", body: $0) }
+      return briefs.map { AnswerShaper.line(.task, label: labels[id] ?? "", body: $0).text }
     }
   }
 
