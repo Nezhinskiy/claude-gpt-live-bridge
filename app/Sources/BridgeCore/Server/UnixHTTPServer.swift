@@ -37,9 +37,20 @@ public final class UnixHTTPServer: Sendable {
     listener = try NWListener(using: parameters)
   }
 
-  /// Binds the socket, replacing a stale socket file that nothing accepts on, and returns once
-  /// the listener is ready.
-  public func start() throws {
+  /// Binds the socket and returns once the listener is ready. While another process still
+  /// accepts on it, tries again every 200 ms for up to `retryFor` (a relaunched app waiting for
+  /// the old instance to quit), then throws `socketInUse`.
+  public func start(retryFor: Duration = .zero) async throws {
+    let deadline = ContinuousClock.now + retryFor
+    while true {
+      do { return try bind() } catch ServerError.socketInUse where ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(200))
+      }
+    }
+  }
+
+  /// One attempt: replaces a stale socket file that nothing accepts on.
+  private func bind() throws {
     if FileManager.default.fileExists(atPath: socketPath) {
       if Self.somethingAccepts(at: socketPath) { throw ServerError.socketInUse(socketPath) }
       try FileManager.default.removeItem(atPath: socketPath)
