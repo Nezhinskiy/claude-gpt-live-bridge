@@ -2,7 +2,7 @@ import AppKit
 import BridgeCore
 import SwiftUI
 
-/// LiveBridge's Settings window: the voice and its prompt, notifications, automatic
+/// LiveBridge's Settings window: the voice, its model and prompt, notifications, automatic
 /// context and Open at login.
 struct SettingsView: View {
   @Bindable var model: AppModel
@@ -21,6 +21,22 @@ struct SettingsView: View {
         }
         Text("A new voice is heard from the next time the voice line opens.")
           .font(.caption).foregroundStyle(.secondary)
+      }
+      Section("Model") {
+        Picker("Model", selection: $model.codexModel) {
+          Text("Codex default").tag(true)
+          Text("Named model").tag(false)
+        }
+        if !model.codexModel {
+          TextField("Model name", text: $model.modelName, prompt: Text("Realtime model name"))
+            .autocorrectionDisabled()
+        }
+        Text(
+          "Codex does not list its realtime models, so a newer one is chosen by typing its name. "
+            + "LiveBridge cannot check the name in advance; if codex refuses it, the line shows "
+            + "codex's error. A new model is used from the next time the voice line opens."
+        )
+        .font(.caption).foregroundStyle(.secondary)
       }
       Section("Prompt") {
         TextField(

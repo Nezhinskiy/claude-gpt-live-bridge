@@ -36,7 +36,8 @@ public actor RealtimeSession: RealtimeControlling {
   private let cwd: URL
   /// The voice chosen in Settings, read at each open; nil leaves it to codex.
   private let voice: @Sendable () -> String?
-  /// The owner's prompt from Settings, read at each open like the voice.
+  /// The realtime model and the owner's prompt from Settings, read at each open like the voice.
+  private let model: @Sendable () -> String?
   private let prompt: @Sendable () -> String
   private let timeout = Duration.seconds(20)
   /// More `mcpServerStatus/list` pages than this is a reply this version does not understand.
@@ -55,11 +56,13 @@ public actor RealtimeSession: RealtimeControlling {
   /// `cwd` is an empty directory the app owns (`<data dir>/codex-cwd`).
   public init(
     client: any RPCClient, cwd: URL, voice: @escaping @Sendable () -> String? = { nil },
+    model: @escaping @Sendable () -> String? = { nil },
     prompt: @escaping @Sendable () -> String = { "" }
   ) {
     self.client = client
     self.cwd = cwd
     self.voice = voice
+    self.model = model
     self.prompt = prompt
     (events, emit) = AsyncStream.makeStream()
   }
@@ -134,6 +137,9 @@ public actor RealtimeSession: RealtimeControlling {
       "initialItems": try JSONValue(encoding: items),
     ]
     fields["voice"] = voice().map(JSONValue.string)
+    // A name codex does not know fails the start in codex's own words, shown as any start error.
+    let name = model()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    fields["model"] = name.isEmpty ? nil : .string(name)
     let params = JSONValue.object(fields)
     lastError = nil
     attempt += 1

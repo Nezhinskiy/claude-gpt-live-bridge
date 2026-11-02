@@ -87,6 +87,14 @@ final class AppModel {
       settings?.update { [prompt] in $0.prompt = prompt }
     }
   }
+  /// Use codex's own realtime model; otherwise `modelName`. It applies from the next opening.
+  var codexModel = true {
+    didSet { saveModel() }
+  }
+  /// The realtime model typed in Settings, kept while Codex default is chosen in this run.
+  var modelName = "" {
+    didSet { saveModel() }
+  }
   /// Load a session's context automatically when it becomes the target.
   var autoContext = false {
     didSet {
@@ -134,6 +142,8 @@ final class AppModel {
       codexCwd = cwd
       voice = settings.current.voice
       prompt = settings.current.prompt
+      modelName = settings.current.model ?? ""
+      codexModel = settings.current.model == nil
       autoContext = settings.current.autoContext
       notifyResults = settings.current.notifyResults
       let time = SystemTime()
@@ -267,14 +277,21 @@ final class AppModel {
     }
   }
 
+  /// The model sent to codex: none for Codex default or a blank name.
+  private func saveModel() {
+    let name = modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let model = codexModel || name.isEmpty ? nil : name
+    settings?.update { $0.model = model }
+  }
+
   /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed`
-  /// off. The voice and prompt chosen in Settings are read at each opening.
+  /// off. The voice, model and prompt chosen in Settings are read at each opening.
   nonisolated private static func voice(cwd: URL, settings: SettingsStore)
     async throws -> any RealtimeControlling
   {
     RealtimeSession(
       client: try await launchCodex(cwd: cwd), cwd: cwd, voice: { settings.current.voice },
-      prompt: { settings.current.prompt })
+      model: { settings.current.model }, prompt: { settings.current.prompt })
   }
 
   /// The voices, from a codex app-server started for the question and ended after it.

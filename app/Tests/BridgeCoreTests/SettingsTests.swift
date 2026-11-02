@@ -8,7 +8,7 @@ struct SettingsStoreTests {
     let file = try temporaryDirectory().appending(path: "settings.json")
     let store = SettingsStore(file: file)
     #expect(store.current == Settings(voice: nil, autoContext: false, notifyResults: true))
-    #expect(store.current.prompt == "")
+    #expect(store.current.prompt == "" && store.current.model == nil)
   }
 
   @Test func changesAreKeptAcrossRestarts() throws {
@@ -18,14 +18,19 @@ struct SettingsStoreTests {
       $0.autoContext = true
       $0.notifyResults = false
       $0.prompt = "Speak with me in Spanish."
+      $0.model = "gpt-realtime-example"
     }
     #expect(
       SettingsStore(file: file).current
         == Settings(
           voice: "cedar", autoContext: true, notifyResults: false,
-          prompt: "Speak with me in Spanish."))
-    SettingsStore(file: file).update { $0.voice = nil }
+          prompt: "Speak with me in Spanish.", model: "gpt-realtime-example"))
+    SettingsStore(file: file).update {
+      $0.voice = nil
+      $0.model = nil
+    }
     #expect(SettingsStore(file: file).current.voice == nil)
+    #expect(SettingsStore(file: file).current.model == nil)
   }
 
   /// A file that does not decode, or lacks a field a later build added, keeps the defaults.

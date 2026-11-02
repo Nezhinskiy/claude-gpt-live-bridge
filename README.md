@@ -115,6 +115,10 @@ steps, and a button that copies the command to run in Terminal.
   **Codex default**. A new voice is heard from the next time the voice line opens. If codex
   cannot list its voices, the window says why and the line keeps the voice already chosen; a
   voice codex no longer offers goes back to the default.
+- **Model**: **Codex default** (the realtime model codex is set to use) or **Named model**, a
+  realtime model name you type, so a newer model can be used without a LiveBridge update. Codex
+  does not list its realtime models, so the name is not checked in advance: if codex refuses
+  it, the line shows codex's error. Used from the next time the line opens.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.

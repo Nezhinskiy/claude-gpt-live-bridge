@@ -12,15 +12,18 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.
   public var prompt: String
+  /// The realtime model; nil leaves the choice to codex (its configured realtime model).
+  public var model: String?
 
   public init(
     voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true,
-    prompt: String = ""
+    prompt: String = "", model: String? = nil
   ) {
     self.voice = voice
     self.autoContext = autoContext
     self.notifyResults = notifyResults
     self.prompt = prompt
+    self.model = model
   }
 
   /// A field the file lacks keeps its default, so an older file still reads.
@@ -30,11 +33,12 @@ public struct Settings: Codable, Sendable, Equatable {
     autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? false
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
+    model = try container.decodeIfPresent(String.self, forKey: .model)
   }
 }
 
-/// The settings, read once and written on each change. Safe from any thread: the voice and the
-/// prompt are read each time the line opens.
+/// The settings, read once and written on each change. Safe from any thread: the voice, the
+/// model and the prompt are read each time the line opens.
 public final class SettingsStore: Sendable {
   private let file: URL
   private let state: OSAllocatedUnfairLock<Settings>
