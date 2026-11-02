@@ -102,6 +102,8 @@ debug() {
 release() {
   stage="$PWD/app/.build/release-app/LiveBridge.app"
   assemble release "$stage"
+  # A build from source, not the download: updates then say they replace it with the release.
+  plutil -insert LBSourceBuild -bool true "$stage/Contents/Info.plist"
   if has_identity; then
     sign "$stage" "$IDENTITY"
   else
