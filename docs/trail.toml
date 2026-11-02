@@ -7,3 +7,4 @@ label = "Everything"
 pattern = ".*"
 
 [states]
+"specs/2026-11-02-in-app-update-design.md" = "proposed"
