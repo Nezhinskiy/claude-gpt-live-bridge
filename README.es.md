@@ -36,11 +36,13 @@ propio modelo, sus herramientas y su modo de permisos, y la voz te cuenta el res
 
 **Local por diseño.** Sin telemetría y sin servidor propio: LiveBridge es un puente en tu Mac
 entre tu propio codex y tu propio Claude Code. La aplicación y el mod se comunican por un socket
-Unix que solo tu usuario puede abrir, y la aplicación no escucha en ningún puerto de red. Lo único
-que sale de tu Mac es lo que esas dos herramientas ya envían: la línea de voz a OpenAI a través de
-tu codex, solo mientras está abierta, y el trabajo de Claude a Anthropic a través de tu sesión de
-Claude Code. [Privacidad](#privacidad) enumera exactamente qué llega a OpenAI;
-[SECURITY.md](SECURITY.md) explica de qué protege y de qué no protege.
+Unix que solo tu usuario puede abrir, y la aplicación no escucha en ningún puerto de red. Además
+de lo que esas dos herramientas ya envían (la línea de voz a OpenAI a través de tu codex, solo
+mientras está abierta, y el trabajo de Claude a Anthropic a través de tu sesión de Claude Code),
+el único tráfico propio de la aplicación es para las [actualizaciones](#actualización): una
+consulta diaria a GitHub por si hay una versión nueva, que puedes desactivar, y, cuando pulsas
+**Install**, la descarga y su verificación. [Privacidad](#privacidad) enumera exactamente qué
+llega a OpenAI y a GitHub; [SECURITY.md](SECURITY.md) explica de qué protege y de qué no protege.
 
 > **No oficial.** Sin afiliación, respaldo ni soporte de Anthropic u OpenAI. Depende de la API
 > experimental de tiempo real de codex, que puede cambiar con cualquier versión de codex.
@@ -91,9 +93,11 @@ micrófono entre actualizaciones y la desinstalación están en [Instalación](#
 
 ## Instalación
 
-El mod viene del marketplace de este repositorio (los comandos de [Inicio rápido](#inicio-rápido)).
-La aplicación va en `/Applications` en ambos casos: desde la imagen de disco o compilada desde el
-código fuente. En ambos casos está firmada ad hoc y no está notarizada.
+El mod viene del marketplace de este repositorio (los comandos de [Inicio
+rápido](#inicio-rápido)), que apunta a la etiqueta de la última versión, así que el mod que
+instalas es el de esa versión. La aplicación va en `/Applications` en ambos casos: desde la imagen
+de disco o compilada desde el código fuente. En ambos casos está firmada ad hoc y no está
+notarizada.
 
 ### Desde la imagen de disco
 
@@ -103,38 +107,74 @@ código fuente. En ambos casos está firmada ad hoc y no está notarizada.
 2. Compruébala con la [GitHub CLI](https://cli.github.com), en la carpeta donde la guardaste:
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge \
+     --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
+     --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners
    ```
 
-   Solo se supera con una imagen que el
-   [flujo de trabajo de publicación](.github/workflows/release.yml) de este repositorio haya
-   compilado a partir de la etiqueta de la versión. Es la única prueba de origen de la imagen: la
-   firma ad hoc no identifica a nadie.
+   donde `vX.Y.Z` es la etiqueta de la versión, tal como la nombra su página. Solo se supera con
+   una imagen que el [flujo de trabajo de publicación](.github/workflows/release.yml) de este
+   repositorio haya compilado a partir de esa etiqueta, en un runner alojado por GitHub, y que no
+   haya cambiado desde entonces. Es la única prueba de origen de la imagen: la firma ad hoc no
+   identifica a nadie. No prueba que nadie haya revisado el código.
 3. Ábrela y arrastra LiveBridge a Aplicaciones.
 4. En el primer arranque, macOS bloquea la aplicación hasta que la permitas en Ajustes del Sistema >
    Privacidad y seguridad > **Open Anyway**.
-
-Para actualizar, reemplaza la aplicación por la de una versión más reciente. macOS vuelve a pedir
-el micrófono después de cada actualización.
 
 ### Desde el código fuente
 
 `scripts/build-app.sh --release` compila la aplicación, la instala en `/Applications` (tu cuenta
 debe poder escribir ahí, como puede la de un administrador) y la abre. Ejecútalo de nuevo para
-actualizar. La compilación se firma ad hoc, así que macOS vuelve a pedir el micrófono después de
-cada actualización. Para conservar el permiso, ejecuta una vez
+recompilar. La compilación se firma ad hoc, así que macOS vuelve a pedir el micrófono después de
+cada recompilación. Para conservar el permiso, ejecuta una vez
 `scripts/build-app.sh --make-signing-identity`: pregunta antes, crea un certificado de firma de
 código autofirmado en tu llavero de inicio de sesión, y las compilaciones de release posteriores se
 firman con él.
+
+Una compilación desde el código fuente busca actualizaciones por sí sola solo si lo activas en
+Settings. Instalar una actualización la reemplaza por la imagen de la versión, que está firmada ad
+hoc, así que el certificado autofirmado deja de aplicarse; **Install** lo dice y pregunta antes.
+
+### Actualización
+
+LiveBridge actualiza la aplicación y su mod cuando pulsas **Install**, y nunca por su cuenta. Solo
+se actualiza la copia en `/Applications/LiveBridge.app`; cualquier otra copia lo indica en
+Settings.
+
+- **Check for updates automatically**, en Settings (activado por defecto, desactivado en una
+  compilación desde el código fuente): una vez al día, la aplicación pregunta a GitHub cuál es la
+  última versión. Una más reciente se anuncia una sola vez, con una notificación cuyo **Install**
+  la instala, y el menú de la barra de menús ofrece **Install LiveBridge X.Y.Z…** hasta que se
+  instala, para lo cual vuelve a preguntar a GitHub en cada arranque. **Check for update**, en
+  Settings, pregunta en el momento.
+- **Install** necesita la [GitHub CLI](https://cli.github.com) con la sesión iniciada
+  (`gh auth login`); sin ella, Install no descarga nada y enlaza a la página de la versión.
+  Descarga la imagen de la versión, la comprueba con el mismo `gh attestation verify` de arriba,
+  después comprueba la aplicación que contiene, y no instala nada a menos que se superen todas las
+  comprobaciones. Espera mientras Claude siga con una petición de voz, actualiza el mod con
+  `claude plugin marketplace update livebridge` y `claude plugin update livebridge@livebridge`,
+  detiene la llamada, pone la aplicación nueva en su sitio en un solo paso y la abre.
+- Después, Settings indica desde qué versión se actualizó. Si no se pudo actualizar el mod,
+  muestra esos dos comandos para que los ejecutes tú. Las sesiones de Claude Code ya abiertas
+  conservan el mod antiguo hasta que se reinician.
+- macOS no bloquea la aplicación actualizada como bloqueó la primera descarga; las comprobaciones
+  de arriba ocupan ese lugar ([SECURITY.md](SECURITY.md#what-an-update-installs)). Sí vuelve a
+  pedir el micrófono en el primer **Start** tras una actualización, porque cada versión se firma
+  ad hoc.
+
+Para actualizar a mano, ejecuta `/live off` en todas las sesiones (el mod vuelve a abrir la
+aplicación de `/Applications` en cuanto deja de responder), cierra LiveBridge, instala la imagen
+más reciente como se indica arriba y ejecuta los dos comandos `claude plugin`.
 
 ### Permisos
 
 El primer Start pide a macOS el micrófono. Si se denegó, la llamada se detiene con una frase y la
 opción **Open Microphone Settings** del menú de la barra de menús abre Privacidad y seguridad >
-Micrófono, donde permites LiveBridge. Con la firma ad hoc, macOS vuelve a preguntar después de cada
-actualización (véase más arriba). Es posible que macOS también pregunte si LiveBridge puede
-encontrar dispositivos en tu red local. La línea de voz necesita también este segundo permiso; sin
-él, la llamada se detiene con una frase que indica dónde permitirlo.
+Micrófono, donde permites LiveBridge. Con la firma ad hoc, macOS vuelve a preguntar en el primer
+Start tras cada actualización o recompilación (véase más arriba). Es posible que macOS también
+pregunte si LiveBridge puede encontrar dispositivos en tu red local. La línea de voz necesita
+también este segundo permiso; sin él, la llamada se detiene con una frase que indica dónde
+permitirlo.
 
 ### Desinstalación
 
@@ -203,6 +243,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
   menú de la barra de menús.
 - **Open at login** (desactivado por defecto).
+- **Updates**: la versión en uso, **Check for update**, **Check for updates automatically** y lo
+  que hizo la última actualización ([Actualización](#actualización)).
 
 ### Qué hace la voz
 
@@ -279,12 +321,22 @@ codex desactivadas salvo donde conserva tu inicio de sesión y cómo usa tu prox
 servidores MCP desactivados; está ahí solo para conversar. El trabajo de Claude va a Anthropic como
 siempre lo hace tu sesión de Claude Code.
 
-En tu Mac, la aplicación guarda sus ajustes, el contador de uso y, para cada una de las últimas 20
-sesiones usadas, su conversación reciente y la última línea de contexto cargada desde ella, en
-`~/Library/Application Support/LiveBridge`. Las líneas de una sesión desaparecen cuando pulsas **New
-conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido las conserva
-hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta `/live on` en ella
-de nuevo y pulsa **New conversation**. La desinstalación las elimina todas.
+Para las actualizaciones, la aplicación se comunica con GitHub. Con **Check for updates
+automatically** activado, una vez al día (y en cada arranque mientras no se haya instalado una
+versión que anunció) pregunta a la API de GitHub, sin credenciales, cuál es la última versión;
+GitHub ve la dirección IP de tu Mac. Cuando encuentra una versión más reciente, ejecuta
+`gh auth status` para indicar si la imagen se puede verificar. Solo cuando pulsas **Install**
+descarga la imagen y ejecuta `gh attestation verify` y `claude plugin`, que se conectan a GitHub,
+y a Sigstore para la raíz de confianza de `gh`, con tus propias sesiones.
+[SECURITY.md](SECURITY.md#what-leaves-the-mac) enumera cada petición.
+
+En tu Mac, la aplicación guarda sus ajustes, el contador de uso, cuándo buscó actualizaciones por
+última vez y qué versiones anunció, lo que hizo la última actualización y, para cada una de las
+últimas 20 sesiones usadas, su conversación reciente y la última línea de contexto cargada desde
+ella, en `~/Library/Application Support/LiveBridge`. Las líneas de una sesión desaparecen cuando
+pulsas **New conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido
+las conserva hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta
+`/live on` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas.
 
 [SECURITY.md](SECURITY.md) contiene el modelo de amenazas: en resumen, todo lo que tu micrófono
 pueda oír puede convertirse en una petición que Claude ejecuta con el propio modo de permisos de la
