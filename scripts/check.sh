@@ -8,7 +8,7 @@ swift format lint --strict -r app
 # build-app.sh --uninstall removes exactly what the app keeps.
 sh scripts/tests/uninstall.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
-node --test app/Tests/AudioJSTests
+node --test 'app/Tests/AudioJSTests/*.test.mjs'
 
 # The mod's pure modules and their unit tests: TypeScript and @types/node, its dev dependencies.
 [ -d plugin/node_modules/@types/node ] || npm --prefix plugin ci --no-audit --no-fund
