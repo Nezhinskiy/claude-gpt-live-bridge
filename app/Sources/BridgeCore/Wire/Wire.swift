@@ -68,6 +68,9 @@ public struct JoinBody: Codable, Sendable, Equatable {
   public var title: String
   /// The id the session had before `/clear`: its place, target and requests move to the new id.
   public var replaces: SessionID?
+  /// `true`: the owner asked for it (`/live on`). Only such a join brings back a session the
+  /// owner removed; any other is answered `410 removed`.
+  public var owner: Bool?
 }
 
 /// `POST /v1/leave`.
@@ -148,6 +151,7 @@ public struct PollReply: Codable, Sendable, Equatable {
 /// What a non-2xx reply asks of the mod, beyond its HTTP status.
 public enum ErrorCode: String, Codable, Sendable {
   /// `410`: the owner removed this session; the mod turns itself off instead of joining again.
+  /// Its joins get it too, until one says the owner asked for it (`JoinBody.owner`).
   case removed
 }
 

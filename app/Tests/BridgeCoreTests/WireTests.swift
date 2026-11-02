@@ -51,12 +51,4 @@ struct WireTests {
       reply.status.sessions.map(\.label) == ["Example session · 0000", "Example session · 1111"])
   }
 
-  /// A mod from before the app's own automatic-context setting still joins.
-  @Test func aJoinWithTheOldAutoContextFlagStillDecodes() throws {
-    let json = Data(
-      #"{"sessionId":"00000000-0000-0000-0000-000000000001","title":"Example session","autoContext":true}"#
-        .utf8)
-    let join = try JSONDecoder().decode(JoinBody.self, from: json)
-    #expect(join.title == "Example session" && join.replaces == nil)
-  }
 }

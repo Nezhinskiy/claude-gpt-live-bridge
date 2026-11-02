@@ -12,7 +12,7 @@ public enum RegistryError: Error, Equatable {
   case unknownSession(SessionID)
   /// The id is not this session's open request (or, for an `update`, its latest one).
   case unknownRequest(RequestID)
-  /// The owner removed the session in the menu; it is told so until it joins again.
+  /// The owner removed the session in the menu; it is told so until the owner joins it again.
   case removedSession(SessionID)
 
   public var message: String {
@@ -62,7 +62,7 @@ public actor SessionRegistry {
   private static let sessionExpiry: TimeInterval = 5
   private static let requestTimeout: TimeInterval = 600
   private var sessions: [SessionID: Session] = [:]
-  /// Sessions the owner removed that have not joined since.
+  /// Sessions the owner removed that the owner has not joined again since.
   private var removed: Set<SessionID> = []
   private var joins = 0
   private var lastSweep: Date?
@@ -81,9 +81,14 @@ public actor SessionRegistry {
   }
 
   /// Adds the session, or renames it and refreshes its liveness if it already joined. A session
-  /// that `replaces` an id takes over that id's place, target and requests.
-  public func join(_ body: JoinBody) {
-    removed.remove(body.sessionId)
+  /// that `replaces` an id takes over that id's place, target and requests. A removed session
+  /// joins again only when the owner asks (`owner`); the mod's own joins, such as following a
+  /// new title, throw `removedSession`.
+  public func join(_ body: JoinBody) throws {
+    if removed.contains(body.sessionId) {
+      guard body.owner == true else { throw RegistryError.removedSession(body.sessionId) }
+      removed.remove(body.sessionId)
+    }
     let replaced = body.replaces.flatMap { sessions.removeValue(forKey: $0) }
     if replaced != nil, target == body.replaces { target = body.sessionId }
     var session =
@@ -100,8 +105,8 @@ public actor SessionRegistry {
     drop(id, labels: labels(), reason: "session left")
   }
 
-  /// The owner removed the session: like `leave`, and until it joins again every call from it
-  /// throws `removedSession`, so the mod stops instead of joining again.
+  /// The owner removed the session: like `leave`, and until the owner joins it again every call
+  /// from it throws `removedSession`, so the mod stops instead of joining again.
   @discardableResult public func remove(_ id: SessionID) -> Delivery? {
     guard sessions[id] != nil else { return nil }
     removed.insert(id)

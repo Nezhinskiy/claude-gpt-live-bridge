@@ -198,12 +198,13 @@ public actor Bridge: Router {
         return .json(PollReply(status: await status, work: work))
       case ("POST", "/v1/join"):
         let body = try req.decodeBody(JoinBody.self)
-        if let old = body.replaces, await registry.rows().contains(where: { $0.sessionId == old }) {
+        let replaced = await registry.rows().contains { $0.sessionId == body.replaces }
+        try await registry.join(body)
+        if let old = body.replaces, replaced {
           continuity.move(old, to: body.sessionId)  // after /clear: the same session, a new id
           if lineSession == old { lineSession = body.sessionId }
           save()
         }
-        await registry.join(body)
         if problem == .noSession { problem = nil }
       case ("POST", "/v1/leave"):
         let delivery = await registry.leave(try req.decodeBody(LeaveBody.self).sessionId)

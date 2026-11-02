@@ -2,7 +2,7 @@
 // app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). Optional
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
-// `removed`), 413 body over 131072 bytes.
+// `removed`; also the reply to its join unless `owner` is true), 413 body over 131072 bytes.
 
 /** The socket path relative to the home folder Foundation reports. */
 const SOCKET_REL = 'Library/Application Support/claude-gpt-live-bridge/run/bridge.sock';
@@ -27,10 +27,12 @@ export type Work = ({ kind: 'request' } & VoiceRequest) | { kind: 'context' };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
- * session had before `/clear`: its place, target and requests move to the new id. Whether a new
- * target is asked for its summary is the app's own setting, not the join's.
+ * session had before `/clear`: its place, target and requests move to the new id. `owner: true`
+ * says the owner asked for it (`/live on`): only such a join brings back a session the owner
+ * removed, any other is answered 410 `removed`; absent means false. Whether a new target is asked
+ * for its summary is the app's own setting, not the join's.
  */
-export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId };
+export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 

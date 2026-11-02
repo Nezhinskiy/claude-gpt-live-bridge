@@ -224,7 +224,8 @@ struct BridgeTests {
     #expect(await bridge.status.problem == nil)
   }
 
-  /// Removing a session from the menu answers its next poll with 410 and the wire's code.
+  /// Removing a session from the menu answers its next poll, and any join but the owner's,
+  /// with 410 and the wire's code.
   @Test func removedSessionsNextPollIsGone() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
@@ -234,6 +235,12 @@ struct BridgeTests {
       HTTPRequest(method: "GET", path: "/v1/next", query: ["sessionId": a.rawValue], body: Data()))
     #expect(reply.status == 410)
     #expect(try JSONDecoder().decode(ErrorReply.self, from: reply.body).code == .removed)
+    let rejoin = try await post("/v1/join", JoinBody(sessionId: a, title: "Alpha renamed"))
+    #expect(rejoin.status == 410)
+    #expect(try JSONDecoder().decode(ErrorReply.self, from: rejoin.body).code == .removed)
+    #expect(await bridge.status.sessions.map(\.sessionId) == [b])
+    try await post("/v1/join", JoinBody(sessionId: a, title: "Alpha", owner: true))
+    #expect(await bridge.status.sessions.map(\.sessionId) == [b, a])
   }
 
   @Test func handoffGoesToTarget() async throws {

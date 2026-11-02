@@ -13,7 +13,7 @@ struct SessionRegistryTests {
   init() { registry = SessionRegistry(time: time) }
 
   func join(_ id: SessionID, _ title: String = "Example session") async {
-    await registry.join(JoinBody(sessionId: id, title: title))
+    try? await registry.join(JoinBody(sessionId: id, title: title))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -53,9 +53,9 @@ struct SessionRegistryTests {
   }
 
   /// The menu's ×: the session is forgotten, its open request fails as "session left", and
-  /// until it joins again every call from it is told it was removed (not "unknown", which the
-  /// mod answers by joining again).
-  @Test func removedSessionIsToldSoUntilItJoinsAgain() async throws {
+  /// until the owner joins it again every call from it is told it was removed (not "unknown",
+  /// which the mod answers by joining again).
+  @Test func removedSessionIsToldSoUntilTheOwnerJoinsItAgain() async throws {
     for id in [a, b, c] { await join(id, id.rawValue) }
     try await registry.enqueue(request(1), for: a)
     let delivery = await registry.remove(a)
@@ -65,7 +65,12 @@ struct SessionRegistryTests {
     await #expect(throws: RegistryError.removedSession(a)) { try await registry.poll(a) }
     #expect(RegistryError.removedSession(a).httpStatus == 410)
     await #expect(throws: RegistryError.removedSession(a)) { try await registry.setTarget(a) }
-    await join(a, "Alpha")
+    // the mod's own join, following a new title or reconnecting, does not undo the Remove
+    await #expect(throws: RegistryError.removedSession(a)) {
+      try await registry.join(JoinBody(sessionId: a, title: "Renamed"))
+    }
+    #expect(await registry.rows().map(\.sessionId) == [b, c])
+    try await registry.join(JoinBody(sessionId: a, title: "Alpha", owner: true))  // `/live on`
     #expect(try await registry.poll(a) == nil)
   }
 
@@ -181,7 +186,7 @@ struct SessionRegistryTests {
     await join(b, "Beta")
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    await registry.join(JoinBody(sessionId: c, title: "Alpha", replaces: a))
+    try await registry.join(JoinBody(sessionId: c, title: "Alpha", replaces: a))
     #expect(await registry.target == c)
     #expect(await registry.rows().map(\.sessionId) == [c, b])
     let delivery = try await registry.complete(answer(request(1), from: c))
@@ -200,10 +205,10 @@ struct SessionRegistryTests {
   @Test func becomingTargetWithAutoContextAsksForContext() async throws {
     let settings = SettingsStore(file: nil)
     let registry = SessionRegistry(time: time, autoContext: { settings.current.autoContext })
-    await registry.join(JoinBody(sessionId: a, title: "Example session"))
+    try await registry.join(JoinBody(sessionId: a, title: "Example session"))
     #expect(try await registry.poll(a) == nil)  // the setting is off
     settings.update { $0.autoContext = true }
-    await registry.join(JoinBody(sessionId: b, title: "Other session"))
+    try await registry.join(JoinBody(sessionId: b, title: "Other session"))
     #expect(try await registry.poll(b) == nil)  // not the target
     try await registry.setTarget(b)
     #expect(try await registry.poll(b) == .context)
