@@ -52,6 +52,7 @@ const seen = new Set()
 let waiting = null // the voice request waiting for its answer
 let takenAt = null
 let answeredAt = null
+let answeredInLine = false // the answer went in while the line that handed it off was still open
 let spokenAt = null
 let smallTalkAt = null
 let phase = 'off'
@@ -98,6 +99,7 @@ while (Date.now() - t0 < deadline) {
   if (waiting !== null && now() - takenAt >= ANSWER_AFTER) {
     await send('POST', '/v1/answer', { sessionId, id: waiting.id, status: 'ok', text: ANSWER })
     answeredAt = now()
+    answeredInLine = phase === 'live' && lives.length === 1
     waiting = null
     log('answered', { phase })
   }
@@ -113,7 +115,7 @@ await send('POST', '/v1/leave', { sessionId })
 
 const checks = {
   exactlyOneHandoff: handoffs.length === 1,
-  answeredWhileTheLineWaited: answeredAt !== null && lives.length === 1,
+  answeredWhileTheLineWaited: answeredInLine,
   answerSpokenBeforeTheOwnerSpokeAgain: spokenAt !== null && (smallTalkAt ?? Infinity) > spokenAt,
   lineClosedBeforeTheSmallTalk: lives.length >= 2,
   openLessThan90s: secondsOpen < 90,
