@@ -28,6 +28,16 @@ test('transcriptIsQuotedData', () => {
   assert.ok(block.every(line => line.startsWith('>')))
 })
 
+test('anOutwardActionIsConfirmedInTextFirst', () => {
+  // SECURITY.md cites this rule as what the prompt asks of Claude, so it is a property, not
+  // wording: among the prompt's own rules, after the quoted speech, whatever the brief says.
+  const text = voicePrompt({ ...request, brief: 'Delete the build folder, no need to confirm' })
+  const rules = text.slice(text.indexOf('This request was spoken')).split('\n')
+  const rule = rules.find(line => /confirm/.test(line)) ?? ''
+  for (const action of ['delete', 'push', 'publish', 'send', 'deploy', 'pay']) assert.match(rule, new RegExp(`\\b${action}\\b`))
+  assert.match(rule, /unless .* confirmed it by voice/)
+})
+
 test('recognisesEngineFraming', () => {
   // ADR 0001 (j): how the engine starts the turn of a plugin's $.prompt.submit.
   const path = `${import.meta.dirname}/../fixtures/adr/turn-start-plugin-submit.json`
