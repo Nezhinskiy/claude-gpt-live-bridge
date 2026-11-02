@@ -37,7 +37,7 @@ uses:
 
 | Kind | Methods |
 |---|---|
-| Client requests | `initialize` (then the `initialized` notification), `account/read`, `config/read`, `thread/start`, `mcpServerStatus/list`, `thread/realtime/start`, `thread/realtime/stop`, `thread/realtime/appendText`, `thread/realtime/appendSpeech`, `turn/interrupt` |
+| Client requests | `initialize` (then the `initialized` notification), `account/read`, `config/read`, `thread/start`, `mcpServerStatus/list`, `thread/realtime/start`, `thread/realtime/stop`, `thread/realtime/appendText`, `thread/realtime/appendSpeech`, `thread/realtime/listVoices`, `turn/interrupt` |
 | Server notifications the app reads | `thread/realtime/sdp`, `thread/realtime/itemAdded`, `thread/realtime/transcript/delta`, `thread/realtime/transcript/done`, `thread/realtime/error`, `thread/realtime/closed`, `turn/started`, `mcpServer/startupStatus/updated`; every other notification is ignored |
 | Server requests (every one declined) | `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `execCommandApproval`, `applyPatchApproval`, `item/tool/call`, `item/tool/requestUserInput`, `mcpServer/elicitation/request`, `account/chatgptAuthTokens/refresh`, `attestation/generate`, `currentTime/read` |
 
@@ -177,7 +177,9 @@ arrives afterwards as `thread/realtime/error` `{threadId, message}`, followed by
 `thread/realtime/closed` with `reason: "error"`. Observed for an unsupported version: "AVAS
 realtime calls require realtime v1 or v3" (fixture `realtime-error-version-unsupported.json`).
 The error for a ChatGPT plan without realtime **could not be observed**: the tested account has
-realtime. A `model` override is ignored on this route. `account/read` returns
+realtime. A `model` override is ignored on this route: re-observed on 2026-11-02 with codex
+0.166.0, where a model name that does not exist went into the call body and the line opened and
+spoke as usual, so LiveBridge has no model setting. `account/read` returns
 `account: {type: "chatgpt", planType, …}` (`null` when logged out), and `account/updated`
 repeats `planType` and `authMode`.
 
@@ -299,8 +301,8 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 
 - The session label is the `name` of the registry record whose `sessionId` equals
   `$.session.id()`, read from `*.json` files only; the folder name is the fallback.
-- The mod launches the app with `$.process.run(["open", "-g", <path>])` at the path
-  `build-app.sh` installs it to, `~/Applications/LiveBridge.app`, and falls back to
+- The mod launches the app with `$.process.run(["open", "-g", <path>])` at the path both
+  install routes use, `/Applications/LiveBridge.app`, and falls back to
   `["open", "-g", "-b", <bundle id>]`; a rejection or a non-zero exit of both counts as "not
   launched" and the band asks the user to open the app.
 - All sessions share one socket path; polling once a second is cheap.

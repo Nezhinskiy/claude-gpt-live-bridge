@@ -14,7 +14,7 @@ says, not in an issue. Everyone taking part follows the [Code of Conduct](CODE_O
 | `app/` | The SwiftPM package: `BridgeCore` (pure logic, tested without codex, a microphone or Claude) and `LiveBridge` (the menu bar app and its invisible audio page). |
 | `plugin/` | The Claude Code mod `livebridge`. `hooks/register.tsx` is wiring only; the other `hooks/*.ts` modules are pure. |
 | `wire/fixtures/` | One JSON file per message between the mod and the app: the shared oracle both sides test against. |
-| `scripts/` | `check.sh` (every check CI runs), `build-app.sh` (build, install, uninstall), `smoke.sh` (end to end). |
+| `scripts/` | `check.sh` (every check CI runs), `build-app.sh` (build, install, uninstall, package), `smoke.sh` (end to end). |
 | `docs/` | [Architecture](docs/architecture/overview.md) and [ADRs](docs/adr/); the rest is the stayfixed scaffold (below). |
 
 ## Where to start
@@ -78,8 +78,8 @@ answer also needs changes to the audio page.
 
 - A Swift 6.0 toolchain or later, the tools version `app/Package.swift` declares. It is tested
   with Xcode 27 and Swift 6.4 (CI uses Xcode 27.2); older Xcode versions are untested. Liquid
-  Glass needs Xcode 26 or later; with an older Xcode the code falls back to the same popover with
-  materials.
+  Glass needs Xcode 26 or later; with an older Xcode the menu's buttons fall back to bordered
+  capsules and the app shows only its classic icon.
 - Node 26, for the mod's checks and the audio page's tests. `scripts/check.sh` installs the
   mod's development dependencies, TypeScript and `@types/node`, with `npm ci`.
 - Claude Code, for the mod's engine-facing half (below).
@@ -109,13 +109,20 @@ Claude Code session with `app/Tests/Smoke/fake-session.mjs`. The voice is a lang
 a run can fail on its wording; if a check fails, run it again before reading much into it, and
 report the rate if it keeps failing.
 
+## Releasing
+
+The app and the mod share one version (`check.sh` holds them equal). Pushing the tag
+`v<version>` runs `.github/workflows/release.yml` on a GitHub-hosted macOS runner: it refuses a
+tag that does not match `Info.plist`, builds the image with `scripts/build-app.sh --package`,
+attests it, and creates the tag's Release with `LiveBridge.dmg` attached.
+
 ## Running the app while you work
 
 ```sh
 scripts/build-app.sh --run                      # debug build, then open it
 scripts/build-app.sh --run --fake-mic say.wav   # the WAV plays as the microphone
 CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of your home
-/usr/bin/log stream --info --predicate 'subsystem == "io.github.nezhinskiy.livebridge"'
+/usr/bin/log stream --info --predicate 'subsystem == "com.getlivebridge.livebridge"'
 ```
 
 `claude --plugin-dir plugin` loads the mod from the working tree. The mod follows
