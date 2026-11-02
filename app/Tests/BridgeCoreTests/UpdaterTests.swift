@@ -358,6 +358,16 @@ struct UpdaterTests {
     #expect(await updater.status == .failed(.http(403)))
   }
 
+  @Test func anInstallOfAReleaseThatIsNotNewerIsRefused() async throws {
+    for running in ["0.1.3", "0.1.10"] {
+      let rig = try UpdateRig()
+      let updater = try rig.updater(running: running)
+      await updater.install(try rig.release)
+      #expect(await updater.status == .failed(.notNewer), "\(running)")
+      #expect(rig.log.downloads == 0, "\(running)")
+    }
+  }
+
   @Test func noGhDownloadsNothing() async throws {
     let rig = try UpdateRig()
     rig.env.change { $0.programs["gh"] = nil }

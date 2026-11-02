@@ -35,6 +35,8 @@ public enum UpdateProblem: Error, Equatable, Sendable {
   case stagedChanged
   /// Putting the new app in place failed, in the system's words.
   case swapFailed(String)
+  /// The release is not newer than the running app, so installing it would be a downgrade.
+  case notNewer
   /// An install is already running.
   case busy
   /// This app is not the copy in `/Applications`.
@@ -63,6 +65,8 @@ public enum UpdateProblem: Error, Equatable, Sendable {
     case .notWritable: "LiveBridge cannot write to /Applications."
     case .stagedChanged: "The update changed after it was checked, so it was not installed."
     case .swapFailed(let detail): "The update could not replace the app: \(detail)"
+    case .notNewer:
+      "This release is not newer than the running LiveBridge, so it was not installed."
     case .busy: "An update is already running."
     case .notInstalledCopy: "Updates install only into /Applications."
     }

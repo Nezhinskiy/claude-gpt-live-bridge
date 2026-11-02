@@ -111,6 +111,7 @@ public actor Updater {
     defer { try? FileManager.default.removeItem(at: folder) }
     var staged: URL?
     do throws(UpdateProblem) {
+      guard version > running else { throw .notNewer }
       if let problem = await verifierProblem() { throw problem }
       set(.downloading)
       let image = try await download(release, into: folder)
