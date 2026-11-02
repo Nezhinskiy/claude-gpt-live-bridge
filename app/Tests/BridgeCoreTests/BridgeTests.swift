@@ -21,6 +21,8 @@ actor FakeVoice: RealtimeControlling {
   }
   func close() { closes += 1 }
   func addContext(_ text: String) { added.append(text) }
+  var spoken: [String] = []
+  func speak(_ text: String) { spoken.append(text) }
   func shutdown() { shutdowns += 1 }
   func fail(with problem: CodexProblem?) { failure = problem }
   nonisolated func emit(_ event: RealtimeEvent) { emitter.yield(event) }
@@ -336,6 +338,60 @@ struct BridgeTests {
     try await answer(request(1), from: a)
     #expect(await audio.calls.contains("chime"))
     #expect(await notifier.posted.isEmpty)
+  }
+
+  /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.
+  func handOff() async throws {
+    voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
+  }
+
+  func answerFirstRequest() async throws {
+    try await post(
+      "/v1/answer",
+      AnswerBody(sessionId: a, id: request(1).id, status: .ok, text: "Done.", reason: nil))
+  }
+
+  /// A result that comes while the line still waits for it is said at once, not only added.
+  @Test func anEarlyResultIsSpokenOnTheOpenLine() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Done."] })
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// While the owner speaks the result waits; it is said once they stop and the grace passes.
+  @Test func aResultWaitsForSilenceAndTheGrace() async throws {
+    await live()  // the owner is still speaking
+    try await handOff()
+    try await answerFirstRequest()
+    await bridge.audioEvent(.speechEnded)
+    #expect(await voice.spoken.isEmpty)
+    #expect(await eventually { time.sleepers >= 5 })  // sweep, 2 silence timers, window, grace
+    time.advance(by: .milliseconds(800))
+    #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Done."] })
+  }
+
+  /// Silence does not close a line that waits for a result; the window does, and a result after
+  /// it chimes as before.
+  @Test func anUnansweredHandoffClosesTheLineAfterTheWindow() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    #expect(await eventually { time.sleepers >= 4 })  // sweep, 2 silence timers, window
+    for second in 1..<CallMachine.resultWindowSeconds {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)  // the session stays joined
+      if second == CallMachine.silenceSeconds + 1 { #expect(await bridge.status.call == .live) }
+    }
+    #expect(await bridge.status.call == .live)
+    time.advance(by: .seconds(1))
+    #expect(await eventually { await bridge.status.call == .listening })
+    try await answerFirstRequest()
+    #expect(await audio.calls.contains("chime"))
+    #expect(await voice.spoken.isEmpty)
   }
 
   /// With no session joined, the failure arrives with the handoff; the ack must not hang up on it.

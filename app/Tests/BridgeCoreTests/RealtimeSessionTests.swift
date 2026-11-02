@@ -284,6 +284,21 @@ struct RealtimeSessionTests {
     #expect(sent["threadId"] == thread)
   }
 
+  /// A result to say now goes as speakable text (`appendSpeech`), codex's own way to have the
+  /// voice say a finished handoff's answer; the text carries no role.
+  @Test func aResultToSayNowIsAppendedAsSpeech() async throws {
+    _ = try await session.open(offerSDP: "offer", items: [])
+    try await session.speak("[RESULT] Example session: Done.")
+    let sent = try #require(await rpc.params("thread/realtime/appendSpeech").first?.object)
+    #expect(sent == ["threadId": thread, "text": "[RESULT] Example session: Done."])
+    #expect(await rpc.params("thread/realtime/appendText").isEmpty)
+  }
+
+  @Test func speakingWithNoSessionOpenFails() async throws {
+    await #expect(throws: CodexProblem.self) { try await session.speak("[RESULT] x: y") }
+    #expect(await rpc.params("thread/realtime/appendSpeech").isEmpty)
+  }
+
   /// The events end with the session, so whoever reads them lets the controller go.
   @Test func eventsEndAtShutdownAndWhenCodexExits() async throws {
     var events = session.events.makeAsyncIterator()
