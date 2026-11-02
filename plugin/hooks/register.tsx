@@ -12,6 +12,7 @@ import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { clip, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
+import type { VoiceRequest } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
@@ -47,11 +48,6 @@ let approval: { tool: string; agent: string | undefined } | null = null
 let offlineSince: number | null = null
 /** The mod's own sentence while online; it lasts until the next voice request. */
 let note: string | null = null
-/**
- * Counts joins and leaves. Work that awaited across one (a poll in flight when the owner left)
- * belongs to a join that is over, so it stops there instead of acting on the app's reply.
- */
-let generation = 0
 /** The registry file holding this session's record, once found: each poll reads it alone. */
 let recordFile: string | null = null
 let lastScan = -Infinity
@@ -74,6 +70,19 @@ const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
 
 async function save($: EngineInterface): Promise<void> {
   if (link?.session) await $.store.set(joinedKey(link.session.sessionId), tracker.snapshot())
+}
+
+/**
+ * Runs `work` after the link work queued before it (`BridgeLink.serial`): joining, the poll,
+ * following the title, a removal and leaving each see the others whole.
+ */
+function serial<T>(work: () => Promise<T>): Promise<T> {
+  return link === null ? work() : link.serial(work)
+}
+
+/** Queues `work` without waiting for it; a failure is logged. */
+function enqueue($: EngineInterface, work: () => Promise<void>): void {
+  void serial(work).catch((error: unknown) => $.ui.log(`LiveBridge: ${String(error)}`))
 }
 
 /**
@@ -115,7 +124,6 @@ function parseRecord(text: string): unknown {
 }
 
 async function turnOn($: EngineInterface): Promise<boolean> {
-  generation += 1
   // What the last join learnt about the app is stale: the owner may have opened or installed it.
   offlineSince = null
   note = null
@@ -133,10 +141,11 @@ async function turnOn($: EngineInterface): Promise<boolean> {
 }
 
 async function turnOff($: EngineInterface): Promise<void> {
-  generation += 1
   link?.stop()
-  if (link?.session) await $.store.delete(joinedKey(link.session.sessionId))
+  const joined = link?.session
+  // Leaving first forgets the session, so no snapshot is saved for it after its key goes.
   await link?.leave()
+  if (joined) await $.store.delete(joinedKey(joined.sessionId))
   await setBand($, null)
 }
 
@@ -147,61 +156,66 @@ async function turnOff($: EngineInterface): Promise<void> {
  */
 async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
   const joined = link?.session
-  const live = generation
   if (!link || !joined) return
   const sessionId = await $.session.id()
   const isNewId = sessionId !== joined.sessionId
   const title = (await readTitle($, sessionId, isPoll && !isNewId)) ?? joined.title
-  if (live !== generation || (!isNewId && title === joined.title)) return
+  if (!isNewId && title === joined.title) return
   if (isNewId) {
     staleSummary()  // /clear: a new transcript
     await $.store.delete(joinedKey(joined.sessionId))
   }
-  await link.join({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
+  await link.rejoin({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
   await save($)
 }
 
-/** One poll: status into the band, a voice request into a prompt, a context request answered. */
+/**
+ * One poll: status into the band, a voice request queued as a prompt, a context request
+ * answered. It polls before it follows the title: any join clears the app's removal mark, so
+ * only a session the app still holds may join again.
+ */
 async function tick($: EngineInterface): Promise<void> {
-  const live = generation
-  await follow($, true)
-  const joined = link?.session
-  const reply = await link?.next()
-  if (live !== generation) return
-  if (reply === REMOVED) return removed($, joined?.sessionId)
+  if (!link?.session) return  // it left, or was removed, while this poll waited its turn
+  const reply = await link.next()
+  if (reply === REMOVED) return  // the link queued `removed`
   if (!reply) {
     const now = await $.clock.now()
     if (offlineSince === null) {
       offlineSince = now
-      const isOpened = await link?.ensureApp()
-      if (live !== generation) return
-      if (!isOpened) await setBand($, { problem: OPEN_APP })
+      if (!(await link?.ensureApp())) await setBand($, { problem: OPEN_APP })
     }
-    if (live === generation) await setBand($, { isOffline: now - offlineSince >= OFFLINE_AFTER_MS })
+    await setBand($, { isOffline: now - offlineSince >= OFFLINE_AFTER_MS })
     return
   }
   offlineSince = null
+  await follow($, true)
   const self = link?.session?.sessionId ?? ''
   if (reply.work?.kind === 'request') note = null
   await update($, band, now => ({
     isOffline: false, status: bandStatus(reply.status, self),
     ...(note && { problem: note }), ...(now?.context && { context: now.context }),
   }))
-  if (reply.work?.kind === 'request') {
-    tracker.submitted(reply.work.id)
-    await save($)
-    // It resolves once the turn starts, which may be after the running one: do not hold the poll.
-    const id = reply.work.id
-    void $.prompt.submit({ text: voicePrompt(reply.work) }).catch(() => refused($, id))
-  } else if (reply.work?.kind === 'context') {
+  const work = reply.work
+  if (work?.kind === 'request') {
+    // Queued behind an off or a removal that came in while this poll ran: those fail it in the app.
+    enqueue($, () => deliver($, work))
+  } else if (work?.kind === 'context') {
     void contextAsked($)
   }
 }
 
+/** A voice request into a prompt, unless the session left or was removed since the poll. */
+async function deliver($: EngineInterface, request: VoiceRequest): Promise<void> {
+  if (!link?.session) return
+  tracker.submitted(request.id)
+  // It resolves once the turn starts, which may be after the running one: do not hold the queue.
+  void $.prompt.submit({ text: voicePrompt(request) }).catch(() => refused($, request.id))
+  await save($)
+}
+
 /** The owner removed this session in the app: off here too, with no leave and no rejoin. */
-async function removed($: EngineInterface, sessionId: string | undefined): Promise<void> {
-  generation += 1
-  if (sessionId !== undefined) await $.store.delete(joinedKey(sessionId))
+async function removed($: EngineInterface, sessionId: string): Promise<void> {
+  await $.store.delete(joinedKey(sessionId))
   await setBand($, null)
   $.ui.log(REMOVED_NOTE)
 }
@@ -298,18 +312,20 @@ async function live($: EngineInterface, args: string): Promise<string> {
   const joined = link?.session
   if (verb === 'status') return statusText($)
   if (verb === 'on') {
-    if (joined) return 'This session has already joined LiveBridge.'
-    // No title here: a new session's is still the one Claude Code derives from its folder, and
-    // the app shows the name the session is given next, once the poll follows it.
-    return (await turnOn($))
-      ? 'Joined LiveBridge.'
-      : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
+    return serial(async () => {
+      if (link?.session) return 'This session has already joined LiveBridge.'
+      // No title here: a new session's is still the one Claude Code derives from its folder, and
+      // the app shows the name the session is given next, once the poll follows it.
+      return (await turnOn($))
+        ? 'Joined LiveBridge.'
+        : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
+    })
   }
   if (verb === 'context' && (option === 'auto' || option === 'manual')) return CONTEXT_SETTING
   if (!['off', 'target', 'context'].includes(verb) || option !== undefined) return USAGE
   if (!joined) return 'This session has not joined LiveBridge.'
   if (verb === 'off') {
-    await turnOff($)
+    await serial(() => turnOff($))
     return 'Left LiveBridge.'
   }
   if (verb === 'target') {
@@ -365,6 +381,7 @@ export const register: Register = on => {
       run: argv => $.process.run(argv),
       every: (ms, fn) => $.clock.every(ms, fn),
       log: text => $.ui.log(text),
+      removed: sessionId => enqueue($, () => removed($, sessionId)),
     }, {
       socketPath: socketPath(home, await $.env.get('CFFIXED_USER_HOME')),
       appPath: `${home}/Applications/LiveBridge.app`,
@@ -373,7 +390,7 @@ export const register: Register = on => {
     const saved = await $.store.get(joinedKey(await $.session.id()))
     if (saved !== undefined) {
       tracker = new TurnTracker(saved as TurnSnapshot)
-      await turnOn($)
+      await serial(() => turnOn($))
     }
     return next(e)
   })
@@ -398,7 +415,7 @@ export const register: Register = on => {
       // A turn with no origin seen is treated as typed: its answer never reaches the voice.
       tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'typed', await $.clock.now())
       lastOrigin = null
-      await follow($, false)
+      await serial(() => follow($, false))
       await save($)
       await link?.activity('working')
     }
@@ -411,8 +428,10 @@ export const register: Register = on => {
       staleSummary()
       approval = null
       await save($)
-      if (post && !(await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) })) && post.status !== 'update') {
-        note = LOST_ANSWER  // an update to a request a newer one replaced is refused by design
+      const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
+      // An update to a request a newer one replaced is refused by design; a removal says so itself.
+      if (post && taken !== true && taken !== REMOVED && post.status !== 'update') {
+        note = LOST_ANSWER
         $.ui.log(LOST_ANSWER)
       }
       await link?.activity('idle')
@@ -434,7 +453,7 @@ export const register: Register = on => {
 
   on('session.end', async ($, e, next) => {
     // After /clear the session goes on under a new id: the next poll leaves the old one and joins.
-    if (e.reason !== 'clear') await turnOff($)
+    if (e.reason !== 'clear') await serial(() => turnOff($))
     return next(e)
   })
 

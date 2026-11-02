@@ -23,7 +23,18 @@ export type Call = { route: string; body?: Record<string, unknown> }
 export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Record<string, string> = {}) {
   const clock = mock.clock(on)
   mock.env(on, { HOME: '/Users/example', ...env })
-  mock.store(on, store)
+  // The store in memory, whose next write can be held where the mod awaits it.
+  const held = async () => {
+    const hold = world.holdStore
+    world.holdStore = null
+    if (hold !== null) {
+      world.onStoreHeld()
+      await hold
+    }
+  }
+  on('store.get', (_, e) => ({ value: world.stored.get(e.key) }))
+  on('store.set', async (_, e) => (await held(), world.stored.set(e.key, e.value), { value: undefined }))
+  on('store.delete', async (_, e) => (await held(), world.stored.delete(e.key), { value: undefined }))
   const world = {
     clock,
     sessionId: ID,
@@ -53,7 +64,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     /** How long the session's model takes over a summary, on the mocked clock. */
     forkMs: 0,
     joined: new Set<string>(),
-    /** Sessions the owner removed in the popover; joining again clears the mark. */
+    /** Sessions the owner removed in the menu; joining again clears the mark. */
     removed: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
     work: [] as Work[],
@@ -65,6 +76,14 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     holdNext: null as Promise<void> | null,
     /** Called once a poll is being held. */
     onNextHeld: () => {},
+    /** What the mod's store holds. */
+    stored: new Map(Object.entries(store)),
+    /** While set, the mod's next write to its store is held until it resolves. */
+    holdStore: null as Promise<void> | null,
+    /** Called once a write is being held. */
+    onStoreHeld: () => {},
+    /** Prompts submitted and leaves posted, in the order they happened. */
+    timeline: [] as ('submit' | 'leave')[],
     /** The registry's other `*.json` files, by name: Claude Code rewrites them, so one may be half written. */
     otherRecords: {} as Record<string, string>,
     /** The calls to one route since the last look, then forgets them. */
@@ -108,10 +127,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'join') world.joined.add(body.sessionId)
     if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
     if (route === 'leave') world.joined.delete(body.sessionId)
+    if (route === 'leave') world.timeline.push('leave')
     if (route === 'answer' && world.answerStatus !== 200) {
       return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
     }
-    if (route === 'next' && world.removed.has(new URL(e.url).searchParams.get('sessionId') ?? '')) {
+    // The app answers every call from a removed session so, until it joins again.
+    if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {
       return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
     }
     const reply = route !== 'next'
@@ -129,6 +150,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('prompt.submit', (_, e) => {
     if (world.isSubmitRefused) throw new Error('the session is closing')
     world.submitted.push(e.text)
+    world.timeline.push('submit')
     return { text: e.text, origin: e.origin }
   })
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
