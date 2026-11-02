@@ -202,6 +202,7 @@ final class AppModel {
     }
     updateState = UpdateStateStore(file: paths.updates.appending(path: "state.json"))
     Task { [weak self] in
+      await self?.restoreAnnounced()
       while !Task.isCancelled {
         await self?.checkIfDue()
         try? await Task.sleep(for: UpdatePolicy.tick)
@@ -252,6 +253,16 @@ final class AppModel {
     await notifier.postUpdate(
       identifier: "update-available-\(release.version)",
       title: "LiveBridge \(release.version) is available", body: body, installs: release.version)
+  }
+
+  /// A release announced before a relaunch stays in the menu: with automatic checks on, one
+  /// check at launch finds it again, without a notice.
+  private func restoreAnnounced() async {
+    guard let updater, let updateState,
+      UpdatePolicy.checksAutomatically(
+        setting: settings.current.checkUpdatesAutomatically, isSourceBuild: isSourceBuild)
+    else { return }
+    if let release = await updater.restoreAnnounced(state: updateState) { available = release }
   }
 
   private func showUpdate(_ status: UpdateStatus) {

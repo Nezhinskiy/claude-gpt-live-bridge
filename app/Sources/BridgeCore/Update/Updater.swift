@@ -111,6 +111,15 @@ public actor Updater {
     return release
   }
 
+  /// At launch: when a release newer than the running app was announced before, checks once so
+  /// the menu offers it again. It is not the day's check and announces nothing: `state` is only
+  /// read. Returns the release the check found, or nil.
+  public func restoreAnnounced(state: UpdateStateStore) async -> Release? {
+    guard state.current.announced.contains(where: { $0 > running }) else { return nil }
+    guard case .available(let release) = await check() else { return nil }
+    return release
+  }
+
   /// Why the image could not be verified on this Mac: `gh` missing or signed out; nil when it
   /// can be.
   public func verifierProblem() async -> UpdateProblem? {

@@ -752,6 +752,27 @@ struct UpdaterTests {
     #expect(!rig.log.all.contains(.fetch))
   }
 
+  @Test func aNewerAnnouncedReleaseIsRestoredAtLaunch() async throws {
+    let rig = try UpdateRig()
+    let state = UpdateStateStore(file: rig.paths.updates.appending(path: "state.json"))
+    let announced = try #require(AppVersion("0.1.3"))
+    state.update { $0.announced = [announced] }
+    let before = state.current
+    let restored = try await rig.updater(running: "0.1.2").restoreAnnounced(state: state)
+    #expect(restored == (try rig.release))
+    #expect(state.current == before)  // not the day's check, and nothing announced again
+  }
+
+  @Test func anAnnouncedReleaseNoNewerIsNotRestored() async throws {
+    let rig = try UpdateRig()
+    let state = UpdateStateStore(file: rig.paths.updates.appending(path: "state.json"))
+    let announced = try #require(AppVersion("0.1.2"))
+    state.update { $0.announced = [announced] }
+    let restored = try await rig.updater(running: "0.1.2").restoreAnnounced(state: state)
+    #expect(restored == nil)
+    #expect(!rig.log.all.contains(.fetch))
+  }
+
   @Test func theRecordIsReadAfterARelaunch() async throws {
     let rig = try UpdateRig()
     _ = try await rig.install()
