@@ -1,7 +1,11 @@
 # Contributing
 
 Thanks for helping. Issues and pull requests are welcome; for anything larger than a fix, open
-an issue first so we can agree on the shape.
+an issue first so we can agree on the shape. The issue forms ask for what a report needs (your
+macOS, LiveBridge commit, Claude Code and codex versions, and what the band or menu showed), and
+the pull request template asks what changed, why, how you tested it, and whether
+`scripts/check.sh` passed. Report a vulnerability privately, as [SECURITY.md](SECURITY.md)
+says, not in an issue. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Layout
 
@@ -12,6 +16,63 @@ an issue first so we can agree on the shape.
 | `wire/fixtures/` | One JSON file per message between the mod and the app: the shared oracle both sides test against. |
 | `scripts/` | `check.sh` (every check CI runs), `build-app.sh` (build, install, uninstall), `smoke.sh` (end to end). |
 | `docs/` | [Architecture](docs/architecture/overview.md) and [ADRs](docs/adr/); the rest is the stayfixed scaffold (below). |
+
+## Where to start
+
+Small first changes: an open issue labelled
+[help wanted](https://github.com/Nezhinskiy/claude-gpt-live-bridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+or one of the README's [known limitations](README.md#known-limitations). The larger directions
+are in the README's [roadmap](README.md#roadmap-and-help-wanted). For each, read the
+[architecture overview](docs/architecture/overview.md) first, then the files below.
+
+### Windows and Linux
+
+The contract a port must keep is [the wire](docs/architecture/overview.md#the-wire):
+`app/Sources/BridgeCore/Wire/Wire.swift`, `plugin/hooks/wire.ts` and the fixtures in
+`wire/fixtures/`, which both test suites parse. What is tied to macOS:
+
+- `app/Sources/LiveBridge/`: the AppKit menu bar app (`App.swift`, `StatusItem.swift`,
+  `StatusMenu.swift`, `SettingsView.swift`, `Notifier.swift`), the login item
+  (`LoginItem.swift`, on `SMAppService`) and the WKWebView that hosts the audio page
+  (`AudioHost.swift`).
+- `app/Sources/LiveBridge/Resources/audio/`: the audio page, which owns the microphone, the voice
+  detector, the pre-roll and the WebRTC peer. Its pure modules are tested with
+  `node --test app/Tests/AudioJSTests`.
+- `app/Sources/BridgeCore/Audio/MicrophoneAccess.swift`: macOS's microphone permission.
+- `app/Sources/BridgeCore/Server/UnixHTTPServer.swift`: the socket server, on Apple's Network
+  framework. `app/Sources/BridgeCore/Paths.swift`: where the app keeps its files and its socket.
+- In the mod, `plugin/hooks/wire.ts` builds the socket path under `~/Library/Application Support`
+  and `plugin/hooks/link.ts` opens the app with macOS's `open`.
+
+The rules a port could reuse are in `BridgeCore`: `Call/CallMachine.swift`,
+`Sessions/SessionRegistry.swift`, `Call/Continuity.swift` and `Text/` (the answer shaper and the
+redactor), with their tests in `app/Tests/BridgeCoreTests`.
+
+### Other agents as the worker
+
+The Claude Code adapter is the mod in `plugin/`: `hooks/register.tsx` wires it to Claude Code's
+mod API (the `/live` command, `prompt.submit`, the band), `hooks/link.ts` talks to the app and
+runs the one-second poll, `hooks/prompt.ts` and `hooks/turns.ts` decide which turns answer a
+voice request and what each posts back, and `hooks/title.ts` reads the session's title from
+Claude Code's session registry. An adapter for another agent speaks the same wire: it joins, polls
+`GET /v1/next` and posts its answers, activity and context, on the routes listed under
+[the wire](docs/architecture/overview.md#the-wire).
+`app/Tests/Smoke/fake-session.mjs`, a plain Node script that plays a session for the smoke test,
+is the smallest example of that side; `plugin/tests/fake-bridge.ts` plays the app in the mod's
+tests. The voice's instructions, in `app/Sources/BridgeCore/Codex/VoicePrompt.swift`, name
+Claude Code.
+
+### Other voice providers
+
+The codex side is `app/Sources/BridgeCore/Codex/`. `RealtimeSession.swift` declares the
+`RealtimeControlling` protocol and implements it over `codex app-server` (`JSONRPCClient.swift`,
+`CodexLaunch.swift`); `Voices.swift` lists the voices for Settings, and `CodexHelp.swift`
+explains a missing or signed-out codex. `Bridge` takes a factory for the controller, wired in
+`app/Sources/LiveBridge/App.swift`, and `FakeVoice` in
+`app/Tests/BridgeCoreTests/BridgeTests.swift` is a minimal implementation to start from. A
+provider reports the voice's handoffs, utterances and close as `RealtimeEvent`s. `open` takes
+the audio page's WebRTC offer and returns the answer, so a provider without a WebRTC offer and
+answer also needs changes to the audio page.
 
 ## Toolchain
 

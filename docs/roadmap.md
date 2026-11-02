@@ -13,6 +13,10 @@ prose above the trail marker.
 The README's [known limitations](../README.md#known-limitations), starting with a reopened line
 that does not always speak a waiting result first.
 
+After that, three directions open to contributors, described in the README's
+[roadmap and help wanted](../README.md#roadmap-and-help-wanted): Windows and Linux, other agents
+as the worker besides Claude Code, and other voice providers besides codex on a ChatGPT login.
+
 <!-- Everything from the next heading to the end-of-trail comment is rewritten by `stayfixed docs
      trail`, the paragraph under it included: stayfixed writes that paragraph, line breaks and
      all, so an edit to it here makes `docs trail --check` report this file stale. -->
