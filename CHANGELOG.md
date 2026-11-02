@@ -4,6 +4,13 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.2]
+
+### Fixed
+
+- On macOS 27 the menu's Conversation submenu opened as an empty box. It shows the conversation
+  again, scrolled to the newest line.
+
 ## [0.1.1]
 
 ### Fixed
