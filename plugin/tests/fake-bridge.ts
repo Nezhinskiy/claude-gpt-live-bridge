@@ -4,10 +4,12 @@ import type { On } from 'claude-code'
 import { mock } from 'claude-code/testing'
 
 import { FRAMING } from '../hooks/prompt.ts'
+import { socketPath } from '../hooks/wire.ts'
 import type { StatusReply, Work } from '../hooks/wire.ts'
 
 export const ID = '00000000-0000-0000-0000-000000000001'
-export const SOCKET = '/Users/example/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
+/** Where the app listens for this home (wire.unit.ts holds the path itself). */
+export const SOCKET = socketPath('/Users/example', undefined)
 export const BAND = {
   plugin: 'livebridge',
   component: 'AbovePrompt',
@@ -23,7 +25,18 @@ export type Call = { route: string; body?: Record<string, unknown> }
 export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Record<string, string> = {}) {
   const clock = mock.clock(on)
   mock.env(on, { HOME: '/Users/example', ...env })
-  mock.store(on, store)
+  // The store in memory, whose next write can be held where the mod awaits it.
+  const held = async () => {
+    const hold = world.holdStore
+    world.holdStore = null
+    if (hold !== null) {
+      world.onStoreHeld()
+      await hold
+    }
+  }
+  on('store.get', (_, e) => ({ value: world.stored.get(e.key) }))
+  on('store.set', async (_, e) => (await held(), world.stored.set(e.key, e.value), { value: undefined }))
+  on('store.delete', async (_, e) => (await held(), world.stored.delete(e.key), { value: undefined }))
   const world = {
     clock,
     sessionId: ID,
@@ -31,7 +44,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isAppUp: true,
     /** The socket the app listens on. */
     socket: SOCKET as string,
-    /** Whether ~/Applications holds the app; Launch Services never finds it by bundle id here. */
+    /** Whether /Applications holds the app; Launch Services never finds it by bundle id here. */
     isAppInstalled: false,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
@@ -40,8 +53,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isCommandRefused: false,
     /** Every slash command the mod declared, in order. */
     commands: [] as string[],
-    /** The session's model fails the summary request. */
-    isForkFailing: false,
+    /** Why the session's model writes no summary (the fork's `reason`), or null when it writes one. */
+    forkFails: null as null | 'api-error' | 'nothing-to-fork',
     logs: [] as string[],
     /** Every event the mod asked the engine to run again (`$.ui.invalidate`), in order. */
     invalidated: [] as string[],
@@ -53,7 +66,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     /** How long the session's model takes over a summary, on the mocked clock. */
     forkMs: 0,
     joined: new Set<string>(),
-    /** Sessions the owner removed in the popover; joining again clears the mark. */
+    /** Sessions the owner removed in the menu; joining again clears the mark. */
     removed: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, minutesThisCall: 0, recentTranscript: [], unheard: 0 } as StatusReply,
     work: [] as Work[],
@@ -65,6 +78,14 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     holdNext: null as Promise<void> | null,
     /** Called once a poll is being held. */
     onNextHeld: () => {},
+    /** What the mod's store holds. */
+    stored: new Map(Object.entries(store)),
+    /** While set, the mod's next write to its store is held until it resolves. */
+    holdStore: null as Promise<void> | null,
+    /** Called once a write is being held. */
+    onStoreHeld: () => {},
+    /** Prompts submitted and leaves posted, in the order they happened. */
+    timeline: [] as ('submit' | 'leave')[],
     /** The registry's other `*.json` files, by name: Claude Code rewrites them, so one may be half written. */
     otherRecords: {} as Record<string, string>,
     /** The calls to one route since the last look, then forgets them. */
@@ -96,7 +117,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   })
   on('process.run', (_, e) => {
     world.launches.push(e.argv)
-    const exitCode = world.isAppInstalled && e.argv.at(-1)?.endsWith('/Applications/LiveBridge.app') ? 0 : 1
+    const exitCode = world.isAppInstalled && e.argv.at(-1) === '/Applications/LiveBridge.app' ? 0 : 1
     return { value: { exitCode, stdout: '', stderr: exitCode === 0 ? '' : 'no such application', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('http.fetch', async (_, e) => {
@@ -108,10 +129,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'join') world.joined.add(body.sessionId)
     if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
     if (route === 'leave') world.joined.delete(body.sessionId)
+    if (route === 'leave') world.timeline.push('leave')
     if (route === 'answer' && world.answerStatus !== 200) {
       return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
     }
-    if (route === 'next' && world.removed.has(new URL(e.url).searchParams.get('sessionId') ?? '')) {
+    // The app answers every call from a removed session so, until it joins again.
+    if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {
       return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
     }
     const reply = route !== 'next'
@@ -129,6 +152,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('prompt.submit', (_, e) => {
     if (world.isSubmitRefused) throw new Error('the session is closing')
     world.submitted.push(e.text)
+    world.timeline.push('submit')
     return { text: e.text, origin: e.origin }
   })
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
@@ -144,12 +168,13 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('model.fork', async () => {
     world.forks += 1
     if (world.forkMs > 0) await world.clock.sleep(world.forkMs)
-    return world.isForkFailing ? { deny: 'the model is unavailable' } : ({
-      value: {
-        isAnswered: true, text: world.summary,
-        usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
-      },
-    })
+    const usage = { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
+    // The engine resolves every outcome, an API error included; it does not throw.
+    if (world.forkFails === 'api-error') {
+      return { value: { isAnswered: false, reason: 'api-error', status: 529, error: 'overloaded', usage } } as const
+    }
+    if (world.forkFails === 'nothing-to-fork') return { value: { isAnswered: false, reason: 'nothing-to-fork' } } as const
+    return { value: { isAnswered: true, text: world.summary, usage } } as const
   })
   on('tool.check', () => ({ decision: 'ask' }))
   on('classic.PermissionRequest', () => ({}))

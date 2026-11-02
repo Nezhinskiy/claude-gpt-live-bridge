@@ -107,7 +107,7 @@ test('aFailedSummaryIsReportedNotThrown', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...LIVE, args: 'on' })
-  world.isForkFailing = true
+  world.forkFails = 'api-error'
   expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('could not summarise')
   world.work.push({ kind: 'context' })
   await world.clock.advance(1000)

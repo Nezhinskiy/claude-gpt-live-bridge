@@ -67,7 +67,13 @@ test('startAgainWithNoNewTurnAsksTheModelForNothing', async ($, on) => {
   expect(world.take('context')).toEqual([SUMMARY])
   // Stop, then Start again: the summary the model wrote still holds, so it is sent as it was (the
   // app may have erased it with New conversation) and the model is not asked again.
+  world.status = { ...world.status, call: 'live' }
+  await world.clock.advance(1000)
   await band.press({ key: 'call' })
+  world.status = { ...world.status, call: 'off' }
+  await world.clock.advance(1000)
+  await band.press({ key: 'call' })
+  expect(world.take('call')).toEqual([{ action: 'start' }, { action: 'stop' }, { action: 'start' }])
   expect(world.take('context')).toEqual([SUMMARY])
   expect(world.forks).toBe(1)
   // A turn completes: the next Start asks for a new summary.
@@ -119,7 +125,7 @@ test('aSummaryThatNeverComesStopsLoadingAfterAMinute', async ($, on) => {
 
 test('aFailedSummaryClearsTheNoteAndSaysSo', async ($, on) => {
   const world = await joined($, on)
-  world.isForkFailing = true
+  world.forkFails = 'api-error'
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await band.press({ key: 'call' })
   expect(world.take('call')).toEqual([{ action: 'start' }])
@@ -153,4 +159,14 @@ test('liveContextAsksTheModelEachTime', async ($, on) => {
   world.turns = 0
   expect((await $.command.run({ ...LIVE, args: 'context' })).text).toBe('Nothing to summarise yet.')
   expect(world.forks).toBe(2)
+})
+
+test('onlyNothingToForkIsNothingToSummarise', async ($, on) => {
+  // The engine answers an outage as a resolved api-error, which is a failure, not an empty session.
+  const world = await joined($, on)
+  world.forkFails = 'nothing-to-fork'
+  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toBe('Nothing to summarise yet.')
+  world.forkFails = 'api-error'
+  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('could not summarise')
+  expect(world.take('context')).toEqual([])
 })
