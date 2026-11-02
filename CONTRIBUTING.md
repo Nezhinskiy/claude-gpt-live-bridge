@@ -84,6 +84,10 @@ answer also needs changes to the audio page.
   mod's development dependencies, TypeScript and `@types/node`, with `npm ci`.
 - Claude Code, for the mod's engine-facing half (below).
 
+Dependabot (`.github/dependabot.yml`) proposes weekly updates of the workflows' pinned actions
+and the mod's development dependencies, each version a week after its release; CI passes before
+one is merged.
+
 ## Checks
 
 ```sh

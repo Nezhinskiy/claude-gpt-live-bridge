@@ -1,0 +1,30 @@
+# Weekly update PRs for the two things this repository pulls in: the SHA-pinned actions of its
+# workflows and the mod's development dependencies. The app has no Swift package dependencies.
+# A new version waits a week before it is proposed, so a release that is pulled soon after
+# publication never reaches a PR.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: npm
+    directory: /plugin
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
