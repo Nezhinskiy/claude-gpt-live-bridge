@@ -56,8 +56,9 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+      # SwiftPM's manifest sandbox (sandbox-exec) cannot start under CodeQL's tracer.
       - if: matrix.build-mode == 'manual'
-        run: swift build --package-path app
+        run: swift build --package-path app --disable-sandbox
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: /language:${{ matrix.language }}
