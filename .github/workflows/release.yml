@@ -1,6 +1,6 @@
 # Builds the disk image on a version tag (v0.1.0 and on), attaches it to that tag's GitHub
 # Release and attests its build provenance, so a downloader can check with
-# `gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge` that this workflow built
+# `gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge` that this workflow built
 # it from the tagged commit. The image is signed ad hoc and not notarized; no secret is used.
 name: Release
 

@@ -7,7 +7,7 @@
 <p align="center"><strong>Разговаривайте голосом с открытой сессией Claude Code.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Лицензия: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Платформа: macOS 14+ на Apple Silicon">
 </p>
@@ -55,11 +55,11 @@ realtime-голосом; чтобы собрать приложение само
 
 ```sh
 # 1. Мод — из маркетплейса этого репозитория
-claude plugin marketplace add getLiveBridge/livebridge
+claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 
 # 2. Приложение — сборка из исходников, установка в /Applications и запуск
-git clone https://github.com/getLiveBridge/livebridge.git
+git clone https://github.com/getLiveBridge/LiveBridge.git
 cd livebridge
 scripts/build-app.sh --release
 ```
@@ -67,7 +67,7 @@ scripts/build-app.sh --release
 3. В сессии Claude Code, с которой хотите говорить, наберите `/live on`.
 4. Нажмите **Start** в полосе над полем ввода, разрешите доступ к микрофону и говорите.
 
-Не хотите собирать? В каждом [выпуске](https://github.com/getLiveBridge/livebridge/releases/latest)
+Не хотите собирать? В каждом [выпуске](https://github.com/getLiveBridge/LiveBridge/releases/latest)
 есть приложение образом диска, который собирает и заверяет GitHub Actions; как его проверить и
 открыть, сказано в разделе [«Из образа диска»](#из-образа-диска). Мод ставится одинаково в обоих
 случаях.
@@ -98,12 +98,12 @@ scripts/build-app.sh --release
 ### Из образа диска
 
 1. Скачайте
-   [LiveBridge.dmg](https://github.com/getLiveBridge/livebridge/releases/latest/download/LiveBridge.dmg)
+   [LiveBridge.dmg](https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg)
    из последнего выпуска.
 2. Проверьте его с помощью [GitHub CLI](https://cli.github.com) в папке, куда сохранили файл:
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/livebridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
    ```
 
    Проверка проходит, только если образ собран из тега выпуска
@@ -320,7 +320,7 @@ conversation**, пока она цель, или убираете её чере�
 Сегодня LiveBridge — это одно приложение для Mac, один исполнитель (Claude Code) и один
 поставщик голоса (codex на входе в ChatGPT). Три части стыкуются через узкие швы, и каждое из
 направлений ниже открыто для участников. Задачи по ним помечены меткой
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
 с каких файлов начать, сказано в [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start).
 
 - **Windows и Linux.** Приложение в строке меню, его аудиостраница и сервер сокета привязаны к
@@ -335,7 +335,7 @@ conversation**, пока она цель, или убираете её чере�
 
 Участие приветствуется. Для всего, что больше исправления, сначала откройте задачу, чтобы
 договориться о форме до начала работы. Хорошо начать с задач
-[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+[help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
 с [известных ограничений](#известные-ограничения) и с направлений [выше](#планы-и-где-нужна-помощь).
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): структура репозитория, инструменты, проверки
