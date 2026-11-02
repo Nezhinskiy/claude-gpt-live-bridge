@@ -9,11 +9,11 @@ test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('not running')
 
   await world.clock.advance(1000)
-  // Where build-app.sh installs it first, a folder only the owner writes; then whatever app
-  // Launch Services knows by the bundle id.
+  // Where both install routes put it first; then whatever app Launch Services knows by the
+  // bundle id.
   expect(world.launches).toEqual([
-    ['open', '-g', '/Users/example/Applications/LiveBridge.app'],
-    ['open', '-g', '-b', 'io.github.nezhinskiy.livebridge'],
+    ['open', '-g', '/Applications/LiveBridge.app'],
+    ['open', '-g', '-b', 'com.getlivebridge.livebridge'],
   ])
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect((await band.find({ type: 'Text', text: /menu bar/ }))?.text).toContain('Open LiveBridge from the menu bar')
@@ -55,7 +55,7 @@ test('anInstalledAppIsOpenedByItsPath', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...LIVE, args: 'on' })
   await world.clock.advance(1000)
-  expect(world.launches).toEqual([['open', '-g', '/Users/example/Applications/LiveBridge.app']])
+  expect(world.launches).toEqual([['open', '-g', '/Applications/LiveBridge.app']])
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await band.find({ type: 'Text', text: /menu bar/ })).toBeUndefined()
   await band.unmount()

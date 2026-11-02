@@ -6,7 +6,7 @@ import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-cod
 import type { AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } from './wire.ts'
 
 /** LiveBridge.app's bundle identifier. */
-export const BUNDLE_ID = 'io.github.nezhinskiy.livebridge'
+export const BUNDLE_ID = 'com.getlivebridge.livebridge'
 const POLL_MS = 1000
 /** What `next` and `answer` answer once the owner removed this session in the app (HTTP 410). */
 export const REMOVED = 'removed'
@@ -35,7 +35,7 @@ export class BridgeLink {
   #isPolling = false
   #queue: Promise<unknown> = Promise.resolve()
 
-  /** `appPath`: where build-app.sh installs the app. */
+  /** `appPath`: where both install routes put the app. */
   constructor(ports: LinkPorts, paths: { socketPath: string; appPath: string }) {
     this.#ports = ports
     this.#socketPath = paths.socketPath
@@ -120,8 +120,8 @@ export class BridgeLink {
 
   /**
    * Opens the app in the background (ADR 0001, item f); false when that did not work. First by
-   * the path build-app.sh installs it at, a folder only the owner writes; only then by bundle id,
-   * which trusts whichever app Launch Services picks for it.
+   * the path both install routes put it at, a folder only an administrator writes; only then by
+   * bundle id, which trusts whichever app Launch Services picks for it.
    */
   async ensureApp(): Promise<boolean> {
     return (await this.#open(['open', '-g', this.#appPath])) || this.#open(['open', '-g', '-b', BUNDLE_ID])

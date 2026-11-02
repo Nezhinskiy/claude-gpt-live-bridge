@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Work } from '../hooks/wire.ts'
-import { fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
+import { fakeWorld, framed, ID, LIVE, SOCKET } from './fake-bridge.ts'
 
 const START = { cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true } as const
 const OTHER = '22222222-0000-0000-0000-000000000003'
@@ -97,7 +97,7 @@ test('offDuringAPollSubmitsNothing', async ($, on) => {
 test('aFixedHomeMovesTheSocketOnly', async ($, on) => {
   // CFFIXED_USER_HOME=/tmp/lb build-app.sh --run keeps the app's files there; the registry stays home.
   const world = fakeWorld(on, {}, { CFFIXED_USER_HOME: '/tmp/lb' })
-  world.socket = '/tmp/lb/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
+  world.socket = SOCKET.replace('/Users/example/', '/tmp/lb/')
   await $.session.start(START)
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
   expect(world.read.every(path => path.startsWith('/Users/example/.claude/sessions/'))).toBe(true)

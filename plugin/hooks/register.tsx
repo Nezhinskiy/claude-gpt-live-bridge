@@ -381,7 +381,7 @@ export const register: Register = on => {
       removed: sessionId => enqueue($, () => removed($, sessionId)),
     }, {
       socketPath: socketPath(home, await $.env.get('CFFIXED_USER_HOME')),
-      appPath: `${home}/Applications/LiveBridge.app`,
+      appPath: '/Applications/LiveBridge.app',
     })
     // A hot reload runs this again with the module's variables gone; the store kept the join.
     const saved = await $.store.get(joinedKey(await $.session.id()))

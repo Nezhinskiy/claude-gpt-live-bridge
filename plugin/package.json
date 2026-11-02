@@ -1,8 +1,8 @@
 {
-  "name": "claude-gpt-live-bridge-mod",
+  "name": "livebridge",
   "private": true,
   "type": "module",
-  "description": "Development scripts for the claude-gpt-live-bridge Claude Code mod; the mod itself has no dependencies.",
+  "description": "Development scripts for the LiveBridge Claude Code mod; the mod itself has no dependencies.",
   "scripts": {
     "test:unit": "node --test \"tests/unit/*.unit.ts\"",
     "typecheck": "tsc --noEmit",

@@ -4,10 +4,12 @@ import type { On } from 'claude-code'
 import { mock } from 'claude-code/testing'
 
 import { FRAMING } from '../hooks/prompt.ts'
+import { socketPath } from '../hooks/wire.ts'
 import type { StatusReply, Work } from '../hooks/wire.ts'
 
 export const ID = '00000000-0000-0000-0000-000000000001'
-export const SOCKET = '/Users/example/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock'
+/** Where the app listens for this home (wire.unit.ts holds the path itself). */
+export const SOCKET = socketPath('/Users/example', undefined)
 export const BAND = {
   plugin: 'livebridge',
   component: 'AbovePrompt',
@@ -42,7 +44,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isAppUp: true,
     /** The socket the app listens on. */
     socket: SOCKET as string,
-    /** Whether ~/Applications holds the app; Launch Services never finds it by bundle id here. */
+    /** Whether /Applications holds the app; Launch Services never finds it by bundle id here. */
     isAppInstalled: false,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
@@ -115,7 +117,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   })
   on('process.run', (_, e) => {
     world.launches.push(e.argv)
-    const exitCode = world.isAppInstalled && e.argv.at(-1)?.endsWith('/Applications/LiveBridge.app') ? 0 : 1
+    const exitCode = world.isAppInstalled && e.argv.at(-1) === '/Applications/LiveBridge.app' ? 0 : 1
     return { value: { exitCode, stdout: '', stderr: exitCode === 0 ? '' : 'no such application', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('http.fetch', async (_, e) => {
