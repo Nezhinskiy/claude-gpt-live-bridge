@@ -26,7 +26,7 @@ The design and its review are in
   once; it never installs by itself. A release that someone with push access to the repository
   could produce then cannot reach a Mac without its owner's action.
 - We will install nothing without a passing
-  `gh attestation verify --repo getLiveBridge/LiveBridge --signer-workflow
+  `gh attestation verify <image> --repo getLiveBridge/LiveBridge --signer-workflow
   getLiveBridge/LiveBridge/.github/workflows/release.yml --source-ref refs/tags/vX.Y.Z
   --deny-self-hosted-runners`, pinned to the release workflow, the release's tag and GitHub's own
   runners, whose attested digest equals the downloaded image's SHA-256. The tag must be a plain
@@ -47,14 +47,17 @@ The design and its review are in
 
 ## Consequences
 
-- The app makes outbound requests of its own: a daily unauthenticated request to GitHub's API,
-  which shows GitHub the Mac's IP address, and, on Install, the image download, `gh`'s requests
-  under the owner's GitHub login (Sigstore's trust root included) and `claude`'s git fetch of the
-  marketplace. The README's Privacy and SECURITY.md's "What leaves the Mac" list them, and the
-  daily check can be turned off.
+- The app makes outbound requests of its own, and runs programs that make more. Before any
+  click: an unauthenticated request to GitHub's API for the latest release, which shows GitHub the
+  Mac's IP address, daily and at each launch while an announced release is not installed (both
+  can be turned off), and on **Check for update**; and `gh auth status`, under the owner's GitHub
+  login, when the daily check announces a release. On Install: `gh auth status` again, the image
+  download, `gh attestation verify` (Sigstore's trust root included) and `claude`'s git fetch of
+  the marketplace. The README's Privacy and SECURITY.md's "What leaves the Mac" list them.
 - An updated app skips Gatekeeper's first-launch block: the download sets no quarantine attribute,
-  and one found on the staged copy is removed after its CDHash matched. The updater's checks are
-  the gate, and they rest on `gh` as found on the owner's `PATH`.
+  and one found on the staged copy is removed after its CDHash matched, so macOS has nothing to
+  block. That follows from the code and is to be observed in the first real update. The
+  updater's checks are the gate, and they rest on `gh` as found on the owner's `PATH`.
 - The attestation proves where and from what the image was built, not that anyone reviewed the
   code; the owner's click is the only stop for a release pushed by someone with push access.
 - macOS asks for the microphone again at the first Start after each update, because each release

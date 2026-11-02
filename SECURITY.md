@@ -158,11 +158,13 @@ asking.
 The app replaces itself in `/Applications` with a release that a reply from GitHub names, and
 only when you click **Install**: in Settings, in the menu bar menu or in the notification that
 announces the release. A check, automatic or from Settings, only reads which release is the
-latest; nothing downloads or installs without that click. Only the copy at
-`/Applications/LiveBridge.app` checks or installs: the running bundle, symlinks resolved, must be
-that path, and the path must not be a symlink. The click is what keeps a release from reaching a
-Mac by itself; the checks below decide what may be installed. Nothing installs unless each
-passes:
+latest (and, for a release the automatic check announces, runs `gh auth status`); nothing
+downloads or installs without that click. Only the copy at `/Applications/LiveBridge.app` checks
+or installs: the running bundle, symlinks resolved, must be that path, and the path must not be
+a symlink. The click is what keeps a release from reaching a Mac by itself; the checks below
+decide what may be installed
+([ADR 0002](docs/adr/0002-the-app-updates-itself-on-the-owners-click.md) records why). Nothing
+installs unless each passes:
 
 - **The release.** The reply's tag must be `vX.Y.Z` with plain integers (no suffix, sign or
   leading zero) and newer than the running version, so an update never installs an older or the
@@ -186,7 +188,7 @@ passes:
   produce a release that passes. It also rests on the `gh` found on your shell's `PATH`, which a
   process running as you could replace, as it could do worse (above).
 - **The app inside.** The image is attached read-only and must hold `LiveBridge.app` with the
-  bundle identifier `com.getlivebridge.livebridge`, the release's version, a
+  bundle identifier `com.getlivebridge.livebridge`, the release's version, when it names one an
   `LSMinimumSystemVersion` this Mac meets, and a signature that passes
   `codesign --verify --deep --strict`. The app is signed ad hoc, so `codesign` proves only that
   the bundle is whole as signed, not who signed it: it is not an origin check. Its CDHash is
@@ -198,9 +200,10 @@ passes:
   staged copy and the image.
 
 **An updated app skips Gatekeeper's first-launch block.** The download sets no quarantine
-attribute, and one found on the staged copy is removed from that copy alone, after its CDHash
-matched. macOS therefore does not block the new version's first launch, as it blocks a first
-install from the disk image until you allow it: the checks above are the gate.
+attribute (the app does not set `LSFileQuarantineEnabled`), and one found on the staged copy is
+removed from that copy alone, after its CDHash matched. It follows that macOS does not block the
+new version's first launch, as it blocks a first install from the disk image until you allow it;
+this has not yet been observed on a real update. Either way, the checks above are the gate.
 
 **The mod is fetched with git and is not attested.** `claude plugin marketplace update
 livebridge` and `claude plugin update livebridge@livebridge` fetch it over HTTPS from this
@@ -234,10 +237,11 @@ Settings starts another codex to list the voices; what codex sends on its own is
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
 session sends its work to Anthropic as it always does. LiveBridge has no telemetry.
 
-For updates, LiveBridge makes these requests, itself or through the programs it runs, and no
-others:
+For updates, the app itself makes two kinds of request, and no others: the release check and the
+image download below. It also runs `gh` and `claude` for the requests listed below; what `gh`
+and `claude` send on their own besides is theirs, as with codex.
 
-- **The release check**:
+- **The release check**, the app's own:
   `GET https://api.github.com/repos/getLiveBridge/LiveBridge/releases/latest`, without
   credentials or cookies. It shows GitHub your Mac's IP address and LiveBridge's user agent.
   With **Check for updates automatically** on, it runs when a check is due (a day after the last
@@ -245,12 +249,13 @@ others:
   once at launch while a release it announced is newer than the running app; **Check for
   update** in Settings, and an Install from a notification posted before a relaunch, send it
   too.
-- **`gh auth status`**, when a check finds a release not announced before and before every
-  install, under your own GitHub login.
-- After you click **Install**: the image download from `github.com` (GitHub counts downloads);
-  `gh attestation verify`, which fetches the image's attestation from GitHub under your login
-  and Sigstore's trust root from Sigstore; and `claude plugin marketplace update` and
-  `claude plugin update`, which fetch this repository with git.
+- **`gh auth status`**, when the automatic check finds a release not announced before and before
+  every install, under your own GitHub login.
+- After you click **Install**: the image download from `github.com`, the app's own, without
+  credentials or cookies (GitHub counts downloads); `gh attestation verify`, which fetches the
+  image's attestation from GitHub under your login and Sigstore's trust root from Sigstore; and
+  `claude plugin marketplace update` and `claude plugin update`, which fetch this repository
+  with git.
 
 Notifications never carry a result, but they name its session, and a session's title is often
 written from its conversation. With macOS's **Show previews** set to show on the lock screen,

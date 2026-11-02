@@ -372,8 +372,10 @@ Install runs only from the owner's click, one run at a time (the actor's flag, a
 8. `updates/record.json` is written, a `/bin/sh` loop waits for this process to exit and then
    `open`s the app, and the app quits.
 
-A failure before step 7 leaves the installed app as it was and removes the staged copy; the image
-folder is removed on every path.
+A failure before the swap, step 7's own re-check included, leaves the installed app as it was
+and removes the staged copy; the image folder is removed on every path. Why the install waits for
+the owner's click, and what that costs, is
+[ADR 0002](../adr/0002-the-app-updates-itself-on-the-owners-click.md).
 
 **At launch**, the installed copy removes every `/Applications/.LiveBridge-update-*.app` (the old
 bundle, or a copy a crashed run left) and, unless `updates` is a symlink, every version folder and

@@ -40,9 +40,12 @@ Unix que solo tu usuario puede abrir, y la aplicación no escucha en ningún pue
 de lo que esas dos herramientas ya envían (la línea de voz a OpenAI a través de tu codex, solo
 mientras está abierta, y el trabajo de Claude a Anthropic a través de tu sesión de Claude Code),
 el único tráfico propio de la aplicación es para las [actualizaciones](#actualización): una
-consulta diaria a GitHub por si hay una versión nueva, que puedes desactivar, y, cuando pulsas
-**Install**, la descarga y su verificación. [Privacidad](#privacidad) enumera exactamente qué
-llega a OpenAI y a GitHub; [SECURITY.md](SECURITY.md) explica de qué protege y de qué no protege.
+consulta automática a GitHub por si hay una versión nueva (diaria, y en cada arranque mientras no
+se haya instalado una que anunció), que puedes desactivar; la misma consulta cuando pulsas **Check
+for update**; `gh auth status` cuando se anuncia una versión nueva; y, cuando pulsas **Install**,
+la descarga, su verificación y la actualización del mod. [Privacidad](#privacidad) enumera
+exactamente qué llega a OpenAI y nombra las peticiones de la aplicación a GitHub;
+[SECURITY.md](SECURITY.md) explica de qué protege y de qué no protege.
 
 > **No oficial.** Sin afiliación, respaldo ni soporte de Anthropic u OpenAI. Depende de la API
 > experimental de tiempo real de codex, que puede cambiar con cualquier versión de codex.
@@ -74,8 +77,8 @@ incluye la aplicación como imagen de disco, compilada y atestada por GitHub Act
 instala igual en ambos casos.
 
 Si `/live` no se encuentra en una sesión que ya estaba abierta, vuelve a abrir la sesión
-([por qué](#limitaciones-conocidas)). La actualización, los permisos, cómo conservar el permiso del
-micrófono entre actualizaciones y la desinstalación están en [Instalación](#instalación).
+([por qué](#limitaciones-conocidas)). La actualización, los permisos, cómo conservar el permiso
+del micrófono entre recompilaciones y la desinstalación están en [Instalación](#instalación).
 
 ## Requisitos
 
@@ -131,6 +134,11 @@ cada recompilación. Para conservar el permiso, ejecuta una vez
 código autofirmado en tu llavero de inicio de sesión, y las compilaciones de release posteriores se
 firman con él.
 
+El marketplace fija el mod a la etiqueta de la última versión, así que una aplicación compilada
+desde la rama principal funciona con el mod de esa versión. Para que coincidan, compila la
+etiqueta de la versión (`git checkout vX.Y.Z`) o carga el mod de tu copia de trabajo con
+`claude --plugin-dir plugin`.
+
 Una compilación desde el código fuente busca actualizaciones por sí sola solo si lo activas en
 Settings. Instalar una actualización la reemplaza por la imagen de la versión, que está firmada ad
 hoc, así que el certificado autofirmado deja de aplicarse; **Install** lo dice y pregunta antes.
@@ -157,10 +165,11 @@ Settings.
 - Después, Settings indica desde qué versión se actualizó. Si no se pudo actualizar el mod,
   muestra esos dos comandos para que los ejecutes tú. Las sesiones de Claude Code ya abiertas
   conservan el mod antiguo hasta que se reinician.
-- macOS no bloquea la aplicación actualizada como bloqueó la primera descarga; las comprobaciones
-  de arriba ocupan ese lugar ([SECURITY.md](SECURITY.md#what-an-update-installs)). Sí vuelve a
-  pedir el micrófono en el primer **Start** tras una actualización, porque cada versión se firma
-  ad hoc.
+- La descarga de la actualización no pone el atributo de cuarentena, así que macOS no debería
+  bloquear el primer arranque de la aplicación actualizada como bloqueó la primera descarga; esto
+  se deduce del código y aún no se ha observado. Las comprobaciones de arriba ocupan ese lugar
+  ([SECURITY.md](SECURITY.md#what-an-update-installs)). macOS sí vuelve a pedir el micrófono en el
+  primer **Start** tras una actualización, porque cada versión se firma ad hoc.
 
 Para actualizar a mano, ejecuta `/live off` en todas las sesiones (el mod vuelve a abrir la
 aplicación de `/Applications` en cuanto deja de responder), cierra LiveBridge, instala la imagen
@@ -194,6 +203,10 @@ rm -rf /Applications/LiveBridge.app ~/Library/Application\ Support/LiveBridge \
 tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
+
+Ninguna de las dos formas elimina una copia llamada `/Applications/.LiveBridge-update-….app`, que
+puede dejar una actualización interrumpida a mitad de la instalación. La aplicación elimina esas
+copias en su siguiente arranque; tras desinstalar, bórrala a mano si existe.
 
 ## Uso
 
@@ -324,10 +337,11 @@ siempre lo hace tu sesión de Claude Code.
 Para las actualizaciones, la aplicación se comunica con GitHub. Con **Check for updates
 automatically** activado, una vez al día (y en cada arranque mientras no se haya instalado una
 versión que anunció) pregunta a la API de GitHub, sin credenciales, cuál es la última versión;
-GitHub ve la dirección IP de tu Mac. Cuando encuentra una versión más reciente, ejecuta
-`gh auth status` para indicar si la imagen se puede verificar. Solo cuando pulsas **Install**
-descarga la imagen y ejecuta `gh attestation verify` y `claude plugin`, que se conectan a GitHub,
-y a Sigstore para la raíz de confianza de `gh`, con tus propias sesiones.
+GitHub ve la dirección IP de tu Mac. **Check for update**, en Settings, envía la misma petición
+cuando lo pulsas. Cuando la comprobación automática encuentra una versión más reciente, la
+aplicación ejecuta `gh auth status` para indicar si la imagen se puede verificar. Solo cuando
+pulsas **Install** descarga la imagen y ejecuta `gh attestation verify` y `claude plugin`, que se
+conectan a GitHub, y a Sigstore para la raíz de confianza de `gh`, con tus propias sesiones.
 [SECURITY.md](SECURITY.md#what-leaves-the-mac) enumera cada petición.
 
 En tu Mac, la aplicación guarda sus ajustes, el contador de uso, cuándo buscó actualizaciones por

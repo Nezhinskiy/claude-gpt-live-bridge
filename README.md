@@ -37,10 +37,12 @@ between your own codex and your own Claude Code. The app and the mod talk over a
 only your user can open, and the app listens on no network port. Besides what those two tools
 already send (the voice line to OpenAI through your codex, only while it is open, and Claude's
 work to Anthropic through your Claude Code session), the app's only traffic of its own is for
-[updates](#updating): a daily check with GitHub for a new release, which you can turn off, and
-the download and its verification when you click **Install**. [Privacy](#privacy) lists exactly
-what reaches OpenAI and GitHub; [SECURITY.md](SECURITY.md) says what this does and does not
-protect against.
+[updates](#updating): an automatic check with GitHub for a new release (daily, and at launch
+while one it announced is not installed), which you can turn off; the same check when you press
+**Check for update**; `gh auth status` when a new release is announced; and the download, its
+verification and the mod's update when you click **Install**. [Privacy](#privacy) lists exactly
+what reaches OpenAI and names the requests the app makes to GitHub; [SECURITY.md](SECURITY.md)
+says what this does and does not protect against.
 
 > **Unofficial.** Not affiliated with, endorsed by or supported by Anthropic or OpenAI. It relies
 > on codex's experimental realtime API, which can change with any codex release.
@@ -73,7 +75,7 @@ installed the same way either way.
 
 If `/live` is not found in a session that was already open, reopen the session
 ([why](#known-limitations)). Updating, permissions, keeping the microphone permission across
-updates and uninstalling are under [Install](#install).
+rebuilds and uninstalling are under [Install](#install).
 
 ## Requirements
 
@@ -124,6 +126,10 @@ the permission, run `scripts/build-app.sh --make-signing-identity` once: it asks
 creates a self-signed code-signing certificate in your login keychain, and later release builds
 are signed with it.
 
+The marketplace pins the mod to the last release's tag, so an app built from the default branch
+runs with that release's mod. To match them, build the release's tag (`git checkout vX.Y.Z`), or
+load the working tree's mod with `claude --plugin-dir plugin`.
+
 A build from source checks for updates by itself only if you turn that on in Settings.
 Installing an update replaces it with the release's image, which is signed ad hoc, so the
 self-signed certificate no longer applies; **Install** says so and asks first.
@@ -148,9 +154,11 @@ the copy at `/Applications/LiveBridge.app` updates; any other copy says so in Se
 - Afterwards Settings says which version it updated from. If the mod could not be updated, it
   shows those two commands for you to run. Claude Code sessions already open keep the old mod
   until they restart.
-- macOS does not block the updated app as it blocked the first download; the checks above take
-  that place ([SECURITY.md](SECURITY.md#what-an-update-installs)). It does ask for the
-  microphone again at the first **Start** after an update, because each release is signed ad hoc.
+- The update's download sets no quarantine attribute, so macOS should not block the updated
+  app's first launch as it blocked the first download; this follows from the code and has not
+  yet been observed. The checks above are what stands in its place
+  ([SECURITY.md](SECURITY.md#what-an-update-installs)). macOS does ask for the microphone again
+  at the first **Start** after an update, because each release is signed ad hoc.
 
 To update by hand instead, run `/live off` in every session (the mod reopens the app at
 `/Applications` whenever the app stops answering), quit LiveBridge, install the newer image as
@@ -183,6 +191,10 @@ rm -rf /Applications/LiveBridge.app ~/Library/Application\ Support/LiveBridge \
 tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
+
+Neither removes a copy named `/Applications/.LiveBridge-update-….app`, which an update stopped
+mid-install can leave behind. The app removes such copies at its next launch; after an
+uninstall, delete one by hand if it is there.
 
 ## Use
 
@@ -313,8 +325,9 @@ always does.
 
 For updates the app talks to GitHub. With **Check for updates automatically** on, once a day
 (and at each launch while a release it announced is not installed) it asks GitHub's API, without
-credentials, which release is the latest; GitHub sees your Mac's IP address. When it finds a
-newer release it runs `gh auth status` to say whether the image can be verified. Only when you
+credentials, which release is the latest; GitHub sees your Mac's IP address. **Check for update**
+in Settings sends the same request when you press it. When the automatic check finds a newer
+release, the app runs `gh auth status` to say whether the image can be verified. Only when you
 click **Install** does it download the image and run `gh attestation verify` and
 `claude plugin`, which reach GitHub, and Sigstore for `gh`'s trust root, under your own logins.
 [SECURITY.md](SECURITY.md#what-leaves-the-mac) lists each request.

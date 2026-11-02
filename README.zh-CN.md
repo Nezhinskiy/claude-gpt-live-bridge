@@ -35,8 +35,9 @@ GPT-Live 语音线路。语音相当于前台接待：它负责闲聊、询问�
 **设计上完全本地。** 没有遥测，也没有自己的服务器：LiveBridge 只是你 Mac 上的一座桥，连接你自己的 codex 与你自己的
 Claude Code。应用与模组之间通过只有你的用户才能打开的 Unix 套接字通信，应用不监听任何网络端口。除了这两个工具本来就会发送的内容
 （语音线路经你的 codex 发往 OpenAI，仅在线路打开期间；Claude 的工作经你的 Claude Code 会话发往 Anthropic），
-应用自身唯一的流量用于[更新](#更新应用)：每天向 GitHub 检查一次是否有新版本（可以关闭），以及在你点击 **Install** 时下载并验证。
-[隐私](#隐私)准确列出了哪些内容会到达 OpenAI 和 GitHub；[SECURITY.md](SECURITY.md) 说明了它能防范什么、不能防范什么。
+应用自身唯一的流量用于[更新](#更新应用)：向 GitHub 自动检查是否有新版本（每天一次，以及在它通知过的版本尚未安装时的每次启动），可以关闭；
+你点击 **Check for update** 时的同一检查；通知新版本时的 `gh auth status`；以及你点击 **Install** 时的下载、验证和模组更新。
+[隐私](#隐私)准确列出了哪些内容会到达 OpenAI，并列出应用向 GitHub 发出的请求；[SECURITY.md](SECURITY.md) 说明了它能防范什么、不能防范什么。
 
 > **非官方项目。** 与 Anthropic 或 OpenAI 无任何隶属、认可或支持关系。它依赖 codex 的实验性实时 API，该 API
 > 可能随任何一次 codex 发布而变化。
@@ -64,7 +65,7 @@ scripts/build-app.sh --release
 不想自己构建？每个[发布版本](https://github.com/getLiveBridge/LiveBridge/releases/latest)都附有磁盘映像形式的应用，
 由 GitHub Actions 构建并出具证明；[通过磁盘映像安装](#通过磁盘映像安装)说明了如何验证并打开它。无论哪种方式，模组的安装方法都相同。
 
-如果在已经打开的会话中找不到 `/live`，请重新打开该会话（[原因](#已知限制)）。更新、权限、更新后保留麦克风权限以及卸载，见[安装](#安装)。
+如果在已经打开的会话中找不到 `/live`，请重新打开该会话（[原因](#已知限制)）。更新、权限、重新构建后保留麦克风权限以及卸载，见[安装](#安装)。
 
 ## 系统要求
 
@@ -108,6 +109,9 @@ scripts/build-app.sh --release
 请运行一次 `scripts/build-app.sh --make-signing-identity`：它会先征求确认，然后在你的登录钥匙串中创建一个自签名代码签名证书，
 之后的发布构建都会用它签名。
 
+marketplace 把模组固定在上一个发布版本的标签上，因此从默认分支构建的应用会搭配该版本的模组运行。若要两者一致，请构建该发布版本的标签（`git checkout vX.Y.Z`），
+或用 `claude --plugin-dir plugin` 加载工作树中的模组。
+
 从源码构建的应用只有在你于 Settings 中开启后才会自行检查更新。安装更新会用发布版本的映像替换它，该映像使用 ad hoc 签名，
 因此自签名证书将不再适用；**Install** 会说明这一点并先征求确认。
 
@@ -125,8 +129,8 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
   `claude plugin update livebridge@livebridge` 更新模组，停止通话，一步将新应用放到原位并打开它。
 - 之后，Settings 会显示是从哪个版本更新而来。如果模组未能更新，那里会列出这两条命令，供你自己运行。
   已经打开的 Claude Code 会话在重启之前仍使用旧模组。
-- macOS 不会像拦截首次下载那样拦截更新后的应用；由上述检查承担这一把关作用（[SECURITY.md](SECURITY.md#what-an-update-installs)）。
-  但更新后第一次点击 **Start** 时，macOS 会再次请求麦克风权限，因为每个发布版本都使用 ad hoc 签名。
+- 更新的下载不会设置隔离（quarantine）属性，因此 macOS 不应像拦截首次下载那样拦截更新后应用的首次启动；这是从代码推出的结论，尚未实际观察到。
+  由上述检查承担这一把关作用（[SECURITY.md](SECURITY.md#what-an-update-installs)）。更新后第一次点击 **Start** 时，macOS 会再次请求麦克风权限，因为每个发布版本都使用 ad hoc 签名。
 
 若要手动更新，请先在每个会话中运行 `/live off`（应用一旦停止响应，模组就会重新打开 `/Applications` 中的应用），退出 LiveBridge，
 按上文安装较新的映像，然后运行这两条 `claude plugin` 命令。
@@ -155,6 +159,9 @@ rm -rf /Applications/LiveBridge.app ~/Library/Application\ Support/LiveBridge \
 tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
+
+两种方式都不会删除名为 `/Applications/.LiveBridge-update-….app` 的副本，这种副本可能由安装中途中断的更新留下。应用会在下次启动时删除这类副本；
+卸载之后，如果它存在，请手动删除。
 
 ## 使用
 
@@ -245,7 +252,8 @@ LiveBridge 没有遥测，也不监听任何网络端口；模组通过一个只
 它只用于对话。Claude 的工作则像你的 Claude Code 会话一贯的做法那样发往 Anthropic。
 
 为了更新，应用会与 GitHub 通信。开启 **Check for updates automatically** 后，它每天一次（以及在它通知过的版本尚未安装时的每次启动）在不带任何凭据的情况下向 GitHub 的 API
-询问最新的发布版本；GitHub 会看到你 Mac 的 IP 地址。发现较新的版本时，它会运行 `gh auth status`，以说明映像能否被验证。
+询问最新的发布版本；GitHub 会看到你 Mac 的 IP 地址。点击 Settings 中的 **Check for update** 时也会发出同样的请求。
+自动检查发现较新的版本时，应用会运行 `gh auth status`，以说明映像能否被验证。
 只有在你点击 **Install** 时，它才会下载映像并运行 `gh attestation verify` 和 `claude plugin`，它们以你自己的登录身份访问 GitHub，
 `gh` 还会访问 Sigstore 获取信任根。[SECURITY.md](SECURITY.md#what-leaves-the-mac) 列出了每一项请求。
 

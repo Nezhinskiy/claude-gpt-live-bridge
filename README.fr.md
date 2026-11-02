@@ -41,11 +41,14 @@ communiquent uniquement par un socket Unix que seul votre utilisateur peut ouvri
 l'application n'écoute sur aucun port réseau. En dehors de ce que ces deux outils envoient déjà
 (la ligne vocale vers OpenAI via votre codex, uniquement tant qu'elle est ouverte, et le travail
 de Claude vers Anthropic via votre session Claude Code), le seul trafic propre à l'application
-sert aux [mises à jour](#mises-à-jour) : une demande quotidienne à GitHub pour savoir s'il existe
-une nouvelle version, que vous pouvez désactiver, et, quand vous cliquez sur **Install**, le
-téléchargement et sa vérification. [Confidentialité](#confidentialité) liste précisément ce qui
-parvient à OpenAI et à GitHub ; [SECURITY.md](SECURITY.md) explique ce que cela protège et ce que
-cela ne protège pas.
+sert aux [mises à jour](#mises-à-jour) : une demande automatique à GitHub pour savoir s'il existe
+une nouvelle version (quotidienne, et à chaque lancement tant qu'une version qu'elle a annoncée
+n'est pas installée), que vous pouvez désactiver ; la même demande quand vous cliquez sur **Check
+for update** ; `gh auth status` quand une nouvelle version est annoncée ; et, quand vous cliquez
+sur **Install**, le téléchargement, sa vérification et la mise à jour du mod.
+[Confidentialité](#confidentialité) liste précisément ce qui parvient à OpenAI et nomme les
+requêtes de l'application vers GitHub ; [SECURITY.md](SECURITY.md) explique ce que cela protège
+et ce que cela ne protège pas.
 
 > **Non officiel.** Sans lien avec Anthropic ou OpenAI, qui ne l'approuvent ni ne le prennent en
 > charge. Il s'appuie sur l'API temps réel expérimentale de codex, qui peut changer à chaque
@@ -79,8 +82,8 @@ s'installe de la même manière dans les deux cas.
 
 Si `/live` est introuvable dans une session déjà ouverte, rouvrez la session
 ([pourquoi](#limitations-connues)). La mise à jour, les autorisations, la conservation de
-l'autorisation du microphone d'une mise à jour à l'autre et la désinstallation sont décrites sous
-[Installation](#installation).
+l'autorisation du microphone d'une recompilation à l'autre et la désinstallation sont décrites
+sous [Installation](#installation).
 
 ## Prérequis
 
@@ -137,6 +140,11 @@ chaque recompilation. Pour conserver l'autorisation, exécutez une fois
 votre trousseau de session un certificat de signature de code auto-signé, et les compilations
 release suivantes sont signées avec lui.
 
+La marketplace épingle le mod au tag de la dernière version : une application compilée depuis la
+branche principale tourne donc avec le mod de cette version. Pour les faire correspondre,
+compilez le tag de la version (`git checkout vX.Y.Z`) ou chargez le mod de votre copie de travail
+avec `claude --plugin-dir plugin`.
+
 Une compilation depuis les sources ne vérifie les mises à jour d'elle-même que si vous l'activez
 dans Settings. Installer une mise à jour la remplace par l'image de la version, signée ad hoc, si
 bien que le certificat auto-signé ne s'applique plus ; **Install** le signale et demande d'abord
@@ -165,10 +173,12 @@ copie l'indique dans Settings.
 - Ensuite, Settings indique la version d'origine de la mise à jour. Si le mod n'a pas pu être mis
   à jour, il affiche ces deux commandes pour que vous les exécutiez vous-même. Les sessions
   Claude Code déjà ouvertes gardent l'ancien mod jusqu'à leur redémarrage.
-- macOS ne bloque pas l'application mise à jour comme il a bloqué le premier téléchargement ; les
-  vérifications ci-dessus en tiennent lieu ([SECURITY.md](SECURITY.md#what-an-update-installs)).
-  Il redemande en revanche l'accès au microphone au premier **Start** après une mise à jour,
-  parce que chaque version est signée ad hoc.
+- Le téléchargement de la mise à jour ne pose pas d'attribut de quarantaine, donc macOS ne
+  devrait pas bloquer le premier lancement de l'application mise à jour comme il a bloqué le
+  premier téléchargement ; cela découle du code et n'a pas encore été observé. Les vérifications
+  ci-dessus en tiennent lieu ([SECURITY.md](SECURITY.md#what-an-update-installs)). macOS
+  redemande en revanche l'accès au microphone au premier **Start** après une mise à jour, parce
+  que chaque version est signée ad hoc.
 
 Pour mettre à jour à la main, exécutez `/live off` dans chaque session (le mod rouvre
 l'application de `/Applications` dès qu'elle ne répond plus), quittez LiveBridge, installez
@@ -203,6 +213,11 @@ rm -rf /Applications/LiveBridge.app ~/Library/Application\ Support/LiveBridge \
 tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
+
+Aucune des deux méthodes ne supprime une copie nommée `/Applications/.LiveBridge-update-….app`,
+qu'une mise à jour interrompue en pleine installation peut laisser. L'application supprime ces
+copies à son lancement suivant ; après une désinstallation, supprimez-la à la main si elle
+existe.
 
 ## Utilisation
 
@@ -339,11 +354,13 @@ travail de Claude va vers Anthropic comme le fait toujours votre session Claude 
 Pour les mises à jour, l'application parle à GitHub. Avec **Check for updates automatically**
 activé, une fois par jour (et à chaque lancement tant qu'une version qu'elle a annoncée n'est pas
 installée), elle demande à l'API de GitHub, sans identifiants, quelle est la dernière version ;
-GitHub voit l'adresse IP de votre Mac. Quand elle trouve une version plus récente, elle exécute
-`gh auth status` pour indiquer si l'image peut être vérifiée. Ce n'est que lorsque vous cliquez
-sur **Install** qu'elle télécharge l'image et exécute `gh attestation verify` et `claude plugin`,
-qui contactent GitHub, et Sigstore pour la racine de confiance de `gh`, sous vos propres
-connexions. [SECURITY.md](SECURITY.md#what-leaves-the-mac) liste chaque requête.
+GitHub voit l'adresse IP de votre Mac. **Check for update**, dans Settings, envoie la même
+requête quand vous cliquez dessus. Quand la vérification automatique trouve une version plus
+récente, l'application exécute `gh auth status` pour indiquer si l'image peut être vérifiée. Ce
+n'est que lorsque vous cliquez sur **Install** qu'elle télécharge l'image et exécute
+`gh attestation verify` et `claude plugin`, qui contactent GitHub, et Sigstore pour la racine de
+confiance de `gh`, sous vos propres connexions. [SECURITY.md](SECURITY.md#what-leaves-the-mac)
+liste chaque requête.
 
 Sur votre Mac, l'application conserve ses réglages, le compteur d'utilisation, la date de sa
 dernière recherche de mise à jour et les versions qu'elle a annoncées, ce qu'a fait la dernière
