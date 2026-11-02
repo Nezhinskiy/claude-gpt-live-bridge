@@ -207,7 +207,11 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - It reads results back in a sentence or two, with the session's name. Code blocks and tables
   stay in the session, and credentials it recognises are redacted.
 - When Claude asks a question, the voice puts it to you and sends your answer back to that
-  session. Work Claude finishes later in the background is reported as an update.
+  session. So it does with a question Claude asks while it works (the dialog with options): the
+  voice tells you about it, explains the options in its own words and talks them over with you
+  for as long as you like, without asking Claude. What you decide, an option or a question back
+  to Claude, answers the dialog; you can still answer it at the keyboard instead. Work Claude
+  finishes later in the background is reported as an update.
 - When Claude is waiting for a permission prompt, the voice says so. You answer the prompt in
   Claude Code; LiveBridge never answers it for you.
 

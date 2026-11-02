@@ -9,11 +9,14 @@ public struct VoiceLine: Equatable, Sendable {
     case failed = "FAILED"
     case question = "QUESTION"
     case approval = "APPROVAL"
+    /// Claude asked the owner a question mid-turn and waits for the reply.
+    case asking = "ASKING"
     case context = "CONTEXT"
     case task = "TASK"
 
     /// It ends a request, so the line stops waiting for that session: a result, a failure or a
-    /// question. An update, an approval notice or context leaves the request open.
+    /// question. An update, an approval notice, a question Claude waits on or context leaves the
+    /// request open.
     public var answers: Bool { [.result, .failed, .question].contains(self) }
   }
 

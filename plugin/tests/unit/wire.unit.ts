@@ -35,12 +35,17 @@ const WORK: Shape = {
     fields<Extract<Wire.Work, { kind: 'request' }>>({
       kind: { oneOf: ['request'] }, id: S, brief: S, transcript: { list: UTTERANCE },
     }),
+    fields<Extract<Wire.Work, { kind: 'reply' }>>({
+      kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE },
+    }),
     fields<Extract<Wire.Work, { kind: 'context' }>>({ kind: { oneOf: ['context'] } }),
   ],
 }
 
 const SHAPES: Record<string, Shape> = {
-  'activity': fields<Wire.ActivityBody>({ sessionId: S, state: { oneOf: ['idle', 'working', 'approval'] } }),
+  'activity': fields<Wire.ActivityBody>({
+    sessionId: S, state: { oneOf: ['idle', 'working', 'approval'] }, question: optional(S),
+  }),
   'answer': fields<Wire.AnswerBody>({
     sessionId: S, id: S, status: { oneOf: ['ok', 'failed', 'question', 'update'] }, text: S,
     reason: optional(S),

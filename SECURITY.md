@@ -28,6 +28,12 @@ answer, at your keyboard in Claude Code. LiveBridge has no code that answers a p
 prompt: the mod declares no `tool.check` hook, and its `classic.PermissionRequest` hook only
 tells the voice that a prompt is waiting.
 
+A question Claude asks you while it works (the AskUserQuestion dialog) is not a permission
+prompt: Claude asks for your input, not for leave to run a tool. During a voice turn the mod
+sends it to the voice, and your spoken reply, given before you answer at the keyboard, answers
+the dialog as free text. That gives speech no reach it did not have, since it already reaches
+Claude as a request, and whatever Claude then does still passes the permission prompt.
+
 In a mode that acts without asking, nothing else stands between what the microphone hears and
 what Claude does. For such a session, keep voice off, or keep the microphone away from other
 voices.

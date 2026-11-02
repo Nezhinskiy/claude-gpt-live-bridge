@@ -23,7 +23,11 @@ export type Utterance = { role: Role; text: string };
 
 /** brief: the voice model's self-contained request; transcript: the speech since the last one. */
 export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance[] };
-export type Work = ({ kind: 'request' } & VoiceRequest) | { kind: 'context' };
+/** `reply`: the owner's reply to the question Claude is waiting on, for the request in flight. */
+export type Work =
+  | ({ kind: 'request' } & VoiceRequest)
+  | ({ kind: 'reply' } & VoiceRequest)
+  | { kind: 'context' };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
@@ -42,7 +46,11 @@ export type AnswerBody =
   { sessionId: SessionId; id: RequestId; status: AnswerStatus; text: string; reason?: string };
 
 export type SessionActivity = 'idle' | 'working' | 'approval';
-export type ActivityBody = { sessionId: SessionId; state: SessionActivity };
+/**
+ * `question`, with `approval`: Claude asked the owner this in a voice turn and waits for the
+ * reply, which the voice may hand over as a `reply` work item.
+ */
+export type ActivityBody = { sessionId: SessionId; state: SessionActivity; question?: string };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
 export type CallAction = 'start' | 'stop';

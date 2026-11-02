@@ -7,7 +7,7 @@ import type { Band } from '../types'
 import { bandStatus, drawBand, JOINING } from './band.tsx'
 import { summarize } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
-import { PLUGIN_NAME, voicePrompt } from './prompt.ts'
+import { askedText, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { clip, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
@@ -30,6 +30,7 @@ const SENT_NOTE_MS = 3_000
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
+const LATE_REPLY = 'LiveBridge: the reply said by voice came after the question was answered here; Claude did not get it.'
 const USAGE = 'Usage: /live on | off | target | status | context'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
@@ -43,6 +44,8 @@ let home = ''
 let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
 let approval: { tool: string; agent: string | undefined } | null = null
+/** Answers the question Claude asked in a voice turn with the owner's spoken reply, while it is open. */
+let answerQuestion: ((text: string) => void) | null = null
 let offlineSince: number | null = null
 /** The mod's own sentence while online; it lasts until the next voice request. */
 let note: string | null = null
@@ -199,6 +202,9 @@ async function tick($: EngineInterface): Promise<void> {
   if (work?.kind === 'request') {
     // Queued behind an off or a removal that came in while this poll ran: those fail it in the app.
     enqueue($, () => deliver($, work))
+  } else if (work?.kind === 'reply') {
+    if (answerQuestion === null) $.ui.log(LATE_REPLY)
+    else answerQuestion(spokenReply(work))
   } else if (work?.kind === 'context') {
     void contextAsked($)
   }
@@ -439,9 +445,28 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // ADR 0001 (i): a permission request that reaches the person during a voice turn.
+  // A question Claude asks in a voice turn goes to the voice as well, and the dialog stays open
+  // for the keyboard: the reply that comes first answers it. A spoken reply is the dialog's
+  // free text, so the owner may ask back instead of choosing; returning before the dialog's
+  // own answer closes it.
+  on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
+    if (e.agentId !== undefined || tracker.current === null || !link?.session) return next(e)
+    const answered = next(e)
+    const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
+    try {
+      await link.activity('approval', askedText(e.questions))
+      const first = await Promise.race([answered, spoken])
+      return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
+    } finally {
+      answerQuestion = null
+      await link?.activity('working')
+    }
+  }).catch(($, e, next) => next(e))
+
+  // ADR 0001 (i): a permission request that reaches the person during a voice turn. Claude's
+  // question has its own report above.
   on('classic.PermissionRequest', async ($, e, next) => {
-    if (tracker.current !== null) {
+    if (tracker.current !== null && e.tool_name !== 'AskUserQuestion') {
       approval = { tool: e.tool_name, agent: e.agent_id }
       await link?.activity('approval')
     }

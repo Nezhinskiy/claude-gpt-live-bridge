@@ -122,6 +122,39 @@ struct SessionRegistryTests {
     #expect(delivery == Delivery(session: a, label: "Example session", status: .ok, text: "done"))
   }
 
+  /// While Claude waits on a question, the next handoff is its reply: it goes out at once, beside
+  /// the request in flight, and that request's answer is still delivered.
+  @Test func handoffWhileClaudeAsksIsTheReply() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2)))
+    #expect(try await registry.poll(a) == nil)
+    #expect(try await registry.complete(answer(request(1)))?.text == "done")
+    // the question was answered: the next handoff is a request again
+    try await registry.enqueue(request(3), for: a)
+    #expect(try await registry.poll(a) == .request(request(3)))
+  }
+
+  /// A question answered in Claude Code before the reply went out leaves that reply to go as a
+  /// request of its own; an approval without a question takes no reply.
+  @Test func replyOutlivingItsQuestionGoesAsARequest() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .working))
+    #expect(try await registry.poll(a) == nil)
+    #expect(try await registry.complete(answer(request(1))) == nil)
+    #expect(try await registry.poll(a) == .request(request(2)))
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval))
+    try await registry.enqueue(request(3), for: a)
+    #expect(try await registry.poll(a) == nil)
+  }
+
   @Test func updateDoesNotCloseTheRequest() async throws {
     await join(a)
     try await registry.enqueue(request(1), for: a)

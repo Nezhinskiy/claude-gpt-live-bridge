@@ -305,6 +305,36 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(a) == .request(request(3)) })
   }
 
+  /// A question Claude asks mid-turn reaches the voice whole, and the owner's next handoff goes
+  /// to that session as its reply, though another session is the target.
+  @Test func replyToClaudesQuestionGoesToTheAskingSession() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await registry.enqueue(request(1), for: a)
+    #expect(try await registry.poll(a) == .request(request(1)))
+    try await post("/v1/target", TargetBody(sessionId: b))
+    await live()
+    let question = "Which name? Options: build (the default), out (shorter)."
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question))
+    #expect(await voice.added == ["[ASKING] Alpha: \(question)"])
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
+  }
+
+  /// A question answered in Claude Code is withdrawn from the voice and routes nothing.
+  @Test func questionAnsweredInClaudeCodeIsWithdrawn() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    #expect(await bridge.status.unheard == 1)
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .working))
+    #expect(await bridge.status.unheard == 0)
+    await live()
+    voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
+  }
+
   /// A question asked before Stop, or before the owner picked a target, routes nothing later.
   @Test func questionRouteEndsWithTheCallAndATargetChoice() async throws {
     let voices = FakeVoices()

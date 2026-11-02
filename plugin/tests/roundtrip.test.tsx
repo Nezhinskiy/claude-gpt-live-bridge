@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 
-import { voicePrompt } from '../hooks/prompt.ts'
+import { spokenReply, voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
 import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
 
@@ -81,6 +82,68 @@ test('approvalIsReported', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval' }])
   await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+})
+
+const ASKED = [{
+  question: 'Which name should the folder get?', header: 'Name', multiSelect: false,
+  options: [{ label: 'build', description: 'the default' }, { label: 'out', description: 'shorter' }],
+}]
+const SPOKEN = { id: '00000000-0000-0000-0000-00000000000b', brief: 'What would out change?', transcript: [] }
+
+/** A voice turn whose prompt Claude has started; the activity it posted so far is taken. */
+async function inVoiceTurn($: Engine, world: ReturnType<typeof fakeWorld>) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  world.take('activity')
+}
+
+/** Claude's question goes to the voice whole; the owner's spoken reply answers it as free text. */
+test('claudesQuestionIsAnsweredByVoice', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{
+    sessionId: ID, state: 'approval',
+    question: 'Which name should the folder get? Options: build: the default; out: shorter.',
+  }])
+  world.work.push({ kind: 'reply', ...SPOKEN })
+  await world.clock.advance(1000)
+  expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+})
+
+/** Answered at the keyboard, the question is settled for the voice too; a reply after it is not lost silently. */
+test('claudesQuestionAnsweredAtTheKeyboard', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.take('activity')
+  world.answerDialog('out')
+  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'out' } })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+  world.work.push({ kind: 'reply', ...SPOKEN })
+  await world.clock.advance(1000)
+  expect(world.logs.some(line => line.includes('came after the question was answered'))).toBe(true)
+  expect(world.submitted).toHaveLength(1)
+})
+
+/** In a typed turn the dialog is Claude Code's alone: nothing goes to the voice. */
+test('aTypedTurnsQuestionStaysInClaudeCode', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('activity')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([])
+  world.answerDialog('build')
+  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' } })
 })
 
 test('bandShowsTheCallAndStartsIt', async ($, on) => {

@@ -39,7 +39,9 @@ public enum RegistryError: Error, Equatable {
 /// The sessions that joined the call, their requests and their liveness.
 ///
 /// Each session has at most one request in flight: `poll` hands out the next queued request only
-/// after the previous one completed. A newer request supersedes the answer of an older one,
+/// after the previous one completed. While Claude waits on a question it asked the owner, the
+/// next request is that question's reply instead: it goes out at once, for the request in
+/// flight, and supersedes nothing. A newer request supersedes the answer of an older one,
 /// which is then not delivered. A session that stops polling for 5 s is dropped and its open
 /// request fails; a request in flight for 10 minutes fails too. Exactly one
 /// session is the target while any is joined.
@@ -53,6 +55,10 @@ public actor SessionRegistry {
     var inFlight: (id: RequestID, brief: String, since: Date)?
     /// The newest request enqueued; only its answers are delivered.
     var latest: RequestID?
+    /// Claude waits on a question it asked the owner in the request in flight.
+    var isAsking = false
+    /// The owner's reply to that question, until the session polls it.
+    var reply: VoiceRequest?
     var wantsContext = false
 
     var hasOpenRequest: Bool { inFlight != nil || !queued.isEmpty }
@@ -121,8 +127,12 @@ public actor SessionRegistry {
 
   public func enqueue(_ request: VoiceRequest, for id: SessionID) throws {
     try update(id) { session in
-      session.queued.append(request)
-      session.latest = request.id
+      if session.isAsking, session.reply == nil {
+        session.reply = request
+      } else {
+        session.queued.append(request)
+        session.latest = request.id
+      }
     }
   }
 
@@ -131,6 +141,11 @@ public actor SessionRegistry {
     let now = time.now
     return try update(id) { session in
       session.lastPoll = now
+      if let reply = session.reply {
+        session.reply = nil
+        session.isAsking = false
+        return .reply(reply)
+      }
       if session.inFlight == nil, !session.queued.isEmpty {
         let request = session.queued.removeFirst()
         session.inFlight = (request.id, request.brief, now)
@@ -165,7 +180,18 @@ public actor SessionRegistry {
     }
   }
 
-  public func setActivity(_ body: ActivityBody) { sessions[body.sessionId]?.activity = body.state }
+  /// A question settled before its reply went out (answered in Claude Code) leaves the reply
+  /// to go as a request of its own.
+  public func setActivity(_ body: ActivityBody) {
+    guard var session = sessions[body.sessionId] else { return }
+    defer { sessions[body.sessionId] = session }
+    session.activity = body.state
+    session.isAsking = body.state == .approval && body.question != nil
+    guard !session.isAsking, let reply = session.reply else { return }
+    session.reply = nil
+    session.queued.append(reply)
+    session.latest = reply.id
+  }
 
   /// Drops sessions that stopped polling and fails requests in flight too long. Run every second;
   /// after a sleep, liveness starts again and request clocks skip the time asleep.

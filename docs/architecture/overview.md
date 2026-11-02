@@ -95,9 +95,9 @@ that both test suites parse.
 |---|---|
 | `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`; an upsert that also refreshes liveness |
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
-| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request or a context ask |
+| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
-| `POST /v1/activity` | `idle`, `working` or `approval` |
+| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
@@ -285,6 +285,34 @@ sequenceDiagram
   Codex-->>Owner: says so (or a chime if the line is closed)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
+  Mod->>Bridge: POST /v1/activity working
+```
+
+### Claude's question mid-turn
+
+When Claude asks the owner a question during a voice turn (the AskUserQuestion dialog), the
+dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
+line. The voice explains it and talks it over from what it knows, without handoffs; the owner's
+next handoff to that session is the reply. It goes out at once as `reply` work, beside the
+request in flight, and the mod returns it as the dialog's free-text answer, which closes the
+dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
+has not polled by then goes as a request of its own.
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Codex as voice
+  participant Bridge
+  participant Mod
+  participant Claude
+  Claude->>Mod: tool.call AskUserQuestion (during a voice turn)
+  Mod->>Bridge: POST /v1/activity approval + question
+  Bridge->>Codex: "[ASKING] label: question. Options: …"
+  Codex-->>Owner: explains, talks it over
+  Owner->>Codex: decides, or asks Claude back
+  Codex-->>Bridge: handoff_request
+  Bridge-->>Mod: work: reply
+  Mod->>Claude: the dialog's answer (free text)
   Mod->>Bridge: POST /v1/activity working
 ```
 

@@ -103,8 +103,9 @@ export class BridgeLink {
     return reply?.status === 410 ? REMOVED : reply?.ok === true
   }
 
-  async activity(state: SessionActivity): Promise<void> {
-    await this.#forSession('activity', { state })
+  /** `question`: what Claude asks the owner while it waits (`approval` only). */
+  async activity(state: SessionActivity, question?: string): Promise<void> {
+    await this.#forSession('activity', { state, ...(question !== undefined && { question }) })
   }
 
   /** Posts the session's summary; false when the app did not take it. */

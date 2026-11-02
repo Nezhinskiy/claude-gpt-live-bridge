@@ -32,20 +32,24 @@ public struct VoiceRequest: Codable, Sendable, Equatable {
   public var transcript: [Utterance]
 }
 
-/// Work for a session, tagged by `kind`: `{"kind":"request", <VoiceRequest>}` or
-/// `{"kind":"context"}` (summarise the session for the voice).
+/// Work for a session, tagged by `kind`: `{"kind":"request", <VoiceRequest>}`,
+/// `{"kind":"reply", <VoiceRequest>}` (the owner's reply to the question Claude is waiting on,
+/// for the request already in flight) or `{"kind":"context"}` (summarise the session for the
+/// voice).
 public enum Work: Sendable, Equatable {
   case request(VoiceRequest)
+  case reply(VoiceRequest)
   case context
 }
 
 extension Work: Codable {
-  private enum Kind: String, Codable { case request, context }
+  private enum Kind: String, Codable { case request, reply, context }
   private enum CodingKeys: String, CodingKey { case kind }
 
   public init(from decoder: any Decoder) throws {
     switch try decoder.container(keyedBy: CodingKeys.self).decode(Kind.self, forKey: .kind) {
     case .request: self = .request(try VoiceRequest(from: decoder))
+    case .reply: self = .reply(try VoiceRequest(from: decoder))
     case .context: self = .context
     }
   }
@@ -55,6 +59,9 @@ extension Work: Codable {
     switch self {
     case .request(let request):
       try container.encode(Kind.request, forKey: .kind)
+      try request.encode(to: encoder)
+    case .reply(let request):
+      try container.encode(Kind.reply, forKey: .kind)
       try request.encode(to: encoder)
     case .context:
       try container.encode(Kind.context, forKey: .kind)
@@ -96,10 +103,12 @@ public struct AnswerBody: Codable, Sendable, Equatable {
 
 public enum SessionActivity: String, Codable, Sendable { case idle, working, approval }
 
-/// `POST /v1/activity`.
+/// `POST /v1/activity`. `question`, with `approval`: Claude asked the owner this in a voice
+/// turn and waits for the reply, which the voice may hand over as `Work.reply`.
 public struct ActivityBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var state: SessionActivity
+  public var question: String?
 }
 
 /// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`.

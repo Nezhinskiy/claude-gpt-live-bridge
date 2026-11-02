@@ -13,11 +13,12 @@ struct WireTests {
     "join": roundTrip(JoinBody.self), "join-replaces": roundTrip(JoinBody.self),
     "leave": roundTrip(LeaveBody.self),
     "target": roundTrip(TargetBody.self), "call": roundTrip(CallBody.self),
-    "activity": roundTrip(ActivityBody.self), "context": roundTrip(ContextBody.self),
+    "activity": roundTrip(ActivityBody.self), "activity-question": roundTrip(ActivityBody.self),
+    "context": roundTrip(ContextBody.self),
     "answer-ok": roundTrip(AnswerBody.self), "answer-failed": roundTrip(AnswerBody.self),
     "next-request": roundTrip(PollReply.self), "next-context": roundTrip(PollReply.self),
-    "next-idle": roundTrip(PollReply.self), "error": roundTrip(ErrorReply.self),
-    "error-removed": roundTrip(ErrorReply.self),
+    "next-idle": roundTrip(PollReply.self), "next-reply": roundTrip(PollReply.self),
+    "error": roundTrip(ErrorReply.self), "error-removed": roundTrip(ErrorReply.self),
   ]
 
   static func roundTrip<T: Codable & Sendable>(_ type: T.Type) -> @Sendable (Data) throws -> Data {

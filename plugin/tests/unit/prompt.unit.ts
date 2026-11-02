@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { FRAMING, PLUGIN_NAME, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
+import { askedText, FRAMING, PLUGIN_NAME, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
 import type { VoiceRequest } from '../../hooks/wire.ts'
 
 const request: VoiceRequest = {
@@ -77,4 +77,13 @@ test('onlyAWireShapedIdOnTheLastLineCounts', () => {
   assert.equal(voiceRequestId(engineFramed(text.replace(request.id, 'not-an-id'))), null)
   assert.equal(voiceRequestId(engineFramed(`${text}\nmore text`)), null)
   assert.equal(voiceRequestId(engineFramed(text.replace(request.id, request.id.toUpperCase()))), request.id.toUpperCase())
+})
+
+test('claudesQuestionIsToldWithItsOptions', () => {
+  const options = [{ label: 'build', description: 'Keep the default.' }, { label: 'out' }]
+  assert.equal(
+    askedText([{ question: 'Which name?', options }, { question: 'Which tests?', options, multiSelect: true }]),
+    'Which name? Options: build: Keep the default.; out. Which tests? Options, any of them: build: Keep the default.; out.')
+  assert.equal(askedText([{ question: 'Which name?', options: [{ label: 'out', description: 'Shorter.' }] }]),
+    'Which name? Options: out: Shorter.')
 })

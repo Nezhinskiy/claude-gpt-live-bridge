@@ -47,6 +47,28 @@ export function voicePrompt(request: VoiceRequest): string {
   ].join('\n')
 }
 
+/** One question of Claude's AskUserQuestion tool, as much of it as the voice is told. */
+export type AskedQuestion = {
+  question: string
+  options?: readonly { label: string; description?: string }[]
+  multiSelect?: boolean
+}
+
+/** What Claude asks the owner, options and their descriptions included, for the voice to put. */
+export function askedText(questions: readonly AskedQuestion[]): string {
+  return questions.map(({ question, options = [], multiSelect }) => {
+    const choices = options.map(o => (o.description ? `${o.label}: ${o.description}` : o.label))
+    const kind = multiSelect === true ? 'Options, any of them' : 'Options'
+    const listed = choices.join('; ')
+    return choices.length === 0 ? question : `${question} ${kind}: ${listed}${/[.!?]$/.test(listed) ? '' : '.'}`
+  }).join(' ')
+}
+
+/** The owner's reply as the dialog's free-text answer, said to come by voice. */
+export function spokenReply(request: VoiceRequest): string {
+  return `${clean(request.brief)}\n\n(The owner answered by voice; a voice assistant relayed it.)`
+}
+
 /**
  * The voice request a turn's prompt carries: its text must open with the engine's framing of
  * this plugin's message and hold the marker line. Null for any other turn.

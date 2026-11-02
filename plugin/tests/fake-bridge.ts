@@ -86,6 +86,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     onStoreHeld: () => {},
     /** Prompts submitted and leaves posted, in the order they happened. */
     timeline: [] as ('submit' | 'leave')[],
+    /** Answers the open AskUserQuestion dialog at the keyboard with a label. */
+    answerDialog: (_label: string) => {},
     /** The registry's other `*.json` files, by name: Claude Code rewrites them, so one may be half written. */
     otherRecords: {} as Record<string, string>,
     /** The calls to one route since the last look, then forgets them. */
@@ -176,7 +178,16 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (world.forkFails === 'nothing-to-fork') return { value: { isAnswered: false, reason: 'nothing-to-fork' } } as const
     return { value: { isAnswered: true, text: world.summary, usage } } as const
   })
-  on('tool.check', () => ({ decision: 'ask' }))
+  // AskUserQuestion's dialog is its own permission prompt; any other tool asks first.
+  on('tool.check', (_, e) => ({ decision: e.tool === 'AskUserQuestion' ? 'allow' : 'ask' }))
+  // The AskUserQuestion dialog: open until `answerDialog` picks a label at the keyboard.
+  on('tool.call', (_, e) => {
+    if (e.tool !== 'AskUserQuestion') return { deny: 'no other tool runs in this world' }
+    const { questions } = e
+    return new Promise(resolve => {
+      world.answerDialog = label => resolve({ result: { questions, answers: { [questions[0]!.question]: label } } })
+    })
+  })
   on('classic.PermissionRequest', () => ({}))
   on('classic.PostToolUse', () => ({}))
   return world
