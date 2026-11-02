@@ -30,9 +30,7 @@ voice tells you the result.
 
 *Русская версия: [README.ru.md](README.ru.md).*
 
-<!-- Demo: when site/assets/demo.gif is committed, put it here:
-<p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="720"></p>
--->
+<p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
 between your own codex and your own Claude Code. The app and the mod talk over a Unix socket

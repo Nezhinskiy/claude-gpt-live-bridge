@@ -321,7 +321,7 @@ main h3 {
   margin-bottom: 8px;
 }
 
-/* Demo slot: the flow, until a recording replaces it. */
+/* Demo: the recording of one request. */
 
 main > section.demo {
   margin-top: 56px;
@@ -340,53 +340,14 @@ main > section.demo > .card-title {
   margin-bottom: 28px;
 }
 
-.flow {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 32px;
-  counter-reset: flow;
-  position: relative;
+.demo-gif {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--glass-edge);
 }
 
-/* The deck that carries the request from one step to the next. */
-.flow::before {
-  content: "";
-  position: absolute;
-  top: 15px;
-  left: 16px;
-  right: 16px;
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-soft));
-  opacity: 0.55;
-}
-
-.flow li {
-  position: relative;
-  counter-increment: flow;
-  padding-top: 52px;
-}
-
-.flow li::before {
-  content: counter(flow);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font: 650 16px/1 var(--display);
-  color: #fff;
-  background: linear-gradient(180deg, var(--hero-top), var(--hero-bottom));
-  box-shadow: 0 0 0 5px var(--bg), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-.flow p,
 .directions p {
   margin: 0;
   color: var(--muted);
@@ -658,22 +619,6 @@ main > section.demo > .card-title {
   main > section.demo {
     padding: 28px 24px;
     border-radius: 24px;
-  }
-  .flow {
-    grid-template-columns: 1fr;
-    gap: 28px;
-  }
-  .flow::before {
-    top: 16px;
-    bottom: 16px;
-    left: 15px;
-    right: auto;
-    width: 4px;
-    height: auto;
-    background: linear-gradient(180deg, var(--accent), var(--accent-soft));
-  }
-  .flow li {
-    padding: 4px 0 0 54px;
   }
   .highlights {
     grid-template-columns: 1fr;
