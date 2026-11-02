@@ -14,7 +14,21 @@ actor FakeVoice: RealtimeControlling {
 
   init() { (events, emitter) = AsyncStream.makeStream() }
 
-  func open(offerSDP: String, items: [InitialItem]) throws -> String {
+  /// While set, the next open waits for `releaseOpen()`, as codex takes seconds to answer.
+  var holdsOpen = false
+  private var heldOpens: [CheckedContinuation<Void, Never>] = []
+  var openWaiting: Int { heldOpens.count }
+  func holdOpen() { holdsOpen = true }
+  func releaseOpen() {
+    for wait in heldOpens { wait.resume() }
+    heldOpens = []
+  }
+
+  func open(offerSDP: String, items: [InitialItem]) async throws -> String {
+    if holdsOpen {
+      holdsOpen = false
+      await withCheckedContinuation { heldOpens.append($0) }
+    }
     if let failure { throw failure }
     opens.append(items)
     return "answer"
@@ -26,6 +40,8 @@ actor FakeVoice: RealtimeControlling {
   func shutdown() { shutdowns += 1 }
   func fail(with problem: CodexProblem?) { failure = problem }
   nonisolated func emit(_ event: RealtimeEvent) { emitter.yield(event) }
+  /// codex exited or stopped answering: the events end.
+  nonisolated func end() { emitter.finish() }
 }
 
 /// A fresh voice for each controller, as the app makes after Stop. While `slow`, each launch
@@ -158,6 +174,43 @@ struct BridgeTests {
     await test.bridge.perform(.start)  // the next Start launches a fresh codex
     #expect(await test.bridge.status.call == .listening)
     #expect(await voices.made.count == 2)
+  }
+
+  /// A codex that ended (it exited, or stopped answering) is not used again: the next speech
+  /// launches a fresh one.
+  @Test func aCodexThatEndedIsReplacedAtTheNextSpeech() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    await test.live()
+    let first = try #require(await voices.made.first)
+    first.emit(.closed(CodexProblem.exited(-1).sentence))
+    first.end()
+    #expect(await eventually { await first.shutdowns == 1 })
+    #expect(await test.bridge.status.call == .listening)
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(await voices.made.count == 2)
+    #expect(await test.bridge.status.call == .live)
+  }
+
+  /// A new target while the line is still opening cancels that opening: when codex's late
+  /// answer comes, the line opened since with the new target's conversation is left alone.
+  @Test func aLateOpenAfterATargetChangeLeavesTheNewLineAlone() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    await voice.holdOpen()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.openWaiting == 1 })
+    await bridge.setTarget(b)
+    #expect(await bridge.status.call == .listening)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await bridge.status.call == .live)
+    let closes = await voice.closes
+    await voice.releaseOpen()
+    await opening.value
+    #expect(await voice.closes == closes)
+    #expect(await bridge.status.call == .live)
+    #expect(await audio.calls.filter { $0 == "applyAnswer" }.count == 1)
   }
 
   /// With no session there is nothing to talk to: Start (from the band or the socket) does

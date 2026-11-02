@@ -10,6 +10,11 @@ actor FakeRPC: RPCClient {
   var declined: [JSONValue] = []
   /// Notifications pushed when `thread/realtime/start` is called.
   var onStart: [JSONValue]
+  /// The next request for each of these methods waits for `release()`.
+  var held: Set<String> = []
+  private var holding: [CheckedContinuation<Void, Never>] = []
+  /// Requests for these methods fail, as codex not answering in time does.
+  var failing: [String: CodexProblem] = [:]
   let notifications: AsyncStream<RPCNotification>
   let serverRequests: AsyncStream<RPCServerRequest>
   private let notify: AsyncStream<RPCNotification>.Continuation
@@ -31,12 +36,21 @@ actor FakeRPC: RPCClient {
   }
 
   func set(_ method: String, _ values: [JSONValue]) { replies[method] = values }
+  func hold(_ method: String) { held.insert(method) }
+  var waiting: Int { holding.count }
+  func release() {
+    for wait in holding { wait.resume() }
+    holding = []
+  }
+  func fail(_ method: String, with problem: CodexProblem) { failing[method] = problem }
   func setOnStart(_ values: [JSONValue]) { onStart = values }
 
   func request<P: Encodable & Sendable, R: Decodable & Sendable>(
     _ method: String, _ params: P, timeout: Duration
   ) async throws -> R {
     calls.append((method, try JSONValue(encoding: params)))
+    if held.remove(method) != nil { await withCheckedContinuation { holding.append($0) } }
+    if let problem = failing[method] { throw problem }
     var queue = replies[method] ?? [[:]]
     let reply = queue.count > 1 ? queue.removeFirst() : queue[0]
     replies[method] = queue
@@ -50,7 +64,8 @@ actor FakeRPC: RPCClient {
   }
 
   func reply(to request: RPCServerRequest, error: RPCError) { declined.append(request.id) }
-  func close() {}
+  var closes = 0
+  func close() { closes += 1 }
   /// codex exits: its streams end.
   nonisolated func exit() {
     notify.finish()
@@ -134,6 +149,57 @@ struct RealtimeSessionTests {
     #expect(
       await rpc.params("thread/realtime/start").map { $0["prompt"]?.string }
         == [VoicePrompt.composed(owner: "Speak with me in Spanish."), VoicePrompt.text])
+  }
+
+  /// A close while an open is still on its way cancels it: the open throws, and codex is not
+  /// asked for a realtime session the line no longer wants.
+  @Test func closeCancelsAnOpenUnderWay() async throws {
+    await rpc.hold("thread/start")
+    let opened = Task { try await session.open(offerSDP: "offer", items: []) }
+    #expect(await eventually { await rpc.waiting == 1 })
+    await session.close()
+    await rpc.release()
+    await #expect(throws: CancellationError.self) { _ = try await opened.value }
+    #expect(await rpc.params("thread/realtime/start").isEmpty)
+  }
+
+  /// One line at a time: an open while another is on its way ends that one, so no wait for an
+  /// answer is lost and the second open gets its own.
+  @Test func aSecondOpenEndsTheFirst() async throws {
+    await rpc.hold("thread/start")
+    let first = Task { try await session.open(offerSDP: "offer", items: []) }
+    #expect(await eventually { await rpc.waiting == 1 })
+    let second = try await session.open(offerSDP: "offer", items: [])
+    #expect(second == (try adrJSON("realtime-sdp")["params"]?["sdp"]?.string))
+    await rpc.release()
+    await #expect(throws: CancellationError.self) { _ = try await first.value }
+    #expect(await rpc.params("thread/realtime/start").count == 1)
+  }
+
+  /// A task cancelled while its open waits for codex's answer gets its own error back, and the
+  /// realtime session it started is stopped.
+  @Test func cancellingTheOpenStopsItsSession() async throws {
+    await rpc.setOnStart([])  // codex never sends the SDP answer
+    let open = Task { try await session.open(offerSDP: "offer", items: []) }
+    #expect(await eventually { await !rpc.params("thread/realtime/start").isEmpty })
+    open.cancel()
+    await #expect(throws: CancellationError.self) { _ = try await open.value }
+    #expect(await eventually { await rpc.params("thread/realtime/stop") == [["threadId": thread]] })
+  }
+
+  /// codex not answering in time ends the controller as its exit does: the line closes, saying
+  /// why, the events end and codex is ended, so the next line starts a fresh one.
+  @Test func aRequestTimeoutRetiresCodex() async throws {
+    _ = try await session.open(offerSDP: "offer", items: [])
+    await rpc.fail("thread/realtime/appendText", with: .timedOut("thread/realtime/appendText"))
+    var events = session.events.makeAsyncIterator()
+    await #expect(throws: CodexProblem.timedOut("thread/realtime/appendText")) {
+      try await session.addContext("[RESULT] Example session: Done.")
+    }
+    #expect(
+      await events.next() == .closed(CodexProblem.timedOut("thread/realtime/appendText").sentence))
+    #expect(await events.next() == nil)
+    #expect(await rpc.closes == 1)
   }
 
   @Test func openRefusesWhenAServerIsEnabled() async throws {

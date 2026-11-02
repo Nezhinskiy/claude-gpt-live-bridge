@@ -107,7 +107,7 @@ public actor JSONRPCClient: RPCClient {
   }
 
   /// Sends a request and waits up to `timeout` for its result. A JSON-RPC error is thrown as
-  /// `RPCError`; no reply in time, or codex gone, as `CodexProblem`.
+  /// `RPCError`; no reply in time as `CodexProblem.timedOut`, codex gone as `.exited`.
   public func request<P: Encodable & Sendable, R: Decodable & Sendable>(
     _ method: String, _ params: P, timeout: Duration
   ) async throws -> R {
@@ -120,7 +120,7 @@ public actor JSONRPCClient: RPCClient {
       send(line)
       Task {
         try? await Task.sleep(for: timeout)
-        self.resolve(id, .failure(CodexProblem.protocolMismatch("no reply to \(method)")))
+        self.resolve(id, .failure(CodexProblem.timedOut(method)))
       }
     }
     do { return try result.decode(R.self) } catch {

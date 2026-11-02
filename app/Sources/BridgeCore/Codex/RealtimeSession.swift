@@ -13,10 +13,15 @@ public enum RealtimeEvent: Sendable, Equatable {
   case closed(String)
 }
 
-/// One realtime voice session at a time, opened and closed as the call needs it.
-public protocol RealtimeControlling: Sendable {
+/// One realtime voice session at a time, opened and closed as the call needs it. Its events end
+/// when codex does (it exited, stopped answering, or was shut down); the controller is then not
+/// used again.
+public protocol RealtimeControlling: Actor {
   /// Opens a session for the page's WebRTC offer, seeded with `items`; returns the answer SDP.
+  /// A session open or opening ends first; a `close()` or a cancel meanwhile makes it throw
+  /// `CancellationError`.
   func open(offerSDP: String, items: [InitialItem]) async throws -> String
+  /// Ends the session, also one still opening.
   func close() async
   /// Adds a line the voice reads as context (a result, a question, an approval notice).
   func addContext(_ text: String) async throws
@@ -32,7 +37,7 @@ public protocol RealtimeControlling: Sendable {
 /// Each `open` starts a new thread with every configured MCP server turned off and refuses to go
 /// on unless codex reports all of them disabled. Every codex turn on the thread is interrupted at
 /// once, every request codex sends is declined, and an MCP server that starts later closes the
-/// session.
+/// session. A request codex does not answer in time ends codex, as its exit does.
 public actor RealtimeSession: RealtimeControlling {
   private let client: any RPCClient
   private let cwd: URL
@@ -43,12 +48,20 @@ public actor RealtimeSession: RealtimeControlling {
   private let timeout = Duration.seconds(20)
   /// More `mcpServerStatus/list` pages than this is a reply this version does not understand.
   static let maxStatusPages = 50
-  /// The open session's thread; notifications for any other thread are ignored.
-  private var thread: String?
-  private var answer: CheckedContinuation<String, any Error>?
-  /// Counts `start` calls, so a late timeout cannot fail a newer session's open.
-  private var attempt = 0
-  private var lastError: String?
+
+  /// Which `open` a line belongs to.
+  private final class Ticket: Sendable {}
+
+  /// The session open or opening: its thread once codex made it, and while opening its wait
+  /// for codex's SDP answer. Notifications for any other thread are ignored.
+  private struct Line {
+    let ticket: Ticket
+    var thread: String?
+    var answer: CheckedContinuation<String, any Error>?
+    var lastError: String?
+  }
+
+  private var line: Line?
   private var handoffs: Set<String> = []
   private var listening = false
   public nonisolated let events: AsyncStream<RealtimeEvent>
@@ -67,34 +80,56 @@ public actor RealtimeSession: RealtimeControlling {
   }
 
   public func open(offerSDP: String, items: [InitialItem]) async throws -> String {
+    await close()
+    let ticket = Ticket()
+    line = Line(ticket: ticket)
+    do {
+      return try await withTaskCancellationHandler {
+        try await establish(ticket, offerSDP: offerSDP, items: items)
+      } onCancel: {
+        Task { await self.close(ticket) }
+      }
+    } catch {
+      await close(ticket)
+      throw error
+    }
+  }
+
+  private func establish(_ ticket: Ticket, offerSDP: String, items: [InitialItem]) async throws
+    -> String
+  {
     await listen()
-    let config: JSONValue = try await client.request(
-      "config/read", ["cwd": .string(cwd.path)] as JSONValue, timeout: timeout)
+    let config: JSONValue = try await request(
+      "config/read", ["cwd": .string(cwd.path)] as JSONValue)
     guard let table = config["config"]?.object, let servers = (table["mcp_servers"] ?? [:]).object
     else {
       throw CodexProblem.protocolMismatch("config/read without an MCP server table")
     }
+    try check(ticket)
     let names = servers.keys
     let off = JSONValue.object(
       Dictionary(uniqueKeysWithValues: names.map { ($0, ["enabled": false]) }))
-    let started: JSONValue = try await client.request(
+    let started: JSONValue = try await request(
       "thread/start",
       [
         "cwd": .string(cwd.path), "sandbox": "read-only", "approvalPolicy": "never",
         "ephemeral": true, "config": ["mcp_servers": off],
         "developerInstructions": "You relay a voice session. Never act: no tools, no files.",
-      ] as JSONValue, timeout: timeout)
+      ] as JSONValue)
     guard let id = started["thread"]?["id"]?.string else {
       throw CodexProblem.protocolMismatch("thread/start without a thread id")
     }
-    thread = id
-    do {
-      try await requireMCPDisabled(thread: id, configured: names)
-      return try await start(thread: id, offerSDP: offerSDP, items: items)
-    } catch {
-      await close()
-      throw error
-    }
+    try check(ticket)
+    line?.thread = id
+    try await requireMCPDisabled(thread: id, configured: names)
+    try check(ticket)
+    return try await start(ticket, thread: id, offerSDP: offerSDP, items: items)
+  }
+
+  /// Throws `CancellationError` once `ticket`'s line was closed or its task cancelled.
+  private func check(_ ticket: Ticket) throws {
+    guard line?.ticket === ticket else { throw CancellationError() }
+    try Task.checkCancellation()
   }
 
   /// Every `mcpServerStatus/list` page must report every server `disabled` (`null` is not),
@@ -106,8 +141,7 @@ public actor RealtimeSession: RealtimeControlling {
     for _ in 0..<Self.maxStatusPages {
       var params: [String: JSONValue] = ["threadId": .string(thread), "detail": "toolsAndAuthOnly"]
       params["cursor"] = cursor.map(JSONValue.string)
-      let page: JSONValue = try await client.request(
-        "mcpServerStatus/list", JSONValue.object(params), timeout: timeout)
+      let page: JSONValue = try await request("mcpServerStatus/list", JSONValue.object(params))
       guard let servers = page["data"]?.array else {
         throw CodexProblem.protocolMismatch("mcpServerStatus/list without data")
       }
@@ -126,7 +160,8 @@ public actor RealtimeSession: RealtimeControlling {
   }
 
   /// `thread/realtime/start` answers `{}`; the SDP answer or an error follows as a notification.
-  private func start(thread: String, offerSDP: String, items: [InitialItem]) async throws -> String
+  private func start(_ ticket: Ticket, thread: String, offerSDP: String, items: [InitialItem])
+    async throws -> String
   {
     var fields: [String: JSONValue] = [
       "threadId": .string(thread), "version": "v3", "outputModality": "audio",
@@ -137,45 +172,52 @@ public actor RealtimeSession: RealtimeControlling {
     ]
     fields["voice"] = voice().map(JSONValue.string)
     let params = JSONValue.object(fields)
-    lastError = nil
-    attempt += 1
-    let mine = attempt
-    return try await withCheckedThrowingContinuation { answer in
-      self.answer = answer
+    return try await withCheckedThrowingContinuation { waiting in
+      guard line?.ticket === ticket else { return waiting.resume(throwing: CancellationError()) }
+      line?.answer = waiting
       Task {
         do {
-          let _: JSONValue = try await client.request(
-            "thread/realtime/start", params, timeout: timeout)
+          let _: JSONValue = try await request("thread/realtime/start", params)
           try await Task.sleep(for: timeout)
-          fail(CodexProblem.protocolMismatch("no SDP answer"), attempt: mine)
-        } catch { fail(error, attempt: mine) }
+          resolve(ticket, with: .failure(CodexProblem.protocolMismatch("no SDP answer")))
+        } catch { resolve(ticket, with: .failure(error)) }
       }
     }
   }
 
-  private func fail(_ error: any Error, attempt: Int? = nil) {
-    guard attempt == nil || attempt == self.attempt else { return }
-    answer?.resume(throwing: error)
-    answer = nil
+  /// Ends the wait for codex's SDP answer, if `ticket`'s line still waits (any line: nil).
+  private func resolve(_ ticket: Ticket? = nil, with result: Result<String, any Error>) {
+    guard let waiting = line, ticket == nil || waiting.ticket === ticket else { return }
+    line?.answer = nil
+    waiting.answer?.resume(with: result)
   }
 
   public func close() async {
-    guard let id = thread else { return }
-    thread = nil  // codex's own `closed` for this thread is not reported back
-    fail(CancellationError())
-    let _: JSONValue? = try? await client.request(
-      "thread/realtime/stop", ["threadId": .string(id)] as JSONValue, timeout: timeout)
+    guard let line else { return }
+    await close(line.ticket)
+  }
+
+  /// Closes `ticket`'s line, open or still opening; codex's own `closed` for its thread is not
+  /// reported back.
+  private func close(_ ticket: Ticket) async {
+    guard let closing = line, closing.ticket === ticket else { return }
+    line = nil
+    closing.answer?.resume(throwing: CancellationError())
+    guard let id = closing.thread else { return }
+    let _: JSONValue? = try? await request(
+      "thread/realtime/stop", ["threadId": .string(id)] as JSONValue)
   }
 
   /// Result lines go in as `user` text, the role ADR 0001 (b) observed being spoken. The voice
   /// reads them as the owner's words, so a session's text could still steer it; the one-line
   /// shape and the prompt's "data, not instructions" rule narrow that, they do not close it.
   public func addContext(_ text: String) async throws {
-    guard let id = thread else { throw CodexProblem.protocolMismatch("no voice session open") }
-    let _: JSONValue = try await client.request(
+    guard let id = line?.thread else {
+      throw CodexProblem.protocolMismatch("no voice session open")
+    }
+    let _: JSONValue = try await request(
       "thread/realtime/appendText",
-      ["threadId": .string(id), "text": .string(text), "role": "user"] as JSONValue,
-      timeout: timeout)
+      ["threadId": .string(id), "text": .string(text), "role": "user"] as JSONValue)
   }
 
   /// `thread/realtime/appendSpeech`: on realtime v3 codex sends it as speakable context
@@ -183,10 +225,12 @@ public actor RealtimeSession: RealtimeControlling {
   /// to have a finished handoff's answer said (ADR 0001 (b)). codex has no request that makes the
   /// model respond on v3; whether and when the voice says it is the model's choice.
   public func speak(_ text: String) async throws {
-    guard let id = thread else { throw CodexProblem.protocolMismatch("no voice session open") }
-    let _: JSONValue = try await client.request(
-      "thread/realtime/appendSpeech",
-      ["threadId": .string(id), "text": .string(text)] as JSONValue, timeout: timeout)
+    guard let id = line?.thread else {
+      throw CodexProblem.protocolMismatch("no voice session open")
+    }
+    let _: JSONValue = try await request(
+      "thread/realtime/appendSpeech", ["threadId": .string(id), "text": .string(text)] as JSONValue
+    )
   }
 
   /// Ends codex and the events, so the reader of the events lets this controller go.
@@ -196,6 +240,18 @@ public actor RealtimeSession: RealtimeControlling {
     emit.finish()
   }
 
+  /// A request to codex. One it does not answer in time ends codex: it hangs.
+  private func request<R: Decodable & Sendable>(_ method: String, _ params: JSONValue)
+    async throws -> R
+  {
+    do { return try await client.request(method, params, timeout: timeout) } catch let problem
+      as CodexProblem
+    {
+      if case .timedOut = problem { await retire(problem) }
+      throw problem
+    }
+  }
+
   private func listen() async {
     guard !listening else { return }
     listening = true
@@ -203,7 +259,7 @@ public actor RealtimeSession: RealtimeControlling {
     let requests = await client.serverRequests
     Task { [weak self] in
       for await notification in notifications { await self?.handle(notification) }
-      await self?.ended()
+      await self?.retire(.exited(-1))
     }
     Task { [client] in
       for await request in requests {
@@ -212,37 +268,40 @@ public actor RealtimeSession: RealtimeControlling {
     }
   }
 
-  /// codex exited: an open session closes, and the events end.
-  private func ended() {
-    defer { emit.finish() }
-    guard thread != nil else { return }
-    thread = nil
-    fail(CodexProblem.exited(-1))
-    emit.yield(.closed(CodexProblem.exited(-1).sentence))
+  /// codex exited or stopped answering: a session open or opening closes, saying why, the
+  /// events end, and codex is ended.
+  private func retire(_ problem: CodexProblem) async {
+    if let ending = line {
+      line = nil
+      ending.answer?.resume(throwing: problem)
+      emit.yield(.closed(problem.sentence))
+    }
+    emit.finish()
+    await client.close()
   }
 
   private func handle(_ notification: RPCNotification) async {
     let params = notification.params
     if notification.method == "mcpServer/startupStatus/updated" {  // any thread: fail closed
-      guard thread != nil, ["starting", "ready"].contains(params["status"]?.string) else { return }
+      guard line != nil, ["starting", "ready"].contains(params["status"]?.string) else { return }
       await close()
       emit.yield(
         .closed(CodexProblem.mcpNotDisabled([params["name"]?.string ?? "unnamed"]).sentence))
       return
     }
-    guard let id = thread, params["threadId"]?.string == id else { return }
+    guard let id = line?.thread, params["threadId"]?.string == id else { return }
     switch notification.method {
     case "thread/realtime/sdp":
-      answer?.resume(returning: params["sdp"]?.string ?? "")
-      answer = nil
+      resolve(with: .success(params["sdp"]?.string ?? ""))
     case "thread/realtime/error":
-      lastError = params["message"]?.string ?? ""
-      fail(CodexProblem.realtimeError(lastError ?? ""))
+      let message = params["message"]?.string ?? ""
+      line?.lastError = message
+      resolve(with: .failure(CodexProblem.realtimeError(message)))
     case "thread/realtime/closed":
-      thread = nil
-      fail(CodexProblem.protocolMismatch("closed before the SDP answer"))
+      let reason = line?.lastError.map { CodexProblem.realtimeError($0).sentence }
+      resolve(with: .failure(CodexProblem.protocolMismatch("closed before the SDP answer")))
+      line = nil
       let code = params["reason"]?.string ?? "no reason"
-      let reason = lastError.map { CodexProblem.realtimeError($0).sentence }
       emit.yield(.closed(reason ?? "The voice session closed (\(code))."))
     case "thread/realtime/itemAdded":
       handoff(params["item"] ?? .null)
@@ -255,9 +314,8 @@ public actor RealtimeSession: RealtimeControlling {
     case "turn/started":
       guard let turn = params["turn"]?["id"] else { return }
       Task {
-        let _: JSONValue? = try? await client.request(
-          "turn/interrupt", ["threadId": .string(id), "turnId": turn] as JSONValue,
-          timeout: timeout)
+        let _: JSONValue? = try? await request(
+          "turn/interrupt", ["threadId": .string(id), "turnId": turn] as JSONValue)
       }
     default:
       break

@@ -8,7 +8,7 @@ struct JSONRPCClientTests {
     let fake = try FakeCodex()
     let client = JSONRPCClient(executable: fake.codex, arguments: ["app-server"], cwd: fake.dir)
     try await client.start()
-    await #expect(throws: CodexProblem.self) {
+    await #expect(throws: CodexProblem.timedOut("example/unanswered")) {
       let _: JSONValue = try await client.request(
         "example/unanswered", JSONValue.object([:]), timeout: .milliseconds(200))
     }

@@ -18,18 +18,14 @@ public actor Bridge: Router {
   /// Settings' "Notify when a result is waiting", read at each chime.
   private let notifies: @Sendable () -> Bool
   private var machine = CallMachine()
+  /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
-  /// Counts controllers made and ended, so events from one already replaced are ignored and a
-  /// launch that an end overtook is ended too.
-  private var controllers = 0
-  /// A Start is launching codex: a second Start is ignored, and a Stop meanwhile wins.
-  private var starting = false
-  /// Counts realtime opens and closes, so an open that a close overtook gives up.
-  private var opening = 0
-  private var silenceTimer = 0
-  /// Generations of the result window and the grace timer, so only the latest one fires.
-  private var windowTimer = 0
-  private var graceTimer = 0
+  /// The one connection attempt under way: Start launching codex, or the line opening
+  /// (launching codex first if it is not running). Stop, a close of the line and a new target
+  /// cancel it; a cancelled attempt has no effect.
+  private var connecting: Task<Void, Never>?
+  /// The armed timers, one of each kind; arming one again replaces it.
+  private var timers: [CallTimer: Task<Void, Never>] = [:]
   /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
   /// The session whose conversation the line last opened with; its transcripts are kept there.
@@ -113,30 +109,39 @@ public actor Bridge: Router {
   public func perform(_ action: CallAction) async {
     switch action {
     case .start:
-      guard machine.phase == .off, !starting else { return }
-      starting = true  // before any await, so a second Start meanwhile does nothing
-      guard await registry.target != nil else {
-        starting = false
-        problem = Self.noSession
-        await changed()
-        return
-      }
-      do { _ = try await controller() } catch is CancellationError {
-        return  // a Stop came first
-      } catch {
-        starting = false
-        problem = Self.sentence(error)
-        await changed()
-        return
-      }
-      starting = false
-      callStart = time.now
-      await send(.start)
+      guard machine.phase == .off, connecting == nil else { return }
+      await attempt { await self.launch() }
     case .stop:
       questionRoute = nil
       await send(.stop)
       await endCodex()
     }
+  }
+
+  /// Runs `work` as the connection attempt, until it ends or is cancelled.
+  private func attempt(_ work: @escaping @Sendable () async -> Void) async {
+    let task = Task { await work() }
+    connecting = task
+    await task.value
+    if connecting == task { connecting = nil }
+  }
+
+  /// Start: launches codex, so a problem with it shows at once, then listens.
+  private func launch() async {
+    guard await registry.target != nil else {
+      problem = Self.noSession
+      await changed()
+      return
+    }
+    do { _ = try await controller() } catch {
+      guard !Task.isCancelled else { return }  // a Stop came first
+      problem = Self.sentence(error)
+      await changed()
+      return
+    }
+    guard !Task.isCancelled else { return }
+    callStart = time.now
+    await send(.start)
   }
 
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
@@ -238,9 +243,10 @@ public actor Bridge: Router {
 
   private func run(_ effect: CallEffect) async {
     switch effect {
-    case .openRealtime: await openRealtime()
+    case .openRealtime: await attempt { await self.openLine() }
     case .closeRealtime:
-      opening += 1
+      connecting?.cancel()
+      connecting = nil
       await audio.closePeer()
       await realtime?.close()
     case .startLocalVAD: await audio.startListening()
@@ -248,27 +254,9 @@ public actor Bridge: Router {
     case .flushPreroll: await audio.flushPreroll()
     case .addContext(let line): try? await realtime?.addContext(line.text)
     case .speak(let line): try? await realtime?.speak(line.text)
-    case .armSilenceTimer(let seconds):
-      silenceTimer += 1
-      let timer = silenceTimer
-      Task { [time] in
-        try? await time.sleep(for: .seconds(seconds))
-        await self.silenceElapsed(timer)
-      }
-    case .armResultWindow(let seconds):
-      windowTimer += 1
-      let timer = windowTimer
-      Task { [time] in
-        try? await time.sleep(for: .seconds(seconds))
-        await self.windowElapsed(timer)
-      }
-    case .armGrace(let milliseconds):
-      graceTimer += 1
-      let timer = graceTimer
-      Task { [time] in
-        try? await time.sleep(for: .milliseconds(milliseconds))
-        await self.graceElapsed(timer)
-      }
+    case .armSilenceTimer(let seconds): arm(.silence, after: .seconds(seconds))
+    case .armResultWindow(let seconds): arm(.resultWindow, after: .seconds(seconds))
+    case .armGrace(let milliseconds): arm(.grace, after: .milliseconds(milliseconds))
     case .chime:
       await audio.chime()
       await notifyWaiting()
@@ -286,26 +274,29 @@ public actor Bridge: Router {
     }
   }
 
-  private func silenceElapsed(_ timer: Int) async {
-    if timer == silenceTimer { await send(.silenceElapsed) }
+  private func arm(_ timer: CallTimer, after delay: Duration) {
+    timers[timer]?.cancel()
+    timers[timer] = Task { [time] in
+      try? await time.sleep(for: delay)
+      await self.fire(timer)
+    }
   }
 
-  private func windowElapsed(_ timer: Int) async {
-    if timer == windowTimer { await send(.resultWindowElapsed) }
+  /// A timer armed again meanwhile was cancelled, and does not fire.
+  private func fire(_ timer: CallTimer) async {
+    guard !Task.isCancelled else { return }
+    await send(timer.event)
   }
 
-  private func graceElapsed(_ timer: Int) async {
-    if timer == graceTimer { await send(.graceElapsed) }
-  }
-
-  private func openRealtime() async {
-    opening += 1
-    let attempt = opening
+  /// Opens the line with the target's conversation. Cancelled, it does nothing more: whoever
+  /// cancelled it closes what it opened. A line the voice closed itself (`CancellationError`)
+  /// says why in its `closed` event.
+  private func openLine() async {
     lineKnowsSession = false
+    let session = await registry.target
+    lineSession = session
+    lineKnowsSession = true
     do {
-      let session = await registry.target
-      lineSession = session
-      lineKnowsSession = true
       let voice = try await controller()
       let offer = try await audio.makeOffer()
       // only the session's own conversation, context and open tasks: never another session's
@@ -314,52 +305,52 @@ public actor Bridge: Router {
       let items = conversation.initialItems(
         tasks: tasks, unheard: Set(machine.pending.map(\.text)))
       let answer = try await voice.open(offerSDP: offer, items: items)
-      guard attempt == opening else { return await voice.close() }
+      try Task.checkCancellation()
       try await audio.applyAnswer(answer)
-      guard attempt == opening else { return }
+      try Task.checkCancellation()
       await send(.connected)
     } catch {
-      guard attempt == opening else { return }
-      if case CodexProblem.exited = error { await endCodex() }
+      guard !Task.isCancelled, !(error is CancellationError) else { return }
+      if let realtime, (error as? CodexProblem)?.endsCodex == true { await retire(realtime) }
       await audio.closePeer()
       await realtime?.close()  // codex may have opened its side before the page failed
       await send(.connectFailed(Self.sentence(error)))
     }
   }
 
-  /// The running codex controller, or a new one. Throws `CancellationError` when codex was
-  /// ended while the new one launched; that one is ended too.
+  /// The running codex controller, or a new one. A launch runs to its end, outside the
+  /// attempt's cancellation; an attempt cancelled meanwhile ends what it launched.
   private func controller() async throws -> any RealtimeControlling {
     if let realtime { return realtime }
-    let generation = controllers
-    let made: any RealtimeControlling
-    do { made = try await makeRealtime() } catch {
-      // A launch that fails after a Stop is the Stop's business, not a problem to show.
-      throw generation == controllers ? error : CancellationError()
-    }
-    guard generation == controllers else {
-      await made.shutdown()
+    let made = try await Task { [makeRealtime] in try await makeRealtime() }.value
+    guard !Task.isCancelled else {
+      await Task { await made.shutdown() }.value
       throw CancellationError()
     }
-    controllers += 1
-    let id = controllers
     realtime = made
     Task { [weak self] in
-      for await event in await made.events { await self?.realtimeEvent(event, from: id) }
+      for await event in await made.events { await self?.realtimeEvent(event, from: made) }
+      await self?.retire(made)
     }
     return made
   }
 
   private func endCodex() async {
-    let ended = realtime
-    realtime = nil
-    starting = false
-    controllers += 1
-    await ended?.shutdown()
+    if let realtime { await retire(realtime) }
   }
 
-  private func realtimeEvent(_ event: RealtimeEvent, from controller: Int) async {
-    guard controller == controllers else { return }
+  /// Ends `controller` if it is still the running one: its events ended (codex exited or
+  /// stopped answering), or the call ended. The next line launches a fresh one.
+  private func retire(_ controller: any RealtimeControlling) async {
+    guard realtime === controller else { return }
+    realtime = nil
+    await controller.shutdown()
+  }
+
+  private func realtimeEvent(_ event: RealtimeEvent, from controller: any RealtimeControlling)
+    async
+  {
+    guard realtime === controller else { return }
     switch event {
     case .handoff(let request):
       let session = await route(request)
@@ -378,7 +369,8 @@ public actor Bridge: Router {
       await send(.assistantFinishedSpeaking(text))
     case .assistantSpeaking: await send(.assistantSpeaking)
     case .closed(let reason):
-      opening += 1
+      connecting?.cancel()
+      connecting = nil
       await audio.closePeer()
       await send(.remoteClosed(reason))
     }
@@ -505,6 +497,19 @@ public actor Bridge: Router {
 
 /// What the app shows of the bridge: the status, and the target's whole conversation, which
 /// the menu lists and the status, carried by every poll, does not.
+/// The call's timers, each armed by its `CallEffect`.
+private enum CallTimer {
+  case silence, resultWindow, grace
+
+  var event: CallEvent {
+    switch self {
+    case .silence: .silenceElapsed
+    case .resultWindow: .resultWindowElapsed
+    case .grace: .graceElapsed
+    }
+  }
+}
+
 public struct BridgeUpdate: Sendable, Equatable {
   public let status: StatusReply
   public let conversation: [String]

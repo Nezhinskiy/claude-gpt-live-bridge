@@ -8,10 +8,20 @@ public enum CodexProblem: LocalizedError, Equatable, Sendable {
   /// codex answered in a shape this version does not understand, or not at all.
   case protocolMismatch(String)
   case exited(Int32)
+  /// codex gave no reply to this request in time: it hangs, and is started again.
+  case timedOut(String)
   /// A `thread/realtime/error` message (ADR 0001 (k)), shown in codex's own words.
   case realtimeError(String)
 
   public var errorDescription: String? { sentence }
+
+  /// codex is gone or hangs: the controller is ended, and the next line launches a fresh one.
+  public var endsCodex: Bool {
+    switch self {
+    case .exited, .timedOut: true
+    default: false
+    }
+  }
 
   public var sentence: String {
     switch self {
@@ -26,6 +36,7 @@ public enum CodexProblem: LocalizedError, Equatable, Sendable {
     case .exited(let status):
       status < 0
         ? "Codex stopped unexpectedly." : "Codex stopped unexpectedly (exit status \(status))."
+    case .timedOut(let method): "Codex stopped answering (\(method)), so it is started again."
     case .realtimeError(let message):
       "Realtime voice failed (codex said: \(message))." + Self.hint(for: message.lowercased())
     }
