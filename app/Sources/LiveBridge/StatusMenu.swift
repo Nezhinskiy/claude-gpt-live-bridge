@@ -71,7 +71,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var content: MenuContent {
     MenuContent(
       status: model.status, problem: model.problem, contextLoad: model.contextLoad,
-      conversation: model.conversation)
+      conversation: model.update?.conversation ?? [])
   }
 
   /// Renders the model's current content, and again whenever it changes. Only the content is

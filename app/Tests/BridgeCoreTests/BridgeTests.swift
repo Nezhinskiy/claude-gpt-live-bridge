@@ -183,7 +183,7 @@ struct BridgeTests {
     let test = try BridgeTests { await voices.make() }
     await test.live()
     let first = try #require(await voices.made.first)
-    first.emit(.closed(CodexProblem.exited(-1).sentence))
+    first.emit(.closed(.codex(.exited(-1))))
     first.end()
     #expect(await eventually { await first.shutdowns == 1 })
     #expect(await test.bridge.status.call == .listening)
@@ -218,7 +218,7 @@ struct BridgeTests {
   @Test func startWithNoSessionDoesNothing() async throws {
     await bridge.perform(.start)
     #expect(await bridge.status.call == .off)
-    #expect(await bridge.status.problem == Bridge.noSession)
+    #expect(await bridge.status.problem == Problem.noSession.sentence)
     #expect(await audio.calls.isEmpty)
     try await join(a, "Alpha")
     #expect(await bridge.status.problem == nil)
@@ -243,7 +243,7 @@ struct BridgeTests {
     await live()
     voice.emit(.handoff(request(1)))
     #expect(try await eventually { try await registry.poll(b) == .request(request(1)) })
-    voice.emit(.closed("The voice session closed (example)."))
+    voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     await bridge.audioEvent(.speechStarted)  // the next session knows the task is open
     #expect(
@@ -644,7 +644,7 @@ struct BridgeTests {
     await live()
     voice.emit(.userUtterance("Remember the colour teal."))
     #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
-    voice.emit(.closed("The voice session closed (example)."))
+    voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     await bridge.setTarget(b)
     #expect(await voice.closes == 0)
@@ -790,12 +790,12 @@ struct BridgeTests {
   @Test func meterCountsOnlyLiveIntervals() async throws {
     await live()
     time.advance(by: .seconds(3))
-    voice.emit(.closed("The voice session closed (example)."))
+    voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     time.advance(by: .seconds(10))  // listening is not metered
     await bridge.audioEvent(.speechStarted)
     time.advance(by: .seconds(2))
-    voice.emit(.closed("The voice session closed (example)."))
+    voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     #expect(await bridge.status.minutesThisCall == 5.0 / 60)
     await bridge.perform(.stop)
@@ -814,7 +814,7 @@ struct BridgeTests {
 
   @Test func audioFailureSurfacesProblem() async throws {
     await live()
-    await bridge.audioEvent(.failed("No microphone is connected."))
+    await bridge.audioEvent(.failed(.other("No microphone is connected.")))
     #expect(await bridge.status.call == .off)
     #expect(await bridge.status.problem == "No microphone is connected.")
     #expect(await audio.calls.contains("stopListening"))

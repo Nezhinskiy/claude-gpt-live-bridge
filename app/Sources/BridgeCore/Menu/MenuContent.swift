@@ -66,30 +66,27 @@ public struct MenuContent: Sendable, Equatable {
   /// `problem` is the app's own or the status's; `status` is nil while there is no bridge.
   /// `conversation` is the target's, as the bridge lists it (`Bridge.conversation`).
   public init(
-    status: StatusReply?, problem: String?, contextLoad: ContextLoadState,
+    status: StatusReply?, problem: Problem?, contextLoad: ContextLoadState,
     conversation: [String]
   ) {
     let footer: [Item] = [
       .command(.settings, title: "Settings…", isEnabled: true),
       .command(.quit, title: "Quit LiveBridge", isEnabled: true),
     ]
-    guard let status else {
-      let card = CallCard(
-        headline: problem == nil ? "Starting…" : "Off", detail: "",
-        tint: problem == nil ? .quiet : .problem, action: nil, canAct: false, unheard: nil,
-        problem: problem, opensMicrophoneSettings: problem == MicrophoneAccess.deniedSentence,
-        codexHelp: CodexHelp.for(problem: problem))
+    let shown = status.map(StatusPresentation.init)
+    let card = CallCard(
+      headline: shown?.headline ?? (problem == nil ? "Starting…" : "Off"),
+      detail: shown?.detail ?? "",
+      tint: problem != nil ? .problem : shown?.tint ?? .quiet, action: shown?.action,
+      canAct: shown?.canAct ?? false,
+      unheard: shown.flatMap { $0.unheard > 0 ? "\($0.unheard) unheard — speak to hear" : nil },
+      problem: problem?.sentence,
+      opensMicrophoneSettings: problem?.opensMicrophoneSettings ?? false,
+      codexHelp: problem?.help)
+    guard let status, let shown else {
       items = [.call(card), .separator] + footer
       return
     }
-    let shown = StatusPresentation(status)
-    let card = CallCard(
-      headline: shown.headline, detail: shown.detail,
-      tint: problem != nil ? .problem : shown.tint, action: shown.action,
-      canAct: shown.canAct,
-      unheard: shown.unheard > 0 ? "\(shown.unheard) unheard — speak to hear" : nil,
-      problem: problem, opensMicrophoneSettings: problem == MicrophoneAccess.deniedSentence,
-      codexHelp: CodexHelp.for(problem: problem))
 
     var sessions: [Item] = [.header("Sessions")]
     if shown.rows.isEmpty {

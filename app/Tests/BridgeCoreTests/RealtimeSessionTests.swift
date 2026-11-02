@@ -196,8 +196,7 @@ struct RealtimeSessionTests {
     await #expect(throws: CodexProblem.timedOut("thread/realtime/appendText")) {
       try await session.addContext("[RESULT] Example session: Done.")
     }
-    #expect(
-      await events.next() == .closed(CodexProblem.timedOut("thread/realtime/appendText").sentence))
+    #expect(await events.next() == .closed(.codex(.timedOut("thread/realtime/appendText"))))
     #expect(await events.next() == nil)
     #expect(await rpc.closes == 1)
   }
@@ -264,16 +263,15 @@ struct RealtimeSessionTests {
     rpc.push(try adrJSON("realtime-error-version-unsupported", params: ["threadId": thread]))
     rpc.push(try adrJSON("realtime-closed-error", params: ["threadId": thread]))
     var events = session.events.makeAsyncIterator()
-    let sentence = CodexProblem.realtimeError("AVAS realtime calls require realtime v1 or v3")
-      .sentence
-    #expect(await events.next() == .closed(sentence))
+    let problem = CodexProblem.realtimeError("AVAS realtime calls require realtime v1 or v3")
+    #expect(await events.next() == .closed(.codex(problem)))
   }
 
   @Test func startingServerClosesSession() async throws {
     _ = try await session.open(offerSDP: "offer", items: [])
     rpc.push(try adrJSON("mcp-server-startup-status-starting"))
     var events = session.events.makeAsyncIterator()
-    #expect(await events.next() == .closed(CodexProblem.mcpNotDisabled(["example-http"]).sentence))
+    #expect(await events.next() == .closed(.codex(.mcpNotDisabled(["example-http"]))))
     #expect(await rpc.params("thread/realtime/stop") == [["threadId": thread]])
   }
 
@@ -352,7 +350,7 @@ struct RealtimeSessionTests {
     _ = try await other.open(offerSDP: "offer", items: [])
     var more = other.events.makeAsyncIterator()
     codex.exit()
-    #expect(await more.next() == .closed(CodexProblem.exited(-1).sentence))
+    #expect(await more.next() == .closed(.codex(.exited(-1))))
     #expect(await more.next() == nil)
   }
 

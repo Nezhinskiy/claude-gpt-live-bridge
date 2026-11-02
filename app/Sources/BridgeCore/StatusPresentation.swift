@@ -36,15 +36,9 @@ public struct StatusPresentation: Sendable, Equatable {
   /// Start needs a joined session to talk to; Stop is always possible.
   public let canAct: Bool
   public let rows: [SessionRowPresentation]
-  public let problem: String?
-  /// The problem is the microphone's refusal: the menu offers to open that setting.
-  public let opensMicrophoneSettings: Bool
-  /// codex is missing or not signed in: the banner explains how, with a command to copy.
-  public let codexHelp: CodexHelp?
+  private let problem: String?
   public let unheard: Int
   public let minutes: String
-  /// No session has joined: the menu offers `joinCommand` to copy.
-  public let offersJoinCommand: Bool
   /// What joins a Claude Code session.
   public static let joinCommand = "/live on"
 
@@ -54,8 +48,6 @@ public struct StatusPresentation: Sendable, Equatable {
     let activities = Set(s.sessions.map(\.activity))
     bars = s.call
     problem = s.problem
-    opensMicrophoneSettings = s.problem == MicrophoneAccess.deniedSentence
-    codexHelp = CodexHelp.for(problem: s.problem)
     unheard = s.unheard
     badge =
       if s.problem != nil { .problem } else if activities.contains(.approval) {
@@ -78,13 +70,13 @@ public struct StatusPresentation: Sendable, Equatable {
         (
           "Off",
           s.sessions.isEmpty
-            ? "Run /live on in a Claude Code session to start." : "Start to talk to your sessions."
+            ? "Run \(Self.joinCommand) in a Claude Code session to start."
+            : "Start to talk to your sessions."
         )
       case .listening: ("Listening — line closed", "The line opens when you speak.")
       case .connecting: ("Connecting…", "Opening the voice line.")
       case .live: ("Live", target.map { "Talking to \($0)" } ?? "No session has joined yet.")
       }
-    offersJoinCommand = s.sessions.isEmpty
     rows = s.sessions.map {
       SessionRowPresentation(
         id: $0.sessionId, label: $0.label, detail: Self.text(of: $0.activity),

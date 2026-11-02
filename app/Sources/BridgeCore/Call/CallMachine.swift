@@ -28,7 +28,7 @@ public struct VoiceLine: Equatable, Sendable {
 /// What happens to the call: owner actions, local voice detection, the realtime session, timers.
 public enum CallEvent: Equatable, Sendable {
   case start, stop, speechStarted, speechEnded, connected
-  case connectFailed(String)
+  case connectFailed(Problem)
   /// The voice finished a reply; the text is its transcript.
   case assistantFinishedSpeaking(String)
   case silenceElapsed
@@ -42,8 +42,8 @@ public enum CallEvent: Equatable, Sendable {
   /// The voice is saying something (a transcript delta); the owner's words were recognised.
   case assistantSpeaking, userTranscribed
   case deliver(VoiceLine)
-  case remoteClosed(String)
-  case audioFailed(String)
+  case remoteClosed(Problem)
+  case audioFailed(Problem)
   /// Another session became the target; an open line carries the previous one's conversation.
   case targetChanged
 }
@@ -61,7 +61,7 @@ public enum CallEffect: Equatable, Sendable {
   /// Asks the open line to say a result now.
   case speak(VoiceLine)
   case chime
-  case problem(String?)
+  case problem(Problem?)
 }
 
 /// The billing-aware call. The realtime session is open only while someone speaks or a handed-off
@@ -71,8 +71,8 @@ public enum CallEffect: Equatable, Sendable {
 /// nobody is speaking. A result that arrives while the line is closed is announced by a chime and
 /// waits until the owner next speaks. Pure: the bridge runs the effects.
 public struct CallMachine: Sendable {
-  public static let noiseSentence =
-    "The voice hung up: the microphone heard sound but no words for 90 seconds."
+  public static let noise = Problem.other(
+    "The voice hung up: the microphone heard sound but no words for 90 seconds.")
   public private(set) var phase: CallPhase = .off
 
   private struct Unheard: Sendable {
@@ -198,7 +198,7 @@ public struct CallMachine: Sendable {
         isSilenceDue = true
         return []
       }
-      return [.closeRealtime] + (isSoundOn ? [.problem(Self.noiseSentence)] : []) + hangUp()
+      return [.closeRealtime] + (isSoundOn ? [.problem(Self.noise)] : []) + hangUp()
     default:
       return []
     }

@@ -1,6 +1,7 @@
 // The audio side of a LiveBridge call, run in an invisible WKWebView. The app calls `LB.*` and
-// awaits the returned promises; the page posts `speechStarted`, `speechEnded`, `level` and
-// `audioFailed` to `window.webkit.messageHandlers.bridge`.
+// awaits the returned promises; the page posts `speechStarted`, `speechEnded`, `level`,
+// `microphoneDenied` (the app has the sentence) and `audioFailed` to
+// `window.webkit.messageHandlers.bridge`.
 //
 // The microphone runs through one 1024-sample processor. While the line is closed it feeds the
 // voice detector and the pre-roll; from the first word (or `makeOffer`) on, the pre-roll and
@@ -17,8 +18,6 @@ const FRAME = 1024;
 /** A microphone request still pending after this fails, so the call never listens to nothing. */
 const MIC_DEADLINE_MS = 10000;
 const say = {
-  denied:
-    'LiveBridge cannot use the microphone. Allow LiveBridge in System Settings > Privacy & Security > Microphone, then start again.',
   micTimeout:
     'The microphone did not start within 10 seconds. Check System Settings > Privacy & Security > Microphone, then start again.',
   noDevice: 'No microphone is connected.',
@@ -133,7 +132,8 @@ async function listen(fake) {
   } catch (error) {
     if (ctx !== mine) return;
     stop();
-    const reasons = { NotAllowedError: say.denied, NotFoundError: say.noDevice, MicTimeoutError: say.micTimeout };
+    if (error?.name === 'NotAllowedError') return post({ type: 'microphoneDenied' });
+    const reasons = { NotFoundError: say.noDevice, MicTimeoutError: say.micTimeout };
     fail(reasons[error?.name] ?? say.busy);
     return;
   }

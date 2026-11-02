@@ -54,7 +54,7 @@ final class AudioHost: NSObject, AudioSide {
       return onEvent(.failed(problem))
     }
     do { try await call("return await LB.listen(fake)", ["fake": fakeMic != nil]) } catch {
-      onEvent(.failed("The audio page did not start: \(Self.message(error))"))
+      onEvent(.failed(.other("The audio page did not start: \(Self.message(error))")))
     }
   }
 
@@ -79,7 +79,7 @@ final class AudioHost: NSObject, AudioSide {
 
   /// macOS's answer for the microphone, asking it first if it never was (its prompt then
   /// shows); nil when the page may open the microphone.
-  private static func askForMicrophone() async -> String? {
+  private static func askForMicrophone() async -> Problem? {
     var access: MicrophoneAccess =
       switch AVCaptureDevice.authorizationStatus(for: .audio) {
       case .authorized: .granted
@@ -167,7 +167,7 @@ extension AudioHost: WKNavigationDelegate, WKUIDelegate {
   /// WebKit ended the page's process: the call cannot go on; the page is loaded again.
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
     loaded = false
-    onEvent(.failed("The audio page stopped unexpectedly. Start again."))
+    onEvent(.failed(.other("The audio page stopped unexpectedly. Start again.")))
     load()
   }
 

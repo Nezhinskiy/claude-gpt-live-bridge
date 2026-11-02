@@ -27,13 +27,4 @@ public struct CodexHelp: Sendable, Equatable {
       + "\(loginCommand) and sign in with a ChatGPT plan that includes realtime voice. Then "
       + "press Start again.",
     command: installCommand)
-
-  /// The help for the problem the status shows, if it has one.
-  public static func `for`(problem: String?) -> CodexHelp? {
-    switch problem {
-    case CodexProblem.notLoggedIn.sentence: signIn
-    case CodexProblem.notInstalled.sentence: install
-    default: nil
-    }
-  }
 }

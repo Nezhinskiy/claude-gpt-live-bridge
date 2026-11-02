@@ -64,14 +64,14 @@ enum VoiceListing: Equatable {
 /// bar shows.
 @MainActor @Observable
 final class AppModel {
-  private(set) var status: StatusReply?
-  /// The target's whole conversation, which the menu's Conversation submenu lists.
-  private(set) var conversation: [String] = []
+  /// What the bridge last published: the status, its problem and the target's conversation.
+  private(set) var update: BridgeUpdate?
+  var status: StatusReply? { update?.status }
   private(set) var presentation: StatusPresentation?
   /// Where the menu's Load context stands for the target.
   private(set) var contextLoad = ContextLoadState.ready
   let glyph = StatusGlyph()
-  private var appProblem: String?
+  private var appProblem: Problem?
   /// Why Open at login could not be changed, shown in Settings.
   private(set) var loginProblem: String?
   var openAtLogin = LoginItem.isEnabled {
@@ -103,7 +103,7 @@ final class AppModel {
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
   private static let log = Logger(subsystem: "io.github.nezhinskiy.livebridge", category: "call")
 
-  var problem: String? { appProblem ?? status?.problem }
+  var problem: Problem? { appProblem ?? update?.problem }
 
   init() {
     let data = Result { try Paths.dataDir() }
@@ -137,7 +137,7 @@ final class AppModel {
         for await id in bridge.contextArrivals { self?.contextArrived(id) }
       }
     } catch {
-      appProblem = "LiveBridge could not start its bridge: \(error.localizedDescription)"
+      appProblem = .other("LiveBridge could not start its bridge: \(error.localizedDescription)")
       glyph.show(.off, badge: .problem, level: 0)
     }
   }
@@ -213,15 +213,15 @@ final class AppModel {
 
   private func show(_ update: BridgeUpdate) {
     let next = update.status
-    if update.conversation != conversation { conversation = update.conversation }
-    if next.call != status?.call || next.problem != status?.problem {
+    if next.call != status?.call || update.problem != self.update?.problem {
       Self.log.info(
-        "call \(next.call.rawValue, privacy: .public), problem: \(next.problem != nil, privacy: .public)"
+        "call \(next.call.rawValue, privacy: .public), problem: \(update.problem != nil, privacy: .public)"
       )
     }
     if next.call != .live { level = 0 }
-    if next != status {
-      status = next
+    let statusChanged = next != status
+    if update != self.update { self.update = update }
+    if statusChanged {
       presentation = StatusPresentation(next)
       loads.keep(only: Set(next.sessions.map(\.sessionId)))
       refreshLoads()

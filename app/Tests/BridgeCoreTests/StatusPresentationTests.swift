@@ -38,7 +38,7 @@ struct StatusPresentationTests {
       let badge: Badge = [.idle: .none, .working: .working, .approval: .approval][activity]!
       #expect(shown.badge == badge, "\(phase) \(activity)")
       #expect(shown.tint == (activity == .approval ? .attention : tint), "\(phase) \(activity)")
-      #expect(shown.problem == nil)
+      #expect(shown.badge != .problem)
     }
   }
 
@@ -53,7 +53,6 @@ struct StatusPresentationTests {
       Self.status(phase, other: .approval, problem: sentence, unheard: 2))
     #expect(shown.badge == .problem)
     #expect(shown.tint == .problem)
-    #expect(shown.problem == sentence)
     #expect(shown.accessibilityLabel.contains(sentence))
   }
 
@@ -89,13 +88,4 @@ struct StatusPresentationTests {
     #expect(StatusPresentation(Self.status(.live)).minutes == "4 min this call · 31 min today")
   }
 
-  /// With no session joined, the menu offers the command that joins one, to copy.
-  @Test func noSessionOffersTheJoinCommand() {
-    let none = StatusReply(
-      call: .off, sessions: [], minutesToday: 0, minutesThisCall: 0, problem: nil,
-      lastContext: nil, recentTranscript: [], unheard: 0)
-    #expect(StatusPresentation(none).offersJoinCommand)
-    #expect(!StatusPresentation(Self.status(.off)).offersJoinCommand)
-    #expect(StatusPresentation.joinCommand == "/live on")
-  }
 }

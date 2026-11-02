@@ -6,8 +6,6 @@ import Foundation
 public enum MicrophoneAccess: Sendable, Equatable {
   case granted, undetermined, denied, restricted
 
-  public static let deniedSentence =
-    "LiveBridge cannot use the microphone. Allow LiveBridge in System Settings > Privacy & Security > Microphone, then start again."
   /// The Microphone pane of Privacy & Security.
   public static let settingsURL = URL(
     string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
@@ -19,10 +17,10 @@ public enum MicrophoneAccess: Sendable, Equatable {
   public var mustAsk: Bool { self == .undetermined }
 
   /// Why the call cannot use the microphone, or nil when it can (or must ask first).
-  public var problem: String? {
+  public var problem: Problem? {
     switch self {
     case .granted, .undetermined: nil
-    case .denied, .restricted: Self.deniedSentence
+    case .denied, .restricted: .microphoneDenied
     }
   }
 }

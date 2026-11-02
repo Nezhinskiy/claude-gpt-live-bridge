@@ -9,8 +9,8 @@ public enum RealtimeEvent: Sendable, Equatable {
   case assistantUtterance(String)
   /// The voice is saying something (a transcript delta).
   case assistantSpeaking
-  /// codex closed the session; the reason is a sentence for the owner.
-  case closed(String)
+  /// codex closed the session, for this reason.
+  case closed(Problem)
 }
 
 /// One realtime voice session at a time, opened and closed as the call needs it. Its events end
@@ -274,7 +274,7 @@ public actor RealtimeSession: RealtimeControlling {
     if let ending = line {
       line = nil
       ending.answer?.resume(throwing: problem)
-      emit.yield(.closed(problem.sentence))
+      emit.yield(.closed(.codex(problem)))
     }
     emit.finish()
     await client.close()
@@ -286,7 +286,7 @@ public actor RealtimeSession: RealtimeControlling {
       guard line != nil, ["starting", "ready"].contains(params["status"]?.string) else { return }
       await close()
       emit.yield(
-        .closed(CodexProblem.mcpNotDisabled([params["name"]?.string ?? "unnamed"]).sentence))
+        .closed(.codex(.mcpNotDisabled([params["name"]?.string ?? "unnamed"]))))
       return
     }
     guard let id = line?.thread, params["threadId"]?.string == id else { return }
@@ -298,11 +298,11 @@ public actor RealtimeSession: RealtimeControlling {
       line?.lastError = message
       resolve(with: .failure(CodexProblem.realtimeError(message)))
     case "thread/realtime/closed":
-      let reason = line?.lastError.map { CodexProblem.realtimeError($0).sentence }
+      let reason = line?.lastError.map { Problem.codex(.realtimeError($0)) }
       resolve(with: .failure(CodexProblem.protocolMismatch("closed before the SDP answer")))
       line = nil
       let code = params["reason"]?.string ?? "no reason"
-      emit.yield(.closed(reason ?? "The voice session closed (\(code))."))
+      emit.yield(.closed(reason ?? .other("The voice session closed (\(code)).")))
     case "thread/realtime/itemAdded":
       handoff(params["item"] ?? .null)
     case "thread/realtime/transcript/done":

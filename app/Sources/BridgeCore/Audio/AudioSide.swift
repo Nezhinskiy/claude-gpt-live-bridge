@@ -6,8 +6,8 @@ public enum AudioEvent: Sendable, Equatable {
   case speechStarted, speechEnded
   /// The input level while the line is open, 0 to 1; it drives only the menu bar meter.
   case level(Double)
-  /// The microphone or the peer connection failed; the sentence is shown to the owner.
-  case failed(String)
+  /// The microphone or the peer connection failed.
+  case failed(Problem)
 
   public init?(body: Any) {
     guard let message = body as? [String: Any], let type = message["type"] as? String else {
@@ -19,8 +19,9 @@ public enum AudioEvent: Sendable, Equatable {
     case "level":
       guard let value = message["value"] as? Double else { return nil }
       self = .level(value)
+    case "microphoneDenied": self = .failed(.microphoneDenied)
     case "audioFailed":
-      self = .failed(message["reason"] as? String ?? "The audio stopped unexpectedly.")
+      self = .failed(.other(message["reason"] as? String ?? "The audio stopped unexpectedly."))
     default: return nil
     }
   }

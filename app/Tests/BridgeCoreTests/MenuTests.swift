@@ -112,7 +112,7 @@ struct MenuContentTests {
   }
 
   static func status(
-    _ call: CallPhase = .off, sessions count: Int, target: Int = 0, problem: String? = nil,
+    _ call: CallPhase = .off, sessions count: Int, target: Int = 0, problem: Problem? = nil,
     lines: [String] = [], context: String? = nil, unheard: Int = 0
   ) -> StatusReply {
     StatusReply(
@@ -122,17 +122,17 @@ struct MenuContentTests {
           sessionId: id($0), label: "Session \($0)", activity: $0 == 1 ? .working : .idle,
           isTarget: $0 == target)
       },
-      minutesToday: 31.4, minutesThisCall: 4.2, problem: problem, lastContext: context,
+      minutesToday: 31.4, minutesThisCall: 4.2, problem: problem?.sentence, lastContext: context,
       recentTranscript: lines, unheard: unheard)
   }
 
   /// The conversation is the status's last lines unless the test gives the whole of it.
   static func menu(
-    _ status: StatusReply?, problem: String? = nil, load: ContextLoadState = .ready,
+    _ status: StatusReply?, problem: Problem? = nil, load: ContextLoadState = .ready,
     conversation: [String]? = nil
   ) -> MenuContent {
     MenuContent(
-      status: status, problem: problem ?? status?.problem, contextLoad: load,
+      status: status, problem: problem, contextLoad: load,
       conversation: conversation ?? status?.recentTranscript ?? [])
   }
 
@@ -245,11 +245,13 @@ struct MenuContentTests {
   }
 
   @Test func theCardCarriesTheProblemAndItsHelp() throws {
-    let sentence = MicrophoneAccess.deniedSentence
-    let menu = Self.menu(Self.status(sessions: 1, problem: sentence, unheard: 2))
+    let problem = Problem.microphoneDenied
+    let menu = Self.menu(Self.status(sessions: 1, problem: problem, unheard: 2), problem: problem)
     let card = try #require(Self.card(menu))
-    #expect(card.problem == sentence)
-    #expect(card.opensMicrophoneSettings)
+    #expect(card.problem == problem.sentence)
+    #expect(card.opensMicrophoneSettings && card.codexHelp == nil)
+    let signIn = try #require(Self.card(Self.menu(nil, problem: .codex(.notLoggedIn))))
+    #expect(signIn.codexHelp == .signIn && !signIn.opensMicrophoneSettings)
     #expect(card.unheard == "2 unheard — speak to hear")
     #expect(card.tint == .problem)
     #expect(card.actionTitle == "Start")
@@ -257,7 +259,7 @@ struct MenuContentTests {
   }
 
   @Test func withoutABridgeOnlyTheProblemSettingsAndQuitAreLeft() throws {
-    let menu = Self.menu(nil, problem: "LiveBridge could not start its bridge: boom")
+    let menu = Self.menu(nil, problem: .other("LiveBridge could not start its bridge: boom"))
     #expect(menu.outline == ["[call] Off", "---", "Settings… ⌘,", "Quit LiveBridge ⌘Q"])
     let card = try #require(Self.card(menu))
     #expect(card.problem == "LiveBridge could not start its bridge: boom")

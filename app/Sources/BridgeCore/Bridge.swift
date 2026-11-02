@@ -4,9 +4,6 @@ import Foundation
 /// handoffs to sessions and their answers back to the voice.
 public actor Bridge: Router {
   public static let maxContext = 1500
-  /// Why Start did nothing: there is no session to talk to.
-  public static let noSession =
-    "No Claude Code session has joined: run /live on in a session, then start."
 
   private let registry: SessionRegistry
   private let makeRealtime: @Sendable () async throws -> any RealtimeControlling
@@ -33,7 +30,7 @@ public actor Bridge: Router {
   /// Whether `lineSession` is set for the line opening now; until then a target change cannot
   /// be told from the target it will open with.
   private var lineKnowsSession = false
-  private var problem: String?
+  private var problem: Problem?
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
   private var callStart: Date?
@@ -91,7 +88,7 @@ public actor Bridge: Router {
       return StatusReply(
         call: machine.phase, sessions: await registry.rows(),
         minutesToday: await meter.minutesToday(), minutesThisCall: minutesThisCall,
-        problem: problem, lastContext: shown.context,
+        problem: problem?.sentence, lastContext: shown.context,
         recentTranscript: shown.lines.suffix(3).map { Self.speaker($0.speaker) + $0.text },
         unheard: machine.pending.count)
     }
@@ -129,13 +126,13 @@ public actor Bridge: Router {
   /// Start: launches codex, so a problem with it shows at once, then listens.
   private func launch() async {
     guard await registry.target != nil else {
-      problem = Self.noSession
+      problem = .noSession
       await changed()
       return
     }
     do { _ = try await controller() } catch {
       guard !Task.isCancelled else { return }  // a Stop came first
-      problem = Self.sentence(error)
+      problem = Problem(error)
       await changed()
       return
     }
@@ -207,7 +204,7 @@ public actor Bridge: Router {
           save()
         }
         await registry.join(body)
-        if problem == Self.noSession { problem = nil }
+        if problem == .noSession { problem = nil }
       case ("POST", "/v1/leave"):
         let delivery = await registry.leave(try req.decodeBody(LeaveBody.self).sessionId)
         if let delivery { await deliver(delivery) }
@@ -260,7 +257,7 @@ public actor Bridge: Router {
     case .chime:
       await audio.chime()
       await notifyWaiting()
-    case .problem(let sentence): problem = sentence
+    case .problem(let shown): problem = shown
     }
   }
 
@@ -314,7 +311,7 @@ public actor Bridge: Router {
       if let realtime, (error as? CodexProblem)?.endsCodex == true { await retire(realtime) }
       await audio.closePeer()
       await realtime?.close()  // codex may have opened its side before the page failed
-      await send(.connectFailed(Self.sentence(error)))
+      await send(.connectFailed(Problem(error)))
     }
   }
 
@@ -473,7 +470,7 @@ public actor Bridge: Router {
   @discardableResult private func changed() async -> StatusReply {
     await followTarget()
     let now = await status
-    let update = BridgeUpdate(status: now, conversation: await conversation)
+    let update = BridgeUpdate(status: now, problem: problem, conversation: await conversation)
     if update != published { publish.yield(update) }
     published = update
     return now
@@ -482,8 +479,6 @@ public actor Bridge: Router {
   private func save() {
     try? JSONEncoder().encode(continuity).write(to: continuityFile, options: .atomic)
   }
-
-  private static func sentence(_ error: any Error) -> String { error.localizedDescription }
 
   /// How the menu's lines name who said each.
   private static func speaker(_ speaker: Conversation.Line.Speaker) -> String {
@@ -512,5 +507,7 @@ private enum CallTimer {
 
 public struct BridgeUpdate: Sendable, Equatable {
   public let status: StatusReply
+  /// The status's problem, with its kind.
+  public let problem: Problem?
   public let conversation: [String]
 }
