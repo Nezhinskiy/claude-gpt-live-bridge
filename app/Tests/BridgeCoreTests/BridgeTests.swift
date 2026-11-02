@@ -181,6 +181,24 @@ struct BridgeTests {
     #expect(await voices.made.count == 2)
   }
 
+  /// The only session leaving while codex is still launching leaves the call off, as a Stop
+  /// then would: the launched codex is ended and the microphone stays off.
+  @Test func lastSessionLeavingDuringStartLeavesTheCallOff() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    await voices.setSlow()
+    async let start: Void = test.bridge.perform(.start)
+    #expect(await eventually { await voices.waiting == 1 })
+    try await test.post("/v1/leave", LeaveBody(sessionId: a))
+    await voices.finishLaunch()
+    _ = await start
+    #expect(await test.bridge.status.call == .off)
+    #expect(await test.bridge.status.problem == Problem.noSession.sentence)
+    #expect(await voices.made.first?.shutdowns == 1)
+    #expect(await !test.audio.calls.contains("startListening"))
+  }
+
   /// A codex that ended (it exited, or stopped answering) is not used again: the next speech
   /// launches a fresh one.
   @Test func aCodexThatEndedIsReplacedAtTheNextSpeech() async throws {
@@ -512,16 +530,13 @@ struct BridgeTests {
     #expect(await voice.spoken.isEmpty)
   }
 
-  /// With no session joined, the failure arrives with the handoff; the ack must not hang up on it.
-  @Test func failureWithNoSessionIsHeard() async throws {
+  /// The last session leaving stops the call, as Start with none refuses: nobody is left to
+  /// talk to.
+  @Test func lastSessionLeavingStopsTheCall() async throws {
     await live()
     try await post("/v1/leave", LeaveBody(sessionId: a))
-    await bridge.audioEvent(.speechEnded)
-    voice.emit(.handoff(request(1)))
-    voice.emit(.assistantUtterance("On it."))
-    #expect(await eventually { await bridge.status.unheard == 1 })
-    #expect(await voice.added == ["[FAILED] LiveBridge: no Claude Code session is joined."])
-    #expect(await bridge.status.call == .live)
+    #expect(await bridge.status.call == .off)
+    #expect(await bridge.status.problem == Problem.noSession.sentence)
   }
 
   @Test func newerRequestSupersedesAnUnheardResult() async throws {

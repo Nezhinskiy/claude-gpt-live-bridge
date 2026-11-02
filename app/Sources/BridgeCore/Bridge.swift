@@ -119,11 +119,7 @@ public actor Bridge: Router {
 
   /// Start: launches codex, so a problem with it shows at once, then listens.
   private func launch() async {
-    guard await registry.target != nil else {
-      problem = .noSession
-      await changed()
-      return
-    }
+    guard await refuseWithNoSession() else { return }
     do { _ = try await controller() } catch {
       guard !Task.isCancelled else { return }  // a Stop came first
       problem = Problem(error)
@@ -131,8 +127,18 @@ public actor Bridge: Router {
       return
     }
     guard !Task.isCancelled else { return }
+    // the last session may have left while codex launched: then the launch ends as a Stop would
+    guard await refuseWithNoSession() else { return await endCodex() }
     callStart = time.now
     await send(.start)
+  }
+
+  /// Whether a session is joined; with none, says so and returns false.
+  private func refuseWithNoSession() async -> Bool {
+    guard await registry.target == nil else { return true }
+    problem = .noSession
+    await changed()
+    return false
   }
 
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
@@ -384,11 +390,16 @@ public actor Bridge: Router {
   }
 
   /// A new target closes a line opened with another session's conversation; the next speech
-  /// opens it with the target's. With no session left there is no conversation to switch to,
-  /// so the line stays open.
+  /// opens it with the target's. With no session left nobody is there to talk to, so the call
+  /// stops as Stop does and says why, as Start with no session does.
   private func followTarget() async {
-    guard isLineOpen, lineKnowsSession, let target = await registry.target, target != lineSession
-    else { return }
+    guard let target = await registry.target else {
+      guard machine.phase != .off else { return }
+      await perform(.stop)
+      problem = .noSession
+      return
+    }
+    guard isLineOpen, lineKnowsSession, target != lineSession else { return }
     await send(.conversationChanged)
   }
 
