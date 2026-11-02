@@ -10,3 +10,5 @@ plugin/node_modules/
 plugin/.claude-plugin/types/
 # The packaged download (scripts/build-app.sh --package).
 dist/
+# The download the site serves; copied from dist/ at deploy.
+site/download/
