@@ -8,7 +8,7 @@ state = "initialised"
 agents = ["claude", "codex"]
 
 [project]
-name = "claude-gpt-live-bridge"
+name = "livebridge"
 base_branch = "main"
 release_branch = "main"
 
