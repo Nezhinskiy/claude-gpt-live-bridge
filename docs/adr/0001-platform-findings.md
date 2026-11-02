@@ -137,6 +137,11 @@ second session then completed a full handoff.
 - `delegationAckFiller`: omitted and `true` behave the same — a short spoken acknowledgement
   ("On it, I'll check that now.") right after the handoff; `false` gives no assistant speech at
   all after the handoff.
+- The model can also say such an acknowledgement without delegating: in 3 of 6 smoke runs it
+  said "On it, checking now" or "I'll take a look", and the websocket carried no
+  `delegation.created` at all, so nothing reached the client. With a rule telling the voice to
+  hand off at once, before it speaks, and never to promise a look without a handoff in the same
+  turn, 5 of 5 runs delegated.
 - `initialItems` is honoured with WebRTC transport: seeded with a user item naming a colour, the
   voice answered "What is my favourite colour?" with that colour; without the items it said it
   did not know.
