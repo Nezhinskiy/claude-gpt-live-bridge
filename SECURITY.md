@@ -51,7 +51,7 @@ voices.
 ### Who can drive the bridge
 
 - **Other users of the Mac are kept out.** The mod talks to the app over HTTP on a Unix socket,
-  `~/Library/Application Support/claude-gpt-live-bridge/run/bridge.sock`. The `run` folder and
+  `~/Library/Application Support/LiveBridge/run/bridge.sock`. The `run` folder and
   the data folder above it are created at mode `0700`, or set back to it at every start (a
   symlinked folder is followed, and the folder it names is set to `0700`). That folder's mode is
   the bridge's one access control: there is no listening TCP port, no shared secret and no peer
@@ -61,36 +61,49 @@ voices.
   - answer those handoffs with any text, which the voice then reads out;
   - start a call, which turns on the microphone under LiveBridge's permission (macOS shows its
     microphone indicator in the menu bar);
-  - read the status, including the last lines of the target's conversation and its context
-    line.
+  - read the status, which names every joined session and its id;
+  - post a `[CONTEXT]` line for any joined session. It is saved and seeds every later call with
+    that session, long after the process has exited (see "A loaded context persists" below);
+  - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
+    take over that session's place, its requests and its saved conversation.
 
-  Such a process can already do worse without LiveBridge: for example, it can add hooks to
+  It can also read the data folder itself, every kept conversation included. Such a process can
+  already do worse without LiveBridge: for example, it can add hooks to
   `~/.claude/settings.json` that run in every Claude Code session.
+- **The app the mod opens.** When the socket does not answer, the mod opens
+  `/Applications/LiveBridge.app`, where both install routes put it. Any administrator account of
+  the Mac can replace that app, as it can do worse with `sudo`. Only if that path does not open
+  does the mod ask Launch Services for the bundle id, which trusts whichever app claims it. The
+  disk image's origin is checked with `gh attestation verify`, as the README's
+  [Install](README.md#from-the-disk-image) says.
 - **Other plugins in the same Claude Code engine are trusted.** They share the engine with the
   mod and can see or submit the same prompts. Install only plugins you trust.
 
 ### What the voice model can do
 
 The voice runs on a codex thread that is ephemeral and read-only (`sandbox_mode="read-only"`,
-`approval_policy="never"`, web search off, notifications off). These keep that thread from
-acting:
+`approval_policy="never"`, web search off, notifications off). The control is that the thread
+has **no tools**:
 
-- **Every codex turn on the thread is interrupted at once**, and **every request codex sends**
-  (approvals, tool calls, input requests and the rest) **is declined**.
 - **Every codex feature is off except an allow-list.** At launch the app runs
   `codex features list` and turns off every feature it reports, except those in
   `CodexLaunch.allowed`: `secret_auth_storage` (where codex keeps your login) and
   `respect_system_proxy` / `system_proxy_fallback` (how codex reaches OpenAI behind a proxy).
-  None of them runs anything. A feature a later codex adds under a new name is therefore off too. This
-  narrows what a turn could use if one were not interrupted.
+  None of them runs anything. A feature listed at stage `removed` is skipped, because
+  `--disable` no longer changes it. A feature a later codex adds under a new name is off too, as
+  long as `codex features list` reports it.
 - **Every MCP server is off.** The app turns off every server codex's configuration names when
-  it starts the thread, then requires codex to report each one disabled before every session. It
-  closes the session if codex later reports a server starting or ready.
+  it starts the thread, then requires codex to report each one disabled before every session.
 
-These checks fail closed. The call does not start if codex cannot list its features, lists them
-in a shape this version does not read, or gives no answer within 10 seconds. It also does not
-start if codex reports an MCP server that is not disabled, or leaves a configured server out of
-its report.
+The rest only narrows what is left. The app interrupts every codex turn it sees start, declines
+every request codex sends (approvals, tool calls, input requests and the rest), and closes the
+session if codex later reports a server starting or ready. The interrupt races codex's own
+start of the turn, so it is not counted as a control.
+
+The checks above fail closed. The call does not start if codex cannot list its features, lists
+them in a shape this version does not read, or gives no answer within 10 seconds. It also does
+not start if codex reports an MCP server that is not disabled, or leaves a configured server out
+of its report.
 
 What is not a control here: the read-only sandbox does not limit reading, so a codex turn that
 did run a command could read any file your user can read. The thread's instruction to "never
@@ -135,10 +148,15 @@ asking.
 ### What leaves the Mac
 
 The list of what goes to OpenAI, and when, is in the README's
-[Privacy](README.md#privacy) section. Nothing is sent while the line is closed: voice detection
-runs on the Mac. Codex talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's
-credentials. The Claude session sends its work to Anthropic as it always does. LiveBridge has no
-telemetry.
+[Privacy](README.md#privacy) section. LiveBridge sends no audio or text while the line is
+closed: voice detection runs on the Mac. Codex itself keeps running between lines, and opening
+Settings starts another codex to list the voices; what codex sends on its own is codex's. Codex
+talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
+session sends its work to Anthropic as it always does. LiveBridge has no telemetry.
+
+Notifications never carry a result, but they name its session, and a session's title is often
+written from its conversation. With macOS's **Show previews** set to show on the lock screen,
+that title can be read there.
 
 ### Out of scope
 
