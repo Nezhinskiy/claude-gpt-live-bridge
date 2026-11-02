@@ -37,12 +37,12 @@ uses:
 
 | Kind | Methods |
 |---|---|
-| Client requests | `initialize` (then the `initialized` notification), `account/read`, `config/read`, `thread/start`, `mcpServerStatus/list`, `thread/realtime/start`, `thread/realtime/stop`, `thread/realtime/appendText`, `turn/interrupt` |
+| Client requests | `initialize` (then the `initialized` notification), `account/read`, `config/read`, `thread/start`, `mcpServerStatus/list`, `thread/realtime/start`, `thread/realtime/stop`, `thread/realtime/appendText`, `thread/realtime/appendSpeech`, `turn/interrupt` |
 | Server notifications the app reads | `thread/realtime/sdp`, `thread/realtime/itemAdded`, `thread/realtime/transcript/delta`, `thread/realtime/transcript/done`, `thread/realtime/error`, `thread/realtime/closed`, `turn/started`, `mcpServer/startupStatus/updated`; every other notification is ignored |
 | Server requests (every one declined) | `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `execCommandApproval`, `applyPatchApproval`, `item/tool/call`, `item/tool/requestUserInput`, `mcpServer/elicitation/request`, `account/chatgptAuthTokens/refresh`, `attestation/generate`, `currentTime/read` |
 
-The findings below also cite `thread/realtime/appendSpeech` and `thread/realtime/appendAudio`,
-which the spike tried and the app does not use.
+The findings below also cite `thread/realtime/appendAudio`, which the spike tried and the app
+does not use.
 
 `thread/realtime/start` takes `threadId`, `outputModality`, and optionally `version`,
 `transport` (`{type:"webrtc", sdp}`, `{type:"websocket"}` or `{type:"existingCall", callId}`),
@@ -155,6 +155,17 @@ second session then completed a full handoff.
   item id; `output_audio.playback.play` needs an `event_id`. Every refusal reaches codex as
   `thread/realtime/error` and codex closes the session.
 - The data channel also reports `session.usage.updated` with `usage.audio_duration_ms`.
+- **Documented** in codex's source at the `rust-v0.166.0` tag (`core/src/realtime_conversation.rs`,
+  `codex-api/src/endpoint/realtime_websocket/methods_common.rs`), read on 2026-11-02: on V3
+  (Frameless Bidi) `appendText` is sent as `session.context.append` with no `channel` and no role
+  (the `role` parameter is dropped), and `appendSpeech` as `session.context.append` with
+  `channel: "speakable"`. codex sends `response.create` only on realtime V2, so the app-server
+  has no request that makes a V3 voice respond now; the generated protocol has no other
+  `thread/realtime/*` request that could (the full list: `start`, `appendAudio`, `appendText`,
+  `appendSpeech`, `stop`, `listVoices`). With `clientManagedHandoffs`, codex sends nothing of its
+  own to the handoff, and codex's own voice client (its TUI) calls `appendSpeech` to have the
+  voice say a finished handoff's answer. The app does the same for a result that arrives while
+  the line still waits for it.
 
 **(k) Errors from `thread/realtime/start`.** The call itself returns `{}` immediately; a failure
 arrives afterwards as `thread/realtime/error` `{threadId, message}`, followed by
@@ -264,7 +275,10 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 - Every `turn/started` on the voice thread is interrupted at once; it costs nothing audible.
 - Results go to the voice with `appendText` (`role: "user"`, tagged lines). A result that arrives
   while the session is closed cannot make a fresh session speak by itself, so it waits for the
-  owner to speak (see "Decision: results while the voice is closed" below).
+  owner to speak (see "Decision: results while the voice is closed" below). A result for a
+  request handed off on the open line, within the window after the handoff, goes with
+  `appendSpeech` instead, so the voice says it without waiting for the owner (see "Decision: the
+  line waits for a handoff's result" below).
 - Realtime failures are read from `thread/realtime/error` (and `closed` with `reason: "error"`),
   not from the start call's response; a message we do not recognise is shown as is. Not logged in
   is `account/read` returning `account: null`.
@@ -330,3 +344,19 @@ time and still leave the result unsaid. The result waits in the app, counted as 
 Claude Code band and the popover. When the owner next speaks and a session connects, every waiting
 result is given to the voice as context, and the voice speaks each one once, with its session's
 label. A failed connection keeps the results waiting; nothing is retried on its own.
+
+## Decision: the line waits for a handoff's result
+
+Decided by the owner on 2026-11-02, after the owner heard results late or not at all although
+Claude had answered soon.
+
+After a handoff the line no longer closes at the end of the voice's acknowledgement. It stays
+open, whatever the silence, for up to `CallMachine.resultWindowSeconds` (120 s) after the
+latest handoff, waiting for the result of the sessions handed a request. Such a result is given
+to the voice with `appendSpeech` as soon as neither the owner nor the voice is speaking, and
+otherwise once both are silent and a grace of 0.8 s has passed; the 20 s silence rule then
+closes the line. A window that passes with no result closes the line once it is silent, and the
+result chimes when it comes, as decided above. The window applies only to handoffs; a line with
+none waiting keeps the 20 s rule. The window is billed: up to two minutes of open line per
+handoff. Since codex offers no way to make a V3 voice respond now (item (b)), whether the voice
+says the speakable text at once is the model's choice; the smoke run checks that it does.

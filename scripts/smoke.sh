@@ -1,14 +1,15 @@
 #!/bin/sh
 # The end-to-end smoke test: the debug app with a spoken WAV as its microphone, the real codex
 # on your ChatGPT login, and a fake Claude Code session (app/Tests/Smoke/fake-session.mjs)
-# over the wire. It opens one or two short realtime sessions, about a minute of voice in all.
+# over the wire. It opens two short realtime sessions, about a minute and a half of voice in all.
 #
 #   scripts/smoke.sh        SMOKE_DIR=<dir> keeps the scratch files there (default: a new
 #                           directory under /tmp; the socket path must stay within 103 bytes)
 #
-# Passes when, within 120 s: the request produced exactly one handoff and the small talk none,
-# the voice spoke the answer after its result arrived, the realtime session was open for less
-# than 60 s in all, and the call ended back in `listening`.
+# Passes when, within 150 s: the request produced exactly one handoff and the small talk none,
+# the result arrived while the line still waited for it and the voice said it before the small
+# talk, that line closed before the small talk opened another, the realtime session was open for
+# less than 90 s in all, and the call ended back in `listening`.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -18,9 +19,9 @@ data="$home/Library/Application Support/claude-gpt-live-bridge"
 app="$PWD/app/.build/app/LiveBridge.app"
 mkdir -p "$home"
 
-# 6 s of silence, the request, 29 s of silence, small talk, then silence to the end.
+# 6 s of silence, the request, 50 s of silence, small talk, then silence to the end.
 say -o "$dir/fake-mic.wav" --file-format=WAVE --data-format=LEI16@24000 \
-  "[[slnc 6000]] Please list the files in this folder. [[slnc 29000]]
+  "[[slnc 6000]] Please list the files in this folder. [[slnc 50000]]
    Thanks! By the way, how is your day going? [[slnc 75000]]"
 
 CFFIXED_USER_HOME="$home" scripts/build-app.sh --run --fake-mic "$dir/fake-mic.wav" >/dev/null
@@ -33,7 +34,7 @@ until [ -S "$data/run/bridge.sock" ]; do
 done
 
 status=0
-node app/Tests/Smoke/fake-session.mjs "$data/run/bridge.sock" 120 || status=$?
+node app/Tests/Smoke/fake-session.mjs "$data/run/bridge.sock" 150 || status=$?
 echo "conversation:"
 node -e 'for (const u of JSON.parse(require("fs").readFileSync(process.argv[1])).utterances)
   console.log(`  ${u.role}: ${u.text}`)' "$data/continuity.json" || true

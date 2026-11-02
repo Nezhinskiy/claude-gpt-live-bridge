@@ -26,6 +26,14 @@ struct CallMachineTests {
   static let told: [CallEvent] = live + [deliver(result), .assistantSpeaking]
   static func said(_ text: String) -> CallEvent { .assistantFinishedSpeaking(text) }
   static func deliver(_ text: String) -> CallEvent { .deliver(VoiceLine(text: text)) }
+  static let alpha = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+  static let beta = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
+  /// A line from Alpha, the session the request was handed to.
+  static let fromAlpha = CallEvent.deliver(VoiceLine(text: result, session: alpha))
+  static let window = CallEffect.armResultWindow(seconds: 120)
+  static let grace = CallEffect.armGrace(milliseconds: 800)
+  /// A request handed to Alpha and acknowledged; the owner has stopped talking.
+  static let waiting: [CallEvent] = live + [.handedOff(alpha), .assistantSpeaking, said("On it.")]
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
@@ -88,7 +96,7 @@ struct CallMachineTests {
       live + [.assistantSpeaking, deliver(result), said("Sure."), .assistantSpeaking],
       said("Alpha passes."), .live, [arm]),
     row(
-      "ackSayingTheResultKeepsIt", told + [.handedOff, .speechStarted, .assistantSpeaking],
+      "ackSayingTheResultKeepsIt", told + [.handedOff(alpha), .speechStarted, .assistantSpeaking],
       said("On it, Alpha."), .live, [cap], pending: [result]),
     row(
       "silenceAfterUnspokenResultReturnsItToPending", live + [deliver("a")], .silenceElapsed,
@@ -107,23 +115,88 @@ struct CallMachineTests {
       [.closeRealtime, .problem(CallMachine.noiseSentence)]),
     row("replyArmsTheSilenceTimer", live, said("Hello."), .live, [arm]),
     row("speakingVoiceReArmsTheTimer", live, .assistantSpeaking, .live, [arm]),
-    row("handoffAwaitsTheAck", live, .handedOff, .live, []),
+    row("handoffOpensTheResultWindow", live, .handedOff(alpha), .live, [window]),
+    row("aLaterHandoffRestartsTheWindow", waiting, .handedOff(alpha), .live, [window]),
+    row("handoffToNoSessionOpensNoWindow", live, .handedOff(nil), .live, []),
     row(
-      "handoffWaitsForAckThenHangsUp", live + [.handedOff], said("On it."),
-      .listening, [.closeRealtime]),
+      "ackKeepsTheLineOpenForTheResult", live + [.handedOff(alpha), .assistantSpeaking],
+      said("On it."), .live, [arm]),
     row(
-      "deliverDuringAckKeepsTheLineOpen", live + [.handedOff, deliver("a")],
-      said("On it."), .live, [arm], pending: ["a"]),
+      "deliverFromAnotherSessionDuringTheWindowIsOnlyContext", waiting, deliver("a"), .live,
+      [.addContext("a"), arm], pending: ["a"]),
     row(
-      "speechDuringAckKeepsTheLineOpen", live + [.handedOff, .speechStarted],
+      "speechDuringAckKeepsTheLineOpen", live + [.handedOff(alpha), .speechStarted],
       said("On it."), .live, [cap]),
     row("silenceHangsUp", live, .silenceElapsed, .listening, [.closeRealtime]),
+    row("silenceDuringTheWindowKeepsTheLineOpen", waiting, .silenceElapsed, .live, []),
     row(
-      "lostAckStillHangsUpOnSilence", live + [.handedOff], .silenceElapsed, .listening,
-      [.closeRealtime]),
+      "noiseStillHangsUpDuringTheWindow", waiting + [.speechStarted], .silenceElapsed,
+      .listening, [.closeRealtime, .problem(CallMachine.noiseSentence)]),
     row(
-      "ackDoesNotOutliveItsSession",
-      live + [.handedOff, .remoteClosed("r"), .speechStarted, .connected, .speechEnded],
+      "windowExpiryAfterSilenceHangsUp", waiting + [.silenceElapsed], .resultWindowElapsed,
+      .listening, [.closeRealtime]),
+    row(
+      "windowExpiryKeepsWaitingResultsUnheard", waiting + [deliver("a"), .silenceElapsed],
+      .resultWindowElapsed, .listening, [.closeRealtime, .chime], pending: ["a"]),
+    row(
+      "windowExpiryWhileTalkingLeavesItToSilence", waiting + [.silenceElapsed, .speechStarted],
+      .resultWindowElapsed, .live, []),
+    row(
+      "silenceAfterAnExpiredWindowHangsUp",
+      waiting + [.speechStarted, .resultWindowElapsed, .speechEnded], .silenceElapsed,
+      .listening, [.closeRealtime]),
+    row(
+      "aResultAfterTheWindowIsOnlyContext", waiting + [.speechStarted, .resultWindowElapsed],
+      fromAlpha, .live, [.addContext(result), cap], pending: [result]),
+    row(
+      "earlyResultIsSpokenAtOnce", waiting, fromAlpha, .live, [.speak(result), arm],
+      pending: [result]),
+    row(
+      "earlyResultEndsTheWindow", waiting + [fromAlpha], .silenceElapsed, .listening,
+      [.closeRealtime, .chime], pending: [result]),
+    row(
+      "theSpokenResultIsHeardThenSilenceHangsUp",
+      waiting + [fromAlpha, .assistantSpeaking, said("Alpha's build passes.")], .silenceElapsed,
+      .listening, [.closeRealtime]),
+    row(
+      "aSecondSessionKeepsTheWindowOpen",
+      waiting + [.handedOff(beta), said("On it."), fromAlpha], .silenceElapsed, .live, [],
+      pending: [result]),
+    row(
+      "resultWhileTheOwnerSpeaksWaits", waiting + [.speechStarted], fromAlpha, .live, [cap],
+      pending: [result]),
+    row(
+      "theOwnersSilenceStartsTheGrace", waiting + [.speechStarted, fromAlpha], .speechEnded,
+      .live, [arm, grace], pending: [result]),
+    row(
+      "theGraceSpeaksIt", waiting + [.speechStarted, fromAlpha, .speechEnded], .graceElapsed,
+      .live, [.speak(result), arm], pending: [result]),
+    row(
+      "speechDuringTheGraceHoldsIt",
+      waiting + [.speechStarted, fromAlpha, .speechEnded, .speechStarted], .graceElapsed, .live,
+      [], pending: [result]),
+    row(
+      "aGraceSpeaksItOnlyOnce",
+      waiting + [.speechStarted, fromAlpha, .speechEnded, .graceElapsed], .graceElapsed, .live,
+      [], pending: [result]),
+    row(
+      "resultWhileTheVoiceSpeaksWaits", live + [.handedOff(alpha), .assistantSpeaking],
+      fromAlpha, .live, [arm], pending: [result]),
+    row(
+      "theVoiceFinishingStartsTheGrace",
+      live + [.handedOff(alpha), .assistantSpeaking, fromAlpha], said("On it."), .live,
+      [arm, grace], pending: [result]),
+    row(
+      "theOwnerStillSpeakingDefersTheGrace",
+      live + [.handedOff(alpha), .speechStarted, .assistantSpeaking, fromAlpha], said("On it."),
+      .live, [cap], pending: [result]),
+    row(
+      "aHangUpDropsWhatWaitedToBeSpoken",
+      waiting + [.speechStarted, fromAlpha, .remoteClosed("r"), .speechStarted, .connected],
+      .graceElapsed, .live, [], pending: [result]),
+    row(
+      "theWindowDoesNotOutliveItsSession",
+      live + [.handedOff(alpha), .remoteClosed("r"), .speechStarted, .connected, .speechEnded],
       .silenceElapsed, .listening, [.closeRealtime]),
     row("remoteCloseFallsBackToListening", live, .remoteClosed("r"), .listening, [.problem("r")]),
     row("stopEndsEverything", unheard, .stop, .off, [.closeRealtime, .stopLocalVAD]),

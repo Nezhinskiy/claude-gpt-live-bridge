@@ -141,16 +141,23 @@ What the voice does:
 ## Billing-aware by design
 
 A realtime voice session costs while it is open, so LiveBridge opens it only while someone is
-talking:
+talking, or while Claude's answer to a request you just made may still come:
 
 - While a call is on and nobody is talking, the microphone feeds only a voice detector on your
   Mac. Nothing is sent anywhere.
 - When you start speaking, the line opens. The 2 seconds before you started are kept and sent
   first, so your first words are not lost.
-- The line closes after 20 seconds of silence, or as soon as the voice has acknowledged a
-  handoff. Sound without words (music, a TV) closes it after 90 seconds.
-- A result that arrives while the line is closed plays a chime and waits: the band and the
-  menu show it as unheard, and the voice tells you when you next speak. A result counts as
+- The line closes after 20 seconds of silence. Sound without words (music, a TV) closes it after
+  90 seconds.
+- When the voice hands a request to Claude (a handoff), the line stays open for up to 2 minutes
+  after that handoff, waiting for Claude's answer, and the voice says the answer as soon as it
+  arrives and nobody is talking; if you or the voice are talking, it waits until both of you
+  stop. Those up to 2 minutes are billed like any open line, once per handoff, and a later
+  handoff starts them again. They apply only to handoffs: a plain exchange with the voice that
+  sends nothing to Claude closes the line after the usual 20 seconds of silence and costs almost
+  nothing.
+- A result that arrives later, while the line is closed, plays a chime and waits: the band and
+  the menu show it as unheard, and the voice tells you when you next speak. A result counts as
   heard only once a reply of the voice has said it ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed));
   if the line closes first, it chimes and waits again.
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
@@ -198,6 +205,10 @@ can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
+- A result that arrives while the line waits for it goes to the voice as text to say; codex has
+  no call that makes the voice speak at once, so the model decides when. In testing it spoke
+  within a few seconds. If it does not, the result stays unheard: the voice says it after your
+  next words, or it chimes when the line closes.
 - When your next words reopen the line, the voice sometimes answers only them and does not say
   the waiting result. The result is not lost: it stays waiting, chimes and posts a notification
   when the line closes, and goes to the voice again the next time the line opens.

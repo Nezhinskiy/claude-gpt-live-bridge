@@ -27,6 +27,9 @@ public actor Bridge: Router {
   /// Counts realtime opens and closes, so an open that a close overtook gives up.
   private var opening = 0
   private var silenceTimer = 0
+  /// Generations of the result window and the grace timer, so only the latest one fires.
+  private var windowTimer = 0
+  private var graceTimer = 0
   /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
   /// The session whose conversation the line last opened with; its transcripts are kept there.
@@ -240,12 +243,27 @@ public actor Bridge: Router {
     case .stopLocalVAD: await audio.stopListening()
     case .flushPreroll: await audio.flushPreroll()
     case .addContext(let text): try? await realtime?.addContext(text)
+    case .speak(let text): try? await realtime?.speak(text)
     case .armSilenceTimer(let seconds):
       silenceTimer += 1
       let timer = silenceTimer
       Task { [time] in
         try? await time.sleep(for: .seconds(seconds))
         await self.silenceElapsed(timer)
+      }
+    case .armResultWindow(let seconds):
+      windowTimer += 1
+      let timer = windowTimer
+      Task { [time] in
+        try? await time.sleep(for: .seconds(seconds))
+        await self.windowElapsed(timer)
+      }
+    case .armGrace(let milliseconds):
+      graceTimer += 1
+      let timer = graceTimer
+      Task { [time] in
+        try? await time.sleep(for: .milliseconds(milliseconds))
+        await self.graceElapsed(timer)
       }
     case .chime:
       await audio.chime()
@@ -266,6 +284,14 @@ public actor Bridge: Router {
 
   private func silenceElapsed(_ timer: Int) async {
     if timer == silenceTimer { await send(.silenceElapsed) }
+  }
+
+  private func windowElapsed(_ timer: Int) async {
+    if timer == windowTimer { await send(.resultWindowElapsed) }
+  }
+
+  private func graceElapsed(_ timer: Int) async {
+    if timer == graceTimer { await send(.graceElapsed) }
   }
 
   private func openRealtime() async {
@@ -332,8 +358,13 @@ public actor Bridge: Router {
     guard controller == controllers else { return }
     switch event {
     case .handoff(let request):
-      await send(.handedOff)
-      await route(request)
+      let session = await route(request)
+      await send(.handedOff(session))
+      if session == nil {
+        let line = AnswerShaper.line(
+          tag: "FAILED", label: "LiveBridge", body: "no Claude Code session is joined.")
+        await send(.deliver(VoiceLine(text: line)))
+      }
     case .userUtterance(let text):
       record(.owner, text, in: lineSession)
       await send(.userTranscribed)
@@ -375,18 +406,17 @@ public actor Bridge: Router {
   // MARK: Routing
 
   /// A handoff goes to the session that asked the last question, else to the target. It
-  /// supersedes that session's results the owner has not heard yet.
-  private func route(_ request: VoiceRequest) async {
+  /// supersedes that session's results the owner has not heard yet. Returns the session it went
+  /// to, or nil when none is joined.
+  private func route(_ request: VoiceRequest) async -> SessionID? {
     let route = questionRoute
     questionRoute = nil
     for id in [route, await registry.target].compactMap({ $0 }) {
       guard (try? await registry.enqueue(request, for: id)) != nil else { continue }
       machine.withdraw { $0.session == id }
-      return
+      return id
     }
-    let line = AnswerShaper.line(
-      tag: "FAILED", label: "LiveBridge", body: "no Claude Code session is joined.")
-    await send(.deliver(VoiceLine(text: line)))
+    return nil
   }
 
   private func deliver(_ delivery: Delivery) async {

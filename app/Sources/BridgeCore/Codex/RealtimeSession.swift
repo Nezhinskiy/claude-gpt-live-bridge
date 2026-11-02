@@ -20,6 +20,8 @@ public protocol RealtimeControlling: Sendable {
   func close() async
   /// Adds a line the voice reads as context (a result, a question, an approval notice).
   func addContext(_ text: String) async throws
+  /// Gives the voice a line to say now, in a session that already has a user turn.
+  func speak(_ text: String) async throws
   /// Ends codex itself; the controller is not used again.
   func shutdown() async
   var events: AsyncStream<RealtimeEvent> { get async }
@@ -167,6 +169,17 @@ public actor RealtimeSession: RealtimeControlling {
       "thread/realtime/appendText",
       ["threadId": .string(id), "text": .string(text), "role": "user"] as JSONValue,
       timeout: timeout)
+  }
+
+  /// `thread/realtime/appendSpeech`: on realtime v3 codex sends it as speakable context
+  /// (`session.context.append` with `channel: "speakable"`), the call its own voice client makes
+  /// to have a finished handoff's answer said (ADR 0001 (b)). codex has no request that makes the
+  /// model respond on v3; whether and when the voice says it is the model's choice.
+  public func speak(_ text: String) async throws {
+    guard let id = thread else { throw CodexProblem.protocolMismatch("no voice session open") }
+    let _: JSONValue = try await client.request(
+      "thread/realtime/appendSpeech",
+      ["threadId": .string(id), "text": .string(text)] as JSONValue, timeout: timeout)
   }
 
   /// Ends codex and the events, so the reader of the events lets this controller go.
