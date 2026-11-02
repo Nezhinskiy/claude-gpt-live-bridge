@@ -40,7 +40,7 @@ enum Main {
 }
 
 /// Owns the app's model and puts its item in the menu bar once the app has launched. A click on
-/// one of its notifications opens the menu.
+/// one of its notifications opens the menu; an update notice's Install action installs.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   let model = AppModel()
@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let statusMenu = StatusMenu(model: model)
     self.statusMenu = statusMenu
     model.notifier.onOpen = { [weak statusMenu] in statusMenu?.open() }
+    model.notifier.onInstall = { [weak model] in model?.installUpdate($0) }
   }
 }
 
@@ -60,8 +61,8 @@ enum VoiceListing: Equatable {
   case failed(String)
 }
 
-/// The composition root: the bridge, its Unix-socket server, the audio page, and what the menu
-/// bar shows.
+/// The composition root: the bridge, its Unix-socket server, the audio page, the updater, and
+/// what the menu bar shows.
 @MainActor @Observable
 final class AppModel {
   /// What the bridge last published: the status, its problem and the target's conversation.
@@ -101,11 +102,35 @@ final class AppModel {
   @ObservationIgnored private var loads = ContextLoads()
   @ObservationIgnored private var loadsTimer: Task<Void, Never>?
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
+  /// The running app's `CFBundleShortVersionString`.
+  let versionText: String
+  /// This is the copy in `/Applications`, the only one that checks for and installs updates.
+  let isInstalledCopy: Bool
+  /// Built from source with `build-app.sh --release` (`LBSourceBuild`).
+  let isSourceBuild: Bool
+  /// Where an update check or install stands.
+  private(set) var updateStatus = UpdateStatus.idle
+  /// The newer release a check found, until a check finds none or it is installed.
+  private(set) var available: Release?
+  /// What the last update left, shown in Settings until the next one.
+  private(set) var updateRecord: UpdateRecord?
+  /// Nil for a copy that does not update: outside `/Applications`, or a version that is not
+  /// `X.Y.Z`.
+  @ObservationIgnored private(set) var updater: Updater?
   private static let log = Logger(subsystem: Paths.bundleID, category: "call")
 
   var problem: Problem? { appProblem ?? update?.problem }
 
   init() {
+    let info = Bundle.main
+    versionText = info.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    isSourceBuild = info.object(forInfoDictionaryKey: "LBSourceBuild") as? Bool == true
+    let installedIsLink =
+      (try? FileManager.default.attributesOfItem(atPath: UpdatePolicy.installedPath)[.type])
+      as? FileAttributeType == .typeSymbolicLink
+    isInstalledCopy = UpdatePolicy.isInstalledCopy(
+      resolvedBundlePath: info.bundleURL.resolvingSymlinksInPath().path,
+      installedPathIsSymlink: installedIsLink)
     let data = Result { try Paths.dataDir() }
     let settings = SettingsStore(file: try? data.get().appending(path: "settings.json"))
     self.settings = settings
@@ -143,6 +168,83 @@ final class AppModel {
       }
     } catch {
       bridgeFailed(error)
+    }
+    startUpdates(dataDir: try? data.get())
+  }
+
+  /// For the installed copy: makes the updater, follows its status, cleans up after the last
+  /// update and posts its notice once. Other copies leave `updates/` to the installed one.
+  private func startUpdates(dataDir: URL?) {
+    guard isInstalledCopy, let running = AppVersion(versionText), let dataDir else { return }
+    let paths = UpdatePaths(
+      applications: URL(filePath: "/Applications"), updates: dataDir.appending(path: "updates"),
+      dataDir: dataDir)
+    let bridge = bridge
+    let updater = Updater(
+      environment: SystemUpdateEnvironment(releasesURL: Self.releasesURL), paths: paths,
+      running: running, hasOpenRequests: { await bridge?.hasOpenRequests ?? false },
+      stopCall: { await bridge?.perform(.stop) },
+      quit: { Task { @MainActor in NSApp.terminate(nil) } },
+      pid: ProcessInfo.processInfo.processIdentifier)
+    self.updater = updater
+    Task { [weak self] in
+      for await status in updater.statuses { self?.showUpdate(status) }
+    }
+    guard let record = Updater.cleanUp(paths: paths) else { return }
+    updateRecord = record
+    guard !record.noticePosted else { return }
+    var posted = record
+    posted.noticePosted = true
+    try? posted.write(paths.updates.appending(path: "record.json"))
+    let body =
+      switch record.mod {
+      case .updated:
+        "Updated from \(record.from). Claude Code sessions already open keep the old mod until "
+          + "they restart."
+      case .byHand:
+        "Updated from \(record.from). Settings shows the commands that update the Claude Code mod."
+      }
+    Task {
+      await notifier.postUpdate(
+        identifier: "update-installed-\(record.to)", title: "LiveBridge updated to \(record.to)",
+        body: body, installs: nil)
+    }
+  }
+
+  private func showUpdate(_ status: UpdateStatus) {
+    updateStatus = status
+    switch status {
+    case .available(let release): available = release
+    case .upToDate: available = nil
+    default: break
+    }
+  }
+
+  /// Settings' Check for update.
+  func checkForUpdate() {
+    guard let updater else { return }
+    Task { _ = await updater.check() }
+  }
+
+  /// Installs the release found: Settings' Install and the menu's item. A build from source
+  /// asks first, since the release replaces it.
+  func installUpdate() {
+    guard let updater, let release = available else { return }
+    if isSourceBuild, !Confirm.ask(.replaceSourceBuild(version: release.version)) { return }
+    Task { await updater.install(release) }
+  }
+
+  /// A notice's Install: opens Settings on the update and installs `version`, checking first
+  /// when this run has not found it (a notice from before a relaunch).
+  func installUpdate(_ version: AppVersion) {
+    showSettings()
+    if available?.version == version { return installUpdate() }
+    guard let updater else { return }
+    Task {
+      guard case .available(let release) = await updater.check(), release.version == version
+      else { return }
+      available = release
+      installUpdate()
     }
   }
 
@@ -293,6 +395,19 @@ final class AppModel {
     let path = await CodexLaunch.defaultSearchPath()
     guard let codex = CodexLaunch.locate(searchPath: path) else { throw CodexProblem.notInstalled }
     return try await CodexLaunch.launch(codex: codex, cwd: cwd, searchPath: path)
+  }
+
+  /// GitHub's latest release of LiveBridge; a debug build takes `LIVEBRIDGE_RELEASES_URL`
+  /// instead when it is set, for the by-hand update test.
+  private static var releasesURL: URL {
+    #if DEBUG
+      if let text = ProcessInfo.processInfo.environment["LIVEBRIDGE_RELEASES_URL"],
+        let url = URL(string: text)
+      {
+        return url
+      }
+    #endif
+    return URL(string: "https://api.github.com/repos/getLiveBridge/LiveBridge/releases/latest")!
   }
 
   /// `--fake-mic <wav>`: debug builds play the file as the microphone.

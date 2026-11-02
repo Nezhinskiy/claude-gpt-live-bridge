@@ -80,9 +80,12 @@ struct MenuContentTests {
   }
 
   static func menu(
-    _ update: BridgeUpdate?, problem: Problem? = nil, load: ContextLoadState = .ready
+    _ update: BridgeUpdate?, problem: Problem? = nil, load: ContextLoadState = .ready,
+    available: AppVersion? = nil
   ) -> MenuContent {
-    MenuContent(update: update, problem: problem ?? update?.problem, contextLoad: load)
+    MenuContent(
+      update: update, problem: problem ?? update?.problem, contextLoad: load,
+      available: available)
   }
 
   static func line(_ speaker: Conversation.Line.Speaker, _ text: String) -> Conversation.Line {
@@ -107,6 +110,18 @@ struct MenuContentTests {
         "Settings… ⌘,",
         "Quit LiveBridge ⌘Q",
       ])
+  }
+
+  @Test func anAvailableUpdateAddsItsInstallItem() {
+    let outline = Self.menu(Self.status(sessions: 0), available: AppVersion("0.1.3")).outline
+    let install = outline.firstIndex(of: "Install LiveBridge 0.1.3…")
+    let settings = outline.firstIndex(of: "Settings… ⌘,")
+    #expect(install != nil && settings != nil && install! < settings!)
+  }
+
+  @Test func noUpdateAddsNoInstallItem() {
+    let outline = Self.menu(Self.status(sessions: 0), available: nil).outline
+    #expect(!outline.contains { $0.hasPrefix("Install LiveBridge") })
   }
 
   @Test func threeSessionsAreRowsWithTheirMarker() {
