@@ -5,7 +5,7 @@
 // `removed`; also the reply to its join unless `owner` is true), 413 body over 131072 bytes.
 
 /** The socket path relative to the home folder Foundation reports. */
-const SOCKET_REL = 'Library/Application Support/claude-gpt-live-bridge/run/bridge.sock';
+const SOCKET_REL = 'Library/Application Support/LiveBridge/run/bridge.sock';
 
 /**
  * The app's socket. The app finds Application Support through Foundation, which takes

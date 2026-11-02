@@ -101,7 +101,7 @@ final class AppModel {
   @ObservationIgnored private var loads = ContextLoads()
   @ObservationIgnored private var loadsTimer: Task<Void, Never>?
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
-  private static let log = Logger(subsystem: "io.github.nezhinskiy.livebridge", category: "call")
+  private static let log = Logger(subsystem: Paths.bundleID, category: "call")
 
   var problem: Problem? { appProblem ?? update?.problem }
 

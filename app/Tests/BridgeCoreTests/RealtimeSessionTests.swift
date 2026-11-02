@@ -90,7 +90,7 @@ struct RealtimeSessionTests {
   let rpc: FakeRPC
   let session: RealtimeSession
   let cwd = URL(
-    filePath: "/Users/example/Library/Application Support/claude-gpt-live-bridge/codex-cwd")
+    filePath: "/Users/example/Library/Application Support/LiveBridge/codex-cwd")
   let thread: JSONValue = "00000000-0000-0000-0000-000000000001"
 
   init() throws {

@@ -139,7 +139,7 @@ public enum CodexLaunch {
       let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
       let hello: JSONValue = [
         "clientInfo": [
-          "name": "claude-gpt-live-bridge", "title": "LiveBridge",
+          "name": "livebridge", "title": "LiveBridge",
           "version": .string(version as? String ?? "dev"),
         ],
         "capabilities": ["experimentalApi": true, "requestAttestation": false],

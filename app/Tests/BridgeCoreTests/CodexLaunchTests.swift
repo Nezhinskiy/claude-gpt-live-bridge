@@ -40,7 +40,7 @@ struct CodexLaunchTests {
     let disabled = zip(argv, argv.dropFirst()).filter { $0.0 == "--disable" }.map(\.1)
     #expect(Set(disabled) == present.subtracting(CodexLaunch.allowed))
     let received = fake.log("received.log")
-    #expect(received.contains(#""name":"claude-gpt-live-bridge""#))
+    #expect(received.contains(#""name":"livebridge""#))
     #expect(received.contains(#""experimentalApi":true"#))
     #expect(received.contains(#"{"method":"initialized"}"#))
     await client.close()

@@ -12,9 +12,8 @@ final class Notifier: NSObject, ResultNotifying, UNUserNotificationCenterDelegat
 {
   /// The Notifications pane of System Settings, at LiveBridge's entry.
   static let settingsURL = URL(
-    string:
-      "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=io.github.nezhinskiy.livebridge"
-  )!
+    string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id="
+      + Paths.bundleID)!
   /// What Settings says when the owner refused notifications.
   static let deniedSentence = "Notifications are off for LiveBridge in System Settings."
 

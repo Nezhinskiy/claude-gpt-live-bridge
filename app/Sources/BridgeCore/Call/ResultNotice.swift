@@ -4,7 +4,7 @@ public struct ResultNotice: Sendable, Equatable {
   public let title = "LiveBridge"
   public let body: String
   /// One identity for every notice, so each replaces the one before instead of stacking.
-  public let identifier = "io.github.nezhinskiy.livebridge.waiting-results"
+  public let identifier = Paths.bundleID + ".waiting-results"
 
   /// The notice for the results waiting, nil when none waits. `labels` names the joined
   /// sessions; a line of LiveBridge's own or from a session that left names none.

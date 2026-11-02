@@ -17,9 +17,9 @@
       "parentThreadId": null,
       "environments": [
         {
-          "cwd": "/Users/example/Library/Application Support/claude-gpt-live-bridge/codex-cwd",
+          "cwd": "/Users/example/Library/Application Support/LiveBridge/codex-cwd",
           "runtimeWorkspaceRoots": [
-            "/Users/example/Library/Application Support/claude-gpt-live-bridge/codex-cwd"
+            "/Users/example/Library/Application Support/LiveBridge/codex-cwd"
           ],
           "environmentId": "local"
         }
@@ -34,8 +34,8 @@
       "updatedAt": 1700000000,
       "id": "00000000-0000-0000-0000-000000000001",
       "sectionEnteredAt": null,
-      "cwd": "/Users/example/Library/Application Support/claude-gpt-live-bridge/codex-cwd",
-      "originator": "claude-gpt-live-bridge",
+      "cwd": "/Users/example/Library/Application Support/LiveBridge/codex-cwd",
+      "originator": "livebridge",
       "threadSource": null,
       "gitInfo": null,
       "name": null,
@@ -51,14 +51,14 @@
     "instructionSources": [
       "/Users/example/.codex/AGENTS.md"
     ],
-    "cwd": "/Users/example/Library/Application Support/claude-gpt-live-bridge/codex-cwd",
+    "cwd": "/Users/example/Library/Application Support/LiveBridge/codex-cwd",
     "approvalsReviewer": "user",
     "sandbox": {
       "type": "readOnly",
       "networkAccess": false
     },
     "runtimeWorkspaceRoots": [
-      "/Users/example/Library/Application Support/claude-gpt-live-bridge/codex-cwd"
+      "/Users/example/Library/Application Support/LiveBridge/codex-cwd"
     ],
     "multiAgentMode": "explicitRequestOnly",
     "serviceTier": "default",

@@ -20,8 +20,10 @@ public enum PathsError: LocalizedError, Equatable {
 /// control: whoever can reach the socket inside it is this user.
 public enum Paths {
   public static let maxSocketPathBytes = 103
+  /// The app's bundle identifier, as `Info.plist` and the scripts give it.
+  public static let bundleID = "com.getlivebridge.livebridge"
 
-  /// `~/Library/Application Support/claude-gpt-live-bridge`.
+  /// `~/Library/Application Support/LiveBridge`.
   public static func dataDir() throws -> URL { try dataDir(in: .applicationSupportDirectory) }
 
   /// `<data dir>/run`, holding the socket.
@@ -32,7 +34,7 @@ public enum Paths {
   public static func socketPath() throws -> URL { try runDir().appending(path: "bridge.sock") }
 
   static func dataDir(in base: URL) throws -> URL {
-    try ownerOnlyDirectory(base.appending(path: "claude-gpt-live-bridge"))
+    try ownerOnlyDirectory(base.appending(path: "LiveBridge"))
   }
 
   static func runDir(in base: URL) throws -> URL {

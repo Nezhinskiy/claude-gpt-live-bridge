@@ -24,7 +24,7 @@ public final class UnixHTTPServer: Sendable {
   private let socketPath: String
   private let router: any Router
   private let listener: NWListener
-  private let queue = DispatchQueue(label: "claude-gpt-live-bridge.http")
+  private let queue = DispatchQueue(label: "livebridge.http")
 
   public init(socketPath: URL, router: any Router) throws {
     guard socketPath.path.utf8.count <= Paths.maxSocketPathBytes else {

@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 
 dir=${SMOKE_DIR:-$(mktemp -d /tmp/livebridge-smoke.XXXXXX)}
 home="$dir/home"
-data="$home/Library/Application Support/claude-gpt-live-bridge"
+data="$home/Library/Application Support/LiveBridge"
 app="$PWD/app/.build/app/LiveBridge.app"
 mkdir -p "$home"
 
