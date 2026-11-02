@@ -4,6 +4,15 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1]
+
+### Fixed
+
+- A question Claude asks during a voice request (the dialog with options) no longer stops the
+  conversation. The voice tells you about it, explains the options in its own words and talks
+  them over with you without asking Claude; what you decide, an option or a question back to
+  Claude, answers the dialog. You can still answer it at the keyboard.
+
 ## [0.1.0]
 
 The first release: **LiveBridge.app**, a macOS menu bar app that keeps a GPT-Live voice line
