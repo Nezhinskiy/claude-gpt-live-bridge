@@ -36,7 +36,8 @@ done
 status=0
 node app/Tests/Smoke/fake-session.mjs "$data/run/bridge.sock" 150 || status=$?
 echo "conversation:"
-node -e 'for (const u of JSON.parse(require("fs").readFileSync(process.argv[1])).utterances)
-  console.log(`  ${u.role}: ${u.text}`)' "$data/continuity.json" || true
+node -e 'const { conversations } = JSON.parse(require("fs").readFileSync(process.argv[1]))
+  for (const c of Object.values(conversations)) for (const l of c.lines)
+    console.log(`  ${l.speaker}: ${l.text}`)' "$data/continuity.json" || true
 [ $status = 0 ] && echo "smoke: PASS" || echo "smoke: FAIL"
 exit $status

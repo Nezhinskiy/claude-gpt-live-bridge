@@ -42,8 +42,9 @@ const log = (event, detail = {}) => console.log(JSON.stringify({ t: now(), event
 
 await send('POST', '/v1/join', { sessionId, title: 'Example session' })
 await send('POST', '/v1/target', { sessionId })
-await send('POST', '/v1/call', { action: 'start' })
-log('started')
+// Start launches codex, which can take longer than the 5 s a silent session is kept, so the
+// session keeps polling meanwhile, as the mod does.
+const starting = send('POST', '/v1/call', { action: 'start' }).then(() => log('started'))
 
 const handoffs = []
 const lives = [] // the time each realtime session went live
@@ -55,6 +56,7 @@ let spokenAt = null
 let smallTalkAt = null
 let phase = 'off'
 let unheard = 0
+let problem = null
 let status = null
 
 while (Date.now() - t0 < deadline) {
@@ -70,6 +72,11 @@ while (Date.now() - t0 < deadline) {
     phase = status.call
     if (phase === 'live') lives.push(now())
     log('phase', { phase, ...(status.problem && { problem: status.problem }) })
+  }
+  // logged on its own: a poll can see the phase change before the problem that caused it
+  if ((status.problem ?? null) !== problem) {
+    problem = status.problem ?? null
+    log('problem', { problem })
   }
   if (status.unheard !== unheard) log('unheard', { count: (unheard = status.unheard) })
   for (const line of status.recentTranscript.filter(line => !seen.has(line))) {
@@ -99,6 +106,7 @@ while (Date.now() - t0 < deadline) {
   await new Promise(resolve => setTimeout(resolve, 1000))
 }
 
+await starting
 const secondsOpen = Math.round((status?.minutesThisCall ?? 0) * 600) / 10
 await send('POST', '/v1/call', { action: 'stop' })
 await send('POST', '/v1/leave', { sessionId })
