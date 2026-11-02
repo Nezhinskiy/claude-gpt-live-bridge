@@ -45,8 +45,9 @@ microphone or Claude:
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`.
 - `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
-  (the owner's, the voice's and the lines the session sent the voice) and the context loaded
-  from it. Each new realtime session is seeded with the target's conversation and only the
+  (the owner's, the voice's, the lines the session sent the voice and the brief of each request
+  its queue took) and the context loaded from it. Each new realtime session is seeded with the
+  target's conversation, less those briefs (an open request goes in as its task), and only the
   target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
   mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
   own session's conversation. New conversation forgets the target's, removing a session forgets

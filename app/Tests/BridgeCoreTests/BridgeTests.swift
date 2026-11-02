@@ -321,6 +321,21 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
   }
 
+  /// What the voice handed off shows in the conversation of the session it went to: here the
+  /// one that asked, not the target.
+  @Test func handoffIsShownInTheSessionItWentTo() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await answer(request(1), from: b, .question, "Which branch?")
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(b) == .request(request(2)) })
+    #expect(await lines().isEmpty)
+    await bridge.setTarget(b)
+    #expect(
+      await lines() == ["Claude: [QUESTION] Beta: Which branch?", "Sent: Example request 2"])
+  }
+
   /// A question answered in Claude Code is withdrawn from the voice and routes nothing.
   @Test func questionAnsweredInClaudeCodeIsWithdrawn() async throws {
     try await join(a, "Alpha")

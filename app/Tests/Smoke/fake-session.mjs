@@ -46,7 +46,7 @@ const log = (event, detail = {}) => console.log(JSON.stringify({ t: now(), event
 const readJSON = name => {
   try { return JSON.parse(readFileSync(join(dataDir, name), 'utf8')) } catch { return null }
 }
-const SPEAKERS = { owner: 'You', voice: 'Voice', claude: 'Claude' }
+const SPEAKERS = { owner: 'You', voice: 'Voice', claude: 'Claude', handoff: 'Sent' }
 /** The session's conversation, `Speaker: text`, as the app keeps it. */
 const conversation = () =>
   (readJSON('continuity.json')?.conversations?.[sessionId]?.lines ?? [])

@@ -14,9 +14,10 @@ public struct Conversation: Codable, Sendable, Equatable {
 
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
-    /// notice), as the voice got it.
+    /// notice), as the voice got it. `handoff`: the brief of a request the session's queue took,
+    /// so the menu shows that it reached Claude.
     public enum Speaker: String, Codable, Sendable {
-      case owner, voice, claude
+      case owner, voice, claude, handoff
 
       /// How the menu names who said a line.
       public var name: String {
@@ -24,6 +25,7 @@ public struct Conversation: Codable, Sendable, Equatable {
         case .owner: "You"
         case .voice: "Voice"
         case .claude: "Claude"
+        case .handoff: "Sent"
         }
       }
     }
@@ -46,12 +48,14 @@ public struct Conversation: Codable, Sendable, Equatable {
   /// The context and the open task lines, then the newest lines that fit codex's limits. Notes
   /// and the session's lines go in as `user` lines, data with the rank of the owner's words and
   /// no more, like every line the app adds while a session is open. A session's line still in
-  /// `unheard` is left out: the line is given it again once it opens.
+  /// `unheard` is left out: the line is given it again once it opens. A handoff line is the
+  /// menu's only: an open request is among the tasks already.
   public func initialItems(tasks: [String], unheard: Set<String> = []) -> [InitialItem] {
     let notes = ([context].compactMap { $0 } + tasks).map { InitialItem(role: .user, text: $0) }
     var tokens = notes.reduce(0) { $0 + Self.estimatedTokens($1.text) }
     var talk: [InitialItem] = []
-    for line in lines.reversed() where line.speaker != .claude || !unheard.contains(line.text) {
+    for line in lines.reversed()
+    where line.speaker != .handoff && (line.speaker != .claude || !unheard.contains(line.text)) {
       tokens += Self.estimatedTokens(line.text)
       guard tokens <= Self.maxTokens, notes.count + talk.count < Self.maxItems else { break }
       talk.insert(
