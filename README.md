@@ -1,3 +1,5 @@
+<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.uk.md">Українська</a></p>
+
 <p align="center"><img src="site/assets/icon.png" alt="LiveBridge app icon" width="144"></p>
 
 <h1 align="center">LiveBridge</h1>
@@ -27,8 +29,6 @@ LiveBridge is a macOS menu bar app that keeps a GPT-Live voice line ready throug
 asks what you mean, and hands real work to your Claude Code session through a small Claude Code
 mod, `livebridge`. Claude does the work with its own model, tools and permission mode, and the
 voice tells you the result.
-
-*Русская версия: [README.ru.md](README.ru.md).*
 
 <p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 

@@ -1,3 +1,5 @@
+<p align="center"><a href="README.md">English</a> · <b>Русский</b> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.uk.md">Українська</a></p>
+
 <p align="center"><img src="site/assets/icon.png" alt="Значок приложения LiveBridge" width="144"></p>
 
 <h1 align="center">LiveBridge</h1>
@@ -28,7 +30,7 @@ LiveBridge — приложение в строке меню macOS, которо
 через небольшой мод Claude Code, `livebridge`. Claude делает работу своей моделью, своими
 инструментами и в своём режиме разрешений, а голос сообщает вам результат.
 
-*English version: [README.md](README.md). Основной текст — английский; перевод может отставать.*
+*Основной текст — английский ([README.md](README.md)); перевод может отставать.*
 
 <p align="center"><img src="site/assets/demo.gif" alt="Разговор с сессией Claude Code через LiveBridge" width="100%"></p>
 
