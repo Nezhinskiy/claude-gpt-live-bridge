@@ -96,7 +96,7 @@ command.
    ```
    gh attestation verify <image> --repo getLiveBridge/LiveBridge \
      --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
-     --source-ref refs/tags/v<X.Y.Z> --format json
+     --source-ref refs/tags/v<X.Y.Z> --deny-self-hosted-runners --format json
    ```
 
    The attested subject digest in the JSON must equal the SHA-256 from step 2. Any failure
@@ -158,11 +158,10 @@ staged copy and the image.
 After an update, sessions already open run the old mod against the new app until they restart.
 The rule: the `/v1` wire stays backward compatible across releases, so an app accepts the mod of
 the release before it; a release that cannot keep this changes the route prefix. The mod is
-installed from the marketplace, which points at `./plugin` on the default branch: if the
-marketplace format lets a plugin source name a ref, `release.yml`'s release commit pins it to the
-release tag; otherwise the version check of step 7 reports a mod that is not the release's. The
-mod is fetched with git over HTTPS from this repository and is not attested; `SECURITY.md` says
-so.
+installed from the marketplace, which today points at `./plugin` on the default branch. Each
+release commit pins it to the release's tag instead (below, "Settled before the plan"), and the
+version check of step 7 reports a mod that is still not the release's. The mod is fetched with
+git over HTTPS from this repository and is not attested; `SECURITY.md` says so.
 
 ## Components
 
@@ -172,15 +171,16 @@ so.
 - `AppVersion`: parses `X.Y.Z` strictly and orders versions.
 - `UpdatePolicy`: whether a check is due (toggle on, installed copy, 24 hours or more since the
   last check or a clock that moved back), and whether the install may go past step 6 and 8.
-- `UpdateMachine`: the steps above as states, `idle`, `checking`, `upToDate`,
-  `available(Release)`, `downloading`, `verifying`, `waiting`, `updatingMod`, `installing`,
-  `failed(UpdateProblem)`, and the effect each event asks for; `UpdateProblem` is typed, as
-  `Problem` is, and each case carries its sentence.
+- `UpdateStatus`: where a run stands, `idle`, `checking`, `upToDate`, `available(Release)`,
+  `downloading`, `verifying`, `waiting`, `updatingMod`, `installing`, `failed(UpdateProblem)`;
+  `UpdateProblem` is typed, as `Problem` is, and each case carries its sentence. The steps run
+  in one order, so no separate event and effect machine is needed.
 - `UpdateRecord`: what step 9 writes and the next launch reads.
-- `Updater`: an actor that runs the effects through `UpdateEnvironment`, a protocol over the
-  network, the file system, `gh`, `hdiutil`, `codesign`, `ditto`, `claude`, the swap and the
-  relaunch, so tests use a fake. It takes the bundle URL and the build kind (release image or
-  source) as inputs.
+- `Updater`: an actor that runs the steps through `UpdateEnvironment`, a protocol over the
+  network, `gh`, `hdiutil`, `codesign`, `ditto`, `claude`, the swap and the relaunch, so tests use
+  a fake; file-system steps run under roots the tests point at temporary folders. Whether the
+  copy is the installed one and whether it is a source build are decided by `UpdatePolicy` and
+  the app, which start no check or install otherwise.
 
 Changes to existing code:
 
@@ -279,12 +279,17 @@ when one app replaces another's bundle in `/Applications`.
 - `docs/architecture/overview.md`: the `Update` components and the launch steps.
 - CHANGELOG.
 
-## Open before the plan
+## Settled before the plan
 
-- Whether the `xcode-27` runner in `release.yml` is GitHub-hosted; if it is, step 3 adds
-  `--deny-self-hosted-runners`.
-- Whether the marketplace format lets a plugin source name a git ref.
-- How `claude` reports an installed plugin's version without a TTY.
+- The `xcode-27` runner is GitHub-hosted (the 0.1.2 release job ran on a runner of the group
+  "GitHub Actions"), so step 3 adds `--deny-self-hosted-runners`.
+- The marketplace format lets a plugin source name a ref:
+  `{"source": "git-subdir", "url": "https://github.com/getLiveBridge/LiveBridge.git", "path": "plugin", "ref": "vX.Y.Z"}`.
+  Each release commit pins the mod to its own tag this way (a commit cannot name its own SHA,
+  so the tag alone, which only maintainers may create); `check.sh` holds the ref equal to `v` and
+  the app's version.
+- `claude plugin list --json` gives each installed plugin's id and version without a TTY; step 7
+  reads `livebridge@livebridge`'s version from it.
 
 ## Out of scope
 
