@@ -81,25 +81,25 @@ public actor Bridge: Router {
     }
   }
 
+  /// What every joined session's poll carries.
   public var status: StatusReply {
     get async {
-      let minutesThisCall = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
-      let shown = await registry.target.map { continuity[$0] } ?? Conversation()
-      return StatusReply(
+      StatusReply(
         call: machine.phase, sessions: await registry.rows(),
-        minutesToday: await meter.minutesToday(), minutesThisCall: minutesThisCall,
-        problem: problem?.sentence, lastContext: shown.context,
-        recentTranscript: shown.lines.suffix(3).map { Self.speaker($0.speaker) + $0.text },
+        minutesToday: await meter.minutesToday(), problem: problem?.sentence,
         unheard: machine.pending.count)
     }
   }
 
-  /// The target's whole conversation as the menu lists it, oldest first: every line the app
-  /// keeps, each `"<Speaker>: <text>"` as the status's last lines are. Empty with no target.
-  public var conversation: [String] {
+  /// What the app shows: the status, and what only the app needs.
+  public var current: BridgeUpdate {
     get async {
-      guard let target = await registry.target else { return [] }
-      return continuity[target].lines.map { Self.speaker($0.speaker) + $0.text }
+      let status = await status
+      let minutes = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
+      let shown = await registry.target.map { continuity[$0] } ?? Conversation()
+      return BridgeUpdate(
+        status: status, problem: problem, minutesThisCall: minutes, context: shown.context,
+        conversation: shown.lines)
     }
   }
 
@@ -470,29 +470,17 @@ public actor Bridge: Router {
   /// Publishes the status if it changed; every change of the target passes through here.
   @discardableResult private func changed() async -> StatusReply {
     await followTarget()
-    let now = await status
-    let update = BridgeUpdate(status: now, problem: problem, conversation: await conversation)
+    let update = await current
     if update != published { publish.yield(update) }
     published = update
-    return now
+    return update.status
   }
 
   private func save() {
     try? JSONEncoder().encode(continuity).write(to: continuityFile, options: .atomic)
   }
-
-  /// How the menu's lines name who said each.
-  private static func speaker(_ speaker: Conversation.Line.Speaker) -> String {
-    switch speaker {
-    case .owner: "You: "
-    case .voice: "Voice: "
-    case .claude: "Claude: "
-    }
-  }
 }
 
-/// What the app shows of the bridge: the status, and the target's whole conversation, which
-/// the menu lists and the status, carried by every poll, does not.
 /// The call's timers, each armed by its `CallEffect`.
 private enum CallTimer {
   case silence, resultWindow, grace
@@ -506,9 +494,15 @@ private enum CallTimer {
   }
 }
 
+/// What the app shows of the bridge: the status every joined session gets too, and what only
+/// the menu shows, which no session is sent.
 public struct BridgeUpdate: Sendable, Equatable {
   public let status: StatusReply
   /// The status's problem, with its kind.
   public let problem: Problem?
-  public let conversation: [String]
+  public let minutesThisCall: Double
+  /// The target's `[CONTEXT]` line, exactly as the voice gets it; kept across restarts.
+  public let context: String?
+  /// The target's whole conversation, oldest first: every line the app keeps.
+  public let conversation: [Conversation.Line]
 }

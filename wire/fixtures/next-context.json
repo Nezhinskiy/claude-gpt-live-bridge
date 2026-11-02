@@ -1,9 +1,7 @@
 {
   "status": {
     "call": "listening",
-    "minutesThisCall": 0,
     "minutesToday": 3,
-    "recentTranscript": [],
     "sessions": [
       {
         "activity": "idle",

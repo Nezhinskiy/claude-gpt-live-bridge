@@ -67,27 +67,6 @@ struct ContextLoadsTests {
   }
 }
 
-struct TranscriptLineTests {
-  @Test func aLineNamesItsSpeaker() {
-    let line = TranscriptLine("Claude: [OK] Alpha: Done.")
-    #expect(line.speaker == "Claude")
-    #expect(line.text == "[OK] Alpha: Done.")
-    #expect(TranscriptLine("no speaker here").speaker == "")
-    #expect(TranscriptLine("no speaker here").text == "no speaker here")
-  }
-
-  @Test func aLongLineIsKeptWhole() {
-    let paragraph = Array(repeating: "word", count: 200).joined(separator: " ")
-    let line = TranscriptLine("Claude: [QUESTION] Alpha: \(paragraph)\n\n\(paragraph)\n")
-    #expect(line.text == "[QUESTION] Alpha: \(paragraph)\n\n\(paragraph)")
-  }
-
-  @Test func aShortLineIsKeptAsItIs() {
-    let text = "[OK] Alpha: Tests pass."
-    #expect(TranscriptLine("Voice: \(text)").text == text)
-  }
-}
-
 struct ConfirmationTests {
   @Test func newConversationSaysWhatIsErased() {
     let ask = Confirmation.newConversation(label: "Alpha")
@@ -113,27 +92,28 @@ struct MenuContentTests {
 
   static func status(
     _ call: CallPhase = .off, sessions count: Int, target: Int = 0, problem: Problem? = nil,
-    lines: [String] = [], context: String? = nil, unheard: Int = 0
-  ) -> StatusReply {
-    StatusReply(
-      call: call,
-      sessions: (0..<count).map {
-        SessionRow(
-          sessionId: id($0), label: "Session \($0)", activity: $0 == 1 ? .working : .idle,
-          isTarget: $0 == target)
-      },
-      minutesToday: 31.4, minutesThisCall: 4.2, problem: problem?.sentence, lastContext: context,
-      recentTranscript: lines, unheard: unheard)
+    lines: [Conversation.Line] = [], context: String? = nil, unheard: Int = 0
+  ) -> BridgeUpdate {
+    BridgeUpdate(
+      status: StatusReply(
+        call: call,
+        sessions: (0..<count).map {
+          SessionRow(
+            sessionId: id($0), label: "Session \($0)", activity: $0 == 1 ? .working : .idle,
+            isTarget: $0 == target)
+        },
+        minutesToday: 31.4, problem: problem?.sentence, unheard: unheard),
+      problem: problem, minutesThisCall: 4.2, context: context, conversation: lines)
   }
 
-  /// The conversation is the status's last lines unless the test gives the whole of it.
   static func menu(
-    _ status: StatusReply?, problem: Problem? = nil, load: ContextLoadState = .ready,
-    conversation: [String]? = nil
+    _ update: BridgeUpdate?, problem: Problem? = nil, load: ContextLoadState = .ready
   ) -> MenuContent {
-    MenuContent(
-      status: status, problem: problem, contextLoad: load,
-      conversation: conversation ?? status?.recentTranscript ?? [])
+    MenuContent(update: update, problem: problem ?? update?.problem, contextLoad: load)
+  }
+
+  static func line(_ speaker: Conversation.Line.Speaker, _ text: String) -> Conversation.Line {
+    Conversation.Line(speaker: speaker, text: text)
   }
 
   @Test func withNoSessionsItOffersTheJoinCommand() {
@@ -158,7 +138,9 @@ struct MenuContentTests {
 
   @Test func threeSessionsAreRowsWithTheirMarker() {
     let menu = Self.menu(
-      Self.status(.live, sessions: 3, target: 2, lines: ["Voice: Hello.", "You: Hi."]))
+      Self.status(
+        .live, sessions: 3, target: 2,
+        lines: [Self.line(.voice, "Hello."), Self.line(.owner, "Hi.")]))
     #expect(
       menu.outline == [
         "[call] Live · Stop",
@@ -211,20 +193,19 @@ struct MenuContentTests {
     if case .call(let card)? = menu.items.first { card } else { nil }
   }
 
-  /// Every line the app keeps, whole, in one item that scrolls, not the status's last three.
+  /// Every line the app keeps, whole, in one item that scrolls.
   @Test func theConversationSubmenuHoldsTheWholeConversation() throws {
     let long = String(repeating: "word ", count: 120) + "end."
-    let whole = (1...12).map { "You: Line \($0)." } + ["Claude: \(long)"]
+    let whole = (1...12).map { Self.line(.owner, "Line \($0).") } + [Self.line(.claude, long)]
     let menu = Self.menu(
-      Self.status(sessions: 1, lines: Array(whole.suffix(3)), context: "[CONTEXT] Alpha: Tidy."),
-      conversation: whole)
+      Self.status(sessions: 1, lines: whole, context: "[CONTEXT] Alpha: Tidy."))
     let items = try #require(
       menu.items.lazy.compactMap { item -> [MenuContent.Item]? in
         if case .submenu("Conversation", true, let items) = item { items } else { nil }
       }.first)
     let lines = try #require(
       items.lazy.compactMap { if case .transcript(let lines) = $0 { lines } else { nil } }.first)
-    #expect(lines == whole.map(TranscriptLine.init))
+    #expect(lines == whole)
     #expect(lines.last?.text == long)
     #expect(items.filter { if case .transcript = $0 { true } else { false } }.count == 1)
     #expect(items.suffix(2) == [.header("What was sent"), .sent("[CONTEXT] Alpha: Tidy.")])
@@ -246,7 +227,7 @@ struct MenuContentTests {
 
   @Test func theCardCarriesTheProblemAndItsHelp() throws {
     let problem = Problem.microphoneDenied
-    let menu = Self.menu(Self.status(sessions: 1, problem: problem, unheard: 2), problem: problem)
+    let menu = Self.menu(Self.status(sessions: 1, problem: problem, unheard: 2))
     let card = try #require(Self.card(menu))
     #expect(card.problem == problem.sentence)
     #expect(card.opensMicrophoneSettings && card.codexHelp == nil)

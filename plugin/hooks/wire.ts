@@ -52,14 +52,12 @@ export type CallPhase = 'off' | 'listening' | 'connecting' | 'live';
 export type SessionRow =
   { sessionId: SessionId; label: string; activity: SessionActivity; isTarget: boolean };
 
+/** What every joined session's band shows; the app's menu has more, which no session is sent. */
 export type StatusReply = {
   call: CallPhase;
   sessions: SessionRow[];
   minutesToday: number;
-  minutesThisCall: number;
   problem?: string;
-  lastContext?: string;
-  recentTranscript: string[];
   /** Results the voice has not said yet. */
   unheard: number;
 };

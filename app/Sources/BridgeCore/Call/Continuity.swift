@@ -15,7 +15,18 @@ public struct Conversation: Codable, Sendable, Equatable {
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
     /// notice), as the voice got it.
-    public enum Speaker: String, Codable, Sendable { case owner, voice, claude }
+    public enum Speaker: String, Codable, Sendable {
+      case owner, voice, claude
+
+      /// How the menu names who said a line.
+      public var name: String {
+        switch self {
+        case .owner: "You"
+        case .voice: "Voice"
+        case .claude: "Claude"
+        }
+      }
+    }
     public var speaker: Speaker
     public var text: String
   }

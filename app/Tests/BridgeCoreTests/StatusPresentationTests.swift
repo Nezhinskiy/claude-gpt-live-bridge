@@ -17,8 +17,7 @@ struct StatusPresentationTests {
         SessionRow(
           sessionId: other, label: "Docs site · ab12", activity: activity, isTarget: false),
       ],
-      minutesToday: 31.4, minutesThisCall: 4.2, problem: problem, lastContext: nil,
-      recentTranscript: [], unheard: unheard)
+      minutesToday: 31.4, problem: problem, unheard: unheard)
   }
 
   static let phases: [(CallPhase, String, CallAction, Tint)] = [
@@ -82,10 +81,6 @@ struct StatusPresentationTests {
     #expect(StatusPresentation(Self.status(.off)).canAct)
     empty.call = .listening
     #expect(StatusPresentation(empty).canAct)  // Stop always works
-  }
-
-  @Test func minutesAreRounded() {
-    #expect(StatusPresentation(Self.status(.live)).minutes == "4 min this call · 31 min today")
   }
 
 }

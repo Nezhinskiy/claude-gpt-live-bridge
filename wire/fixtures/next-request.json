@@ -1,14 +1,8 @@
 {
   "status": {
     "call": "live",
-    "lastContext": "Goal: tidy the example project.",
-    "minutesThisCall": 1.5,
     "minutesToday": 12.25,
     "problem": "Example problem sentence.",
-    "recentTranscript": [
-      "You: Please list the files in this folder",
-      "Voice: On it, I'll check that now."
-    ],
     "sessions": [
       {
         "activity": "working",

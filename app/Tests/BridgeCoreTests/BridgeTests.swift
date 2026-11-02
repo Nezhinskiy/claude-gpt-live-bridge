@@ -146,6 +146,11 @@ struct BridgeTests {
       AnswerBody(sessionId: session, id: request.id, status: status, text: text, reason: nil))
   }
 
+  /// The target's conversation as the menu shows it, `Speaker: text`, oldest first.
+  func lines() async -> [String] {
+    await bridge.current.conversation.map { "\($0.speaker.name): \($0.text)" }
+  }
+
   /// Starts the call, with `Alpha` joined if no session is, and opens the line.
   func live() async {
     if await registry.target == nil { try? await join(a, "Alpha") }
@@ -569,7 +574,7 @@ struct BridgeTests {
       "The password: hunter2 is set. Key sk-\u{200B}abcdefghijklmnopqrst. "
       + String(repeating: "More detail here. ", count: 100)
     try await post("/v1/context", ContextBody(sessionId: a, summary: summary))
-    let shown = try #require(await bridge.status.lastContext)
+    let shown = try #require(await bridge.current.context)
     #expect(!shown.contains("hunter2") && !shown.contains("abcdefghij"))
     #expect(shown.count <= Bridge.maxContext && shown.hasSuffix("."))
     #expect(shown.hasPrefix("[CONTEXT] Alpha: The password"))
@@ -577,7 +582,7 @@ struct BridgeTests {
     #expect(await voice.opens.first?.first == InitialItem(role: .user, text: shown))
     let restarted = try restart()
     try await restarted.join(a, "Alpha")
-    #expect(await restarted.bridge.status.lastContext == shown)
+    #expect(await restarted.bridge.current.context == shown)
   }
 
   /// The same app data after the app restarted: a fresh bridge and registry.
@@ -592,43 +597,48 @@ struct BridgeTests {
     try await join(b, "Beta")
     await live()
     voice.emit(.userUtterance("Remember the colour teal."))
-    #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
+    #expect(await eventually { await lines().count == 1 })
     await bridge.setTarget(b)
     #expect(await bridge.status.call == .listening)
     #expect(await voice.closes == 1)
-    #expect(await bridge.status.recentTranscript.isEmpty)
+    #expect(await lines().isEmpty)
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.opens.last == [])
     voice.emit(.userUtterance("Remember the colour red."))
     #expect(
       await eventually {
-        await bridge.status.recentTranscript == ["You: Remember the colour red."]
+        await lines() == ["You: Remember the colour red."]
       })
     try await post("/v1/target", TargetBody(sessionId: a))  // the band's way
     #expect(await voice.closes == 2)
-    #expect(await bridge.status.recentTranscript == ["You: Remember the colour teal."])
+    #expect(await lines() == ["You: Remember the colour teal."])
     await bridge.audioEvent(.speechStarted)
     #expect(
       await voice.opens.last == [InitialItem(role: .user, text: "Remember the colour teal.")])
   }
 
-  /// The menu lists the target's whole conversation, as the app keeps it; the status, which
-  /// every poll carries, its last three lines.
-  @Test func theMenuGetsTheTargetsWholeConversation() async throws {
+  /// The menu gets the target's whole conversation, its context and this call's minutes; the
+  /// status, which every joined session's poll carries, has none of them.
+  @Test func onlyTheAppGetsTheTargetsConversation() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
     await live()
     let said = (1...5).map { "Remember line \($0)." }
     for line in said { voice.emit(.userUtterance(line)) }
-    #expect(await eventually { await bridge.conversation.count == 5 })
-    #expect(await bridge.conversation == said.map { "You: \($0)" })
-    #expect(await bridge.status.recentTranscript == said.suffix(3).map { "You: \($0)" })
+    #expect(await eventually { await lines().count == 5 })
+    #expect(await lines() == said.map { "You: \($0)" })
     var updates = bridge.updates.makeAsyncIterator()
     let update = await updates.next()
-    #expect(update?.conversation == said.map { "You: \($0)" })
-    #expect(update?.status == (await bridge.status))
+    #expect(update?.conversation.map(\.text) == said)
+    #expect(update?.context == "[CONTEXT] Alpha: Alpha's work.")
+    let reply = await bridge.handle(
+      HTTPRequest(method: "GET", path: "/v1/next", query: ["sessionId": b.rawValue], body: Data()))
+    let polled = try JSONSerialization.jsonObject(with: reply.body) as? [String: Any]
+    let status = try #require(polled?["status"] as? [String: Any])
+    #expect(Set(status.keys) == ["call", "sessions", "minutesToday", "unheard"])
     await bridge.setTarget(b)
-    #expect(await bridge.conversation.isEmpty)
+    #expect(await lines().isEmpty)
   }
 
   /// A line is seeded with its own session's open tasks only, not another session's.
@@ -650,7 +660,7 @@ struct BridgeTests {
     try await join(b, "Beta")
     await live()
     voice.emit(.userUtterance("Remember the colour teal."))
-    #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
+    #expect(await eventually { await lines().count == 1 })
     voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     await bridge.setTarget(b)
@@ -681,9 +691,9 @@ struct BridgeTests {
     voice.emit(.assistantSpeaking)
     voice.emit(.assistantUtterance("Beta is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
-    #expect(await bridge.status.recentTranscript == ["Voice: Beta is done."])
+    #expect(await lines() == ["Voice: Beta is done."])
     await bridge.setTarget(b)
-    #expect(await bridge.status.recentTranscript == ["Claude: [RESULT] Beta: Done."])
+    #expect(await lines() == ["Claude: [RESULT] Beta: Done."])
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.opens.last == [InitialItem(role: .user, text: "[RESULT] Beta: Done.")])
   }
@@ -695,7 +705,7 @@ struct BridgeTests {
     try await answer(request(1), from: a)
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
     #expect(
-      await bridge.status.recentTranscript == [
+      await lines() == [
         "Claude: [RESULT] Alpha: Done.",
         "Claude: [APPROVAL] Alpha: Claude is waiting for your approval",
       ])
@@ -712,12 +722,12 @@ struct BridgeTests {
     await live()
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
     #expect(await voice.added.isEmpty)
-    #expect(await bridge.status.lastContext == nil)
+    #expect(await bridge.current.context == nil)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
     #expect(await voice.added == ["[CONTEXT] Alpha: Alpha's work."])
-    #expect(await bridge.status.lastContext == "[CONTEXT] Alpha: Alpha's work.")
+    #expect(await bridge.current.context == "[CONTEXT] Alpha: Alpha's work.")
     await bridge.setTarget(b)
-    #expect(await bridge.status.lastContext == "[CONTEXT] Beta: Beta's work.")
+    #expect(await bridge.current.context == "[CONTEXT] Beta: Beta's work.")
     await bridge.audioEvent(.speechStarted)
     #expect(
       await voice.opens.last == [InitialItem(role: .user, text: "[CONTEXT] Beta: Beta's work.")])
@@ -729,9 +739,9 @@ struct BridgeTests {
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
     await bridge.newConversation()
-    #expect(await bridge.status.lastContext == nil)
+    #expect(await bridge.current.context == nil)
     await bridge.setTarget(b)
-    #expect(await bridge.status.lastContext == "[CONTEXT] Beta: Beta's work.")
+    #expect(await bridge.current.context == "[CONTEXT] Beta: Beta's work.")
   }
 
   /// A session removed from the app (the menu's ×) loses its conversation, on disk too.
@@ -739,10 +749,10 @@ struct BridgeTests {
     try await join(a, "Alpha")
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
     await bridge.remove(a)
-    #expect(await bridge.status.lastContext == nil)
+    #expect(await bridge.current.context == nil)
     let restarted = try restart()
     try await restarted.join(a, "Alpha")
-    #expect(await restarted.bridge.status.lastContext == nil)
+    #expect(await restarted.bridge.current.context == nil)
   }
 
   /// After `/clear` the session's new id keeps its conversation, and the open line stays open.
@@ -750,13 +760,13 @@ struct BridgeTests {
     let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
     await live()
     voice.emit(.userUtterance("Remember the colour teal."))
-    #expect(await eventually { await bridge.status.recentTranscript.count == 1 })
+    #expect(await eventually { await lines().count == 1 })
     try await post(
       "/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
     #expect(await bridge.status.call == .live)
-    #expect(await bridge.status.recentTranscript == ["You: Remember the colour teal."])
+    #expect(await lines() == ["You: Remember the colour teal."])
     voice.emit(.userUtterance("And blue."))
-    #expect(await eventually { await bridge.status.recentTranscript.count == 2 })
+    #expect(await eventually { await lines().count == 2 })
   }
 
   /// The single conversation an earlier build saved is discarded, not shown as anyone's.
@@ -766,8 +776,8 @@ struct BridgeTests {
     try Data(old.utf8).write(to: file)
     let restarted = try restart()
     try await restarted.join(a, "Alpha")
-    #expect(await restarted.bridge.status.lastContext == nil)
-    #expect(await restarted.bridge.status.recentTranscript.isEmpty)
+    #expect(await restarted.bridge.current.context == nil)
+    #expect(await restarted.lines().isEmpty)
     #expect(!FileManager.default.fileExists(atPath: file.path))
   }
 
@@ -776,7 +786,7 @@ struct BridgeTests {
     voice.emit(.userUtterance("Remember the colour teal."))
     #expect(
       await eventually {
-        await bridge.status.recentTranscript == ["You: Remember the colour teal."]
+        await lines() == ["You: Remember the colour teal."]
       })
     await bridge.perform(.stop)
     await live()
@@ -786,12 +796,12 @@ struct BridgeTests {
   @Test func newConversationClearsContinuity() async throws {
     await live()
     voice.emit(.userUtterance("Remember the colour teal."))
-    #expect(await eventually { await !bridge.status.recentTranscript.isEmpty })
+    #expect(await eventually { await !lines().isEmpty })
     await bridge.perform(.stop)
     await bridge.newConversation()
     await live()
     #expect(await voice.opens.last == [])
-    #expect(await bridge.status.recentTranscript.isEmpty)
+    #expect(await lines().isEmpty)
   }
 
   @Test func meterCountsOnlyLiveIntervals() async throws {
@@ -804,10 +814,10 @@ struct BridgeTests {
     time.advance(by: .seconds(2))
     voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
-    #expect(await bridge.status.minutesThisCall == 5.0 / 60)
+    #expect(await bridge.current.minutesThisCall == 5.0 / 60)
     await bridge.perform(.stop)
     await bridge.perform(.start)
-    #expect(await bridge.status.minutesThisCall == 0)
+    #expect(await bridge.current.minutesThisCall == 0)
     #expect(await bridge.status.minutesToday == 5.0 / 60)
   }
 

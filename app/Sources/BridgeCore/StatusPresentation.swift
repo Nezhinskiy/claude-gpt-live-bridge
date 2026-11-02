@@ -38,7 +38,6 @@ public struct StatusPresentation: Sendable, Equatable {
   public let rows: [SessionRowPresentation]
   private let problem: String?
   public let unheard: Int
-  public let minutes: String
   /// What joins a Claude Code session.
   public static let joinCommand = "/live on"
 
@@ -82,8 +81,6 @@ public struct StatusPresentation: Sendable, Equatable {
         id: $0.sessionId, label: $0.label, detail: Self.text(of: $0.activity),
         activity: $0.activity, isTarget: $0.isTarget)
     }
-    minutes =
-      "\(Int(s.minutesThisCall.rounded())) min this call · \(Int(s.minutesToday.rounded())) min today"
   }
 
   private static func text(of activity: SessionActivity) -> String {

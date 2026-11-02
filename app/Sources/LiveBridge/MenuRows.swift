@@ -190,7 +190,7 @@ struct SessionRowView: View {
 
 /// The target's whole conversation, oldest first; its item scrolls (`ScrollingItem`).
 struct TranscriptView: View {
-  let lines: [TranscriptLine]
+  let lines: [Conversation.Line]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -202,15 +202,15 @@ struct TranscriptView: View {
 
 /// One line of the conversation, whole and wrapped: who said it, then what.
 struct LineView: View {
-  let line: TranscriptLine
+  let line: Conversation.Line
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 6) {
-      if !line.speaker.isEmpty {
-        Text(line.speaker).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
-      }
-      Text(line.text).fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      Text(line.speaker.name).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
+      Text(line.text.trimmingCharacters(in: .whitespacesAndNewlines)).fixedSize(
+        horizontal: false, vertical: true
+      )
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .font(.system(size: 12))
     .padding(.horizontal, MenuStyle.inset)

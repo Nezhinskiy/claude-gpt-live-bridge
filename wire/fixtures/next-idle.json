@@ -1,9 +1,7 @@
 {
   "status": {
     "call": "off",
-    "minutesThisCall": 0,
     "minutesToday": 0,
-    "recentTranscript": [],
     "sessions": [],
     "unheard": 0
   }

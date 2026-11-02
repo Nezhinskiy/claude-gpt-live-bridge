@@ -1,15 +1,19 @@
 // A fake Claude Code session for scripts/smoke.sh: it speaks the mod's side of the wire over the
 // app's Unix socket (join, target, Start, a poll every second, one answer), records what the
-// bridge reports, and checks the run.
+// bridge reports, and checks the run. The conversation and the minutes, which no session is
+// sent, it reads from the app's files beside the socket (continuity.json, usage.json).
 //
 //   node app/Tests/Smoke/fake-session.mjs <socket path> [deadline seconds]
 //
 // It answers the voice request a few seconds after taking it, while the line still waits for
 // the result, so the voice must say it by itself, before the owner's next line (the small talk).
 // Exit code 0 when every check passes; the timeline and the verdict go to stdout as JSON lines.
+import { readFileSync } from 'node:fs'
 import { request } from 'node:http'
+import { dirname, join } from 'node:path'
 
 const [socketPath, deadlineArg = '120'] = process.argv.slice(2)
+const dataDir = dirname(dirname(socketPath))
 const deadline = Number(deadlineArg) * 1000
 const sessionId = '00000000-0000-0000-0000-000000000001'
 /** Words of the answer that only a spoken result can contain. */
@@ -39,6 +43,24 @@ function send(method, path, body) {
 const t0 = Date.now()
 const now = () => Math.round((Date.now() - t0) / 100) / 10
 const log = (event, detail = {}) => console.log(JSON.stringify({ t: now(), event, ...detail }))
+const readJSON = name => {
+  try { return JSON.parse(readFileSync(join(dataDir, name), 'utf8')) } catch { return null }
+}
+const SPEAKERS = { owner: 'You', voice: 'Voice', claude: 'Claude' }
+/** The session's conversation, `Speaker: text`, as the app keeps it. */
+const conversation = () =>
+  (readJSON('continuity.json')?.conversations?.[sessionId]?.lines ?? [])
+    .map(line => `${SPEAKERS[line.speaker]}: ${line.text}`)
+/** Swift's `Date` encodes as seconds since 2001-01-01. */
+const REFERENCE_DATE = Date.UTC(2001, 0, 1) / 1000
+/** Seconds the realtime session was open since this run started (usage.json). */
+function secondsOpen() {
+  const usage = readJSON('usage.json') ?? {}
+  const since = t0 / 1000 - REFERENCE_DATE
+  const open = (usage.intervals ?? []).filter(i => i.start >= since).reduce((sum, i) => sum + i.end - i.start, 0)
+  const current = usage.openedAt >= since ? Date.now() / 1000 - REFERENCE_DATE - usage.openedAt : 0
+  return Math.round((open + current) * 10) / 10
+}
 
 await send('POST', '/v1/join', { sessionId, title: 'Example session' })
 await send('POST', '/v1/target', { sessionId })
@@ -80,7 +102,7 @@ while (Date.now() - t0 < deadline) {
     log('problem', { problem })
   }
   if (status.unheard !== unheard) log('unheard', { count: (unheard = status.unheard) })
-  for (const line of status.recentTranscript.filter(line => !seen.has(line))) {
+  for (const line of conversation().filter(line => !seen.has(line))) {
     seen.add(line)
     log('line', { line })
     if (line.startsWith('You: ') && SMALL_TALK.test(line)) smallTalkAt ??= now()
@@ -109,7 +131,7 @@ while (Date.now() - t0 < deadline) {
 }
 
 await starting
-const secondsOpen = Math.round((status?.minutesThisCall ?? 0) * 600) / 10
+const open = secondsOpen()
 await send('POST', '/v1/call', { action: 'stop' })
 await send('POST', '/v1/leave', { sessionId })
 
@@ -118,8 +140,8 @@ const checks = {
   answeredWhileTheLineWaited: answeredInLine,
   answerSpokenBeforeTheOwnerSpokeAgain: spokenAt !== null && (smallTalkAt ?? Infinity) > spokenAt,
   lineClosedBeforeTheSmallTalk: lives.length >= 2,
-  openLessThan90s: secondsOpen < 90,
+  openLessThan90s: open < 90,
   backToListening: phase === 'listening',
 }
-log('verdict', { checks, handoffs, answeredAt, spokenAt, smallTalkAt, secondsOpen, lives })
+log('verdict', { checks, handoffs, answeredAt, spokenAt, smallTalkAt, secondsOpen: open, lives })
 process.exit(Object.values(checks).every(Boolean) ? 0 : 1)

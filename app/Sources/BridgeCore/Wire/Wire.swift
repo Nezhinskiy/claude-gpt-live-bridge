@@ -125,18 +125,13 @@ public struct SessionRow: Codable, Sendable, Equatable {
   public var isTarget: Bool
 }
 
-/// What the band and the menu show.
+/// What every joined session's band shows, and the menu with it (`BridgeUpdate`).
 public struct StatusReply: Codable, Sendable, Equatable {
   public var call: CallPhase
   public var sessions: [SessionRow]
   public var minutesToday: Double
-  public var minutesThisCall: Double
   /// One sentence on why the call cannot start or just stopped.
   public var problem: String?
-  /// The target session's `[CONTEXT]` line, exactly as the voice gets it; kept across restarts.
-  public var lastContext: String?
-  /// The last three lines of the target session's conversation.
-  public var recentTranscript: [String]
   /// Results the voice has not said yet: waiting for the owner to speak, or given to the open
   /// session.
   public var unheard: Int

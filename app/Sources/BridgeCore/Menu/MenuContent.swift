@@ -56,24 +56,20 @@ public struct MenuContent: Sendable, Equatable {
     case submenu(String, isEnabled: Bool, items: [Item])
     /// A custom view: every line of the target's conversation, whole and wrapped, oldest
     /// first; it scrolls inside the menu and opens at the newest.
-    case transcript([TranscriptLine])
+    case transcript([Conversation.Line])
     /// The target's context line as it was sent: a custom view, wrapped.
     case sent(String)
   }
 
   public let items: [Item]
 
-  /// `problem` is the app's own or the status's; `status` is nil while there is no bridge.
-  /// `conversation` is the target's, as the bridge lists it (`Bridge.conversation`).
-  public init(
-    status: StatusReply?, problem: Problem?, contextLoad: ContextLoadState,
-    conversation: [String]
-  ) {
+  /// `problem` is the app's own or the bridge's; `update` is nil while there is no bridge.
+  public init(update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState) {
     let footer: [Item] = [
       .command(.settings, title: "Settings…", isEnabled: true),
       .command(.quit, title: "Quit LiveBridge", isEnabled: true),
     ]
-    let shown = status.map(StatusPresentation.init)
+    let shown = update.map { StatusPresentation($0.status) }
     let card = CallCard(
       headline: shown?.headline ?? (problem == nil ? "Starting…" : "Off"),
       detail: shown?.detail ?? "",
@@ -83,7 +79,7 @@ public struct MenuContent: Sendable, Equatable {
       problem: problem?.sentence,
       opensMicrophoneSettings: problem?.opensMicrophoneSettings ?? false,
       codexHelp: problem?.help)
-    guard let status, let shown else {
+    guard let update, let shown else {
       items = [.call(card), .separator] + footer
       return
     }
@@ -103,13 +99,13 @@ public struct MenuContent: Sendable, Equatable {
       }
     }
 
-    let target = status.sessions.first(where: \.isTarget)?.label
+    let target = update.status.sessions.first(where: \.isTarget)?.label
     var talk: [Item] = []
-    if !conversation.isEmpty {
+    if !update.conversation.isEmpty {
       if let target { talk.append(.header(target)) }
-      talk.append(.transcript(conversation.map(TranscriptLine.init)))
+      talk.append(.transcript(update.conversation))
     }
-    if let sent = status.lastContext {
+    if let sent = update.context {
       if !talk.isEmpty { talk.append(.separator) }
       talk += [.header("What was sent"), .sent(Self.capped(sent))]
     }
@@ -123,7 +119,12 @@ public struct MenuContent: Sendable, Equatable {
 
     items =
       [.call(card), .separator] + sessions + [.separator] + context
-      + [.separator, .note(shown.minutes), .separator] + footer
+      + [.separator, .note(Self.minutes(update)), .separator] + footer
+  }
+
+  private static func minutes(_ update: BridgeUpdate) -> String {
+    let call = Int(update.minutesThisCall.rounded())
+    return "\(call) min this call · \(Int(update.status.minutesToday.rounded())) min today"
   }
 
   private static func capped(_ text: String) -> String {
@@ -154,7 +155,7 @@ public struct MenuContent: Sendable, Equatable {
         return [indent + "\(title) ▸"] + outline(items, indent: indent + "  ")
       case .transcript(let lines):
         return [indent + "[transcript]"]
-          + lines.map { indent + "| " + ($0.speaker.isEmpty ? "" : "\($0.speaker): ") + $0.text }
+          + lines.map { indent + "| \($0.speaker.name): \($0.text)" }
       case .sent(let text): return [indent + "[sent] \(text)"]
       }
     }
