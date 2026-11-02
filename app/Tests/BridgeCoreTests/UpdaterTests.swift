@@ -713,6 +713,13 @@ struct UpdaterTests {
     #expect(rig.stagedCopies.isEmpty)
   }
 
+  /// The system's reason for a failed swap reaches the owner as it was given.
+  @Test func aFailedSwapKeepsItsReason() async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.swapError = UpdateProblem.swapFailed("Example reason") }
+    #expect(try await rig.install() == .failed(.swapFailed("Example reason")))
+  }
+
   @Test func theRecordIsReadAfterARelaunch() async throws {
     let rig = try UpdateRig()
     _ = try await rig.install()

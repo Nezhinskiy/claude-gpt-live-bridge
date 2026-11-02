@@ -306,6 +306,8 @@ public actor Updater {
     else { throw .stagedChanged }
     do {
       try environment.swap(staged.copy, paths.installed)
+    } catch let problem as UpdateProblem {
+      throw problem
     } catch {
       throw .swapFailed(error.localizedDescription)
     }
