@@ -2,6 +2,8 @@
   "name": "livebridge",
   "version": "0.1.0",
   "description": "Talk to a Claude Code session by voice through the LiveBridge menu bar app: /live on|off|target|status|context.",
-  "author": { "name": "Nezhinskiy" },
+  "author": {
+    "name": "getLiveBridge"
+  },
   "types": "./types/index.d.ts"
 }

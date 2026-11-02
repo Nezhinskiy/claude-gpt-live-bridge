@@ -5,7 +5,7 @@
 <p align="center"><strong>Разговаривайте голосом с открытой сессией Claude Code.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/Nezhinskiy/claude-gpt-live-bridge/actions/workflows/ci.yml"><img src="https://github.com/Nezhinskiy/claude-gpt-live-bridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Лицензия: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Платформа: macOS 14+ на Apple Silicon">
 </p>
@@ -53,12 +53,12 @@ realtime-голосом. Подробности — в разделе [«Тре�
 
 ```sh
 # 1. Мод — из маркетплейса этого репозитория
-claude plugin marketplace add Nezhinskiy/claude-gpt-live-bridge
-claude plugin install livebridge@claude-gpt-live-bridge
+claude plugin marketplace add getLiveBridge/livebridge
+claude plugin install livebridge@livebridge
 
 # 2. Приложение — сборка из исходников, установка в ~/Applications и запуск
-git clone https://github.com/Nezhinskiy/claude-gpt-live-bridge.git
-cd claude-gpt-live-bridge
+git clone https://github.com/getLiveBridge/livebridge.git
+cd livebridge
 scripts/build-app.sh --release
 ```
 
@@ -109,7 +109,7 @@ scripts/build-app.sh --release
 
 `scripts/build-app.sh --uninstall` удаляет приложение, его объект входа и все файлы, которые оно
 хранит, и печатает две команды, которые оставляет вам: `tccutil reset Microphone
-io.github.nezhinskiy.livebridge` и `claude plugin uninstall livebridge@claude-gpt-live-bridge`.
+io.github.nezhinskiy.livebridge` и `claude plugin uninstall livebridge@livebridge`.
 
 ## Использование
 
@@ -300,7 +300,7 @@ Mac приложение хранит свои настройки, счётчи�
 Сегодня LiveBridge — это одно приложение для Mac, один исполнитель (Claude Code) и один
 поставщик голоса (codex на входе в ChatGPT). Три части стыкуются через узкие швы, и каждое из
 направлений ниже открыто для участников. Задачи по ним помечены меткой
-[help wanted](https://github.com/Nezhinskiy/claude-gpt-live-bridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
+[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22);
 с каких файлов начать, сказано в [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start).
 
 **Windows и Linux.** Сегодня LiveBridge работает только на macOS. Привязано к macOS: приложение
@@ -332,7 +332,7 @@ codex и изменятся вместе с поставщиком.
 
 Участие приветствуется. Для всего, что больше исправления, сначала откройте задачу, чтобы
 договориться о форме до начала работы. Хорошо начать с задач
-[help wanted](https://github.com/Nezhinskiy/claude-gpt-live-bridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
 с [известных ограничений](#известные-ограничения) и с направлений [выше](#планы-и-где-нужна-помощь).
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): структура репозитория, инструменты, проверки

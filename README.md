@@ -5,7 +5,7 @@
 <p align="center"><strong>Talk to an open Claude Code session by voice.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/Nezhinskiy/claude-gpt-live-bridge/actions/workflows/ci.yml"><img src="https://github.com/Nezhinskiy/claude-gpt-live-bridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/livebridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Platform: macOS 14+ on Apple Silicon">
 </p>
@@ -52,12 +52,12 @@ realtime voice. The details are under [Requirements](#requirements).
 
 ```sh
 # 1. The mod, from this repository's marketplace
-claude plugin marketplace add Nezhinskiy/claude-gpt-live-bridge
-claude plugin install livebridge@claude-gpt-live-bridge
+claude plugin marketplace add getLiveBridge/livebridge
+claude plugin install livebridge@livebridge
 
 # 2. The app, built from source, installed in ~/Applications and opened
-git clone https://github.com/Nezhinskiy/claude-gpt-live-bridge.git
-cd claude-gpt-live-bridge
+git clone https://github.com/getLiveBridge/livebridge.git
+cd livebridge
 scripts/build-app.sh --release
 ```
 
@@ -106,7 +106,7 @@ sentence that says where to allow it.
 
 `scripts/build-app.sh --uninstall` removes the app, its login item and every file it keeps, and
 prints the two commands it leaves to you: `tccutil reset Microphone
-io.github.nezhinskiy.livebridge` and `claude plugin uninstall livebridge@claude-gpt-live-bridge`.
+io.github.nezhinskiy.livebridge` and `claude plugin uninstall livebridge@livebridge`.
 
 ## Use
 
@@ -294,7 +294,7 @@ wire between the mod and the app, and the message flows;
 LiveBridge today is one Mac app, one worker (Claude Code) and one voice provider (codex on a
 ChatGPT login). The three meet at narrow seams, and each direction below is open to
 contributors. Issues for them carry the
-[help wanted](https://github.com/Nezhinskiy/claude-gpt-live-bridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 label; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) points to the files to read first.
 
 **Windows and Linux.** Today LiveBridge runs only on macOS. Tied to macOS: the Swift/AppKit menu
@@ -325,7 +325,7 @@ with the provider.
 
 Contributions are welcome. For anything larger than a fix, open an issue first so the shape can
 be agreed before the work starts. Good places to begin are the
-[help wanted](https://github.com/Nezhinskiy/claude-gpt-live-bridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 issues, the [known limitations](#known-limitations) and the directions
 [above](#roadmap-and-help-wanted).
 

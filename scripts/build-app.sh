@@ -168,7 +168,7 @@ uninstall() {
     fi
   done
   echo "To reset the microphone permission too: tccutil reset Microphone $BUNDLE_ID"
-  echo "To remove the Claude Code mod: claude plugin uninstall livebridge@claude-gpt-live-bridge"
+  echo "To remove the Claude Code mod: claude plugin uninstall livebridge@livebridge"
 }
 
 case "${1:-}" in

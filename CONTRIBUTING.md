@@ -20,7 +20,7 @@ says, not in an issue. Everyone taking part follows the [Code of Conduct](CODE_O
 ## Where to start
 
 Small first changes: an open issue labelled
-[help wanted](https://github.com/Nezhinskiy/claude-gpt-live-bridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
+[help wanted](https://github.com/getLiveBridge/livebridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22),
 or one of the README's [known limitations](README.md#known-limitations). The larger directions
 are in the README's [roadmap](README.md#roadmap-and-help-wanted). For each, read the
 [architecture overview](docs/architecture/overview.md) first, then the files below.
