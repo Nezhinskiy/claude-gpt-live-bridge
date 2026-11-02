@@ -103,6 +103,38 @@ struct CodexLaunchTests {
     #expect(found?.standardizedFileURL == fake.codex.standardizedFileURL)
   }
 
+  /// The updater finds `gh` and `claude` the way the voice finds `codex`.
+  @Test func locateFindsTheNamedProgram() throws {
+    let dir = try temporaryDirectory()
+    let gh = dir.appending(path: "gh")
+    try FakeCodex.executable(gh, "#!/bin/sh\n")
+    #expect(CodexLaunch.locate("gh", searchPath: [dir.path])?.standardizedFileURL == gh)
+    #expect(CodexLaunch.locate(searchPath: [dir.path]) == nil)
+    try FakeCodex.executable(dir.appending(path: "codex"), "#!/bin/sh\n")
+    #expect(CodexLaunch.locate(searchPath: [dir.path])?.lastPathComponent == "codex")
+  }
+
+  /// `codesign -dvvv` reports on standard error, so a caller can have it in the output; codex's
+  /// callers keep only standard output.
+  @Test func runKeepsStandardErrorOnlyWhenAsked() async throws {
+    let script = ["-c", "echo out; echo err >&2"]
+    let merged = try await CodexLaunch.run(
+      URL(filePath: "/bin/sh"), script, mergingErrors: true, timeout: .seconds(10))
+    #expect(merged?.output.contains("err") == true && merged?.output.contains("out") == true)
+    let plain = try await CodexLaunch.run(URL(filePath: "/bin/sh"), script, timeout: .seconds(10))
+    #expect(plain?.output == "out\n")
+  }
+
+  /// `claude` runs in the data folder, so no project's settings apply to it.
+  @Test func runStartsInTheGivenDirectory() async throws {
+    let dir = try temporaryDirectory()
+    let answer = try await CodexLaunch.run(
+      URL(filePath: "/bin/pwd"), ["-P"], cwd: dir, timeout: .seconds(10))
+    let real = try #require(realpath(dir.path, nil))
+    defer { free(real) }
+    #expect(answer?.output == String(cString: real) + "\n")
+  }
+
   /// The PATH comes from the user's own shell, read as a Terminal window would start it; what
   /// its start-up files print is skipped, and a shell that hangs gives up after the timeout.
   @Test func searchPathComesFromTheUserShell() async throws {
