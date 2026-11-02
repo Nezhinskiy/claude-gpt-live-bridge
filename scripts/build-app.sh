@@ -157,13 +157,15 @@ EOF
 
 # Builds the downloadable disk image from the committed HEAD in a scratch copy under /tmp, so no
 # path of this Mac ends up in the binary, strips the debug symbols, signs ad hoc (a local signing
-# identity means nothing on another Mac) and writes dist/LiveBridge.dmg with its SHA-256.
+# identity means nothing on another Mac) and writes dist/LiveBridge.dmg. The version is read
+# from that copy, so the volume name matches the app inside it. The release workflow
+# (.github/workflows/release.yml) runs this on a tag and attests the image.
 package() {
-  version=$(plutil -extract CFBundleShortVersionString raw app/Support/Info.plist)
   out="$PWD/dist"
   src=$(mktemp -d /tmp/livebridge-package.XXXXXX)
   trap 'rm -rf "$src"' EXIT
   git archive HEAD | tar -x -C "$src"
+  version=$(plutil -extract CFBundleShortVersionString raw "$src/app/Support/Info.plist")
   (
     cd "$src"
     assemble release "$src/stage/LiveBridge.app"
@@ -179,7 +181,6 @@ package() {
   rm -f "$out/LiveBridge.dmg"
   hdiutil create -quiet -volname "LiveBridge $version" -srcfolder "$src/stage" -ov \
     -format UDZO "$out/LiveBridge.dmg"
-  (cd "$out" && shasum -a 256 LiveBridge.dmg >LiveBridge.dmg.sha256)
   echo "packaged $out/LiveBridge.dmg ($version, $(git rev-parse --short HEAD))"
 }
 
