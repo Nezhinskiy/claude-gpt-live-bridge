@@ -24,10 +24,24 @@ public enum UpdateStatus: Equatable, Sendable {
 public actor Updater {
   /// The time a check-like program (`gh`, `hdiutil`, `codesign`, `ditto`, `xattr`) is given.
   static let checkTimeout: Duration = .seconds(30)
+  /// The time each `claude` command is given.
+  static let claudeTimeout: Duration = .seconds(120)
   /// The largest image downloaded.
   static let imageLimit = 100 * 1024 * 1024
   static let repository = "getLiveBridge/LiveBridge"
   static let signerWorkflow = "getLiveBridge/LiveBridge/.github/workflows/release.yml"
+  static let hdiutil = URL(filePath: "/usr/bin/hdiutil")
+  static let codesign = URL(filePath: "/usr/bin/codesign")
+  static let ditto = URL(filePath: "/usr/bin/ditto")
+  static let xattr = URL(filePath: "/usr/bin/xattr")
+  static let quarantine = "com.apple.quarantine"
+  /// The commands that update the mod, run in this order; `UpdateRecord.byHandCommands` are
+  /// the same for the owner.
+  static let modCommands = [
+    ["plugin", "marketplace", "update", "livebridge"],
+    ["plugin", "update", "livebridge@livebridge"],
+  ]
+  static let modID = "livebridge@livebridge"
 
   private let environment: any UpdateEnvironment
   private let paths: UpdatePaths
@@ -90,15 +104,27 @@ public actor Updater {
   public func install(_ release: Release) async {
     guard !busy, begin() else { return }
     defer { end() }
-    let folder = paths.updates.appending(path: release.version.description)
+    let version = release.version
+    let folder = paths.updates.appending(path: version.description)
     defer { try? FileManager.default.removeItem(at: folder) }
+    var staged: URL?
     do throws(UpdateProblem) {
       if let problem = await verifierProblem() { throw problem }
       set(.downloading)
       let image = try await download(release, into: folder)
       set(.verifying)
-      try await verifyOrigin(image, version: release.version)
+      try await verifyOrigin(image, version: version)
+      let checked = try await stage(image, in: folder, version: version)
+      staged = checked.copy
+      try await settle(checked)
+      await waitForQuiet()
+      set(.updatingMod)
+      let mod = await updateMod(to: version)
+      await waitForQuiet()
+      try? UpdateRecord(from: running, to: version, mod: mod, noticePosted: false)
+        .write(paths.updates.appending(path: "record.json"))
     } catch {
+      if let staged { try? FileManager.default.removeItem(at: staged) }
       set(.failed(error))
     }
   }
@@ -168,6 +194,123 @@ public actor Updater {
     }
     guard attested.contains(digest) else { throw .digestMismatch }
   }
+
+  // MARK: Stage, wait and update the mod
+
+  /// A staged copy in `/Applications` and the CDHash its app had in the image.
+  struct Staged {
+    let copy: URL
+    let cdhash: String
+  }
+
+  /// Attaches the image, checks its app and copies it into a new staged copy; the image is
+  /// detached on every path. A failure after the staged copy exists removes it.
+  private func stage(_ image: URL, in folder: URL, version: AppVersion) async throws(UpdateProblem)
+    -> Staged
+  {
+    let arguments = [
+      "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountrandom", folder.path, "-plist",
+      image.path,
+    ]
+    let attach = await environment.run(
+      Self.hdiutil, arguments, cwd: nil, timeout: Self.checkTimeout)
+    guard let attach, attach.status == 0 else { throw .noApp }
+    let volume = UpdateBundleCheck.volume(attachPlist: attach.output)
+    defer {
+      if let device = volume.device {
+        _ = await environment.run(
+          Self.hdiutil, ["detach", device], cwd: nil, timeout: Self.checkTimeout)
+      }
+    }
+    guard let mountPoint = volume.mountPoint else { throw .noApp }
+    let app = mountPoint.appending(path: "LiveBridge.app")
+    let cdhash = try await checkBundle(app, version: version)
+    let copy = paths.applications.appending(path: ".LiveBridge-update-\(UUID().uuidString).app")
+    guard mkdir(copy.path, 0o755) == 0 else { throw .notWritable }
+    let ditto = await environment.run(
+      Self.ditto, [app.path, copy.path], cwd: nil, timeout: Self.checkTimeout)
+    guard ditto?.status == 0 else {
+      try? FileManager.default.removeItem(at: copy)
+      throw .notWritable
+    }
+    return Staged(copy: copy, cdhash: cdhash)
+  }
+
+  /// Requires the app in the image to be LiveBridge at `version`, runnable on this macOS and
+  /// validly signed, and returns its CDHash.
+  private func checkBundle(_ app: URL, version: AppVersion) async throws(UpdateProblem) -> String {
+    guard UpdateBundleCheck.isDirectory(app),
+      let info = UpdateBundleCheck.info(app.appending(path: "Contents/Info.plist"))
+    else { throw .noApp }
+    let identifier = info["CFBundleIdentifier"] as? String ?? ""
+    guard identifier == Paths.bundleID else { throw .wrongBundle(identifier) }
+    let shown = info["CFBundleShortVersionString"] as? String ?? ""
+    guard AppVersion(shown) == version else { throw .wrongVersion(shown) }
+    if let minimum = info["LSMinimumSystemVersion"] {
+      let text = minimum as? String ?? "\(minimum)"
+      guard UpdateBundleCheck.runs(on: environment.osVersion(), minimum: text) else {
+        throw .needsNewerMacOS(text)
+      }
+    }
+    guard await signatureIsValid(app), let cdhash = await cdhash(of: app) else {
+      throw .signatureInvalid
+    }
+    return cdhash
+  }
+
+  /// Requires the staged copy to have the image's CDHash, then removes a quarantine attribute
+  /// from it (and from nothing else).
+  private func settle(_ staged: Staged) async throws(UpdateProblem) {
+    guard await cdhash(of: staged.copy) == staged.cdhash else { throw .stagedChanged }
+    guard getxattr(staged.copy.path, Self.quarantine, nil, 0, 0, XATTR_NOFOLLOW) >= 0 else {
+      return
+    }
+    _ = await environment.run(
+      Self.xattr, ["-d", Self.quarantine, staged.copy.path], cwd: nil, timeout: Self.checkTimeout)
+  }
+
+  /// `codesign --verify --deep --strict` passes for `app`.
+  private func signatureIsValid(_ app: URL) async -> Bool {
+    let answer = await environment.run(
+      Self.codesign, ["--verify", "--deep", "--strict", app.path], cwd: nil,
+      timeout: Self.checkTimeout)
+    return answer?.status == 0
+  }
+
+  /// The CDHash `codesign -dvvv` reports for `app`, or nil.
+  private func cdhash(of app: URL) async -> String? {
+    let answer = await environment.run(
+      Self.codesign, ["-dvvv", app.path], cwd: nil, timeout: Self.checkTimeout)
+    guard let answer, answer.status == 0 else { return nil }
+    return UpdateBundleCheck.cdhash(codesignOutput: answer.output)
+  }
+
+  /// Waits, polling each second, while any joined session has a request open.
+  private func waitForQuiet() async {
+    guard await hasOpenRequests() else { return }
+    set(.waiting)
+    repeat { await environment.sleep(for: .seconds(1)) } while await hasOpenRequests()
+  }
+
+  /// Updates the mod with `claude` in the data folder, never answering a prompt for the owner,
+  /// and requires the installed mod to be `version` after it.
+  private func updateMod(to version: AppVersion) async -> ModOutcome {
+    let byHand = ModOutcome.byHand(commands: UpdateRecord.byHandCommands)
+    guard let claude = await environment.locate("claude") else { return byHand }
+    for arguments in Self.modCommands {
+      let answer = await environment.run(
+        claude, arguments, cwd: paths.dataDir, timeout: Self.claudeTimeout)
+      guard answer?.status == 0 else { return byHand }
+    }
+    let list = await environment.run(
+      claude, ["plugin", "list", "--json"], cwd: paths.dataDir, timeout: Self.claudeTimeout)
+    guard let list, list.status == 0,
+      UpdateBundleCheck.modVersion(pluginList: list.output, id: Self.modID) == version
+    else { return byHand }
+    return .updated
+  }
+
+  // MARK: Helpers
 
   /// The lowercase hex SHA-256 of `file`, read in pieces, or nil when it cannot be read.
   static func sha256(of file: URL) -> String? {

@@ -262,6 +262,48 @@ struct UpdateRig {
   }
 
   func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
+
+  /// The record the install left.
+  var record: UpdateRecord? { UpdateRecord.read(paths.updates.appending(path: "record.json")) }
+
+  /// Installs 0.1.3 over 0.1.2 and returns the final status.
+  func install(_ updater: Updater? = nil) async throws -> UpdateStatus {
+    let updater = try updater ?? self.updater()
+    await updater.install(try release)
+    return await updater.status
+  }
+}
+
+/// Statuses seen from inside the run.
+final class SeenStatuses: Sendable {
+  private let seen = OSAllocatedUnfairLock<[UpdateStatus]>(initialState: [])
+  func append(_ status: UpdateStatus) { seen.withLock { $0.append(status) } }
+  var all: [UpdateStatus] { seen.withLock { $0 } }
+}
+
+/// A fault in the image that stops the install between attaching and detaching it.
+enum BundleFault: CaseIterable, Sendable {
+  case noApp, otherBundle, otherVersion, newerMacOS, badSignature, readOnlyApplications
+
+  /// Puts the fault into `rig`.
+  func apply(to rig: UpdateRig) throws {
+    var info = [
+      "CFBundleIdentifier": "com.getlivebridge.livebridge", "CFBundleShortVersionString": "0.1.3",
+      "LSMinimumSystemVersion": "14.0",
+    ]
+    switch self {
+    case .noApp: try FileManager.default.removeItem(at: rig.mountedApp)
+    case .otherBundle: info["CFBundleIdentifier"] = "com.example.other"
+    case .otherVersion: info["CFBundleShortVersionString"] = "0.1.2"
+    case .newerMacOS: info["LSMinimumSystemVersion"] = "15.2"
+    case .badSignature:
+      rig.env.answer("codesign --verify") { _ in ProgramResult(status: 1, output: "") }
+    case .readOnlyApplications:
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o555], ofItemAtPath: rig.paths.applications.path)
+    }
+    if self != .noApp { try rig.writeMountedInfo(info) }
+  }
 }
 
 struct UpdaterTests {
@@ -385,5 +427,184 @@ struct UpdaterTests {
     let rig = try UpdateRig()
     _ = try await rig.updater().check()
     #expect(!rig.exists(rig.paths.updates.appending(path: "lock")))
+  }
+
+  // MARK: Bundle checks, staging, waiting and the mod
+
+  @Test func anImageWithoutTheAppIsRefused() async throws {
+    let rig = try UpdateRig()
+    try BundleFault.noApp.apply(to: rig)
+    #expect(try await rig.install() == .failed(.noApp))
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test func anotherBundleIdIsRefused() async throws {
+    let rig = try UpdateRig()
+    try BundleFault.otherBundle.apply(to: rig)
+    #expect(try await rig.install() == .failed(.wrongBundle("com.example.other")))
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test func anotherBundleVersionIsRefused() async throws {
+    let rig = try UpdateRig()
+    try BundleFault.otherVersion.apply(to: rig)
+    #expect(try await rig.install() == .failed(.wrongVersion("0.1.2")))
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test func anAppNeedingANewerMacOSIsRefused() async throws {
+    let rig = try UpdateRig()
+    try BundleFault.newerMacOS.apply(to: rig)
+    #expect(try await rig.install() == .failed(.needsNewerMacOS("15.2")))
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test func aRefusedSignatureIsRefused() async throws {
+    let rig = try UpdateRig()
+    try BundleFault.badSignature.apply(to: rig)
+    #expect(try await rig.install() == .failed(.signatureInvalid))
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test(arguments: BundleFault.allCases)
+  func theImageIsDetachedOnFailure(_ fault: BundleFault) async throws {
+    let rig = try UpdateRig()
+    try fault.apply(to: rig)
+    defer {
+      try? FileManager.default.setAttributes(
+        [.posixPermissions: 0o755], ofItemAtPath: rig.paths.applications.path)
+    }
+    #expect(try await rig.install() != .installing)
+    #expect(rig.log.runs(of: "hdiutil").contains(["detach", rig.mount.path]))
+  }
+
+  @Test func theImageIsAttachedReadOnlyWithoutBrowsingOrOpening() async throws {
+    let rig = try UpdateRig()
+    _ = try await rig.install()
+    let folder = rig.paths.updates.appending(path: "0.1.3")
+    #expect(
+      rig.log.runs(of: "hdiutil").first == [
+        "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountrandom", folder.path, "-plist",
+        folder.appending(path: "LiveBridge.dmg").path,
+      ])
+  }
+
+  @Test func readOnlyApplicationsLeavesTheAppAsItWas() async throws {
+    let rig = try UpdateRig()
+    try BundleFault.readOnlyApplications.apply(to: rig)
+    defer {
+      try? FileManager.default.setAttributes(
+        [.posixPermissions: 0o755], ofItemAtPath: rig.paths.applications.path)
+    }
+    #expect(try await rig.install() == .failed(.notWritable))
+    #expect(rig.installedMarker == "old")
+    #expect(rig.stagedCopies.isEmpty)
+  }
+
+  @Test func aFailureAfterStagingRemovesTheStagedCopy() async throws {
+    let rig = try UpdateRig()
+    rig.env.answer("codesign -dvvv") { arguments in
+      let staged = arguments[1].contains(".LiveBridge-update-")
+      return ProgramResult(status: 0, output: "CDHash=\(staged ? "feedface" : "0123456789")\n")
+    }
+    #expect(try await rig.install() == .failed(.stagedChanged))
+    #expect(rig.stagedCopies.isEmpty)
+    #expect(rig.installedMarker == "old")
+  }
+
+  @Test func aQuarantinedStagedCopyIsClearedAfterItsCDHashMatched() async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.quarantineStaged = true }
+    _ = try await rig.install()
+    let clear = try #require(rig.log.lastRun("xattr"))
+    let stagedHash = try #require(
+      rig.log.index {
+        guard case .run("codesign", let arguments, _) = $0 else { return false }
+        return arguments.first == "-dvvv" && arguments[1].contains(".LiveBridge-update-")
+      })
+    #expect(stagedHash < clear)
+    let arguments = try #require(rig.log.runs(of: "xattr").first)
+    #expect(Array(arguments.prefix(2)) == ["-d", "com.apple.quarantine"])
+    #expect(arguments.last?.hasPrefix(rig.paths.applications.path + "/.LiveBridge-update-") == true)
+  }
+
+  @Test func theInstallWaitsWhileARequestIsOpen() async throws {
+    let rig = try UpdateRig()
+    let updater = try rig.updater()
+    let seen = SeenStatuses()
+    rig.requestOpen.set(true)
+    rig.env.change {
+      $0.onSleep = {
+        seen.append(await updater.status)
+        rig.requestOpen.set(false)
+      }
+    }
+    _ = try await rig.install(updater)
+    #expect(seen.all == [.waiting])
+    let firstClaude = try #require(
+      rig.log.index { if case .run("claude", _, _) = $0 { true } else { false } })
+    #expect(try #require(rig.log.index { $0 == .sleep }) < firstClaude)
+  }
+
+  @Test func claudeMissingLeavesTheAppUpdated() async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.programs["claude"] = nil }
+    _ = try await rig.install()
+    #expect(rig.record?.mod == .byHand(commands: UpdateRecord.byHandCommands))
+  }
+
+  @Test func aFailingClaudeLeavesTheAppUpdated() async throws {
+    let rig = try UpdateRig()
+    rig.env.answer("claude plugin marketplace") { _ in ProgramResult(status: 1, output: "") }
+    _ = try await rig.install()
+    #expect(rig.record?.mod == .byHand(commands: UpdateRecord.byHandCommands))
+  }
+
+  @Test func aModOfAnotherVersionIsReportedByHand() async throws {
+    let rig = try UpdateRig(modVersion: "0.1.2")
+    _ = try await rig.install()
+    #expect(rig.record?.mod == .byHand(commands: UpdateRecord.byHandCommands))
+  }
+
+  @Test func claudeIsNeverAskedToAccept() async throws {
+    let rig = try UpdateRig()
+    _ = try await rig.install()
+    let runs = rig.log.all.compactMap { event -> ([String], URL?)? in
+      guard case .run("claude", let arguments, let cwd) = event else { return nil }
+      return (arguments, cwd)
+    }
+    #expect(
+      runs.map(\.0) == [
+        ["plugin", "marketplace", "update", "livebridge"],
+        ["plugin", "update", "livebridge@livebridge"], ["plugin", "list", "--json"],
+      ])
+    for (arguments, cwd) in runs {
+      #expect(Set(arguments).isDisjoint(with: ["-y", "--yes", "--accept-command"]))
+      #expect(cwd == rig.paths.dataDir)
+    }
+    #expect(rig.record?.mod == .updated)
+  }
+
+  @Test func aRequestOpenedDuringTheModUpdateDelaysTheSwap() async throws {
+    let rig = try UpdateRig()
+    let updater = try rig.updater()
+    let seen = SeenStatuses()
+    let requestOpen = rig.requestOpen
+    rig.env.answer("claude plugin update") { _ in
+      requestOpen.set(true)
+      return ProgramResult(status: 0, output: "")
+    }
+    rig.env.change {
+      $0.onSleep = {
+        seen.append(await updater.status)
+        requestOpen.set(false)
+      }
+    }
+    _ = try await rig.install(updater)
+    #expect(seen.all == [.waiting])
+    let wait = try #require(rig.log.index { $0 == .sleep })
+    #expect(try #require(rig.log.lastRun("claude", ["plugin", "update"])) < wait)
+    let swap = rig.log.index { if case .swap = $0 { true } else { false } }
+    #expect(wait < swap ?? .max)
   }
 }
