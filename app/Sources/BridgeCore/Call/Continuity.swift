@@ -28,6 +28,15 @@ public struct Conversation: Codable, Sendable, Equatable {
         case .handoff: "Sent"
         }
       }
+
+      /// The role a line has when it seeds the voice; none for a line that is the menu's only.
+      var role: Role? {
+        switch self {
+        case .voice: .assistant
+        case .owner, .claude: .user
+        case .handoff: nil
+        }
+      }
     }
     public var speaker: Speaker
     public var text: String
@@ -55,12 +64,11 @@ public struct Conversation: Codable, Sendable, Equatable {
     let notes = ([context].compactMap { $0 } + tasks).map { InitialItem(role: .user, text: $0) }
     var tokens = notes.reduce(0) { $0 + Self.estimatedTokens($1.text) }
     var talk: [InitialItem] = []
-    for line in lines.reversed()
-    where line.speaker != .handoff && (line.speaker != .claude || !unheard.contains(line.text)) {
+    for line in lines.reversed() where line.speaker != .claude || !unheard.contains(line.text) {
+      guard let role = line.speaker.role else { continue }
       tokens += Self.estimatedTokens(line.text)
       guard tokens <= Self.maxTokens, notes.count + talk.count < Self.maxItems else { break }
-      talk.insert(
-        InitialItem(role: line.speaker == .voice ? .assistant : .user, text: line.text), at: 0)
+      talk.insert(InitialItem(role: role, text: line.text), at: 0)
     }
     return notes + talk
   }
