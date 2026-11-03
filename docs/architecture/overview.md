@@ -43,7 +43,8 @@ microphone or Claude:
   is pure; `Bridge` runs the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
-  flight for 10 minutes fails; either is reported to the voice as `[FAILED]`.
+  flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
+  session was the last one, which stops the call ([failure behaviour](#failure-behaviour)).
 - `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
   (the owner's, the voice's and the lines the session sent the voice) and the context loaded
   from it. Each new realtime session is seeded with the target's conversation and only the
