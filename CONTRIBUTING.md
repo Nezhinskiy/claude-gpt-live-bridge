@@ -124,7 +124,7 @@ differ (`scripts/tests/release-guards.test.sh` for the `ref`).
 Push the tag right after the release pull request merges: until it exists, the marketplace on the
 default branch names a tag that does not, and installing or updating the mod fails. Pushing the
 tag `v<version>` runs `.github/workflows/release.yml` on a GitHub-hosted macOS runner: it refuses
-a tag that does not match `Info.plist`, builds the image with `scripts/build-app.sh --package`,
+a tag that does not match `Info.plist` or the marketplace's `ref`, builds the image with `scripts/build-app.sh --package`,
 attests it, and creates the tag's Release with `LiveBridge.dmg` attached. The app's in-app update
 verifies that attestation pinned to this workflow, the tag and GitHub-hosted runners
 ([SECURITY.md](SECURITY.md#what-an-update-installs)), so a release built any other way does not

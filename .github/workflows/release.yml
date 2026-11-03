@@ -38,6 +38,13 @@ jobs:
             echo "the tag is $GITHUB_REF_NAME but Info.plist says $version" >&2
             exit 1
           fi
+      - name: Check the marketplace pins the mod to the tag
+        run: |
+          ref=$(plutil -extract plugins.0.source.ref raw .claude-plugin/marketplace.json || true)
+          if [ "$GITHUB_REF_NAME" != "$ref" ]; then
+            echo "the tag is $GITHUB_REF_NAME but marketplace.json pins the mod to $ref" >&2
+            exit 1
+          fi
       - name: Package
         run: scripts/build-app.sh --package
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
