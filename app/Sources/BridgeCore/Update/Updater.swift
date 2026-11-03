@@ -288,9 +288,9 @@ public actor Updater {
     guard let attach, attach.status == 0 else { throw .noApp }
     let volume = UpdateBundleCheck.volume(attachPlist: attach.output)
     defer {
-      if let device = volume.device {
+      if let target = volume.detachTarget {
         _ = await environment.run(
-          Self.hdiutil, ["detach", device], cwd: nil, timeout: Self.checkTimeout)
+          Self.hdiutil, ["detach", target], cwd: nil, timeout: Self.checkTimeout)
       }
     }
     guard let mountPoint = volume.mountPoint else { throw .noApp }

@@ -3,9 +3,10 @@ import Foundation
 
 /// The pure readings the `Updater` makes of the image and of the programs it runs.
 enum UpdateBundleCheck {
-  /// What `hdiutil attach -plist` attached: the device to detach and the mount point, if any.
+  /// What `hdiutil attach -plist` attached: what `hdiutil detach` is given (the mount point, or
+  /// a device when nothing was mounted) and the mount point, if any.
   struct Volume: Equatable {
-    var device: String?
+    var detachTarget: String?
     var mountPoint: URL?
   }
 
@@ -16,9 +17,9 @@ enum UpdateBundleCheck {
       from: Data(attachPlist.utf8), format: nil)
     let entities = (plist as? [String: Any])?["system-entities"] as? [[String: Any]] ?? []
     if let mountPoint = entities.lazy.compactMap({ $0["mount-point"] as? String }).first {
-      return Volume(device: mountPoint, mountPoint: URL(filePath: mountPoint))
+      return Volume(detachTarget: mountPoint, mountPoint: URL(filePath: mountPoint))
     }
-    return Volume(device: entities.lazy.compactMap { $0["dev-entry"] as? String }.first)
+    return Volume(detachTarget: entities.lazy.compactMap { $0["dev-entry"] as? String }.first)
   }
 
   /// `url` is a directory and not a symbolic link.
