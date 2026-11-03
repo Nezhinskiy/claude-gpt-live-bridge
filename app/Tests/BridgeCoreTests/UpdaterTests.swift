@@ -642,6 +642,25 @@ struct UpdaterTests {
     #expect(try wait < #require(rig.log.index { if case .swap = $0 { true } else { false } }))
   }
 
+  /// A request opened between the last wait and the call's stop is waited for before the swap.
+  @Test func aRequestOpenedWhileTheCallStopsDelaysTheSwap() async throws {
+    let rig = try UpdateRig()
+    let (log, requestOpen) = (rig.log, rig.requestOpen)
+    let updater = Updater(
+      environment: rig.env, paths: rig.paths, running: try #require(AppVersion("0.1.2")),
+      hasOpenRequests: { requestOpen.isSet },
+      stopCall: {
+        log.append(.stopCall)
+        requestOpen.set(true)
+      }, quit: { log.append(.quit) }, pid: 4242)
+    rig.env.change { $0.onSleep = { requestOpen.set(false) } }
+    #expect(try await rig.install(updater) == .installing)
+    let stop = try #require(rig.log.index { $0 == .stopCall })
+    let wait = try #require(rig.log.index { $0 == .sleep })
+    #expect(stop < wait)
+    #expect(try wait < #require(rig.log.index { if case .swap = $0 { true } else { false } }))
+  }
+
   // MARK: Swap, record, relaunch and the launch cleanup
 
   @Test func theSwapExchangesTheBundles() async throws {

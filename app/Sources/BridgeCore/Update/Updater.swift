@@ -153,6 +153,8 @@ public actor Updater {
       await waitForQuiet()
       set(.installing)
       await stopCall()
+      // A request opened between the last wait and the stop is waited for too.
+      if await waitForQuiet() { set(.installing) }
       do throws(UpdateProblem) {
         try await swapIn(checked)
       } catch {
@@ -360,11 +362,14 @@ public actor Updater {
     return UpdateBundleCheck.cdhash(codesignOutput: answer.output)
   }
 
-  /// Waits, polling each second, while any joined session has a request open.
-  private func waitForQuiet() async {
-    guard await hasOpenRequests() else { return }
+  /// Waits, polling each second, while any joined session has a request open. True when it
+  /// waited.
+  @discardableResult
+  private func waitForQuiet() async -> Bool {
+    guard await hasOpenRequests() else { return false }
     set(.waiting)
     repeat { await environment.sleep(for: .seconds(1)) } while await hasOpenRequests()
+    return true
   }
 
   /// Updates the mod with `claude` in the data folder, never answering a prompt for the owner,

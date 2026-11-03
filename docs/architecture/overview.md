@@ -365,8 +365,9 @@ Install runs only from the owner's click, one run at a time (the actor's flag, a
 6. `claude plugin marketplace update livebridge` and `claude plugin update livebridge@livebridge`
    run in the data folder; `claude plugin list --json` must then report the release's version,
    or the record carries the two commands for the owner.
-7. The wait of step 5 again, then the call stops, the staged copy is checked again (a directory,
-   not a symlink, the same CDHash, `codesign` passes) and swapped with the installed app by
+7. The wait of step 5 again, then the call stops and the wait runs once more (for a request
+   opened just before the stop); the staged copy is checked again (a directory, not a symlink,
+   the same CDHash, `codesign` passes) and swapped with the installed app by
    `renamex_np(…, RENAME_SWAP)`. From here any launch of the path, the mod's included, starts the
    new version; the running process keeps its binary.
 8. `updates/record.json` is written, a `/bin/sh` loop (`RelaunchScript`) waits for this process
