@@ -321,8 +321,8 @@ sequenceDiagram
 - **No session joined:** Start is disabled in the menu. From the band or the socket, Start
   does nothing but report "No Claude Code session has joined: run /live on in a session, then
   start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
-  session closing, the menu's ×, or no poll for 5 s) stops a call that is on, as Stop does, and
-  reports the same sentence; so does a Start whose session leaves while codex is launching.
+  session closing, the menu's ×, or no poll for 5 s) stops a call that is on, a Start still
+  launching codex included, as Stop does, and reports the same sentence.
 - **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
   gives no answer within 10 s.

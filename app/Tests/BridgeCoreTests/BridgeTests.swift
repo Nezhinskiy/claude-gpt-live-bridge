@@ -181,8 +181,8 @@ struct BridgeTests {
     #expect(await voices.made.count == 2)
   }
 
-  /// The only session leaving while codex is still launching leaves the call off, as a Stop
-  /// then would: the launched codex is ended and the microphone stays off.
+  /// The only session leaving while codex is still launching stops the Start there, as a Stop
+  /// then would: it says why at once, the launched codex is ended and the microphone stays off.
   @Test func lastSessionLeavingDuringStartLeavesTheCallOff() async throws {
     let voices = FakeVoices()
     let test = try BridgeTests { await voices.make() }
@@ -191,10 +191,10 @@ struct BridgeTests {
     async let start: Void = test.bridge.perform(.start)
     #expect(await eventually { await voices.waiting == 1 })
     try await test.post("/v1/leave", LeaveBody(sessionId: a))
+    #expect(await test.bridge.status.problem == Problem.noSession.sentence)
     await voices.finishLaunch()
     _ = await start
     #expect(await test.bridge.status.call == .off)
-    #expect(await test.bridge.status.problem == Problem.noSession.sentence)
     #expect(await voices.made.first?.shutdowns == 1)
     #expect(await !test.audio.calls.contains("startListening"))
   }
@@ -537,6 +537,7 @@ struct BridgeTests {
     try await post("/v1/leave", LeaveBody(sessionId: a))
     #expect(await bridge.status.call == .off)
     #expect(await bridge.status.problem == Problem.noSession.sentence)
+    #expect(await voice.shutdowns == 1)
   }
 
   @Test func newerRequestSupersedesAnUnheardResult() async throws {
