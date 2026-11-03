@@ -211,10 +211,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
       case .newConversation: #selector(newConversation)
       case .settings: #selector(showSettings)
       case .quit: #selector(quit)
-      case .installUpdate: #selector(installUpdate)
+      case .installUpdate: #selector(installUpdate(_:))
       }
     let item = NSMenuItem(title: "", action: action, keyEquivalent: command.keyEquivalent)
     item.target = self
+    if case .installUpdate(let version) = command { item.representedObject = version }
     return item
   }
 
@@ -241,12 +242,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   @objc private func quit() { NSApp.terminate(nil) }
 
-  /// Settings opens on the update section's progress, past any confirmation the install asks.
-  @objc private func installUpdate() {
-    later { [model] in
-      model.showSettings()
-      model.installUpdate()
-    }
+  /// Installs the item's version as a notice's Install does: Settings opens on the update
+  /// section's progress, past any confirmation the install asks.
+  @objc private func installUpdate(_ sender: NSMenuItem) {
+    guard let version = sender.representedObject as? AppVersion else { return }
+    later { [model] in model.installUpdate(version) }
   }
 
   /// Runs `action` once the run loop is back in its default mode, past any menu tracking.
