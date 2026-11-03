@@ -87,13 +87,7 @@ test('approvalIsReported', async ($, on) => {
 /** A voice request waiting for the next turn does not make the typed turn's approval the voice's. */
 test('aTypedTurnsApprovalIsNotReportedWhileAVoiceRequestWaits', async ($, on) => {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
-  world.work.push({ kind: 'request', ...REQUEST })
-  await world.clock.advance(1000)
-  expect(world.submitted).toHaveLength(1)
-  world.take('activity')
+  await inTypedTurnWithVoiceWaiting($, world, 'Remove the build folder')
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
   expect(world.take('activity')).toEqual([])
 })
@@ -111,6 +105,17 @@ async function inVoiceTurn($: Engine, world: ReturnType<typeof fakeWorld>) {
   world.work.push({ kind: 'request', ...REQUEST })
   await world.clock.advance(1000)
   await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  world.take('activity')
+}
+
+/** A typed turn that runs while a voice request waits behind it; the activity so far is taken. */
+async function inTypedTurnWithVoiceWaiting($: Engine, world: ReturnType<typeof fakeWorld>, text: string) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text, turnId: 't1' })
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  expect(world.submitted).toHaveLength(1)
   world.take('activity')
 }
 
@@ -163,13 +168,7 @@ test('aTypedTurnsQuestionStaysInClaudeCode', async ($, on) => {
 /** A voice request waiting for the next turn does not make the typed turn's question the voice's. */
 test('aTypedTurnsQuestionStaysInClaudeCodeWhileAVoiceRequestWaits', async ($, on) => {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
-  world.work.push({ kind: 'request', ...REQUEST })
-  await world.clock.advance(1000)
-  expect(world.submitted).toHaveLength(1)
-  world.take('activity')
+  await inTypedTurnWithVoiceWaiting($, world, 'Rename the folder')
   const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
   await world.clock.advance(1000)
   expect(world.take('activity')).toEqual([])
