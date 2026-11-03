@@ -763,6 +763,16 @@ struct UpdaterTests {
     #expect(problem.sentence.contains("0.1.3"))
   }
 
+  @Test func onlyAnImageThatCannotBeVerifiedSendsToTheReleasePage() {
+    let verifying: [UpdateProblem] = [.ghMissing, .ghSignedOut, .attestationFailed]
+    let others: [UpdateProblem] = [
+      .network("Example reason"), .http(403), .noImage, .digestMismatch, .signatureInvalid,
+      .notWritable, .busy,
+    ]
+    #expect(verifying.map(\.offersReleasePage) == [true, true, true])
+    #expect(others.filter(\.offersReleasePage) == [])
+  }
+
   // MARK: The schedule
 
   static let t0 = Date(timeIntervalSince1970: 1_700_000_000)

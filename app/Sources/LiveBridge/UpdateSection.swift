@@ -18,7 +18,7 @@ struct UpdateSection: View {
         Text("LiveBridge \(model.versionText)")
       }
       if !model.isInstalledCopy {
-        Text("Updates install only into /Applications")
+        Text(UpdateProblem.notInstalledCopy.sentence)
           .font(.caption).foregroundStyle(.secondary)
       } else if model.updater != nil {
         outcome
@@ -44,37 +44,30 @@ struct UpdateSection: View {
     }
   }
 
-  /// The outcome of the last check or install, or the step of the one under way.
+  /// The step of the run under way, or the outcome of the last check or install.
   @ViewBuilder private var outcome: some View {
-    switch model.updateStatus {
-    case .idle: EmptyView()
-    case .upToDate: Text("Up to date")
-    case .available(let release):
-      LabeledContent("Version \(release.version.description) is available") {
-        Button("Install") { model.installUpdate() }
-      }
-    case .failed(let problem):
-      VStack(alignment: .leading, spacing: 6) {
-        Label(problem.sentence, systemImage: "exclamationmark.triangle.fill")
-          .font(.caption).symbolRenderingMode(.multicolor)
-        if Self.sendsToReleasePage(problem), let release = model.available {
-          Link("Open the release page", destination: release.pageURL)
-        }
-      }
-    case .checking, .downloading, .verifying, .waiting, .updatingMod, .installing:
+    if let step {
       HStack(spacing: 6) {
         ProgressView().controlSize(.small)
-        Text(step ?? "")
+        Text(step)
       }
-    }
-  }
-
-  /// The problems whose sentence points at the release page, where the image is for a download
-  /// by hand.
-  private static func sendsToReleasePage(_ problem: UpdateProblem) -> Bool {
-    switch problem {
-    case .ghMissing, .ghSignedOut, .attestationFailed: true
-    default: false
+    } else {
+      switch model.updateStatus {
+      case .upToDate: Text("Up to date")
+      case .available(let release):
+        LabeledContent("Version \(release.version.description) is available") {
+          Button("Install") { model.installUpdate() }
+        }
+      case .failed(let problem):
+        VStack(alignment: .leading, spacing: 6) {
+          Label(problem.sentence, systemImage: "exclamationmark.triangle.fill")
+            .font(.caption).symbolRenderingMode(.multicolor)
+          if problem.offersReleasePage, let release = model.available {
+            Link("Open the release page", destination: release.pageURL)
+          }
+        }
+      default: EmptyView()
+      }
     }
   }
 

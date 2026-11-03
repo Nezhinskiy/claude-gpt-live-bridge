@@ -45,6 +45,14 @@ public enum UpdateProblem: Error, Equatable, Sendable {
   /// not.
   indirect case modAlreadyUpdated(UpdateProblem, version: AppVersion)
 
+  /// The sentence points at the release page, which has the image for a download by hand.
+  public var offersReleasePage: Bool {
+    switch self {
+    case .ghMissing, .ghSignedOut, .attestationFailed: true
+    default: false
+    }
+  }
+
   /// One sentence for the owner.
   public var sentence: String {
     switch self {
