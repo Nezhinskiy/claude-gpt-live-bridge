@@ -134,8 +134,10 @@ command.
    of the path from now on, the mod's included, starts the new version.
 9. **Record and relaunch.** Write `updates/record.json`: the old and new versions, the mod's
    outcome and the commands to show. Start `RelaunchScript`'s `/bin/sh`, which waits for this
-   pid to exit with `/bin/kill -0`, then, until `/usr/bin/pgrep -x` finds a `LiveBridge` of this
-   user, runs `/usr/bin/open /Applications/LiveBridge.app` and waits a second, at most ten times
+   pid to exit with `/bin/kill -0`, then, until `/usr/bin/pgrep -U <uid> -f` finds a process of
+   this user running `/Applications/LiveBridge.app`'s own executable (a `LiveBridge` built
+   elsewhere does not count), runs `/usr/bin/open /Applications/LiveBridge.app` and waits a
+   second, at most ten times
    (one `open` right after the quit can target the quitting instance, fail and still exit 0),
    every value a positional argument; then quit.
 
