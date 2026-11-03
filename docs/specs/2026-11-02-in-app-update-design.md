@@ -1,6 +1,6 @@
 # In-app update
 
-Status: proposed, 2026-11-02. Revised the same day after a design and security review.
+Status: delivered, 2026-11-03. Proposed 2026-11-02 and revised the same day after a design and security review.
 
 ## Why
 

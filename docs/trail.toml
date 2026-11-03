@@ -7,5 +7,5 @@ label = "Everything"
 pattern = ".*"
 
 [states]
-"specs/2026-11-02-in-app-update-design.md" = "proposed"
-"plans/2026-11-02-in-app-update.md" = "proposed"
+"specs/2026-11-02-in-app-update-design.md" = "delivered"
+"plans/2026-11-02-in-app-update.md" = "delivered"
