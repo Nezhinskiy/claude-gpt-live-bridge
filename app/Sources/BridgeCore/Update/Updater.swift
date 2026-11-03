@@ -116,11 +116,17 @@ public actor Updater {
     return release
   }
 
-  /// At launch: when a release newer than the running app was announced before, checks once so
-  /// the menu offers it again. It is not the day's check and announces nothing: `state` is only
-  /// read. Returns the release the check found, or nil.
-  public func restoreAnnounced(state: UpdateStateStore) async -> Release? {
-    guard state.current.announced.contains(where: { $0 > running }) else { return nil }
+  /// At launch, with automatic checks `enabled`: when a release newer than the running app was
+  /// announced before, checks once so the menu offers it again, unless the day's check is due
+  /// and finds it anyway. It is not the day's check and announces nothing: `state` is only read.
+  /// Returns the release the check found, or nil.
+  public func restoreAnnounced(now: Date, enabled: Bool, state: UpdateStateStore) async
+    -> Release?
+  {
+    let current = state.current
+    guard enabled, current.announced.contains(where: { $0 > running }),
+      !UpdatePolicy.isCheckDue(now: now, lastCheck: current.lastCheck, enabled: enabled)
+    else { return nil }
     guard case .available(let release) = await check() else { return nil }
     return release
   }

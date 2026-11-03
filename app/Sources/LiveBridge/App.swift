@@ -124,6 +124,12 @@ final class AppModel {
 
   var problem: Problem? { appProblem ?? update?.problem }
 
+  /// Check for updates automatically, as the owner set it or as the build's default.
+  var checksAutomatically: Bool {
+    UpdatePolicy.checksAutomatically(
+      setting: settings.current.checkUpdatesAutomatically, isSourceBuild: isSourceBuild)
+  }
+
   init() {
     let info = Bundle.main
     versionText = info.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -240,11 +246,9 @@ final class AppModel {
   /// whose Install installs it, and the menu offers it. The notice says when the image cannot
   /// be verified on this Mac yet.
   private func checkIfDue() async {
-    guard let updater, let updateState else { return }
-    let enabled = UpdatePolicy.checksAutomatically(
-      setting: settings.current.checkUpdatesAutomatically, isSourceBuild: isSourceBuild)
-    guard
-      let release = await updater.checkIfDue(now: Date(), enabled: enabled, state: updateState)
+    guard let updater, let updateState,
+      let release = await updater.checkIfDue(
+        now: Date(), enabled: checksAutomatically, state: updateState)
     else { return }
     available = release
     let problem = await updater.verifierProblem()
@@ -258,11 +262,10 @@ final class AppModel {
   /// A release announced before a relaunch stays in the menu: with automatic checks on, one
   /// check at launch finds it again, without a notice.
   private func restoreAnnounced() async {
-    guard let updater, let updateState,
-      UpdatePolicy.checksAutomatically(
-        setting: settings.current.checkUpdatesAutomatically, isSourceBuild: isSourceBuild)
-    else { return }
-    if let release = await updater.restoreAnnounced(state: updateState) { available = release }
+    guard let updater, let updateState else { return }
+    let release = await updater.restoreAnnounced(
+      now: Date(), enabled: checksAutomatically, state: updateState)
+    if let release { available = release }
   }
 
   private func showUpdate(_ status: UpdateStatus) {
