@@ -58,8 +58,8 @@ enum UpdateBundleCheck {
 
   /// The version of the plugin `id` in `claude plugin list --json` output, or nil.
   static func modVersion(pluginList: String, id: String) -> AppVersion? {
-    let list = try? JSONSerialization.jsonObject(with: Data(pluginList.utf8)) as? [[String: Any]]
-    let plugin = list?.first { $0["id"] as? String == id }
-    return (plugin?["version"] as? String).flatMap { AppVersion($0) }
+    let list = try? JSONDecoder().decode(JSONValue.self, from: Data(pluginList.utf8))
+    let plugin = list?.array?.first { $0["id"]?.string == id }
+    return plugin?["version"]?.string.flatMap { AppVersion($0) }
   }
 }
