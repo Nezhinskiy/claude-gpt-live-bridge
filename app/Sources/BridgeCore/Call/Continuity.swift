@@ -15,7 +15,7 @@ public struct Conversation: Codable, Sendable, Equatable {
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
     /// notice), as the voice got it. `handoff`: the brief of a request the session's queue took,
-    /// so the menu shows that it reached Claude.
+    /// so the menu shows that it was handed on.
     public enum Speaker: String, Codable, Sendable {
       case owner, voice, claude, handoff
 
@@ -49,7 +49,8 @@ public struct Conversation: Codable, Sendable, Equatable {
   /// and the session's lines go in as `user` lines, data with the rank of the owner's words and
   /// no more, like every line the app adds while a session is open. A session's line still in
   /// `unheard` is left out: the line is given it again once it opens. A handoff line is the
-  /// menu's only: an open request is among the tasks already.
+  /// menu's only, so seeding sends nothing it did not send before; an open request still goes in
+  /// as its task line.
   public func initialItems(tasks: [String], unheard: Set<String> = []) -> [InitialItem] {
     let notes = ([context].compactMap { $0 } + tasks).map { InitialItem(role: .user, text: $0) }
     var tokens = notes.reduce(0) { $0 + Self.estimatedTokens($1.text) }

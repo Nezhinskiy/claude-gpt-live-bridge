@@ -398,7 +398,7 @@ public actor Bridge: Router {
 
   /// A handoff goes to the session that asked the last question, else to the target. It
   /// supersedes that session's results the owner has not heard yet, and its brief is kept in
-  /// that session's conversation, so the menu shows it reached Claude. Returns the session it
+  /// that session's conversation, so the menu shows its queue took it. Returns the session it
   /// went to, or nil when none is joined.
   private func route(_ request: VoiceRequest) async -> SessionID? {
     let route = questionRoute
