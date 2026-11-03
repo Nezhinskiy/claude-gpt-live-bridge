@@ -113,7 +113,8 @@ test('aSummaryThatNeverComesStopsLoadingAfterAMinute', async ($, on) => {
   await band.press({ key: 'call' })
   expect(await note(band)).toBe('Loading context…')
   // The minute keeps its own timer, so the app holds its reply to the poll meanwhile: the clock
-  // crosses sixty idle ticks instead of sixty polls, each a round trip a loaded machine slows.
+  // crosses the minute with one held poll instead of sixty, each a round trip a loaded machine
+  // slows.
   let release = () => {}
   world.holdNext = new Promise<void>(resolve => { release = resolve })
   await world.clock.advance(59_999)
