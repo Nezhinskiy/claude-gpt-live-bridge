@@ -35,17 +35,41 @@ struct RelaunchScriptTests {
       try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
     }
 
-    func arguments(pid: Int32, attempts: Int = 10) -> [String] {
+    /// `app` and `pgrep` nil are `/Applications/LiveBridge.app` and the stand-in `pgrep`.
+    func arguments(
+      pid: Int32, attempts: Int = 10, app: String? = nil, pgrep: String? = nil
+    ) -> [String] {
       RelaunchScript.arguments(
-        pid: pid, app: "/Applications/LiveBridge.app", open: folder.appending(path: "open").path,
-        pgrep: folder.appending(path: "pgrep").path, sleep: folder.appending(path: "sleep").path,
-        attempts: attempts)
+        pid: pid, app: app ?? "/Applications/LiveBridge.app",
+        open: folder.appending(path: "open").path,
+        pgrep: pgrep ?? folder.appending(path: "pgrep").path,
+        sleep: folder.appending(path: "sleep").path, attempts: attempts)
     }
 
     var opens: [String] {
       ((try? String(contentsOf: log, encoding: .utf8)) ?? "").split(separator: "\n").map(
         String.init)
     }
+  }
+
+  /// A `LiveBridge.app` in a new folder whose executable is a copy of `sleep`, signed ad hoc so
+  /// it runs; its process is named `LiveBridge`.
+  func sleepingApp() throws -> URL {
+    let app = try temporaryDirectory().appending(path: "LiveBridge.app")
+    let executable = app.appending(path: "Contents/MacOS/LiveBridge")
+    try FileManager.default.createDirectory(
+      at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.copyItem(at: URL(filePath: "/bin/sleep"), to: executable)
+    let sign = try start("/usr/bin/codesign", ["-s", "-", "-f", executable.path])
+    sign.waitUntilExit()
+    return app
+  }
+
+  /// Starts `app`'s executable for ten seconds; the caller terminates it.
+  func run(_ app: URL) throws -> Process {
+    let process = try start(app.appending(path: "Contents/MacOS/LiveBridge").path, ["10"])
+    Thread.sleep(forTimeInterval: 0.2)
+    return process
   }
 
   /// A pid that has already exited and been reaped.
@@ -101,5 +125,29 @@ struct RelaunchScriptTests {
     let stage = try Stage(appearsOn: 1, watching: old.processIdentifier)
     #expect(try runs(stage.arguments(pid: old.processIdentifier)))
     #expect(stage.opens == ["open /Applications/LiveBridge.app gone"])
+  }
+
+  /// Only the installed app counts as running: another `LiveBridge` of this user (a debug build,
+  /// say) does not end the loop before the installed app is opened.
+  @Test func aLiveBridgeElsewhereDoesNotEndTheRelaunch() throws {
+    let stage = try Stage(appearsOn: nil)
+    let (installed, elsewhere) = (try sleepingApp(), try sleepingApp())
+    let other = try run(elsewhere)
+    defer { other.terminate() }
+    let arguments = stage.arguments(
+      pid: try goneProcess(), attempts: 2, app: installed.path, pgrep: "/usr/bin/pgrep")
+    #expect(try runs(arguments))
+    #expect(stage.opens.count == 2)
+  }
+
+  @Test func theInstalledAppRunningEndsTheRelaunch() throws {
+    let stage = try Stage(appearsOn: nil)
+    let installed = try sleepingApp()
+    let app = try run(installed)
+    defer { app.terminate() }
+    let arguments = stage.arguments(
+      pid: try goneProcess(), attempts: 2, app: installed.path, pgrep: "/usr/bin/pgrep")
+    #expect(try runs(arguments))
+    #expect(stage.opens.isEmpty)
   }
 }
