@@ -374,7 +374,9 @@ Install runs only from the owner's click, one run at a time (the actor's flag, a
    attempts have passed, and the app quits.
 
 A failure before the swap, step 7's own re-check included, leaves the installed app as it was
-and removes the staged copy; the image folder is removed on every path. Why the install waits for
+and removes the staged copy; the image folder is removed on every path. When it comes after step
+6 updated the mod, the mod stays at the new version, and the failure's sentence says so
+(`UpdateProblem.modAlreadyUpdated`). Why the install waits for
 the owner's click, and what that costs, is
 [ADR 0002](../adr/0002-the-app-updates-itself-on-the-owners-click.md).
 

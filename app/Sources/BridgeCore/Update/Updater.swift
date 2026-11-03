@@ -153,7 +153,11 @@ public actor Updater {
       await waitForQuiet()
       set(.installing)
       await stopCall()
-      try await swapIn(checked)
+      do throws(UpdateProblem) {
+        try await swapIn(checked)
+      } catch {
+        throw mod == .updated ? .modAlreadyUpdated(error, version: version) : error
+      }
       staged = nil
       try? UpdateRecord(from: running, to: version, mod: mod, noticePosted: false)
         .write(paths.updates.appending(path: "record.json"))

@@ -673,7 +673,9 @@ struct UpdaterTests {
   @Test func aStagedCopyWithAnotherCDHashIsNotSwapped() async throws {
     let rig = try UpdateRig()
     rig.answerStagedCDHash { $0 == 1 ? "0123456789" : "feedface" }
-    #expect(try await rig.install() == .failed(.stagedChanged))
+    #expect(
+      try await rig.install()
+        == .failed(.modAlreadyUpdated(.stagedChanged, version: #require(AppVersion("0.1.3")))))
     #expect(rig.swap == nil)
     #expect(rig.stagedCopies.isEmpty)
   }
@@ -703,7 +705,7 @@ struct UpdaterTests {
     let rig = try UpdateRig()
     rig.env.change { $0.swapError = CocoaError(.fileWriteNoPermission) }
     let status = try await rig.install()
-    guard case .failed(.swapFailed) = status else {
+    guard case .failed(.modAlreadyUpdated(.swapFailed, _)) = status else {
       Issue.record("status \(status)")
       return
     }
@@ -713,11 +715,29 @@ struct UpdaterTests {
     #expect(rig.stagedCopies.isEmpty)
   }
 
-  /// The system's reason for a failed swap reaches the owner as it was given.
+  /// The system's reason for a failed swap reaches the owner as it was given; with the mod left
+  /// to the owner, nothing is added to it.
   @Test func aFailedSwapKeepsItsReason() async throws {
-    let rig = try UpdateRig()
+    let rig = try UpdateRig(modVersion: "0.1.2")
     rig.env.change { $0.swapError = UpdateProblem.swapFailed("Example reason") }
     #expect(try await rig.install() == .failed(.swapFailed("Example reason")))
+  }
+
+  /// A failure after the mod was updated says the mod is already the new version.
+  @Test func aFailedSwapAfterTheModUpdateSaysTheModIsNew() async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.swapError = UpdateProblem.swapFailed("Example reason") }
+    let version = try #require(AppVersion("0.1.3"))
+    #expect(
+      try await rig.install()
+        == .failed(.modAlreadyUpdated(.swapFailed("Example reason"), version: version)))
+  }
+
+  @Test func aModAlreadyUpdatedSentenceKeepsTheReasonAndNamesTheVersion() throws {
+    let problem = UpdateProblem.modAlreadyUpdated(
+      .swapFailed("Example reason"), version: try #require(AppVersion("0.1.3")))
+    #expect(problem.sentence.hasPrefix(UpdateProblem.swapFailed("Example reason").sentence))
+    #expect(problem.sentence.contains("0.1.3"))
   }
 
   // MARK: The schedule

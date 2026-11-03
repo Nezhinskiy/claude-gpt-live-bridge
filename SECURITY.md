@@ -197,7 +197,8 @@ installs unless each passes:
 - **The swap.** The staged copy is exchanged with the installed app in one
   `renamex_np(…, RENAME_SWAP)` call in the same folder, so there is never a moment without an app
   at the path. A failure before the swap leaves the installed app as it was and removes the
-  staged copy and the image.
+  staged copy and the image. When it comes after the mod was updated, the mod stays at the new
+  version, and the failure says so.
 
 **An updated app skips Gatekeeper's first-launch block.** The download sets no quarantine
 attribute (the app does not set `LSFileQuarantineEnabled`), and one found on the staged copy is

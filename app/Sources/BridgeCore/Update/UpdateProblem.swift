@@ -41,6 +41,9 @@ public enum UpdateProblem: Error, Equatable, Sendable {
   case busy
   /// This app is not the copy in `/Applications`.
   case notInstalledCopy
+  /// The install stopped after the mod was updated to this version: the mod is new, the app is
+  /// not.
+  indirect case modAlreadyUpdated(UpdateProblem, version: AppVersion)
 
   /// One sentence for the owner.
   public var sentence: String {
@@ -69,6 +72,9 @@ public enum UpdateProblem: Error, Equatable, Sendable {
       "This release is not newer than the running LiveBridge, so it was not installed."
     case .busy: "An update is already running."
     case .notInstalledCopy: "Updates install only into /Applications."
+    case .modAlreadyUpdated(let problem, let version):
+      "\(problem.sentence) LiveBridge's Claude Code mod is already \(version), but the app was not "
+        + "replaced; install again from Settings > Updates."
     }
   }
 }
