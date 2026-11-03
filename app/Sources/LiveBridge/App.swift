@@ -186,9 +186,7 @@ final class AppModel {
   /// `UpdatePolicy.tick` and on wake. Other copies leave `updates/` to the installed one.
   private func startUpdates(dataDir: URL?) {
     guard isInstalledCopy, let running = AppVersion(versionText), let dataDir else { return }
-    let paths = UpdatePaths(
-      applications: URL(filePath: "/Applications"), updates: dataDir.appending(path: "updates"),
-      dataDir: dataDir)
+    let paths = UpdatePaths(dataDir: dataDir)
     let bridge = bridge
     let updater = Updater(
       environment: SystemUpdateEnvironment(releasesURL: Self.releasesURL), paths: paths,
@@ -203,10 +201,10 @@ final class AppModel {
     if let record = Updater.cleanUp(paths: paths) {
       updateRecord = record
       if !record.noticePosted {
-        announceInstalled(record, file: paths.updates.appending(path: "record.json"))
+        announceInstalled(record, file: paths.record)
       }
     }
-    updateState = UpdateStateStore(file: paths.updates.appending(path: "state.json"))
+    updateState = UpdateStateStore(file: paths.state)
     Task { [weak self] in
       await self?.restoreAnnounced()
       while !Task.isCancelled {
@@ -464,7 +462,7 @@ final class AppModel {
         return url
       }
     #endif
-    return URL(string: "https://api.github.com/repos/getLiveBridge/LiveBridge/releases/latest")!
+    return Release.latestURL
   }
 
   /// `--fake-mic <wav>`: debug builds play the file as the microphone.

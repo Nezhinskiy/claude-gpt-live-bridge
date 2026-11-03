@@ -50,6 +50,12 @@ struct UpdatePolicyTests {
       !UpdatePolicy.isInstalledCopy(
         resolvedBundlePath: "/Applications/LiveBridge.app", installedPathIsSymlink: true))
   }
+
+  @Test func theAppsUpdatePathsInstallTheInstalledCopy() {
+    let paths = UpdatePaths(dataDir: URL(filePath: "/Users/example/Library/LiveBridge"))
+    #expect(paths.installed.path == "/Applications/LiveBridge.app")
+    #expect(paths.updates.path == "/Users/example/Library/LiveBridge/updates")
+  }
 }
 
 struct UpdateStateTests {

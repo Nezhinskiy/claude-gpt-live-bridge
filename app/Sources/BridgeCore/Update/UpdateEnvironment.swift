@@ -62,6 +62,20 @@ public struct UpdatePaths: Sendable {
     self.dataDir = dataDir
   }
 
+  /// The app's own folders: the one that holds `UpdatePolicy.installedPath`, and `dataDir`'s
+  /// `updates`.
+  public init(dataDir: URL) {
+    self.init(
+      applications: URL(filePath: UpdatePolicy.installedPath).deletingLastPathComponent(),
+      updates: dataDir.appending(path: "updates"), dataDir: dataDir)
+  }
+
   /// The installed app.
   public var installed: URL { applications.appending(path: "LiveBridge.app") }
+  /// What the last update left for the relaunched app (`UpdateRecord`).
+  public var record: URL { updates.appending(path: "record.json") }
+  /// The automatic check's state (`UpdateStateStore`).
+  public var state: URL { updates.appending(path: "state.json") }
+  /// The lock a run holds.
+  var lock: URL { updates.appending(path: "lock") }
 }

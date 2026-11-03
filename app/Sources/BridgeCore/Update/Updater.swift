@@ -28,8 +28,7 @@ public actor Updater {
   static let claudeTimeout: Duration = .seconds(120)
   /// The largest image downloaded.
   static let imageLimit = 100 * 1024 * 1024
-  static let repository = "getLiveBridge/LiveBridge"
-  static let signerWorkflow = "getLiveBridge/LiveBridge/.github/workflows/release.yml"
+  static let signerWorkflow = "\(Release.repository)/.github/workflows/release.yml"
   static let hdiutil = URL(filePath: "/usr/bin/hdiutil")
   static let codesign = URL(filePath: "/usr/bin/codesign")
   static let ditto = URL(filePath: "/usr/bin/ditto")
@@ -37,8 +36,8 @@ public actor Updater {
   static let quarantine = "com.apple.quarantine"
   /// The start of a staged copy's name in `/Applications`.
   static let stagedPrefix = ".LiveBridge-update-"
-  /// The commands that update the mod, run in this order; `UpdateRecord.byHandCommands` are
-  /// the same for the owner.
+  /// The commands that update the mod, run in this order; `UpdateRecord.byHandCommands` gives
+  /// them to the owner.
   static let modCommands = [
     ["plugin", "marketplace", "update", "livebridge"],
     ["plugin", "update", "livebridge@livebridge"],
@@ -173,7 +172,7 @@ public actor Updater {
       }
       staged = nil
       try? UpdateRecord(from: running, to: version, mod: mod, noticePosted: false)
-        .write(paths.updates.appending(path: "record.json"))
+        .write(paths.record)
     } catch {
       if let staged { try? FileManager.default.removeItem(at: staged) }
       set(.failed(error))
@@ -194,9 +193,9 @@ public actor Updater {
       try? files.removeItem(at: paths.applications.appending(path: name))
     }
     guard UpdateBundleCheck.isDirectory(paths.updates) else { return nil }
-    let record = UpdateRecord.read(paths.updates.appending(path: "record.json"))
+    let record = UpdateRecord.read(paths.record)
     for name in (try? files.contentsOfDirectory(atPath: paths.updates.path)) ?? []
-    where name == "lock" || AppVersion(name) != nil {
+    where name == paths.lock.lastPathComponent || AppVersion(name) != nil {
       try? files.removeItem(at: paths.updates.appending(path: name))
     }
     return record
@@ -206,9 +205,8 @@ public actor Updater {
 
   /// Starts a run: takes `updates/lock`, or reports `busy` when another instance holds it.
   private func begin() -> Bool {
-    let lock = paths.updates.appending(path: "lock")
     try? FileManager.default.createDirectory(at: paths.updates, withIntermediateDirectories: true)
-    let file = open(lock.path, O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW, 0o600)
+    let file = open(paths.lock.path, O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW, 0o600)
     guard file >= 0 else {
       set(.failed(.busy))
       return false
@@ -220,7 +218,7 @@ public actor Updater {
 
   private func end() {
     busy = false
-    try? FileManager.default.removeItem(at: paths.updates.appending(path: "lock"))
+    try? FileManager.default.removeItem(at: paths.lock)
   }
 
   private func set(_ next: UpdateStatus) {
@@ -253,7 +251,7 @@ public actor Updater {
     }
     guard let gh = await environment.locate("gh") else { throw .ghMissing }
     let arguments = [
-      "attestation", "verify", image.path, "--repo", Self.repository, "--signer-workflow",
+      "attestation", "verify", image.path, "--repo", Release.repository, "--signer-workflow",
       Self.signerWorkflow, "--source-ref", "refs/tags/\(version.tag)",
       "--deny-self-hosted-runners", "--format", "json",
     ]

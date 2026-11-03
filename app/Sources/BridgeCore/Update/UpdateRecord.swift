@@ -20,9 +20,9 @@ public struct UpdateRecord: Codable, Equatable, Sendable {
   }
 
   /// The commands that update the mod when LiveBridge could not.
-  public static let byHandCommands = [
-    "claude plugin marketplace update livebridge", "claude plugin update livebridge@livebridge",
-  ]
+  public static let byHandCommands = Updater.modCommands.map {
+    (["claude"] + $0).joined(separator: " ")
+  }
 
   /// The record in `file`, or nil when there is none or it does not decode.
   public static func read(_ file: URL) -> UpdateRecord? {

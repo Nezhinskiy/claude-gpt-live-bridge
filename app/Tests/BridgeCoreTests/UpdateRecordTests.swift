@@ -19,6 +19,13 @@ struct UpdateRecordTests {
     }
   }
 
+  @Test func theByHandCommandsAreTheOnesTheUpdaterRuns() {
+    #expect(
+      UpdateRecord.byHandCommands == [
+        "claude plugin marketplace update livebridge", "claude plugin update livebridge@livebridge",
+      ])
+  }
+
   @Test func aMissingRecordIsNil() throws {
     let file = try temporaryDirectory().appending(path: "record.json")
     #expect(UpdateRecord.read(file) == nil)
