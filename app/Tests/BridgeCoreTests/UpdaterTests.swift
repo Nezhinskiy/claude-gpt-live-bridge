@@ -116,15 +116,15 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
 
   func locate(_ program: String) async -> URL? { script.withLockUnchecked { $0.programs[program] } }
 
-  func run(_ executable: URL, _ arguments: [String], cwd: URL?, timeout: Duration) async
-    -> ProgramResult?
-  {
+  func run(
+    _ executable: URL, _ arguments: [String], cwd: URL?, mergingErrors: Bool, timeout: Duration
+  ) async -> ProgramResult? {
     let program = executable.lastPathComponent
     log.append(.run(program: program, arguments: arguments, cwd: cwd))
     let line = ([program] + arguments).joined(separator: " ")
     let scripted = script.withLockUnchecked { $0.answers.first { line.hasPrefix($0.prefix) } }
     if let scripted { return scripted.answer(arguments) }
-    return genuine(program, arguments)
+    return genuine(program, arguments, mergingErrors: mergingErrors)
   }
 
   func swap(_ a: URL, _ b: URL) throws {
@@ -143,7 +143,9 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
   }
 
   /// What each program answers when the update is genuine.
-  private func genuine(_ program: String, _ arguments: [String]) -> ProgramResult? {
+  private func genuine(_ program: String, _ arguments: [String], mergingErrors: Bool)
+    -> ProgramResult?
+  {
     let ok = ProgramResult(status: 0, output: "")
     switch (program, arguments.first) {
     case ("gh", "attestation"):
@@ -160,6 +162,8 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
         fromPropertyList: plist, format: .xml, options: 0)
       return ProgramResult(status: 0, output: String(decoding: data ?? Data(), as: UTF8.self))
     case ("codesign", "-dvvv"):
+      // codesign reports on standard error, which is in the output only when asked for
+      guard mergingErrors else { return ok }
       let cdhash = script.withLockUnchecked { $0.cdhash }
       return ProgramResult(
         status: 0,

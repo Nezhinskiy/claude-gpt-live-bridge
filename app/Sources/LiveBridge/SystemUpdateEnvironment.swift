@@ -7,10 +7,6 @@ import Foundation
 final class SystemUpdateEnvironment: UpdateEnvironment {
   /// The largest release-check reply read.
   static let replyLimit = 2 * 1024 * 1024
-  /// The programs whose output includes their standard error: `codesign -dvvv` prints its
-  /// `CDHash=` line there. Every other program gives only its standard output, so a warning on
-  /// standard error cannot spoil the JSON or property list the `Updater` reads from it.
-  static let reportingOnStandardError: Set<String> = ["/usr/bin/codesign"]
 
   /// GitHub's `releases/latest` for this repository, or a debug build's stand-in.
   private let releasesURL: URL
@@ -52,12 +48,12 @@ final class SystemUpdateEnvironment: UpdateEnvironment {
     CodexLaunch.locate(program, searchPath: await searchPath.value())
   }
 
-  func run(_ executable: URL, _ arguments: [String], cwd: URL?, timeout: Duration) async
-    -> ProgramResult?
-  {
+  func run(
+    _ executable: URL, _ arguments: [String], cwd: URL?, mergingErrors: Bool, timeout: Duration
+  ) async -> ProgramResult? {
     let answer = try? await CodexLaunch.run(
       executable, arguments, searchPath: await searchPath.value(), cwd: cwd,
-      mergingErrors: Self.reportingOnStandardError.contains(executable.path), timeout: timeout)
+      mergingErrors: mergingErrors, timeout: timeout)
     return answer.map { ProgramResult(status: $0.status, output: $0.output) }
   }
 

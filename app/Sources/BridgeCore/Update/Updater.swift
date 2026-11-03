@@ -365,10 +365,11 @@ public actor Updater {
     return answer?.status == 0
   }
 
-  /// The CDHash `codesign -dvvv` reports for `app`, or nil.
+  /// The CDHash `codesign -dvvv` reports for `app` (on its standard error), or nil.
   private func cdhash(of app: URL) async -> String? {
     let answer = await environment.run(
-      Self.codesign, ["-dvvv", app.path], cwd: nil, timeout: Self.checkTimeout)
+      Self.codesign, ["-dvvv", app.path], cwd: nil, mergingErrors: true,
+      timeout: Self.checkTimeout)
     guard let answer, answer.status == 0 else { return nil }
     return UpdateBundleCheck.cdhash(codesignOutput: answer.output)
   }

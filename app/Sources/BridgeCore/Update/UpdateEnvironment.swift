@@ -21,10 +21,12 @@ public protocol UpdateEnvironment: Sendable {
   func download(_ url: URL, to file: URL, maxBytes: Int) async throws(UpdateProblem)
   /// `program` on the search path, or nil when it is not installed.
   func locate(_ program: String) async -> URL?
-  /// Runs `executable` with `arguments` in `cwd`; nil when it did not start or did not finish
-  /// within `timeout`.
-  func run(_ executable: URL, _ arguments: [String], cwd: URL?, timeout: Duration) async
-    -> ProgramResult?
+  /// Runs `executable` with `arguments` in `cwd`; the output is its standard output, with its
+  /// standard error too when `mergingErrors`. Nil when it did not start or did not finish within
+  /// `timeout`.
+  func run(
+    _ executable: URL, _ arguments: [String], cwd: URL?, mergingErrors: Bool, timeout: Duration
+  ) async -> ProgramResult?
   /// Exchanges `a` and `b` in one step.
   func swap(_ a: URL, _ b: URL) throws
   /// Opens `app` once the process `pid` has exited.
@@ -33,6 +35,16 @@ public protocol UpdateEnvironment: Sendable {
   func osVersion() -> OperatingSystemVersion
   /// Waits `duration`.
   func sleep(for duration: Duration) async
+}
+
+extension UpdateEnvironment {
+  /// Runs `executable` and gives its standard output only, so a warning on standard error
+  /// cannot spoil the JSON or property list read from it.
+  func run(_ executable: URL, _ arguments: [String], cwd: URL?, timeout: Duration) async
+    -> ProgramResult?
+  {
+    await run(executable, arguments, cwd: cwd, mergingErrors: false, timeout: timeout)
+  }
 }
 
 /// The folders an update works in.
