@@ -341,7 +341,8 @@ and reports `available` for a plain `vX.Y.Z` tag newer than the running version.
 **Check for updates automatically** on (`Settings.checkUpdatesAutomatically`, nil meaning on for a
 release build and off for one with `LBSourceBuild`), the app asks at launch, every
 `UpdatePolicy.tick` (15 minutes) and on wake whether a check is due: 24 hours since the last
-one, or a clock that moved back. A newer release is announced once per version, by a
+one GitHub answered, or a clock that moved back; a check that did not reach GitHub (common right
+after a wake) is tried again at the next tick. A newer release is announced once per version, by a
 notification with an Install action and a menu item; `updates/state.json` keeps the last check's
 time and the versions announced.
 

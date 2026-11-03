@@ -3,7 +3,7 @@ import os
 
 /// What the update check remembers between launches.
 public struct UpdateState: Codable, Equatable, Sendable {
-  /// When the last check finished, successful or not.
+  /// When the last automatic check GitHub answered finished, with a release or an error.
   public var lastCheck: Date?
   /// The versions the owner has already been told about, so each is announced once.
   public var announced: Set<AppVersion>

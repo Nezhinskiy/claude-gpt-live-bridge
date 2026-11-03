@@ -94,12 +94,17 @@ public actor Updater {
   }
 
   /// The automatic check: when one is due (`UpdatePolicy.isCheckDue`), checks and stores its
-  /// time, whatever the outcome. Returns a newer release the owner has not been told about yet,
-  /// and records it as told; nil otherwise.
+  /// time, unless it got no answer (GitHub not reached, which is common right after a wake, or
+  /// a run already under way), so the next tick tries again. Returns a newer release the owner
+  /// has not been told about yet, and records it as told; nil otherwise.
   public func checkIfDue(now: Date, enabled: Bool, state: UpdateStateStore) async -> Release? {
     guard UpdatePolicy.isCheckDue(now: now, lastCheck: state.current.lastCheck, enabled: enabled)
     else { return nil }
     let outcome = await check()
+    switch outcome {
+    case .failed(.network), .failed(.busy): return nil
+    default: break
+    }
     var isNew = false
     state.update { state in
       state.lastCheck = now

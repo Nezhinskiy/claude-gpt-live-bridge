@@ -43,7 +43,7 @@ image) shows `Updates install only into /Applications` instead of the button and
 never checks.
 
 With the toggle on, the app looks for a newer release when it is due: 24 hours or more since the
-last check, or a clock that moved back past it. It evaluates this on launch, every 15 minutes, and
+last check GitHub answered, or a clock that moved back past it. It evaluates this on launch, every 15 minutes, and
 when the Mac wakes. A newer release is announced once per version: a notification
 `LiveBridge 0.1.3 is available` with an **Install** action, and a menu item
 `Install LiveBridge 0.1.3…` until it is installed or a newer one replaces it.

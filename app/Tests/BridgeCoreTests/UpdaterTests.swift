@@ -770,6 +770,14 @@ struct UpdaterTests {
     #expect(state.current.lastCheck == Self.t0)
   }
 
+  @Test func aCheckGitHubDidNotAnswerIsNotTheDaysCheck() async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.latest = .failure(.network("The Internet connection appears offline.")) }
+    let state = UpdateStateStore(file: rig.paths.updates.appending(path: "state.json"))
+    _ = try await rig.updater().checkIfDue(now: Self.t0, enabled: true, state: state)
+    #expect(state.current.lastCheck == nil)
+  }
+
   @Test func aReleaseIsAnnouncedOnce() async throws {
     let rig = try UpdateRig()
     let state = UpdateStateStore(file: rig.paths.updates.appending(path: "state.json"))
