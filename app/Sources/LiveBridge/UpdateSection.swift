@@ -44,7 +44,8 @@ struct UpdateSection: View {
     }
   }
 
-  /// The step of the run under way, or the outcome of the last check or install.
+  /// The step of the run under way, or the outcome of the last check or install. A failure
+  /// with a release found offers Install again, as its sentence may ask.
   @ViewBuilder private var outcome: some View {
     if let step {
       HStack(spacing: 6) {
@@ -62,8 +63,13 @@ struct UpdateSection: View {
         VStack(alignment: .leading, spacing: 6) {
           Label(problem.sentence, systemImage: "exclamationmark.triangle.fill")
             .font(.caption).symbolRenderingMode(.multicolor)
-          if problem.offersReleasePage, let release = model.available {
-            Link("Open the release page", destination: release.pageURL)
+          if let release = model.available {
+            HStack {
+              if problem.offersReleasePage {
+                Link("Open the release page", destination: release.pageURL)
+              }
+              Button("Install \(release.version.description)") { model.installUpdate() }
+            }
           }
         }
       default: EmptyView()
