@@ -81,9 +81,7 @@ struct UpdateSection: View {
   /// The toggle shows the build's default until the owner sets it.
   private var automatic: Binding<Bool> {
     Binding {
-      UpdatePolicy.checksAutomatically(
-        setting: model.settings.current.checkUpdatesAutomatically,
-        isSourceBuild: model.isSourceBuild)
+      model.checksAutomatically
     } set: { on in
       model.settings.update { $0.checkUpdatesAutomatically = on }
     }
