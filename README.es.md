@@ -279,7 +279,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 
 Una sesión de voz en tiempo real cuesta mientras está abierta, así que LiveBridge la abre solo
 mientras alguien habla, mientras todavía puede llegar la respuesta de Claude a una petición que
-acabas de hacer, o para decir esa respuesta o una pregunta de Claude:
+acabas de hacer, o para decir esa respuesta, una pregunta de Claude o que Claude espera tu
+permiso:
 
 - Mientras hay una llamada en curso y nadie habla, el micrófono alimenta únicamente un detector de
   voz en tu Mac. No se envía nada a ninguna parte.
@@ -291,10 +292,10 @@ acabas de hacer, o para decir esa respuesta o una pregunta de Claude:
   después de ese traspaso, facturada como cualquier línea abierta, y la voz dice la respuesta de
   Claude cuando nadie esté hablando. Un traspaso posterior reinicia los 2 minutos; un intercambio
   que no envía nada a Claude se cierra tras los 20 segundos habituales de silencio.
-- La respuesta de Claude a una petición que le diste a la sesión con la que hablas, o una
-  pregunta que Claude te hace en ella, vuelve a abrir la línea si llega con la línea cerrada, y la
-  voz la dice, con el coste de cualquier línea abierta. Todo lo demás que llega con la línea
-  cerrada (una respuesta en una sesión de la que cambiaste, una solicitud de permiso, una
+- La respuesta de Claude a una petición que le diste a la sesión con la que hablas, una pregunta
+  que Claude te hace en ella o una solicitud de permiso que espera vuelve a abrir la línea si
+  llega con la línea cerrada, y la voz la dice, con el coste de cualquier línea abierta. Todo lo
+  demás que llega con la línea cerrada (cualquier cosa de una sesión de la que cambiaste, una
   actualización posterior) reproduce un timbre y queda en espera: la banda y el menú lo muestran
   como sin escuchar, y la voz te lo dice la próxima vez que hables
   ([cuándo se considera escuchado](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
@@ -312,8 +313,8 @@ por un socket Unix en una carpeta que solo tu usuario puede abrir. Lo que va a O
 la sesión en tiempo real de codex:
 
 - el audio del micrófono mientras la línea está abierta, desde 2 segundos antes de que empezaras a
-  hablar (o, en una línea que abrió una respuesta o pregunta de Claude, desde que se abrió) hasta
-  que se cierra;
+  hablar (o, en una línea que abrió una respuesta, pregunta o solicitud de permiso de Claude,
+  desde que se abrió) hasta que se cierra;
 - las instrucciones de la voz: las reglas propias de LiveBridge y, después, el **Prompt** de tus
   Ajustes si escribiste uno;
 - la conversación reciente de la sesión de destino (hasta las últimas 24 líneas) para continuarla

@@ -392,13 +392,12 @@ public actor Bridge: Router {
     await send(.deliver(line, opensLine: await opensLine(line)))
   }
 
-  /// Whether `line` opens a closed line: an answer or a question from the target, whose
-  /// conversation holds a turn of the owner's. A line seeded without one stays silent
-  /// (ADR 0001 (b), (n)); an approval notice the voice cannot settle, and an update, chime.
+  /// Whether `line` opens a closed line: an answer, a question or an approval notice from the
+  /// target, whose conversation holds a turn of the owner's. A line seeded without one stays
+  /// silent (ADR 0001 (b), (n)); an update chimes.
   private func opensLine(_ line: VoiceLine) async -> Bool {
-    guard let session = line.session, line.kind.answers || line.kind == .asking else {
-      return false
-    }
+    guard let session = line.session, line.kind.answers || [.asking, .approval].contains(line.kind)
+    else { return false }
     let target = await registry.target
     return session == target && continuity[session].lines.contains { $0.speaker == .owner }
   }

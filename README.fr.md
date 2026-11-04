@@ -294,7 +294,8 @@ parlez.
 
 Une session vocale en temps réel coûte tant qu'elle est ouverte, donc LiveBridge ne l'ouvre que
 pendant que quelqu'un parle, pendant que la réponse de Claude à une demande que vous venez de
-faire peut encore arriver, ou pour dire cette réponse ou une question de Claude :
+faire peut encore arriver, ou pour dire cette réponse, une question de Claude ou que Claude
+attend votre autorisation :
 
 - Tant qu'un appel est en cours et que personne ne parle, le microphone alimente uniquement un
   détecteur de voix sur votre Mac. Rien n'est envoyé nulle part.
@@ -307,10 +308,10 @@ faire peut encore arriver, ou pour dire cette réponse ou une question de Claude
   la réponse de Claude dès que plus personne ne parle. Un transfert ultérieur relance les
   2 minutes ; un échange qui n'envoie rien à Claude se ferme après les 20 secondes de silence
   habituelles.
-- La réponse de Claude à une demande confiée à la session à laquelle vous parlez, ou une
-  question que Claude vous y pose, rouvre la ligne si elle arrive alors que la ligne est fermée,
-  et la voix la dit, facturée comme toute ligne ouverte. Tout le reste de ce qui arrive ligne
-  fermée (une réponse dans une session que vous avez quittée, une demande d'autorisation, une
+- La réponse de Claude à une demande confiée à la session à laquelle vous parlez, une question
+  que Claude vous y pose ou une demande d'autorisation qu'il attend rouvre la ligne si elle arrive
+  alors que la ligne est fermée, et la voix la dit, facturée comme toute ligne ouverte. Tout le
+  reste de ce qui arrive ligne fermée (tout ce qui vient d'une session que vous avez quittée, une
   mise à jour ultérieure) joue un carillon et attend : la bande et le menu l'affichent comme non
   entendu, et la voix vous le dit la prochaine fois que vous parlez
   ([quand il compte comme entendu](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
@@ -328,8 +329,8 @@ par un socket Unix situé dans un dossier que seul votre utilisateur peut ouvrir
 OpenAI, via la session temps réel de codex :
 
 - l'audio du microphone tant que la ligne est ouverte, de 2 secondes avant que vous ne commenciez
-  à parler (ou, pour une ligne qu'une réponse ou une question de Claude a ouverte, dès son
-  ouverture) jusqu'à sa fermeture ;
+  à parler (ou, pour une ligne qu'une réponse, une question ou une demande d'autorisation de
+  Claude a ouverte, dès son ouverture) jusqu'à sa fermeture ;
 - les instructions de la voix : les règles propres de LiveBridge, puis le **Prompt** de vos
   Settings si vous en avez écrit un ;
 - la conversation récente de la session cible (jusqu'aux 24 dernières lignes) pour la poursuivre

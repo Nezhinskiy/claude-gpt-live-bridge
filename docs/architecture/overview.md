@@ -204,22 +204,23 @@ sequenceDiagram
 
 ### A result while the line is closed
 
-An answer or a question from the target (its result, failure or question, or a question Claude asks
-while it works) opens the closed line when the target's conversation holds a turn of the owner's; a
-line seeded without one stays silent ([ADR 0001](../adr/0001-platform-findings.md) (b)). The bridge
-decides this from the registry's target and the conversation, and passes it with the delivery. The
-new realtime session is seeded with the target's conversation, starts without the pre-roll, as
-nobody spoke, and gets the line as context; the voice usually says it unprompted, within about 8 s
-of connecting ([ADR 0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence
-rule closes the line, and the line chimes and waits as below. The mod's request that brought the
-line does not wait for the connect, and a question the owner answers at the keyboard while its line
-still connects closes that line.
+An answer, a question or an approval notice from the target (its result, failure or question, or a
+question Claude asks or a permission prompt it waits on while it works) opens the closed line when
+the target's conversation holds a turn of the owner's; a line seeded without one stays silent ([ADR
+0001](../adr/0001-platform-findings.md) (b)). The bridge decides this from the registry's target and
+the conversation, and passes it with the delivery. The new realtime session is seeded with the
+target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
+the voice usually says it unprompted, within about 8 s of connecting ([ADR
+0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence rule closes the line,
+and the line chimes and waits as below. The mod's request that brought the line does not wait for
+the connect, and a question or approval the owner settles at the keyboard while its line still
+connects closes that line.
 
-Any other line that arrives while the line is closed (one from a session that is not the target, an
-approval notice, which the voice cannot settle, a later update) does not open it. It chimes, the
-notification names the session, and the line waits; the voice gets it when the owner next speaks and
-says it in a reply. A connect that fails with lines unheard chimes too. A result for a session the
-open line is not waiting on is added as context and said in the voice's next reply.
+Any other line that arrives while the line is closed (one from a session that is not the target, a
+later update) does not open it. It chimes, the notification names the session, and the line waits;
+the voice gets it when the owner next speaks and says it in a reply. A connect that fails with lines
+unheard chimes too. A result for a session the open line is not waiting on is added as context and
+said in the voice's next reply.
 
 ```mermaid
 sequenceDiagram
@@ -316,7 +317,7 @@ sequenceDiagram
   Claude->>Mod: classic.PermissionRequest (during a voice turn)
   Mod->>Bridge: POST /v1/activity approval
   Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval"
-  Codex-->>Owner: says so (or a chime if the line is closed)
+  Codex-->>Owner: says so (a closed line opens for it, as for a result)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
   Mod->>Bridge: POST /v1/activity working

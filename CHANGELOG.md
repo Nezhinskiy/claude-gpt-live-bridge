@@ -8,11 +8,11 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
-- Claude's answer to a request you handed the session you are talking to, or a question Claude
-  asks you there, now opens the closed voice line, and the voice says it, instead of only
-  chiming. It is billed like any open line; if the voice stays silent, the line closes after 20
-  seconds and chimes as before. An answer in another session, a permission prompt and a later
-  update still only chime
+- Claude's answer to a request you handed the session you are talking to, a question Claude asks
+  you there, or a permission prompt it waits on now opens the closed voice line, and the voice
+  says it, instead of only chiming. It is billed like any open line; if the voice stays silent,
+  the line closes after 20 seconds and chimes as before. Anything from another session, and a
+  later update, still only chimes
   ([billing](README.md#billing-aware-by-design), [privacy](README.md#privacy)).
 
 ## [0.2.0]

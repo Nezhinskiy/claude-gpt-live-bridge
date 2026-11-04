@@ -603,9 +603,9 @@ struct BridgeTests {
     #expect(await voice.opens.count == 1)
   }
 
-  /// After the answer, an update and an approval notice, which the voice cannot settle, only
-  /// chime; a question Claude asks opens the line.
-  @Test func aQuestionOpensTheLineAnUpdateAndAnApprovalChime() async throws {
+  /// After the answer, an update only chimes; an approval notice and a question Claude asks open
+  /// the line.
+  @Test func anApprovalAndAQuestionOpenTheLineAnUpdateChimes() async throws {
     try await closedAfterARequest()
     try await answerFirstRequest()
     #expect(await eventually { await voice.opens.count == 2 })
@@ -617,13 +617,16 @@ struct BridgeTests {
       "/v1/answer",
       AnswerBody(sessionId: a, id: request(1).id, status: .update, text: "Tests pass.", reason: nil)
     )
-    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
-    try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
-    #expect(await chimes() == before + 2)
+    #expect(await chimes() == before + 1)
     #expect(await voice.opens.count == 2)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
+    #expect(await eventually { await voice.opens.count == 3 })
+    voice.emit(.closed(.other("closed")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
     try await post(
       "/v1/activity", ActivityBody(sessionId: a, state: .approval, question: "Which branch?"))
-    #expect(await eventually { await voice.opens.count == 3 })
+    #expect(await eventually { await voice.opens.count == 4 })
   }
 
   /// The last session leaving stops the call, as Start with none refuses: nobody is left to

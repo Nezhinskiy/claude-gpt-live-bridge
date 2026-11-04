@@ -269,8 +269,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 ## Billing-aware by design
 
 A realtime voice session costs while it is open, so LiveBridge opens it only while someone is
-talking, while Claude's answer to a request you just made may still come, or to say that answer
-or Claude's question:
+talking, while Claude's answer to a request you just made may still come, or to say that answer,
+a question Claude asks you, or that Claude waits for your approval:
 
 - While a call is on and nobody is talking, the microphone feeds only a voice detector on your
   Mac. Nothing is sent anywhere.
@@ -282,11 +282,11 @@ or Claude's question:
   after that handoff, billed like any open line, and the voice says Claude's answer once nobody
   is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
   Claude closes after the usual 20 seconds of silence.
-- Claude's answer to a request you handed the session you are talking to, or a question Claude
-  asks you there, opens the line again when it comes after the line closed, and the voice says
-  it, billed like any open line. Anything else that arrives while the line is closed (an answer
-  in a session you switched away from, a permission prompt, a later update) plays a chime and
-  waits: the band and the menu show it as unheard, and the voice tells you when you next speak
+- Claude's answer to a request you handed the session you are talking to, a question Claude asks
+  you there, or a permission prompt it waits on opens the line again when it comes after the line
+  closed, and the voice says it, billed like any open line. Anything else that arrives while the
+  line is closed (anything from a session you switched away from, a later update) plays a chime
+  and waits: the band and the menu show it as unheard, and the voice tells you when you next speak
   ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
@@ -302,7 +302,8 @@ socket in a folder only your user can open. What goes to OpenAI, through codex's
 session:
 
 - microphone audio while the line is open, from 2 seconds before you started speaking (or, for
-  a line Claude's answer or question opened, from when it opened) until it closes;
+  a line Claude's answer, question or approval notice opened, from when it opened) until it
+  closes;
 - the voice's instructions: LiveBridge's own rules, then your Settings **Prompt** if you wrote
   one;
 - the target session's recent conversation (up to the last 24 lines) to continue it in a new

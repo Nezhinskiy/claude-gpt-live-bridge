@@ -44,8 +44,8 @@ public enum CallEvent: Equatable, Sendable {
   case graceElapsed
   /// The voice is saying something (a transcript delta); the owner's words were recognised.
   case assistantSpeaking, userTranscribed
-  /// `opensLine`: the bridge found that the line opens a closed line (the target's answer or
-  /// question, while the target's conversation holds a turn of the owner's).
+  /// `opensLine`: the bridge found that the line opens a closed line (the target's answer,
+  /// question or approval notice, while the target's conversation holds a turn of the owner's).
   case deliver(VoiceLine, opensLine: Bool = false)
   case remoteClosed(Problem)
   case audioFailed(Problem)
