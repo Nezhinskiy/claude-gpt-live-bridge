@@ -82,6 +82,7 @@ actor FakeAudio: AudioSide {
   func flushPreroll() { calls.append("flushPreroll") }
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
+  func confirmHandoff() { calls.append("confirmHandoff") }
 }
 
 /// Records the notices the bridge posts.
@@ -105,7 +106,8 @@ struct BridgeTests {
   /// `dir` and `time` are given to restart the app on another test's data.
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
-    time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true }
+    time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
+    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }
   ) throws {
     self.time = time
     self.dir = try dir ?? temporaryDirectory()
@@ -115,7 +117,7 @@ struct BridgeTests {
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
-      notifier: notifier, notifies: notifies)
+      notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs)
   }
 
   @discardableResult
@@ -353,6 +355,16 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
   }
 
+  /// A handoff queued for a session is confirmed by a sound, so the owner can tell a request
+  /// that went to Claude from a voice that only said it would look (BR-001).
+  @Test func handoffToASessionIsConfirmedBySound() async throws {
+    try await join(a, "Alpha")
+    await live()
+    voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
+    #expect(await eventually { await audio.calls.filter { $0 == "confirmHandoff" }.count == 1 })
+  }
+
   /// What the voice handed off shows in the conversation of the session it went to: here the
   /// one that asked, not the target.
   @Test func handoffIsShownInTheSessionItWentTo() async throws {
@@ -468,6 +480,18 @@ struct BridgeTests {
     try await test.answer(request(1), from: a)
     #expect(await test.audio.calls.contains("chime"))
     #expect(await test.notifier.posted.isEmpty)
+  }
+
+  /// Settings' handoff sound is read at each handoff; off, the request still goes.
+  @Test func handoffSoundCanBeTurnedOff() async throws {
+    let settings = SettingsStore(file: nil)
+    let test = try BridgeTests(confirmsHandoffs: { settings.current.confirmHandoffs })
+    settings.update { $0.confirmHandoffs = false }
+    try await test.join(a, "Alpha")
+    await test.live()
+    test.voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await test.registry.poll(a) == .request(request(1)) })
+    #expect(await !test.audio.calls.contains("confirmHandoff"))
   }
 
   /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.

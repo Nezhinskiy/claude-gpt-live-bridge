@@ -6,11 +6,22 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A short sound when the app queues a request the voice handed off. The voice sometimes says it
+  is looking without handing the request off; with no sound, nothing was queued
+  ([BR-001](docs/bugs/BR-001.md)). **Settings > Notifications > Play a sound when a request is
+  queued for Claude** turns it off.
+
 ### Changed
 
 - The in-app update attaches and ejects the release image with `diskutil image attach` and
   `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
   a new folder of its own.
+- The voice's rule against promising a look without a handoff is one sentence shorter, and lets
+  the voice ask you to confirm an action first. In 20 test runs it missed no handoff, against 3 of
+  20 with the old wording: too few runs to call the failure fixed
+  ([BR-001](docs/bugs/BR-001.md)).
 
 ### Fixed
 
