@@ -7,7 +7,7 @@ app runs `codex app-server` on the user's ChatGPT login, opens an OpenAI realtim
 through it, and relays the voice model's handoffs to a Claude Code session through the mod.
 Before any of that is built, a throwaway spike checked the platform facts the design rests on.
 This record keeps what was measured, how, and what we decided from it. Items are lettered (a)
-to (m) so later work can cite them.
+to (n) so later work can cite them.
 
 Tested on: macOS 27.0.1 (Apple Silicon), Swift 6.4.2, `codex-cli 0.166.0` (realtime `v3`,
 `outputModality: "audio"`, ChatGPT plan with realtime), Claude Code 2.1.309. The codex realtime
@@ -198,6 +198,49 @@ The names come from `config/read` (`config.mcp_servers` keys). `mcpServerStatus/
 each server's state in `runtimeStatus` (`notStarted`, `starting`, `connected`,
 `authenticationRequired`, `failed`, `cancelled`, `disabled`, or `null`).
 
+**(n) A line opened by a result, and a synthetic first utterance.** Observed, 2026-11-04,
+`codex-cli 0.166.0`, 11 runs of a probe build that was never committed: the debug app with
+`--fake-mic` (a `say` request at 6 s, silence after), `resultWindowSeconds` set to 0, a result
+that arrives while the line is closed opening the line instead of chiming, and the smoke test's
+fake session answering 30 s after it took the request. The second line was seeded as usual:
+`initialItems` holding the owner's request and the voice's acknowledgement, then the result as
+`appendText`. In the speech runs the audio page then queued a `say` phrase into the peer's
+track, not played locally and not seen by the voice detector. Times are from `live` to the
+first assistant `transcript/done` (the end of the first segment, polled every 250 ms), so speech
+began earlier.
+
+| Run | Nudge | Handoff of the request | Second line |
+|---|---|---|---|
+| 1 | none | — | Local Network not yet allowed for the ad hoc debug build; no line |
+| 2, 4, 5 | none | yes | the voice said the result unprompted; first segment 7.7, 5.4, 7.4 s |
+| 6 | none | yes | silent; closed after 20 s, the result left unheard |
+| 7 | "Any news?" | yes | the result, first segment at 1.3 s |
+| 10 | "Any news?" | yes | began the result at 1.3 s, then handed "Any news" to Claude as a new request and said it was checking; the result was not finished |
+| 11 | "Any news?" | yes | began the result at 2.0 s, then said it again in full 25 s later |
+| 3, 8, 9 | none, "Any news?", "Hmm." | no: the voice said "On it" / "Looking now" without delegating | not reached |
+
+- A session that has a user turn in its `initialItems` does speak a result added after it,
+  without a user turn of its own: 3 of 4 runs. This narrows item (b), whose fresh sessions had no
+  user turn at all and said nothing.
+- A synthetic utterance is heard as the owner's (the smoke test relies on this too) and makes the
+  voice answer within about 2 s: 3 of 3. It is a turn like any other, so the voice may act on its
+  words: a question ("Any news?") became a handoff in 1 of 3 and a repeat in 1 of 3. Its
+  transcript arrives as a `user` line and goes into the conversation unless filtered.
+- `transport.dtmf.send` was not tried; the speech runs answered the question it was meant to.
+- In 3 of 11 runs the voice acknowledged the request without delegating, the failure item (b)
+  measured at 3 of 6 before the prompt rule and 0 of 5 after it.
+- The probe kept the realtime line open 476 s in all (about $0.40 at
+  [GPT-Live's $0.05 a minute](https://learn.chatgpt.com/docs/pricing)).
+
+What this would allow, not decided: the result window could close the line 20 s after the
+acknowledgement instead of holding it up to 120 s, and a result for a session the voice handed a
+request could reopen the line and be said, instead of chiming. That costs about one connect and
+the time the voice speaks, holds no line while Claude works, and says a result that takes longer
+than the window today. Without a nudge 1 in 4 such lines stayed silent, so the chime would remain
+the fallback when the result is still unheard at the close; a nudge would make the answer prompt
+but needs wording that is no request ("Hmm." did not reach a result, so it is untested) and a
+filter that keeps it out of the conversation and the menu.
+
 ### Claude Code mod API
 
 **(e) Session title.** Observed against the desktop app's own session list: for each of 5
@@ -347,7 +390,8 @@ Decided by the owner on 2026-11-01, after the findings above.
 When an answer, a question or a later update arrives while no realtime session is open, the app
 plays a short chime and does not open a session for it. Item (b) shows why: a fresh session with
 no user turn does not speak appended text or initial items, so reopening one would spend session
-time and still leave the result unsaid. The result waits in the app, counted as unheard in the
+time and still leave the result unsaid. Item (n) later found that a session seeded with the owner's request
+usually does say it; this decision stands until the owner revisits it. The result waits in the app, counted as unheard in the
 Claude Code band and the popover. When the owner next speaks and a session connects, every waiting
 result is given to the voice as context, and the voice speaks each one once, with its session's
 label. A failed connection keeps the results waiting; nothing is retried on its own.
