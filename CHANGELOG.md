@@ -6,6 +6,12 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The in-app update attaches and ejects the release image with `diskutil image attach` and
+  `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
+  a new folder of its own.
+
 ## [0.2.0]
 
 ### Added
