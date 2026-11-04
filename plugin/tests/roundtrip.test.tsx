@@ -4,7 +4,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { spokenReply, voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
+import { ASKED, BAND, fakeWorld, framed, ID, LIVE, model } from './fake-bridge.ts'
 
 const REQUEST: VoiceRequest = {
   id: '00000000-0000-0000-0000-00000000000a',
@@ -93,10 +93,6 @@ test('aTypedTurnsApprovalIsNotReportedWhileAVoiceRequestWaits', async ($, on) =>
   expect(world.take('activity')).toEqual([])
 })
 
-const ASKED = [{
-  question: 'Which name should the folder get?', header: 'Name', multiSelect: false,
-  options: [{ label: 'build', description: 'the default' }, { label: 'out', description: 'shorter' }],
-}]
 const SPOKEN = { id: '00000000-0000-0000-0000-00000000000b', brief: 'What would out change?', transcript: [] }
 
 /** A voice turn whose prompt Claude has started; the activity it posted so far is taken. */
@@ -135,25 +131,6 @@ test('claudesQuestionIsAnsweredByVoice', async ($, on) => {
   expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
-
-/**
- * The model beneath the mod: each step it is asked for answers `text` as its visible text. The
- * hook must be on before the test first calls `$`.
- */
-function model(on: On) {
-  const said = { text: '' }
-  on('turn.step', async function* ($, e) {
-    return { turnId: e.turnId, index: e.index, answer: said.text, toolUses: [], stopReason: 'tool_use', usage: null }
-  })
-  return {
-    async step($: Engine, turnId: string, text: string) {
-      said.text = text
-      const stream = $.turn.step({ turnId, index: 0, model: 'example-model', messageCount: 1 })
-      for await (const _ of stream) { /* drain */ }
-      return stream.result
-    },
-  }
-}
 
 /** What Claude wrote in the step that asks the question reaches the voice before the question. */
 test('theTextBeforeClaudesQuestionGoesToTheVoiceFirst', async ($, on) => {

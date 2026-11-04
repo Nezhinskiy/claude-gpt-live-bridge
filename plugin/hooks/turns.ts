@@ -22,7 +22,7 @@ type Tracked = { id: RequestId; isVoice: boolean }
 /**
  * Background work a voice request may have started (a background task's notification, a
  * returning background agent included). Every other origin, one this list does not know too,
- * counts as typed: its answer is never sent to the voice.
+ * counts as typed: its answer reaches the voice only as the context's `last`, when asked for.
  */
 const BACKGROUND = new Set(['task-notification'])
 const FAILURE: Record<Exclude<TurnOutcome, 'answer'>, string> = {
@@ -41,6 +41,14 @@ export function clip(text: string, limit: number): string {
     count += 1
   }
   return text
+}
+
+/** `text` within `limit` characters, cut before its last line break when it is cut at all. */
+export function clipAtLine(text: string, limit: number): string {
+  const head = clip(text, limit)
+  if (head === text) return text
+  const cut = head.lastIndexOf('\n')
+  return cut > 0 ? head.slice(0, cut) : head
 }
 
 /** A turn's origin from the `origin` of the `prompt.submit` before it (ADR 0001, item m). */

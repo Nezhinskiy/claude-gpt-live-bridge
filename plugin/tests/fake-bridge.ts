@@ -2,6 +2,7 @@
 // HTTP over the socket, a registry record for the session title, and the engine's answers.
 import type { On } from 'claude-code'
 import { mock } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 
 import { FRAMING } from '../hooks/prompt.ts'
 import { socketPath } from '../hooks/wire.ts'
@@ -196,3 +197,28 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
 /** How the engine starts the turn of a prompt this plugin submitted (ADR 0001, item j). */
 export const framed = (text: string) =>
   `${FRAMING}${text}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns — it starts this turn in the user's place. Address the message above.`
+
+/** A question Claude asks the owner with `AskUserQuestion`. */
+export const ASKED = [{
+  question: 'Which name should the folder get?', header: 'Name', multiSelect: false,
+  options: [{ label: 'build', description: 'the default' }, { label: 'out', description: 'shorter' }],
+}]
+
+/**
+ * The model beneath the mod: each step it is asked for answers `text` as its visible text. The
+ * hook must be on before the test first calls `$`.
+ */
+export function model(on: On) {
+  const said = { text: '' }
+  on('turn.step', async function* ($, e) {
+    return { turnId: e.turnId, index: e.index, answer: said.text, toolUses: [], stopReason: 'tool_use', usage: null }
+  })
+  return {
+    async step($: Engine, turnId: string, text: string) {
+      said.text = text
+      const stream = $.turn.step({ turnId, index: 0, model: 'example-model', messageCount: 1 })
+      for await (const _ of stream) { /* drain */ }
+      return stream.result
+    },
+  }
+}
