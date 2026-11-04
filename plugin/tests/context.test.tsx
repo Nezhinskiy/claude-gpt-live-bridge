@@ -193,6 +193,21 @@ test('anOpenQuestionComesWithTheTextThatAskedIt', async ($, on) => {
   expect(world.take('context')).toEqual([SUMMARY])
 })
 
+test('aVoiceTurnsOpenQuestionGivesTheTextThatAskedItOnce', async ($, on) => {
+  // The voice turn's question line takes the step's text too; the context keeps its own copy,
+  // said once, before the question.
+  const world = await joined($, on)
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  await step($, world, 't1', 'Two folders.')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await appAsks(world)
+  expect(world.take('context')).toEqual([{ ...SUMMARY, last: `Two folders.\n\n${askedText(ASKED)}` }])
+  world.answerDialog('build')
+  await asked
+})
+
 test('aLongLastReplyIsClipped', async ($, on) => {
   const world = await joined($, on)
   const lines = Array.from({ length: 205 }, (_, i) => `line ${i} `.padEnd(97, 'x'))
