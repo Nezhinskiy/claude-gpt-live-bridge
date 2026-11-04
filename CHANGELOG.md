@@ -6,6 +6,17 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A short tick confirms each request the voice hands to Claude. The voice sometimes says it is
+  looking without handing the request off; with no tick you know nothing was sent
+  ([BR-001](docs/bugs/BR-001.md)).
+
+### Changed
+
+- The voice's rule now says it may answer from what it already knows, and must never say it is
+  checking or doing something unless it hands it off in the same turn.
+
 ## [0.2.0]
 
 ### Added

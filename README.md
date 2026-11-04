@@ -281,6 +281,8 @@ talking, or while Claude's answer to a request you just made may still come:
   after that handoff, billed like any open line, and the voice says Claude's answer once nobody
   is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
   Claude closes after the usual 20 seconds of silence.
+- Each handoff that reaches a Claude Code session plays a short tick. If the voice says it is
+  looking and no tick follows, nothing was sent to Claude ([known limitations](#known-limitations)).
 - A result that arrives later, while the line is closed, plays a chime and waits: the band and
   the menu show it as unheard, and the voice tells you when you next speak
   ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
@@ -347,6 +349,11 @@ can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
+- The voice sometimes says it is looking ("On it", "Looking now") without handing the request
+  off, so nothing reaches Claude: about one request in five in testing, with the voice's rule
+  against it in place. The tick that confirms each handoff is how you notice; say the request
+  again. The app cannot tell such a promise from an answer by its words, since the voice speaks
+  your language ([BR-001](docs/bugs/BR-001.md)).
 - A result that arrives while the line waits for it goes to the voice as text to say; codex has
   no call that makes the voice speak at once, so the model decides when. In testing it spoke
   within a few seconds. If it does not, the result stays unheard: the voice says it after your

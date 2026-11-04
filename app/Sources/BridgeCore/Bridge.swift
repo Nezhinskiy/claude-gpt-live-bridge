@@ -257,6 +257,7 @@ public actor Bridge: Router {
     case .chime:
       await audio.chime()
       await notifyWaiting()
+    case .confirmHandoff: await audio.confirmHandoff()
     case .problem(let shown): problem = shown
     }
   }

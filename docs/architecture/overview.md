@@ -138,8 +138,10 @@ again, as it does after a `404` (the app restarted).
 
 ### Handoff
 
-The owner speaks; the line opens with the pre-roll, the voice hands the request off, and the line
-stays open for its result up to `CallMachine.resultWindowSeconds` (120 s) after the latest
+The owner speaks; the line opens with the pre-roll, the voice hands the request off, the app plays
+a short sound once the request is queued for a session (the voice can promise a look without
+handing off, [BR-001](../bugs/BR-001.md); the sound is how the owner tells the two apart), and
+the line stays open for its result up to `CallMachine.resultWindowSeconds` (120 s) after the latest
 handoff, however silent it is (sound without words still closes it after 90 s). A result from a session handed a request in that window is given
 to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the owner
 (local voice detection) nor the voice is speaking; when either was, the bridge waits until both

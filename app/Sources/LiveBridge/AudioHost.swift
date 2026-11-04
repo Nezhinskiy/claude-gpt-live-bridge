@@ -77,6 +77,8 @@ final class AudioHost: NSObject, AudioSide {
 
   func chime() async { NSSound(named: "Glass")?.play() }
 
+  func confirmHandoff() async { NSSound(named: "Tink")?.play() }
+
   /// macOS's answer for the microphone, asking it first if it never was (its prompt then
   /// shows); nil when the page may open the microphone.
   private static func askForMicrophone() async -> Problem? {

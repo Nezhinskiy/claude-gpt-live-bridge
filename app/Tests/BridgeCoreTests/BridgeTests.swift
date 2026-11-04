@@ -82,6 +82,7 @@ actor FakeAudio: AudioSide {
   func flushPreroll() { calls.append("flushPreroll") }
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
+  func confirmHandoff() { calls.append("confirmHandoff") }
 }
 
 /// Records the notices the bridge posts.
@@ -337,6 +338,16 @@ struct BridgeTests {
     #expect(await voice.added == ["[ASKING] Alpha: \(question)"])
     voice.emit(.handoff(request(2)))
     #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
+  }
+
+  /// A handoff that reaches a session is confirmed by a sound, so the owner can tell a request
+  /// that went to Claude from a voice that only said it would look (BR-001).
+  @Test func handoffToASessionIsConfirmedBySound() async throws {
+    try await join(a, "Alpha")
+    await live()
+    voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
+    #expect(await audio.calls.filter { $0 == "confirmHandoff" }.count == 1)
   }
 
   /// What the voice handed off shows in the conversation of the session it went to: here the
