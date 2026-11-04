@@ -43,7 +43,8 @@ microphone or Claude:
   is pure; `Bridge` runs the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
-  flight for 10 minutes fails; either is reported to the voice as `[FAILED]`.
+  flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
+  session was the last one, which stops the call ([failure behaviour](#failure-behaviour)).
 - `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
   (the owner's, the voice's and the lines the session sent the voice) and the context loaded
   from it. Each new realtime session is seeded with the target's conversation and only the
@@ -322,7 +323,9 @@ sequenceDiagram
 
 - **No session joined:** Start is disabled in the menu. From the band or the socket, Start
   does nothing but report "No Claude Code session has joined: run /live on in a session, then
-  start."; the sentence goes when a session joins.
+  start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
+  session closing, the menu's ×, or no poll for 5 s) stops a call that is on, a Start still
+  launching codex included, as Stop does, and reports the same sentence.
 - **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
   gives no answer within 10 s.
