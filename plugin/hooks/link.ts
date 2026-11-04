@@ -3,7 +3,7 @@
 // Each call answers what happened and never throws.
 import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-code'
 
-import type { AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } from './wire.ts'
+import type { ActivityBody, AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } from './wire.ts'
 
 /** LiveBridge.app's bundle identifier. */
 export const BUNDLE_ID = 'com.getlivebridge.livebridge'
@@ -103,9 +103,9 @@ export class BridgeLink {
     return reply?.status === 410 ? REMOVED : reply?.ok === true
   }
 
-  /** `question`: what Claude asks the owner while it waits (`approval` only). */
-  async activity(state: SessionActivity, question?: string): Promise<void> {
-    await this.#forSession('activity', { state, ...(question !== undefined && { question }) })
+  /** `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only). */
+  async activity(state: SessionActivity, said: Pick<ActivityBody, 'question' | 'text'> = {}): Promise<void> {
+    await this.#forSession('activity', { state, ...said })
   }
 
   /** Posts the session's summary; false when the app did not take it. */

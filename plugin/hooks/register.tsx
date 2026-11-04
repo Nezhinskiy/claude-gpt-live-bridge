@@ -483,7 +483,7 @@ export const register: Register = on => {
     const answered = next(e)
     const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
     try {
-      await link.activity('approval', askedText(e.questions, tracker.takeStepText()))
+      await link.activity('approval', { question: askedText(e.questions, tracker.takeStepText()) })
       const first = await Promise.race([answered, spoken])
       return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
     } finally {
@@ -492,12 +492,13 @@ export const register: Register = on => {
     }
   }).catch(($, e, next) => next(e))
 
-  // ADR 0001 (i): a permission request that reaches the person during a voice turn. Claude's
-  // question has its own report above.
+  // ADR 0001 (i): a permission request that reaches the person during a voice turn, with what
+  // the main loop wrote in the step that asks for it. Claude's question has its own report above.
   on('classic.PermissionRequest', async ($, e, next) => {
     if (tracker.running !== null && e.tool_name !== 'AskUserQuestion') {
       approval = { tool: e.tool_name, agent: e.agent_id }
-      await link?.activity('approval')
+      const text = e.agent_id === undefined ? clip(tracker.takeStepText().trim(), ANSWER_LIMIT) : ''
+      await link?.activity('approval', text === '' ? {} : { text })
     }
     return next(e)
   }).catch(($, e, next) => next(e))

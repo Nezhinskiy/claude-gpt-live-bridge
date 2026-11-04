@@ -84,6 +84,35 @@ test('approvalIsReported', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
 
+/** What Claude wrote in the step that asks for a permission goes with the approval notice. */
+test('theTextBeforeAnApprovalGoesWithIt', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', "I'm going to delete build/ and re-run.")
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'approval', text: "I'm going to delete build/ and re-run." },
+  ])
+})
+
+/** A subagent's permission request is not the main loop's step: it goes without that text. */
+test('aSubagentsApprovalGoesWithoutTheMainLoopsText', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Two folders hold build output.')
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval' }])
+})
+
+/** A step longer than an answer may be is cut, so the notice still fits the app's body limit. */
+test('aLongStepIsCutForTheApproval', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'a'.repeat(40_000))
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', text: 'a'.repeat(32_000) }])
+})
+
 /** A voice request waiting for the next turn does not make the typed turn's approval the voice's. */
 test('aTypedTurnsApprovalIsNotReportedWhileAVoiceRequestWaits', async ($, on) => {
   const world = fakeWorld(on)

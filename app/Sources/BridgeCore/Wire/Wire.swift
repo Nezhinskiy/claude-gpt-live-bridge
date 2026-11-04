@@ -104,11 +104,14 @@ public struct AnswerBody: Codable, Sendable, Equatable {
 public enum SessionActivity: String, Codable, Sendable { case idle, working, approval }
 
 /// `POST /v1/activity`. `question`, with `approval`: Claude asked the owner this in a voice
-/// turn and waits for the reply, which the voice may hand over as `Work.reply`.
+/// turn and waits for the reply, which the voice may hand over as `Work.reply`. `text`, with
+/// `approval` and no `question`: what Claude wrote in the step that asks for a permission; the
+/// voice only reports it.
 public struct ActivityBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var state: SessionActivity
   public var question: String?
+  public var text: String?
 }
 
 /// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`.

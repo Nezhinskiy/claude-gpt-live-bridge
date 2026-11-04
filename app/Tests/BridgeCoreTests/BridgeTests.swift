@@ -341,6 +341,18 @@ struct BridgeTests {
     #expect(await voice.added == ["[ASKING] Alpha: \(said)"])
   }
 
+  /// What Claude wrote in the step that asked for a permission follows the approval notice,
+  /// its code and tables removed as from a result.
+  @Test func anApprovalsLineCarriesTheStepsProse() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let text = "Deleting build.\n```\nrm -rf build\n```\n| a | b |\nThen test."
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
+    let notice = "Claude is waiting for your approval"
+    let said = "\(notice). Claude wrote just before: Deleting build. Then test."
+    #expect(await voice.added == ["[APPROVAL] Alpha: \(said)"])
+  }
+
   @Test func replyToClaudesQuestionGoesToTheAskingSession() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
