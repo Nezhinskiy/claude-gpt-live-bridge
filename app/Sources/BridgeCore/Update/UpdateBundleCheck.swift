@@ -3,14 +3,15 @@ import Foundation
 
 /// The pure readings the `Updater` makes of the image and of the programs it runs.
 enum UpdateBundleCheck {
-  /// What `hdiutil attach -plist` attached: what `hdiutil detach` is given (the mount point, or
-  /// a device when nothing was mounted) and the mount point, if any.
+  /// What `hdiutil attach -plist` or `diskutil image attach --plist` attached: what `detach` or
+  /// `eject` is given (the mount point, or a device when nothing was mounted) and the mount
+  /// point, if any.
   struct Volume: Equatable {
     var detachTarget: String?
     var mountPoint: URL?
   }
 
-  /// The first mounted entity in `hdiutil attach -plist` output; its mount point is detached,
+  /// The first mounted entity in the attach's property list; its mount point is detached,
   /// or the first device when nothing was mounted.
   static func volume(attachPlist: String) -> Volume {
     let plist = try? PropertyListSerialization.propertyList(

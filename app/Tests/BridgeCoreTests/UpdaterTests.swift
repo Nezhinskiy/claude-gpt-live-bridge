@@ -151,7 +151,7 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
     case ("gh", "attestation"):
       let digest = Self.sha256(of: URL(filePath: arguments[2]))
       return ProgramResult(status: 0, output: Self.attestation(digest: digest))
-    case ("hdiutil", "attach"):
+    case ("hdiutil", "attach"), ("diskutil", "image"):
       let plist: [String: Any] = [
         "system-entities": [
           ["dev-entry": "/dev/disk9", "content-hint": "GUID_partition_scheme"],
@@ -525,6 +525,36 @@ struct UpdaterTests {
         "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountrandom", folder.path, "-plist",
         folder.appending(path: "LiveBridge.dmg").path,
       ])
+  }
+
+  static let macOS27 = OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0)
+
+  /// macOS 27 deprecates `hdiutil attach` and `detach` for `diskutil image attach` and `eject`.
+  @Test func onMacOS27TheImageIsAttachedWithDiskutil() async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.os = Self.macOS27 }
+    _ = try await rig.install()
+    let folder = rig.paths.updates.appending(path: "0.1.3")
+    #expect(rig.log.runs(of: "hdiutil").isEmpty)
+    #expect(
+      rig.log.runs(of: "diskutil").first == [
+        "image", "attach", "--plist", "--readOnly", "--nobrowse", "--mountPoint",
+        folder.appending(path: "mount").path, folder.appending(path: "LiveBridge.dmg").path,
+      ])
+  }
+
+  // A minimum of 15.2 is met on 27, so that fault installs there.
+  @Test(arguments: BundleFault.allCases.filter { $0 != .newerMacOS })
+  func onMacOS27TheImageIsEjectedOnFailure(_ fault: BundleFault) async throws {
+    let rig = try UpdateRig()
+    rig.env.change { $0.os = Self.macOS27 }
+    try fault.apply(to: rig)
+    defer {
+      try? FileManager.default.setAttributes(
+        [.posixPermissions: 0o755], ofItemAtPath: rig.paths.applications.path)
+    }
+    #expect(try await rig.install() != .installing)
+    #expect(rig.log.runs(of: "diskutil").contains(["eject", rig.mount.path]))
   }
 
   @Test func readOnlyApplicationsLeavesTheAppAsItWas() async throws {

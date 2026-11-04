@@ -22,7 +22,8 @@ public enum UpdateStatus: Equatable, Sendable {
 /// so a second instance of the app cannot run one beside it. Every program starts through
 /// `environment.run`.
 public actor Updater {
-  /// The time a check-like program (`gh`, `hdiutil`, `codesign`, `ditto`, `xattr`) is given.
+  /// The time a check-like program (`gh`, `diskutil`, `hdiutil`, `codesign`, `ditto`, `xattr`)
+  /// is given.
   static let checkTimeout: Duration = .seconds(30)
   /// The time each `claude` command is given.
   static let claudeTimeout: Duration = .seconds(120)
@@ -30,6 +31,7 @@ public actor Updater {
   static let imageLimit = 100 * 1024 * 1024
   static let signerWorkflow = "\(Release.repository)/.github/workflows/release.yml"
   static let hdiutil = URL(filePath: "/usr/bin/hdiutil")
+  static let diskutil = URL(filePath: "/usr/sbin/diskutil")
   static let codesign = URL(filePath: "/usr/bin/codesign")
   static let ditto = URL(filePath: "/usr/bin/ditto")
   static let xattr = URL(filePath: "/usr/bin/xattr")
@@ -279,18 +281,33 @@ public actor Updater {
   private func stage(_ image: URL, in folder: URL, version: AppVersion) async throws(UpdateProblem)
     -> Staged
   {
-    let arguments = [
-      "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountrandom", folder.path, "-plist",
-      image.path,
-    ]
-    let attach = await environment.run(
-      Self.hdiutil, arguments, cwd: nil, timeout: Self.checkTimeout)
+    // macOS 27 deprecates hdiutil's attach and detach for diskutil's, which print the same
+    // property list; macOS 14, the oldest the app runs on, may have no `diskutil image`.
+    let isDiskutil = environment.osVersion().majorVersion >= 27
+    let (program, arguments) =
+      isDiskutil
+      ? (
+        Self.diskutil,
+        [
+          "image", "attach", "--plist", "--readOnly", "--nobrowse", "--mountPoint",
+          folder.appending(path: "mount").path, image.path,
+        ]
+      )
+      : (
+        Self.hdiutil,
+        [
+          "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountrandom", folder.path, "-plist",
+          image.path,
+        ]
+      )
+    let attach = await environment.run(program, arguments, cwd: nil, timeout: Self.checkTimeout)
     guard let attach, attach.status == 0 else { throw .noApp }
     let volume = UpdateBundleCheck.volume(attachPlist: attach.output)
     defer {
       if let target = volume.detachTarget {
         _ = await environment.run(
-          Self.hdiutil, ["detach", target], cwd: nil, timeout: Self.checkTimeout)
+          program, [isDiskutil ? "eject" : "detach", target], cwd: nil,
+          timeout: Self.checkTimeout)
       }
     }
     guard let mountPoint = volume.mountPoint else { throw .noApp }
