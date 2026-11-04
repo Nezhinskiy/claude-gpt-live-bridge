@@ -1,7 +1,8 @@
 #!/bin/sh
 # The end-to-end smoke test: the debug app with a spoken WAV as its microphone, the real codex
 # on your ChatGPT login, and a fake Claude Code session (app/Tests/Smoke/fake-session.mjs)
-# over the wire. It opens two short realtime sessions, about two minutes of voice in all.
+# over the wire. It opens two short realtime sessions, three if the voice is slow enough that the
+# look at the chat finds the second closed, and spends about two minutes of voice in all.
 #
 #   scripts/smoke.sh        SMOKE_DIR=<dir> keeps the scratch files there (default: a new
 #                           directory under /tmp; the socket path must stay within 103 bytes)

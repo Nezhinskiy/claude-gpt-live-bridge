@@ -21,8 +21,9 @@ the status section at most 50 lines); detail lives in the documents it links to.
 
 - `scripts/check.sh` runs every check CI runs and must exit 0 before a commit. Without `claude`
   on `PATH` it skips the mod's engine-facing half and says so; CI does not skip it.
-- `scripts/smoke.sh` drives the real codex end to end and spends about a minute of realtime voice
-  on your ChatGPT plan, so run it for changes to the voice path, not for every change.
+- `scripts/smoke.sh` drives the real codex end to end and spends your ChatGPT plan's
+  realtime voice (the cost is in the script's header), so run it for changes to the voice path,
+  not for every change.
   The voice is a language model, so one failed run is not proof of a regression.
 - `scripts/build-app.sh --run` builds and opens the debug app; `claude --plugin-dir plugin`
   loads the mod from the working tree. The toolchain is in
