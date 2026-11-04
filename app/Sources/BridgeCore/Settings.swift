@@ -10,7 +10,7 @@ public struct Settings: Codable, Sendable, Equatable {
   public var autoContext: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
-  /// Play a short sound when a handoff reaches a session (BR-001).
+  /// Play a short sound when a handoff is queued for a session (BR-001).
   public var confirmHandoffs: Bool
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.

@@ -341,7 +341,7 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
   }
 
-  /// A handoff that reaches a session is confirmed by a sound, so the owner can tell a request
+  /// A handoff queued for a session is confirmed by a sound, so the owner can tell a request
   /// that went to Claude from a voice that only said it would look (BR-001).
   @Test func handoffToASessionIsConfirmedBySound() async throws {
     try await join(a, "Alpha")

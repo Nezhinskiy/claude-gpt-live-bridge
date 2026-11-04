@@ -65,8 +65,8 @@ public enum CallEffect: Equatable, Sendable {
   /// Asks the open line to say a result now.
   case speak(VoiceLine)
   case chime
-  /// A handoff reached a session; without this sound the owner cannot tell it from a voice
-  /// that only said it would look (BR-001).
+  /// A handoff was queued for a session; without this sound the owner cannot tell it from a
+  /// voice that only said it would look (BR-001).
   case confirmHandoff
   case problem(Problem?)
 }

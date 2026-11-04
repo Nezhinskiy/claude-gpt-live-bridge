@@ -14,7 +14,7 @@ public actor Bridge: Router {
   private let notifier: (any ResultNotifying)?
   /// Settings' "Notify when a result is waiting", read at each chime.
   private let notifies: @Sendable () -> Bool
-  /// Settings' "Play a sound when a request reaches Claude", read at each handoff.
+  /// Settings' "Play a sound when a request is queued for Claude", read at each handoff.
   private let confirmsHandoffs: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.

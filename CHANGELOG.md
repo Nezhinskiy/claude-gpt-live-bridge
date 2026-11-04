@@ -8,15 +8,17 @@ All notable changes to this project are listed here. The format follows
 
 ### Added
 
-- A short tick confirms each request the voice hands to Claude. The voice sometimes says it is
-  looking without handing the request off; with no tick you know nothing was sent
-  ([BR-001](docs/bugs/BR-001.md)). **Settings > Notifications > Play a sound when a request
-  reaches Claude** turns it off.
+- A short sound when the app queues a request the voice handed off. The voice sometimes says it
+  is looking without handing the request off; with no sound, nothing was queued
+  ([BR-001](docs/bugs/BR-001.md)). **Settings > Notifications > Play a sound when a request is
+  queued for Claude** turns it off.
 
 ### Changed
 
-- The voice's rule now says it may answer from what it already knows, and must never say it is
-  checking or doing something unless it hands it off in the same turn.
+- The voice's rule against promising a look without a handoff is one sentence shorter, and lets
+  the voice ask you to confirm an action first. In 20 test runs it missed no handoff, against 3 of
+  20 with the old wording: too few runs to call the failure fixed
+  ([BR-001](docs/bugs/BR-001.md)).
 
 ## [0.2.0]
 
