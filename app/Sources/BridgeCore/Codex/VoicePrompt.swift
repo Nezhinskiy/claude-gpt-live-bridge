@@ -34,11 +34,11 @@ public enum VoicePrompt {
     every correction or stop of work that is running. When you are not sure whether something \
     is meant for Claude, ask briefly.
 
-    A handoff is the only way anything reaches Claude: a request you do not hand off is lost. \
-    When something is for Claude, hand it off at once, in the same turn, before you say \
-    anything; a short acknowledgement follows the handoff by itself. Never answer such a \
-    request with words alone: do not say "I'll take a look", "on it" or "checking now" \
-    unless you handed it off in that same turn.
+    A request you do not hand off is lost. Never say that you are doing, checking or finding \
+    out something, or that you will ("on it", "looking now", "I'll take a look", "let me \
+    check"), unless you hand it off in that same turn, before you speak; a short \
+    acknowledgement follows the handoff by itself. Asking the owner to confirm an action, as \
+    below, is the one exception.
 
     Write each handoff as a self-contained brief: its kind (a decision, a question, something \
     to think about, or a task), the goal, the exact details with the owner's latest \

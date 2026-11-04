@@ -241,6 +241,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   which win where the two disagree, and apply from the next time the line opens.
 - **Load a session's context automatically when it becomes the target** (off by default): one
   setting for every session, kept by the app.
+- **Play a sound when a request is queued for Claude** (on by default): a short sound for each
+  request the voice hands off ([why](#known-limitations)).
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
@@ -292,8 +294,10 @@ a question Claude asks you, or that Claude waits for your approval:
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
   ago. A new target switches the conversation: an open line closes, and your next words open it
   with the new target's.
-- The menu shows the minutes the line was open, as measured by the app; how your plan meters
-  realtime voice is not published.
+- The menu shows the minutes the line was open, as measured by the app. OpenAI prices desktop
+  voice per minute of your Codex budget, and on its API the same model family bills silence too
+  ([details](docs/research/2026-11-04-gpt-live-billing.md)); your plan's own usage page is the
+  authority.
 
 ## Privacy
 
@@ -310,7 +314,8 @@ session:
   realtime session;
 - the target session's requests still open, as their one-line briefs;
 - each result, question, update and approval notice, as one line of at most 2,000 characters,
-  with code blocks and tables removed. An update is Claude's answer in a later turn started by a
+  with code blocks and tables removed. A question Claude asks mid-turn also carries what Claude
+  wrote just before asking it. An update is Claude's answer in a later turn started by a
   background task's notification, for up to 10 minutes after a voice request and until any other
   turn starts in the session;
 - the target session's context summary, as one line of at most 1,500 characters. It is saved
@@ -352,6 +357,12 @@ can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
+- The voice sometimes says it is looking ("On it", "Looking now") without handing the request
+  off, so nothing reaches Claude: about one request in five in
+  [testing](docs/bugs/BR-001.md), with the voice's rule against it in place. The app plays a
+  short sound when it queues a request for Claude; if the voice says it is looking and no sound
+  follows, say the request again. The app cannot tell such a promise from an answer by its
+  words, since the voice speaks your language.
 - A result that arrives while the line waits for it goes to the voice as text to say; codex has
   no call that makes the voice speak at once, so the model decides when. In testing it spoke
   within a few seconds. If it does not, the result stays unheard: the voice says it after your

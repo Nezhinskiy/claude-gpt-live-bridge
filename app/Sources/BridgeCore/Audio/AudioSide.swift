@@ -40,4 +40,6 @@ public protocol AudioSide: Sendable {
   func closePeer() async
   /// The short sound for a result that waits until the owner next speaks.
   func chime() async
+  /// The short sound that confirms a handoff was queued for a session (BR-001).
+  func confirmHandoff() async
 }

@@ -246,6 +246,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   टकराव होने पर उन्हीं नियमों की चलती है, और अगली बार line खुलने से लागू होते हैं।
 - **Load a session's context automatically when it becomes the target** (डिफ़ॉल्ट रूप से बंद): सभी
   sessions के लिए एक setting, जिसे app सँभालकर रखता है।
+- **Play a sound when a request is queued for Claude** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध
+  Claude को सौंपता है, हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ))।
 - **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
   chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
   hear it"), नतीजा खुद कभी नहीं। उस पर click करने से menu bar menu खुलता है।
@@ -309,7 +311,8 @@ session के ज़रिए OpenAI को यह जाता है:
   जारी रखा जा सके;
 - target session के अभी खुले अनुरोध, उनके एक-पंक्ति के सार (brief) के रूप में;
 - हर नतीजा, सवाल, update और approval notice, अधिकतम 2,000 अक्षरों की एक पंक्ति के रूप में, code
-  blocks और tables हटाकर। Update, Claude का जवाब है जो किसी background task के notification से शुरू हुए
+  blocks और tables हटाकर। Turn के बीच Claude का पूछा सवाल वह text भी साथ लाता है जो Claude ने
+  उसे पूछने से ठीक पहले लिखा। Update, Claude का जवाब है जो किसी background task के notification से शुरू हुए
   बाद के turn में आता है, voice अनुरोध के बाद 10 मिनट तक और तब तक जब तक session में कोई दूसरा turn
   शुरू न हो;
 - target session का context सारांश, अधिकतम 1,500 अक्षरों की एक पंक्ति के रूप में। यह load होने पर सेव
@@ -352,6 +355,11 @@ Uninstall करने से वे सब हट जाती हैं।
 
 ## ज्ञात सीमाएँ
 
+- voice कभी-कभी कहता है कि वह देख रहा है ("On it", "Looking now"), पर अनुरोध Claude को नहीं सौंपता,
+  इसलिए Claude तक कुछ नहीं पहुँचता: [टेस्टिंग](docs/bugs/BR-001.md) में लगभग पाँच में से एक अनुरोध,
+  जबकि voice का नियम इसकी मनाही करता है। जब app किसी अनुरोध को Claude की queue में डालता है, तो एक
+  छोटी आवाज़ बजती है; अगर voice कहे कि वह देख रहा है और कोई आवाज़ न बजे, तो अनुरोध दोबारा कहें। app
+  शब्दों से ऐसे वादे और जवाब में फ़र्क नहीं कर सकता, क्योंकि voice आपकी भाषा में बोलता है।
 - जो नतीजा तब आता है जब line उसका इंतज़ार कर रही हो, वह voice को बोलने के लिए text के रूप में जाता है;
   codex में ऐसा कोई call नहीं है जो voice को तुरंत बुलवाए, इसलिए कब बोलना है यह model तय करता है।
   टेस्टिंग में वह कुछ सेकंड के भीतर बोल गया। अगर नहीं बोलता, तो नतीजा न सुना हुआ रहता है: voice उसे आपके

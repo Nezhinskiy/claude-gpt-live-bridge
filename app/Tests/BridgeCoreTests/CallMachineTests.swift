@@ -146,9 +146,19 @@ struct CallMachineTests {
       [.closeRealtime, .problem(CallMachine.noise)]),
     row("replyArmsTheSilenceTimer", live, said("Hello."), .live, [arm]),
     row("speakingVoiceReArmsTheTimer", live, .assistantSpeaking, .live, [arm]),
-    row("handoffOpensTheResultWindow", live, .handedOff(alpha), .live, [window]),
-    row("aLaterHandoffRestartsTheWindow", waiting, .handedOff(alpha), .live, [window]),
-    row("handoffToNoSessionOpensNoWindow", live, .handedOff(nil), .live, []),
+    row(
+      "handoffIsConfirmedAndOpensTheResultWindow", live, .handedOff(alpha), .live,
+      [.confirmHandoff, window]),
+    row(
+      "aLaterHandoffIsConfirmedAndRestartsTheWindow", waiting, .handedOff(alpha), .live,
+      [.confirmHandoff, window]),
+    row("handoffToNoSessionIsNotConfirmedAndOpensNoWindow", live, .handedOff(nil), .live, []),
+    row(
+      "aHandoffWhileConnectingIsConfirmed", connecting, .handedOff(alpha), .connecting,
+      [.confirmHandoff]),
+    row(
+      "aHandoffAsTheLineClosesIsConfirmed", [.start], .handedOff(alpha), .listening,
+      [.confirmHandoff]),
     row(
       "ackKeepsTheLineOpenForTheResult", live + [.handedOff(alpha), .assistantSpeaking],
       said("On it."), .live, [arm]),

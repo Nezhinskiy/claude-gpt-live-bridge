@@ -267,6 +267,8 @@ parlez.
   ouverture de la ligne.
 - **Load a session's context automatically when it becomes the target** (désactivé par défaut) :
   un réglage unique pour toutes les sessions, conservé par l'application.
+- **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
+  chaque demande que la voix transmet à Claude ([pourquoi](#limitations-connues)).
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
   attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
   new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
@@ -337,7 +339,8 @@ OpenAI, via la session temps réel de codex :
   dans une nouvelle session temps réel ;
 - les demandes encore ouvertes de la session cible, sous forme de résumés d'une ligne ;
 - chaque résultat, question, mise à jour et avis d'approbation, en une ligne d'au plus
-  2 000 caractères, blocs de code et tableaux retirés. Une mise à jour est la réponse de Claude
+  2 000 caractères, blocs de code et tableaux retirés. Une question que Claude pose en cours de
+  tour porte aussi ce que Claude a écrit juste avant de la poser. Une mise à jour est la réponse de Claude
   dans un tour ultérieur déclenché par la notification d'une tâche d'arrière-plan, pendant au plus
   10 minutes après une demande vocale et jusqu'à ce qu'un autre tour démarre dans la session ;
 - le résumé de contexte de la session cible, en une ligne d'au plus 1 500 caractères. Il est
@@ -384,6 +387,12 @@ session.
 
 ## Limitations connues
 
+- La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande,
+  si bien que rien n'arrive à Claude : environ une demande sur cinq lors des
+  [tests](docs/bugs/BR-001.md), alors que la règle de la voix l'interdit. L'application joue un
+  son bref quand elle met une demande en file pour Claude ; si la voix dit qu'elle regarde et
+  qu'aucun son ne suit, répétez la demande. L'application ne peut pas distinguer une telle
+  promesse d'une réponse par ses mots, car la voix parle votre langue.
 - Un résultat qui arrive pendant que la ligne l'attend est transmis à la voix sous forme de texte
   à dire ; codex n'a aucun appel qui fasse parler la voix immédiatement, c'est donc le modèle qui
   décide du moment. Lors des tests, elle a parlé en quelques secondes. Si ce n'est pas le cas, le

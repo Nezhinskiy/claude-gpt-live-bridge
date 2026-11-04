@@ -155,7 +155,8 @@ final class AppModel {
         realtime: { try await Self.voice(cwd: cwd, settings: settings) },
         audio: audio, meter: UsageMeterStore(file: data.appending(path: "usage.json"), time: time),
         continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier,
-        notifies: { settings.current.notifyResults })
+        notifies: { settings.current.notifyResults },
+        confirmsHandoffs: { settings.current.confirmHandoffs })
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge
       self.server = server

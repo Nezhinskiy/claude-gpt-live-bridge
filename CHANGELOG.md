@@ -6,14 +6,34 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A short sound when the app queues a request the voice handed off. The voice sometimes says it
+  is looking without handing the request off; with no sound, nothing was queued
+  ([BR-001](docs/bugs/BR-001.md)). **Settings > Notifications > Play a sound when a request is
+  queued for Claude** turns it off.
+
 ### Changed
 
+- The in-app update attaches and ejects the release image with `diskutil image attach` and
+  `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
+  a new folder of its own.
+- The voice's rule against promising a look without a handoff is one sentence shorter, and lets
+  the voice ask you to confirm an action first. In 20 test runs it missed no handoff, against 3 of
+  20 with the old wording: too few runs to call the failure fixed
+  ([BR-001](docs/bugs/BR-001.md)).
 - Claude's answer to a request you handed the session you are talking to, a question Claude asks
   you there, or a permission prompt it waits on now opens the closed voice line, and the voice
   says it, instead of only chiming. It is billed like any open line; if the voice stays silent,
   the line closes after 20 seconds and chimes as before. Anything from another session, and a
   later update, still only chimes
   ([billing](README.md#billing-aware-by-design), [privacy](README.md#privacy)).
+
+### Fixed
+
+- When Claude asks a question during a voice request, the voice also gets what Claude wrote just
+  before the question, in the same line after the options, with code blocks and tables removed
+  as from a result.
 
 ## [0.2.0]
 

@@ -141,7 +141,8 @@ second session then completed a full handoff.
   said "On it, checking now" or "I'll take a look", and the websocket carried no
   `delegation.created` at all, so nothing reached the client. With a rule telling the voice to
   hand off at once, before it speaks, and never to promise a look without a handoff in the same
-  turn, 5 of 5 runs delegated.
+  turn, 5 of 5 runs delegated. Later runs put the miss rate with the rule near one in five
+  ([BR-001](../bugs/BR-001.md)).
 - `initialItems` is honoured with WebRTC transport: seeded with a user item naming a colour, the
   voice answered "What is my favourite colour?" with that colour; without the items it said it
   did not know.

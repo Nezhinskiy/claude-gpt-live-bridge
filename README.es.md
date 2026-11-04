@@ -252,6 +252,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
 - **Load a session's context automatically when it becomes the target** (desactivado por defecto):
   un único ajuste para todas las sesiones, que guarda la aplicación.
+- **Play a sound when a request is queued for Claude** (activado por defecto): un sonido breve por
+  cada petición que la voz pasa a Claude ([por qué](#limitaciones-conocidas)).
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
@@ -321,7 +323,8 @@ la sesión en tiempo real de codex:
   en una nueva sesión en tiempo real;
 - las peticiones de la sesión de destino aún abiertas, como sus resúmenes de una línea;
 - cada resultado, pregunta, actualización y aviso de aprobación, como una línea de como máximo 2000
-  caracteres, sin bloques de código ni tablas. Una actualización es la respuesta de Claude en un
+  caracteres, sin bloques de código ni tablas. Una pregunta que Claude hace a mitad de turno lleva
+  también lo que Claude escribió justo antes de hacerla. Una actualización es la respuesta de Claude en un
   turno posterior iniciado por la notificación de una tarea en segundo plano, durante hasta 10
   minutos después de una petición por voz y hasta que empiece cualquier otro turno en la sesión;
 - el resumen de contexto de la sesión de destino, como una línea de como máximo 1500 caracteres. Se
@@ -365,6 +368,12 @@ sesión.
 
 ## Limitaciones conocidas
 
+- A veces la voz dice que está mirando ("On it", "Looking now") sin pasar la petición, así que a
+  Claude no le llega nada: más o menos una petición de cada cinco en las
+  [pruebas](docs/bugs/BR-001.md), aunque la regla de la voz lo prohíbe. La aplicación emite un
+  sonido breve cuando pone una petición en la cola de Claude; si la voz dice que está mirando y no
+  suena nada, repite la petición. La aplicación no puede distinguir esa promesa de una respuesta
+  por sus palabras, porque la voz habla tu idioma.
 - Un resultado que llega mientras la línea lo espera pasa a la voz como texto para decir; codex no
   tiene ninguna llamada que haga hablar a la voz de inmediato, así que el modelo decide cuándo. En
   las pruebas habló en pocos segundos. Si no lo hace, el resultado queda sin escuchar: la voz lo

@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { spokenReply, voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
+import { BAND, fakeWorld, framed, ID, LIVE, step } from './fake-bridge.ts'
 
 const REQUEST: VoiceRequest = {
   id: '00000000-0000-0000-0000-00000000000a',
@@ -133,6 +133,71 @@ test('claudesQuestionIsAnsweredByVoice', async ($, on) => {
   await world.clock.advance(1000)
   expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+})
+
+const PLAIN = 'Which name should the folder get? Options: build: the default; out: shorter.'
+
+/** What Claude wrote in the step that asks the question goes with the question. */
+test('theTextBeforeClaudesQuestionGoesWithIt', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  world.take('answer')
+  await step($, world, 't1', 'Here is what I found: the folder has two outputs.')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{
+    sessionId: ID, state: 'approval',
+    question: `${PLAIN} Claude wrote just before asking: Here is what I found: the folder has two outputs.`,
+  }])
+  expect(world.take('answer')).toEqual([])
+  world.answerDialog('build')
+  await asked
+})
+
+/** A step with no text after one with text: the question goes alone. */
+test('aQuestionAfterAStepWithNoTextGoesAlone', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Let me look at the folder.')
+  await step($, world, 't1', '')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN }])
+  world.answerDialog('build')
+  await asked
+})
+
+/** The text goes with one question only. */
+test('aSecondQuestionDoesNotRepeatTheText', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Two folders hold build output.')
+  const first = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.answerDialog('out')
+  await first
+  world.take('activity')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN }])
+  world.answerDialog('build')
+  await asked
+})
+
+/** A subagent's step does not replace what the main loop wrote. */
+test('aSubagentsStepLeavesTheMainLoopsText', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Two folders hold build output.')
+  await step($, world, 't1', 'A subagent report.', 'a1')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{
+    sessionId: ID, state: 'approval',
+    question: `${PLAIN} Claude wrote just before asking: Two folders hold build output.`,
+  }])
+  world.answerDialog('build')
+  await asked
 })
 
 /** Answered at the keyboard, the question is settled for the voice too; a reply after it is not lost silently. */
