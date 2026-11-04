@@ -23,6 +23,10 @@ final class AudioHost: NSObject, AudioSide {
   private var navigation: WKNavigation?
   private var loaded = false
   private var waiting: [CheckedContinuation<Void, Never>] = []
+  /// The bundled `audio/handoff.wav`, which `scripts/render-sound.mjs` renders.
+  private let handoffSound = Bundle.module.url(
+    forResource: "handoff", withExtension: "wav", subdirectory: "audio"
+  ).flatMap { NSSound(contentsOf: $0, byReference: true) }
 
   /// `fakeMic` (debug builds only) replaces the microphone with a WAV file.
   init(fakeMic: URL?) {
@@ -77,7 +81,7 @@ final class AudioHost: NSObject, AudioSide {
 
   func chime() async { NSSound(named: "Glass")?.play() }
 
-  func confirmHandoff() async { NSSound(named: "Tink")?.play() }
+  func confirmHandoff() async { handoffSound?.play() }
 
   /// macOS's answer for the microphone, asking it first if it never was (its prompt then
   /// shows); nil when the page may open the microphone.
