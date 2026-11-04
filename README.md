@@ -287,10 +287,10 @@ talking, or while Claude's answer to a request you just made may still come:
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
   ago. A new target switches the conversation: an open line closes, and your next words open it
   with the new target's.
-- The menu shows the minutes the line was open, as measured by the app. OpenAI charges voice
-  to your Codex budget per minute the line is open, silence included
-  ([what that means for LiveBridge](docs/research/2026-11-04-gpt-live-billing.md)); your plan's
-  own usage page is the authority.
+- The menu shows the minutes the line was open, as measured by the app. OpenAI prices desktop
+  voice per minute of your Codex budget, and on its API the same model family bills silence too
+  ([details](docs/research/2026-11-04-gpt-live-billing.md)); your plan's own usage page is the
+  authority.
 
 ## Privacy
 

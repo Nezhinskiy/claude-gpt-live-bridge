@@ -1,7 +1,7 @@
 import Foundation
 
 /// When the realtime session was open, so any day or call can be summed. It measures this app's
-/// side only; the plan bills voice per minute open (docs/research/2026-11-04-gpt-live-billing.md).
+/// side only; how the plan meters voice: docs/research/2026-11-04-gpt-live-billing.md.
 public struct UsageMeter: Codable, Sendable, Equatable {
   struct Interval: Codable, Sendable, Equatable {
     var start: Date
