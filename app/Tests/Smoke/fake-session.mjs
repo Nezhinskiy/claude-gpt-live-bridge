@@ -1,12 +1,14 @@
 // A fake Claude Code session for scripts/smoke.sh: it speaks the mod's side of the wire over the
-// app's Unix socket (join, target, Start, a poll every second, one answer), records what the
-// bridge reports, and checks the run. The conversation and the minutes, which no session is
+// app's Unix socket (join, target, Start, a poll every second, one answer, and Claude's last reply
+// with every context), records what the bridge reports, and checks the run. The conversation and the minutes, which no session is
 // sent, it reads from the app's files beside the socket (continuity.json, usage.json).
 //
 //   node app/Tests/Smoke/fake-session.mjs <socket path> [deadline seconds]
 //
 // It answers the voice request a few seconds after taking it, while the line still waits for
 // the result, so the voice must say it by itself, before the owner's next line (the small talk).
+// After the small talk the owner asks the voice to look at the chat: the voice must fetch the
+// session's context itself, which sends this session no request, and say Claude's last reply.
 // Exit code 0 when every check passes; the timeline and the verdict go to stdout as JSON lines.
 import { readFileSync } from 'node:fs'
 import { request } from 'node:http'
@@ -21,6 +23,12 @@ const ANSWER = 'There are three files in this folder: alpha.txt, bravo.txt and c
 const ANSWER_WORDS = /alpha|bravo|charlie/i
 /** The owner's small talk, which comes long after the request. */
 const SMALL_TALK = /thanks|your day/i
+/** Claude's last reply, which the context carries; only a fetch makes the voice say it. */
+const LAST = 'I archived delta.log, foxtrot.log and golf.log into the old folder.'
+/** Words of it that only a spoken `[LAST]` line can contain. */
+const LAST_WORDS = /delta|foxtrot|golf/i
+/** The words of the voice's handoff for a fetch, which must never reach Claude as a request. */
+const FETCH_BRIEF = /refresh context/i
 /** Seconds between taking the request and answering it. */
 const ANSWER_AFTER = 3
 
@@ -77,6 +85,8 @@ let answeredAt = null
 let answeredInLine = false // the answer went in while the line that handed it off was still open
 let spokenAt = null
 let smallTalkAt = null
+let lastSpokenAt = null // the voice said Claude's last reply, which only a fetch brings
+let contextAsks = 0 // the line opening asks too; a fetch is one more
 let phase = 'off'
 let unheard = 0
 let problem = null
@@ -109,6 +119,7 @@ while (Date.now() - t0 < deadline) {
     if (answeredAt !== null && line.startsWith('Voice: ') && ANSWER_WORDS.test(line)) {
       spokenAt ??= now()
     }
+    if (line.startsWith('Voice: ') && LAST_WORDS.test(line)) lastSpokenAt ??= now()
   }
   if (reply.work?.kind === 'request') {
     handoffs.push(reply.work.brief)
@@ -116,7 +127,8 @@ while (Date.now() - t0 < deadline) {
     takenAt = now()
     log('handoff', { brief: reply.work.brief })
   } else if (reply.work?.kind === 'context') {
-    await send('POST', '/v1/context', { sessionId, summary: 'Example session: a scratch folder.' })
+    contextAsks += 1
+    await send('POST', '/v1/context', { sessionId, summary: 'Example session: a scratch folder.', last: LAST })
   }
   if (waiting !== null && now() - takenAt >= ANSWER_AFTER) {
     await send('POST', '/v1/answer', { sessionId, id: waiting.id, status: 'ok', text: ANSWER })
@@ -125,8 +137,9 @@ while (Date.now() - t0 < deadline) {
     waiting = null
     log('answered', { phase })
   }
-  // the line that said the answer closed, and the small talk's line opened and closed
-  if (spokenAt !== null && lives.length >= 2 && phase === 'listening') break
+  // the line that said the answer closed, the small talk's line opened, and the voice said
+  // Claude's last reply; then the line closed
+  if (spokenAt !== null && lastSpokenAt !== null && lives.length >= 2 && phase === 'listening') break
   await new Promise(resolve => setTimeout(resolve, 1000))
 }
 
@@ -140,8 +153,14 @@ const checks = {
   answeredWhileTheLineWaited: answeredInLine,
   answerSpokenBeforeTheOwnerSpokeAgain: spokenAt !== null && (smallTalkAt ?? Infinity) > spokenAt,
   lineClosedBeforeTheSmallTalk: lives.length >= 2,
-  openLessThan90s: open < 90,
+  openLessThan120s: open < 120,
   backToListening: phase === 'listening',
+  // "look at the chat" asked the app, not Claude: no second request, and the fetch's context
+  // reached the voice, which said Claude's last reply (sent only in answer to a fetch)
+  fetchWasNotARequest: !handoffs.some(brief => FETCH_BRIEF.test(brief)),
+  lastReplySpoken: lastSpokenAt !== null && (smallTalkAt ?? Infinity) < lastSpokenAt,
 }
-log('verdict', { checks, handoffs, answeredAt, spokenAt, smallTalkAt, secondsOpen: open, lives })
+log('verdict', {
+  checks, handoffs, answeredAt, spokenAt, smallTalkAt, lastSpokenAt, contextAsks, secondsOpen: open, lives,
+})
 process.exit(Object.values(checks).every(Boolean) ? 0 : 1)
