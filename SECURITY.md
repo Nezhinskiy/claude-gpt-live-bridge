@@ -26,7 +26,7 @@ target session, and Claude runs it **under that session's own permission mode, a
 included**. Whatever that mode would ask before a tool runs, it still asks, and only you can
 answer, at your keyboard in Claude Code. LiveBridge has no code that answers a permission
 prompt: the mod declares no `tool.check` hook, and its `classic.PermissionRequest` hook only
-tells the voice that a prompt is waiting.
+tells the voice that a prompt is waiting, with what Claude wrote in the step that asks for it.
 
 A question Claude asks you while it works (the AskUserQuestion dialog) is not a permission
 prompt: Claude asks for your input, not for leave to run a tool. During a voice turn the mod

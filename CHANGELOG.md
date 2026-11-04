@@ -28,6 +28,9 @@ All notable changes to this project are listed here. The format follows
 - When Claude asks a question during a voice request, the voice also gets what Claude wrote just
   before the question, in the same line after the options, with code blocks and tables removed
   as from a result.
+- When a voice request stops at a permission prompt, the approval notice also carries what Claude
+  wrote in the step that asks for it, such as "I'm going to delete build/ and re-run", with code
+  blocks and tables removed. The voice only reports the prompt; you still answer it in Claude Code.
 
 ## [0.2.0]
 

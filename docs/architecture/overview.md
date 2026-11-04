@@ -119,7 +119,7 @@ that both test suites parse.
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
-| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn |
+| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn, `text` with `approval` alone what Claude wrote in the step that asks for a permission |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
@@ -295,7 +295,10 @@ sequenceDiagram
 ### Approval notice
 
 The bridge never answers a permission prompt. When a voice turn hits one, the voice says that
-Claude is waiting; the owner answers in Claude Code.
+Claude is waiting, and what the main loop wrote in the model step that asks for it, such as "I'm
+going to delete build/ and re-run": the same step text a question carries (below), taken once,
+after the notice in the line and with code and tables removed. A subagent's prompt goes without
+it. The owner answers in Claude Code.
 
 ```mermaid
 sequenceDiagram
@@ -305,8 +308,8 @@ sequenceDiagram
   participant Mod
   participant Claude
   Claude->>Mod: classic.PermissionRequest (during a voice turn)
-  Mod->>Bridge: POST /v1/activity approval
-  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval"
+  Mod->>Bridge: POST /v1/activity approval (and the step's text)
+  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before: …"
   Codex-->>Owner: says so (or a chime if the line is closed)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied

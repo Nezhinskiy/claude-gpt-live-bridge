@@ -335,7 +335,7 @@ OpenAI, via la session temps réel de codex :
 - les demandes encore ouvertes de la session cible, sous forme de résumés d'une ligne ;
 - chaque résultat, question, mise à jour et avis d'approbation, en une ligne d'au plus
   2 000 caractères, blocs de code et tableaux retirés. Une question que Claude pose en cours de
-  tour porte aussi ce que Claude a écrit juste avant de la poser. Une mise à jour est la réponse de Claude
+  tour, et un avis d'approbation, portent aussi ce que Claude a écrit juste avant de demander. Une mise à jour est la réponse de Claude
   dans un tour ultérieur déclenché par la notification d'une tâche d'arrière-plan, pendant au plus
   10 minutes après une demande vocale et jusqu'à ce qu'un autre tour démarre dans la session ;
 - le résumé de contexte de la session cible, en une ligne d'au plus 1 500 caractères. Il est
