@@ -231,7 +231,8 @@ claude plugin uninstall livebridge@livebridge
 
 - **Start у смузі** робить її сесію ціллю, починає дзвінок і надсилає голосу резюме сесії
   ([подробиці](docs/architecture/overview.md#components)). Поки дзвінок іде з іншою сесією,
-  смуга показує **Talk here**.
+  смуга показує **Talk here**. Якщо в приєднаній сесії
+  смуги немає, `/live on` повертає її.
 - **Меню в рядку меню** містить дзвінок, приєднані сесії (клацання робить сесію ціллю),
   **Load context**, **Conversation** цілі в тому вигляді, в якому його зберігає LiveBridge,
   хвилини, **Settings…** та **Quit LiveBridge**.

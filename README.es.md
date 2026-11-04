@@ -232,7 +232,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 
 - **El Start de la banda** convierte su sesión en el destino, inicia la llamada y envía a la voz el
   resumen de la sesión ([detalles](docs/architecture/overview.md#components)). Mientras la llamada
-  habla con otra sesión, la banda muestra **Talk here**.
+  habla con otra sesión, la banda muestra **Talk here**. Si la banda
+  no aparece en una sesión unida, `/live on` la recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
   conserva LiveBridge, los minutos, **Settings…** y **Quit LiveBridge**.
