@@ -152,6 +152,10 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
       let digest = Self.sha256(of: URL(filePath: arguments[2]))
       return ProgramResult(status: 0, output: Self.attestation(digest: digest))
     case ("diskutil", "image") where arguments.dropFirst().first == "attach":
+      // macOS 14's diskutil refuses a mount point that does not exist yet (64, "doesn't exist")
+      guard let at = arguments.firstIndex(of: "--mountPoint"), at + 1 < arguments.count,
+        UpdateBundleCheck.isDirectory(URL(filePath: arguments[at + 1]))
+      else { return ProgramResult(status: 64, output: "") }
       // diskutil's own output, recorded on macOS 27, with the rig's mount point in it
       return ProgramResult(status: 0, output: Self.attachOutput(mountedAt: mount))
     case ("codesign", "-dvvv"):

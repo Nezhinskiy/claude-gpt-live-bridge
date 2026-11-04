@@ -279,8 +279,10 @@ public actor Updater {
   private func stage(_ image: URL, in folder: URL, version: AppVersion) async throws(UpdateProblem)
     -> Staged
   {
-    // A fresh folder each run: a volume a crash left mounted is never stacked on.
+    // A fresh folder each run, so a volume a crash left mounted is never stacked on; made here,
+    // since diskutil before macOS 27 refuses a mount point that does not exist.
     let mount = folder.appending(path: "mount-\(UUID().uuidString)")
+    guard mkdir(mount.path, 0o700) == 0 else { throw .notWritable }
     let arguments = [
       "image", "attach", "--plist", "--readOnly", "--nobrowse", "--mountPoint", mount.path,
       image.path,
