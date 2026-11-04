@@ -333,7 +333,7 @@ struct BridgeTests {
     #expect(await lines().isEmpty)
     await bridge.setTarget(b)
     #expect(
-      await lines() == ["Claude: [QUESTION] Beta: Which branch?", "Sent: Example request 2"])
+      await lines() == ["Claude: [QUESTION] Beta: Which branch?", "Task: Example request 2"])
   }
 
   /// A question answered in Claude Code is withdrawn from the voice and routes nothing.

@@ -25,7 +25,7 @@ public struct Conversation: Codable, Sendable, Equatable {
         case .owner: "You"
         case .voice: "Voice"
         case .claude: "Claude"
-        case .handoff: "Sent"
+        case .handoff: "Task"
         }
       }
 

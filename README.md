@@ -175,7 +175,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   session's summary ([details](docs/architecture/overview.md#components)). While the call talks
   to another session, the band shows **Talk here**.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
-  **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Sent** line
+  **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
   for each request the voice handed to Claude), the minutes, **Settings…** and
   **Quit LiveBridge**.
 - **New conversation…** erases the target's conversation and its loaded context, and a
