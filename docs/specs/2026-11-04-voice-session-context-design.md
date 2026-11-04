@@ -1,6 +1,6 @@
 # The voice knows the Claude session
 
-Status: proposed, 2026-11-04. Revised the same day after a design, simplify and security review
+Status: delivered, 2026-11-04. Revised the same day after a design, simplify and security review
 (`docs/reviews/2026-11-04-voice-context-review.md` on `review/voice-context`).
 
 ## Why

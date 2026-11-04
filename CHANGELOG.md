@@ -6,6 +6,24 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The voice can look at the Claude Code session. Ask it about "the chat" or what is in the
+  session and, when what it has does not cover that, it fetches the session's context itself and
+  answers from it: the summary, and Claude's last reply (a turn you typed included) with its open
+  question and options. Claude runs no turn for it. The reply is sent only for that fetch and is
+  not saved. If no context arrives within 60 seconds, the voice says so.
+
+### Changed
+
+- **Load context automatically** is now on by default and means "when a line opens": every line
+  the app opens (a Start, a line reopened after silence, the line after a target switch) asks the
+  target for its summary, and the line does not wait for it. The band's Start no longer asks for
+  it separately. The mod reuses its summary until a turn you typed completes, so a line
+  reopened after a voice request costs no new summary.
+- The voice's instructions say that "the chat" is the Claude Code session, and that a question
+  from a turn you typed waits at the keyboard.
+
 ### Fixed
 
 - When Claude asks a question during a voice request, the voice also gets what Claude wrote just

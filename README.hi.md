@@ -313,7 +313,8 @@ session के ज़रिए OpenAI को यह जाता है:
   होता है और जब भी line खुलती है और वह session target होता है, तब भेजा जाता है, Stop और Start के
   पार और app के restart के बाद भी, और तब भी जब voice session का context मँगाती है। Menu का
   Conversation submenu उस पंक्ति को ठीक वैसी ही दिखाता है जैसी वह भेजी जाती है;
-- target session में Claude का आख़िरी जवाब, आपके type किए turn का भी, अधिकतम 2,000 अक्षरों की एक
+- target session में Claude का आख़िरी जवाब, आपके type किए turn का भी, और जब कोई सवाल खुला हो तो
+  वह सवाल और उसके विकल्प जिन पर Claude इंतज़ार कर रहा है, अधिकतम 2,000 अक्षरों की एक
   `[LAST]` पंक्ति के रूप में, code blocks और tables हटाकर और उसका अंत रखकर। यह सिर्फ़ तब भेजा जाता है
   जब voice session का context मँगाती है, जो उसे तब करने को कहा गया है जब आप session के बारे में पूछें
   और उसके पास मौजूद जानकारी काफ़ी न हो: यह voice को दिया गया निर्देश है, कोई control नहीं। LiveBridge

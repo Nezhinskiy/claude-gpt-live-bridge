@@ -343,7 +343,8 @@ OpenAI, via la session temps réel de codex :
   quand la voix récupère le contexte de la session. Le sous-menu Conversation du menu affiche
   cette ligne exactement telle qu'elle est envoyée ;
 - la dernière réponse de Claude dans la session cible, y compris celle d'un tour que vous avez
-  tapé, en une ligne `[LAST]` d'au plus 2 000 caractères, blocs de code et tableaux retirés, dont
+  tapé, et la question et les options sur lesquelles Claude attend quand il y en a une d'ouverte,
+  en une ligne `[LAST]` d'au plus 2 000 caractères, blocs de code et tableaux retirés, dont
   la fin est conservée. Elle n'est envoyée que lorsque la voix récupère le contexte de la
   session, ce qu'il lui est demandé de faire quand vous l'interrogez sur la session et que ce
   qu'elle a ne suffit pas : c'est une instruction donnée à la voix, pas un contrôle. LiveBridge

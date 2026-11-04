@@ -326,7 +326,7 @@ la sesión en tiempo real de codex:
   contexto de la sesión. El submenú Conversation del menú muestra esa línea exactamente como se
   envía;
 - la última respuesta de Claude en la sesión de destino, también la de un turno que escribiste,
-  como una línea `[LAST]` de como máximo 2000 caracteres, sin bloques de código ni tablas y
+  y la pregunta y las opciones que Claude espera cuando hay una abierta, como una línea `[LAST]` de como máximo 2000 caracteres, sin bloques de código ni tablas y
   conservando su final. Solo se envía cuando la voz obtiene el contexto de la sesión, algo que se
   le indica hacer cuando preguntas por la sesión y lo que ya tiene no basta: es una instrucción a
   la voz, no un control. LiveBridge no la guarda; lo que la voz diga sobre ella queda en la
