@@ -185,7 +185,8 @@ claude plugin uninstall livebridge@livebridge
 在提示输入框上方的状态条或菜单栏菜单中点击 **Start**，然后开始说话。
 
 - **状态条上的 Start** 会让它所属的会话成为目标，开始通话，并把该会话的摘要发送给语音
-  （[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。
+  （[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
+  状态条，`/live on` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
   **Load context**、LiveBridge 保存的目标会话 **Conversation**、分钟数、
   **Settings…** 和 **Quit LiveBridge**。

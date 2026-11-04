@@ -45,6 +45,8 @@ All notable changes to this project are listed here. The format follows
 - A question or permission notice from a turn you typed no longer goes to the voice while a
   voice request waits behind that turn. Only a voice turn that is running routes its question to
   the voice.
+- The band above the prompt comes back by itself when the Claude app lost it, and `/live on`
+  in a session that has already joined brings it back too.
 
 ### Note
 

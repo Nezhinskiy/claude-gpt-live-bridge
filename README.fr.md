@@ -245,7 +245,8 @@ parlez.
 
 - **Le Start de la bande** fait de sa session la cible, démarre l'appel et envoie à la voix le
   résumé de la session ([détails](docs/architecture/overview.md#components)). Tant que l'appel
-  parle à une autre session, la bande affiche **Talk here**.
+  parle à une autre session, la bande affiche **Talk here**. Si la bande
+  n'apparaît pas dans une session rejointe, `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
   la conserve, les minutes, **Settings…** et **Quit LiveBridge**.
