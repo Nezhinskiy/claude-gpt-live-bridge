@@ -133,6 +133,12 @@ struct CallMachineTests {
       [.confirmHandoff, window]),
     row("handoffToNoSessionIsNotConfirmedAndOpensNoWindow", live, .handedOff(nil), .live, []),
     row(
+      "aHandoffWhileConnectingIsConfirmed", connecting, .handedOff(alpha), .connecting,
+      [.confirmHandoff]),
+    row(
+      "aHandoffAsTheLineClosesIsConfirmed", [.start], .handedOff(alpha), .listening,
+      [.confirmHandoff]),
+    row(
       "ackKeepsTheLineOpenForTheResult", live + [.handedOff(alpha), .assistantSpeaking],
       said("On it."), .live, [arm]),
     row(

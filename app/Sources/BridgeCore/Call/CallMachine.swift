@@ -151,6 +151,8 @@ public struct CallMachine: Sendable {
     case (.connecting, .deliver(let result)):
       unheard.append(Unheard(line: result))
       return []
+    case (.listening, .handedOff(.some)), (.connecting, .handedOff(.some)):
+      return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
       return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
