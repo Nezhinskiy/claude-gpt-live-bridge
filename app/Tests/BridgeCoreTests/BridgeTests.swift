@@ -839,6 +839,28 @@ struct BridgeTests {
     #expect(await voice.added == [summary])
   }
 
+  /// A summary that came before the line's items were built is in them already: once connected,
+  /// the line is not given it again. Here the line waits for a fresh codex to launch, so the
+  /// summary lands before the items are built.
+  @Test func aSeededContextIsNotAddedAgainOnceTheLineConnects() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    await test.live()
+    let first = try #require(await voices.made.first)
+    first.emit(.closed(.codex(.exited(-1))))
+    first.end()
+    #expect(await eventually { await first.shutdowns == 1 })
+    await voices.setSlow()
+    let opening = Task { await test.bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voices.waiting == 1 })
+    try await test.post("/v1/context", test.context())
+    await voices.finishLaunch()
+    await opening.value
+    let second = try #require(await voices.made.last)
+    #expect(await second.opens.last?.map(\.text).contains(test.summary) == true)
+    #expect(await second.added.isEmpty)
+  }
+
   /// A summary for another session than the one the line is connecting to is not added to it.
   @Test func contextForAnotherSessionDoesNotReachAConnectingLine() async throws {
     try await join(a, "Alpha")
