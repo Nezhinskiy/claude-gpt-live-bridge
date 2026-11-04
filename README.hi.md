@@ -310,13 +310,18 @@ session के ज़रिए OpenAI को यह जाता है:
   शुरू न हो;
 - target session का context सारांश, अधिकतम 1,500 अक्षरों की एक पंक्ति के रूप में। यह load होने पर सेव
   होता है और जब भी line खुलती है और वह session target होता है, तब भेजा जाता है, Stop और Start के
-  पार और app के restart के बाद भी। Menu का Conversation submenu उस पंक्ति को ठीक वैसी ही दिखाता है
-  जैसी वह भेजी जाती है;
+  पार और app के restart के बाद भी, और तब भी जब voice session का context मँगाती है। Menu का
+  Conversation submenu उस पंक्ति को ठीक वैसी ही दिखाता है जैसी वह भेजी जाती है;
+- target session में Claude का आख़िरी जवाब, आपके type किए turn का भी, अधिकतम 2,000 अक्षरों की एक
+  `[LAST]` पंक्ति के रूप में, code blocks और tables हटाकर और उसका अंत रखकर। यह सिर्फ़ तब भेजा जाता है
+  जब voice session का context मँगाती है, जो उसे तब करने को कहा गया है जब आप session के बारे में पूछें
+  और उसके पास मौजूद जानकारी काफ़ी न हो: यह voice को दिया गया निर्देश है, कोई control नहीं। LiveBridge
+  इसे सेव नहीं करता; voice इसके बारे में जो कहती है, वह किसी भी जवाब की तरह conversation में रहता है;
 - ऊपर की हर पंक्ति के साथ, उसके session का label: Claude Code session का title, या अगर title न हो तो
   session folder का नाम;
 - WebRTC offer, जो Mac के local network addresses को connection candidates के रूप में सूचीबद्ध करता है।
 
-नतीजे, सवाल, updates और सारांश पहले जानी-पहचानी credential आकृतियों (private keys, JWTs, आम API
+नतीजे, सवाल, updates, सारांश और Claude का आख़िरी जवाब पहले जानी-पहचानी credential आकृतियों (private keys, JWTs, आम API
 tokens, URL में passwords, `password=` जैसे fields) के redactor से गुज़रते हैं। यह patterns की सूची है,
 कोई गारंटी नहीं।
 

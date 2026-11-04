@@ -258,8 +258,54 @@ struct SessionRegistryTests {
     try await registry.setTarget(b)
     #expect(try await registry.poll(b) == .context)
     #expect(try await registry.poll(b) == nil)
-    await registry.requestContext(for: a)
+    await registry.requestContext(for: a, fetch: nil)
     #expect(try await registry.poll(a) == .context)
+  }
+
+  var fetchFailed: Delivery {
+    Delivery(
+      session: a, label: "Example session", status: .failed, text: "context not available",
+      isFetch: true)
+  }
+
+  /// The voice's fetch asks for context like any ask, and fails once its deadline passes.
+  @Test func aFetchFailsAtItsDeadline() async throws {
+    await join(a)
+    await registry.requestContext(for: a, fetch: time.now + 60)
+    #expect(try await registry.poll(a) == .context)
+    #expect(await run(59) == [])
+    #expect(await run(1) == [fetchFailed])
+    #expect(await run(60) == [])
+  }
+
+  /// Context that arrives ends the fetch, once; an ask that is not a fetch has none to end.
+  @Test func contextEndsTheFetch() async throws {
+    await join(a)
+    await registry.requestContext(for: a, fetch: nil)
+    #expect(await !registry.endFetch(of: a))
+    await registry.requestContext(for: a, fetch: time.now + 60)
+    #expect(await registry.endFetch(of: a))
+    #expect(await !registry.endFetch(of: a))
+    #expect(await run(60) == [])
+  }
+
+  /// A second fetch while the first waits keeps one deadline: the later one.
+  @Test func aSecondFetchMovesTheDeadline() async throws {
+    await join(a)
+    await registry.requestContext(for: a, fetch: time.now + 60)
+    #expect(await run(30) == [])
+    await registry.requestContext(for: a, fetch: time.now + 60)
+    #expect(await run(59) == [])
+    #expect(await run(1) == [fetchFailed])
+  }
+
+  /// A session that leaves takes its fetch with it: nothing fails later.
+  @Test func aSessionLeavingDropsItsFetch() async throws {
+    await join(a)
+    await join(b, "Other session")
+    await registry.requestContext(for: a, fetch: time.now + 60)
+    #expect(await registry.leave(a) == nil)
+    #expect(await run(60) == [])
   }
 
   @Test func activityShowsInRows() async {

@@ -644,6 +644,145 @@ struct BridgeTests {
   /// The same app data after the app restarted: a fresh bridge and registry.
   func restart() throws -> BridgeTests { try BridgeTests(dir: dir, time: time) }
 
+  // MARK: The voice's fetch
+
+  /// The voice fetches the open line's context, and `session` (Alpha by default) takes the ask.
+  func fetch(from session: SessionID? = nil) async throws {
+    voice.emit(.contextFetch)
+    #expect(try await eventually { try await registry.poll(session ?? a) == .context })
+  }
+
+  let summary = "[CONTEXT] Alpha: Alpha's work."
+  func context(_ summary: String = "Alpha's work.", last: String? = nil) -> ContextBody {
+    ContextBody(sessionId: a, summary: summary, last: last)
+  }
+
+  /// The voice's fetch asks the target for its context; Claude gets no request, and the
+  /// conversation records nothing.
+  @Test func aFetchNeverReachesClaude() async throws {
+    await live()
+    try await fetch()
+    #expect(try await registry.poll(a) == nil)
+    #expect(await !registry.hasOpenRequests)
+    #expect(await lines().isEmpty)
+  }
+
+  /// The fetch's answer, the summary and Claude's last reply, is spoken at once. It is not
+  /// unheard: it neither chimes nor waits for a later line.
+  @Test func aFetchsAnswerIsSpoken() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await fetch()
+    try await post("/v1/context", context(last: "Two folders hold build output."))
+    #expect(await voice.spoken == [summary, "[LAST] Alpha: Two folders hold build output."])
+    #expect(await bridge.status.unheard == 0)
+  }
+
+  /// A fetch while Alpha works on a handoff: the context answers the fetch but not the
+  /// handoff, so silence still keeps the line open, and Alpha's result is said when it comes.
+  @Test func aFetchAndAHandoffKeepTheirOwnWaits() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    try await fetch()
+    try await post("/v1/context", context())
+    #expect(await voice.spoken == [summary])
+    #expect(await eventually { time.sleepers >= 5 })  // sweep, 3 silence timers, window
+    for _ in 0...CallMachine.silenceSeconds {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)  // the session stays joined
+    }
+    #expect(await bridge.status.call == .live)
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.spoken == [summary, "[RESULT] Alpha: Done."] })
+  }
+
+  /// A fetch while Claude's question is open asks the target, and the owner's next handoff
+  /// still answers the question.
+  @Test func aFetchKeepsTheQuestionsRoute() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await registry.enqueue(request(1), for: a)
+    #expect(try await registry.poll(a) == .request(request(1)))
+    try await post("/v1/target", TargetBody(sessionId: b))
+    await live()
+    let question = "Which name? Options: build (the default), out (shorter)."
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question))
+    try await fetch(from: b)
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
+  }
+
+  /// A fetch nobody answers is said to have failed once a minute has passed; the line stays
+  /// open meanwhile, and a summary after it is only added.
+  @Test func aFetchNobodyAnswersFailsAfterAMinute() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await fetch()
+    for second in 1...60 {
+      #expect(await voice.spoken.isEmpty, "\(second)")
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)  // the session stays joined
+      #expect(await eventually { time.sleeps(until: time.now + 1) })  // the sweep ran
+    }
+    #expect(await bridge.status.call == .live)
+    #expect(await voice.spoken == ["[FAILED] Alpha: context not available"])
+    try await post("/v1/context", context())
+    #expect(await voice.added == [summary])
+  }
+
+  /// A summary that failed with no last reply fails the fetch at once.
+  @Test func anEmptyAnswerFailsTheFetch() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await fetch()
+    try await post("/v1/context", context("", last: " "))
+    #expect(await voice.spoken == ["[FAILED] Alpha: context not available"])
+  }
+
+  /// A fetch from a line about Alpha is dropped when Beta becomes the target: Alpha's late
+  /// context reaches neither the voice nor Beta's line.
+  @Test func aTargetChangeDropsTheFetch() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await fetch()
+    await bridge.setTarget(b)
+    await bridge.audioEvent(.speechStarted)
+    await bridge.audioEvent(.speechEnded)
+    #expect(await bridge.status.call == .live)
+    try await post("/v1/context", context(last: "Two folders hold build output."))
+    #expect(await voice.spoken.isEmpty)
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// A fetch the closing line dropped leaves its context routine: added to the next line about
+  /// that session, without Claude's last reply.
+  @Test func aDroppedFetchsContextIsOnlyAdded() async throws {
+    await live()
+    try await fetch()
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await bridge.audioEvent(.speechStarted)
+    await bridge.audioEvent(.speechEnded)
+    try await post("/v1/context", context(last: "Two folders hold build output."))
+    #expect(await voice.spoken.isEmpty)
+    #expect(await voice.added == [summary])
+  }
+
+  /// A summary that failed while Claude's last reply came: the reply is said alone, and the
+  /// stored context stays.
+  @Test func aSummaryOnlyFailureSpeaksTheLastReply() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", context())
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await fetch()
+    try await post("/v1/context", context("", last: "Two folders hold build output."))
+    #expect(await voice.spoken == ["[LAST] Alpha: Two folders hold build output."])
+    #expect(await bridge.current.context == summary)
+  }
+
   // MARK: One conversation per session
 
   /// Each session's conversation is its own: changing the target closes the open line, and the

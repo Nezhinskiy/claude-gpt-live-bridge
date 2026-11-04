@@ -310,13 +310,19 @@ session:
   turn starts in the session;
 - the target session's context summary, as one line of at most 1,500 characters. It is saved
   when it is loaded and sent every time the line opens while that session is the target, across
-  Stop and Start and app restarts. The menu's Conversation submenu shows that line exactly as it
-  is sent;
+  Stop and Start and app restarts, and when the voice fetches the session's context. The menu's
+  Conversation submenu shows that line exactly as it is sent;
+- Claude's last reply in the target session, a turn you typed included, as one `[LAST]` line of
+  at most 2,000 characters with code blocks and tables removed and its end kept. It is sent
+  only when the voice fetches the session's context, which it is told to do when you ask about
+  the session and what it has does not cover it: an instruction to the voice, not a control.
+  LiveBridge does not save it; what the voice says about it stays in the conversation like any
+  reply;
 - with every line above, its session's label: the Claude Code session title, or the session
   folder's name when it has none;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
 
-Results, questions, updates and summaries pass through a redactor of known credential shapes
+Results, questions, updates, summaries and Claude's last reply pass through a redactor of known credential shapes
 first (private keys, JWTs, common API tokens, URL passwords, `password=`-style fields). It is a
 list of patterns, not a guarantee.
 

@@ -6,6 +6,8 @@ public struct Delivery: Sendable, Equatable {
   public var label: String
   public var status: AnswerStatus
   public var text: String
+  /// It answers the voice's fetch of the session's context, not a request.
+  public var isFetch = false
 }
 
 public enum RegistryError: Error, Equatable {
@@ -43,8 +45,8 @@ public enum RegistryError: Error, Equatable {
 /// next request is that question's reply instead: it goes out at once, for the request in
 /// flight, and supersedes nothing. A newer request supersedes the answer of an older one,
 /// which is then not delivered. A session that stops polling for 5 s is dropped and its open
-/// request fails; a request in flight for 10 minutes fails too. Exactly one
-/// session is the target while any is joined.
+/// request fails; a request in flight for 10 minutes fails too, and so does the voice's fetch of
+/// a session's context at its deadline. Exactly one session is the target while any is joined.
 public actor SessionRegistry {
   private struct Session {
     let joinOrder: Int
@@ -60,6 +62,8 @@ public actor SessionRegistry {
     /// The owner's reply to that question, until the session polls it.
     var reply: VoiceRequest?
     var wantsContext = false
+    /// The deadline of the voice's fetch of the context, until the context arrives.
+    var fetchDue: Date?
 
     var hasOpenRequest: Bool { inFlight != nil || !queued.isEmpty }
   }
@@ -157,8 +161,21 @@ public actor SessionRegistry {
     }
   }
 
-  /// Asks the session for its context summary at its next poll.
-  public func requestContext(for id: SessionID) { sessions[id]?.wantsContext = true }
+  /// What a fetch that got no context says.
+  static let fetchFailure = "context not available"
+
+  /// Asks the session for its context summary at its next poll. With `fetch`, the voice asked
+  /// for it, and its fetch fails at that deadline unless the context arrives first; a later
+  /// fetch moves the deadline.
+  public func requestContext(for id: SessionID, fetch: Date?) {
+    sessions[id]?.wantsContext = true
+    if let fetch { sessions[id]?.fetchDue = fetch }
+  }
+
+  /// The session's context arrived: whether it answers a fetch, which then ends.
+  public func endFetch(of id: SessionID) -> Bool {
+    sessions[id]?.fetchDue.take() != nil
+  }
 
   /// Records an answer. `ok`, `failed` and `question` close the request in flight; `update`
   /// closes nothing. Returns `nil` when a newer request superseded this one.
@@ -210,14 +227,20 @@ public actor SessionRegistry {
     for (id, session) in ordered() {
       if now.timeIntervalSince(session.lastPoll) >= Self.sessionExpiry {
         deliveries += [drop(id, labels: labels, reason: "session closed")].compactMap { $0 }
-      } else if let flight = session.inFlight,
-        now.timeIntervalSince(flight.since) >= Self.requestTimeout
-      {
+        continue
+      }
+      if let flight = session.inFlight, now.timeIntervalSince(flight.since) >= Self.requestTimeout {
         sessions[id]?.inFlight = nil
         if session.latest == flight.id, let label = labels[id] {
           deliveries.append(
             Delivery(session: id, label: label, status: .failed, text: "timed out"))
         }
+      }
+      if let due = session.fetchDue, now >= due, let label = labels[id] {
+        sessions[id]?.fetchDue = nil
+        deliveries.append(
+          Delivery(
+            session: id, label: label, status: .failed, text: Self.fetchFailure, isFetch: true))
       }
     }
     return deliveries

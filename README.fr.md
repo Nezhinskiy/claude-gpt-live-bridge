@@ -337,14 +337,21 @@ OpenAI, via la session temps réel de codex :
   10 minutes après une demande vocale et jusqu'à ce qu'un autre tour démarre dans la session ;
 - le résumé de contexte de la session cible, en une ligne d'au plus 1 500 caractères. Il est
   enregistré quand il est chargé et envoyé à chaque ouverture de la ligne tant que cette session
-  est la cible, d'un Stop à un Start et d'un redémarrage de l'application à l'autre. Le
-  sous-menu Conversation du menu affiche cette ligne exactement telle qu'elle est envoyée ;
+  est la cible, d'un Stop à un Start et d'un redémarrage de l'application à l'autre, ainsi que
+  quand la voix récupère le contexte de la session. Le sous-menu Conversation du menu affiche
+  cette ligne exactement telle qu'elle est envoyée ;
+- la dernière réponse de Claude dans la session cible, y compris celle d'un tour que vous avez
+  tapé, en une ligne `[LAST]` d'au plus 2 000 caractères, blocs de code et tableaux retirés, dont
+  la fin est conservée. Elle n'est envoyée que lorsque la voix récupère le contexte de la
+  session, ce qu'il lui est demandé de faire quand vous l'interrogez sur la session et que ce
+  qu'elle a ne suffit pas : c'est une instruction donnée à la voix, pas un contrôle. LiveBridge
+  ne l'enregistre pas ; ce que la voix en dit reste dans la conversation comme toute réponse ;
 - avec chacune des lignes ci-dessus, le libellé de sa session : le titre de la session Claude
   Code, ou le nom du dossier de la session si elle n'en a pas ;
 - l'offre WebRTC, qui liste les adresses réseau locales du Mac comme candidats de connexion.
 
-Les résultats, questions, mises à jour et résumés passent d'abord par un masqueur de formes
-connues d'identifiants (clés privées, JWT, jetons d'API courants, mots de passe dans les URL,
+Les résultats, questions, mises à jour, résumés et la dernière réponse de Claude passent d'abord
+par un masqueur de formes connues d'identifiants (clés privées, JWT, jetons d'API courants, mots de passe dans les URL,
 champs de type `password=`). C'est une liste de motifs, pas une garantie.
 
 Le thread codex qui porte la voix est éphémère et en lecture seule, avec toutes les

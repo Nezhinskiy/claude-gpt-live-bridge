@@ -320,14 +320,21 @@ la sesión en tiempo real de codex:
   minutos después de una petición por voz y hasta que empiece cualquier otro turno en la sesión;
 - el resumen de contexto de la sesión de destino, como una línea de como máximo 1500 caracteres. Se
   guarda cuando se carga y se envía cada vez que se abre la línea mientras esa sesión es el
-  destino, a través de Stop y Start y de los reinicios de la aplicación. El submenú Conversation del
-  menú muestra esa línea exactamente como se envía;
+  destino, a través de Stop y Start y de los reinicios de la aplicación, y cuando la voz obtiene el
+  contexto de la sesión. El submenú Conversation del menú muestra esa línea exactamente como se
+  envía;
+- la última respuesta de Claude en la sesión de destino, también la de un turno que escribiste,
+  como una línea `[LAST]` de como máximo 2000 caracteres, sin bloques de código ni tablas y
+  conservando su final. Solo se envía cuando la voz obtiene el contexto de la sesión, algo que se
+  le indica hacer cuando preguntas por la sesión y lo que ya tiene no basta: es una instrucción a
+  la voz, no un control. LiveBridge no la guarda; lo que la voz diga sobre ella queda en la
+  conversación como cualquier respuesta;
 - con cada línea anterior, la etiqueta de su sesión: el título de la sesión de Claude Code o, si no
   tiene, el nombre de la carpeta de la sesión;
 - la oferta WebRTC, que enumera las direcciones de red local del Mac como candidatas de conexión.
 
-Los resultados, las preguntas, las actualizaciones y los resúmenes pasan antes por un redactor de
-formatos de credenciales conocidos (claves privadas, JWT, tokens de API comunes, contraseñas en
+Los resultados, las preguntas, las actualizaciones, los resúmenes y la última respuesta de Claude
+pasan antes por un redactor de formatos de credenciales conocidos (claves privadas, JWT, tokens de API comunes, contraseñas en
 URL, campos del tipo `password=`). Es una lista de patrones, no una garantía.
 
 El hilo de codex que transporta la voz es efímero y de solo lectura, con todas las funciones de

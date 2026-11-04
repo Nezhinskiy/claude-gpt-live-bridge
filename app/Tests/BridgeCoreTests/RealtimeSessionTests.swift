@@ -308,6 +308,32 @@ struct RealtimeSessionTests {
     #expect(await events.next() == .assistantUtterance("I'm pulling up the folder now."))
   }
 
+  /// The fetch brief, in any case, punctuation, quotes or backticks, is the voice's own fetch;
+  /// a brief that only resembles it is a handoff.
+  @Test(arguments: [
+    ("refresh context", true), ("Refresh context.", true), ("`refresh context`", true),
+    ("\"REFRESH  context!\"", true), ("refresh the context", false),
+    ("refresh context and run the tests", false),
+  ])
+  func theFetchBriefIsItsOwnEvent(brief: String, isFetch: Bool) async throws {
+    _ = try await session.open(offerSDP: "offer", items: [])
+    let name = "realtime-item-added-handoff-request"
+    var item = try #require(adrJSON(name)["params"]?["item"]?.object)
+    item["input_transcript"] = .string(brief)
+    rpc.push(try adrJSON(name, params: ["item": .object(item)]))
+    var events = session.events.makeAsyncIterator()
+    let event = await events.next()
+    if isFetch {
+      #expect(event == .contextFetch)
+    } else {
+      guard case .handoff(let request) = event else {
+        Issue.record("no handoff")
+        return
+      }
+      #expect(request.brief == brief)
+    }
+  }
+
   @Test func assistantDeltaMeansTheVoiceIsSpeaking() async throws {
     _ = try await session.open(offerSDP: "offer", items: [])
     rpc.push(try adrJSON("realtime-transcript-delta-user"))  // the owner's words are not

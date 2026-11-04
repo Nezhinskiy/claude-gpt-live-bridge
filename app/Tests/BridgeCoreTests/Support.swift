@@ -48,6 +48,12 @@ final class TestTime: TimeSource {
   /// How many sleepers are waiting; tests wait for a timer to be armed before advancing.
   var sleepers: Int { state.withLock { $0.sleepers.count } }
 
+  /// Whether a sleeper wakes at `deadline`: a loop that sleeps a second at a time, such as the
+  /// bridge's sweep, has run since `advance(by:)` once it sleeps until a second from now.
+  func sleeps(until deadline: Date) -> Bool {
+    state.withLock { $0.sleepers.contains { $0.deadline == deadline } }
+  }
+
   func sleep(for duration: Duration) async throws {
     await withCheckedContinuation { wake in
       state.withLock { $0.sleepers.append(($0.now + duration.timeInterval, wake)) }

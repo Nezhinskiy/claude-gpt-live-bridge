@@ -44,6 +44,11 @@ struct CallMachineTests {
   static let grace = CallEffect.armGrace(milliseconds: 800)
   /// A request handed to Alpha and acknowledged; the owner has stopped talking.
   static let waiting: [CallEvent] = live + [.handedOff(alpha), .assistantSpeaking, said("On it.")]
+  /// The answer to the voice's fetch of Alpha's context.
+  static let fetched = [
+    alphas(.context, "Alpha's work."), alphas(.last, "Two folders hold output."),
+  ]
+  static let fetching: [CallEvent] = live + [.fetchAsked(alpha)]
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
@@ -233,6 +238,37 @@ struct CallMachineTests {
       "targetChangeWhileConnectingCloses", connecting, .conversationChanged, .listening,
       [.closeRealtime]),
     row("targetChangeWhileListeningChangesNothing", [.start], .conversationChanged, .listening, []),
+    row(
+      "fetchAnsweredSpeaksOnALiveLine", fetching, .fetchAnswered(fetched), .live,
+      fetched.map { .speak($0) } + [arm]),
+    row(
+      "fetchAnsweredWhileTheOwnerSpeaksWaits", fetching + [.speechStarted],
+      .fetchAnswered(fetched), .live, [cap]),
+    row(
+      "fetchAnsweredWhileTheOwnerSpeaksIsHeld",
+      fetching + [.speechStarted, .fetchAnswered(fetched), .speechEnded], .graceElapsed, .live,
+      fetched.map { .speak($0) } + [arm]),
+    row("aFetchHoldsTheLineThroughSilence", fetching, .silenceElapsed, .live, []),
+    row(
+      "theFetchsAnswerEndsItsHold", fetching + [.fetchAnswered(fetched)], .silenceElapsed,
+      .listening, [.closeRealtime]),
+    row(
+      "aResultLeavesTheFetchWaiting", waiting + [.fetchAsked(alpha), fromAlpha], .silenceElapsed,
+      .live, [], pending: [result]),
+    row(
+      "theWindowLeavesAFetchingLineOpen", waiting + [.fetchAsked(alpha), .silenceElapsed],
+      .resultWindowElapsed, .live, []),
+    row(
+      "aFetchsAckSaysNoResult", told + [.fetchAsked(alpha), .speechStarted, .assistantSpeaking],
+      said("Alpha's build passes."), .live, [cap], pending: [result]),
+    row(
+      "aClosedLineDropsTheFetch",
+      fetching + [.remoteClosed(r), .speechStarted, .connected, .speechEnded], .silenceElapsed,
+      .listening, [.closeRealtime]),
+    row(
+      "aDroppedFetchsAnswerIsNotSaid",
+      fetching + [.conversationChanged, .speechStarted, .connected, .speechEnded],
+      .fetchAnswered(fetched), .live, []),
   ]
 
   @Test(arguments: table) func transition(_ row: Transition) {
@@ -254,6 +290,15 @@ struct CallMachineTests {
     var answer = Self.result
     answer.session = cleared
     #expect(machine.handle(.deliver(answer)) == [.speak(answer), Self.arm])
+  }
+
+  /// After `/clear` the line still waits for the session's context, under its new id.
+  @Test func aRenamedSessionKeepsItsFetch() {
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    var machine = CallMachine()
+    for event in Self.fetching { _ = machine.handle(event) }
+    machine.rename(Self.alpha, to: cleared)
+    #expect(machine.fetching == cleared)
   }
 
   /// A result held while the owner spoke is withdrawn with the rest: nothing is left to say.
