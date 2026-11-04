@@ -117,7 +117,7 @@ test('clipToEndLeavesShortTextAlone', () => {
 })
 
 test('clipToEndKeepsTheEndFromALineStart', () => {
-  // The last 12 characters are "ee\nfour\nfive"; the cut line "ee" goes whole.
+  // The last 12 characters are "ee\nfour\nfive"; what is left of the cut line, "ee", is dropped.
   assert.equal(clipToEnd('one\ntwo\nthree\nfour\nfive', 12), 'four\nfive')
 })
 

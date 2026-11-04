@@ -45,7 +45,7 @@ export function clip(text: string, limit: number): string {
 
 /**
  * The last `limit` characters of `text` (code points, so no surrogate pair is cut), from the start
- * of a line when it is cut at all: the line the cut fell in goes whole.
+ * of a line when it is cut at all: what is left of the line the cut fell in is dropped.
  */
 export function clipToEnd(text: string, limit: number): string {
   const chars = [...text]
