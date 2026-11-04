@@ -248,6 +248,9 @@ struct CallMachineTests {
       "fetchAnsweredWhileTheOwnerSpeaksIsHeld",
       fetching + [.speechStarted, .fetchAnswered(fetched), .speechEnded], .graceElapsed, .live,
       fetched.map { .speak($0) } + [arm]),
+    row(
+      "aHeldFetchAnswerArmsTheGrace", fetching + [.speechStarted, .fetchAnswered(fetched)],
+      .speechEnded, .live, [arm, grace]),
     row("aFetchHoldsTheLineThroughSilence", fetching, .silenceElapsed, .live, []),
     row(
       "theFetchsAnswerEndsItsHold", fetching + [.fetchAnswered(fetched)], .silenceElapsed,
