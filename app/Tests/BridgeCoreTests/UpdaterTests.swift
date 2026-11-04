@@ -80,7 +80,7 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
   }
 
   let log: UpdateLog
-  /// Where the fake `hdiutil attach` says the image is mounted.
+  /// Where the fake `diskutil image attach` says the image is mounted.
   let mount: URL
   /// The mod version `claude plugin list --json` reports.
   let modVersion: String
@@ -151,16 +151,9 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
     case ("gh", "attestation"):
       let digest = Self.sha256(of: URL(filePath: arguments[2]))
       return ProgramResult(status: 0, output: Self.attestation(digest: digest))
-    case ("hdiutil", "attach"), ("diskutil", "image"):
-      let plist: [String: Any] = [
-        "system-entities": [
-          ["dev-entry": "/dev/disk9", "content-hint": "GUID_partition_scheme"],
-          ["dev-entry": "/dev/disk9s1", "mount-point": mount.path],
-        ]
-      ]
-      let data = try? PropertyListSerialization.data(
-        fromPropertyList: plist, format: .xml, options: 0)
-      return ProgramResult(status: 0, output: String(decoding: data ?? Data(), as: UTF8.self))
+    case ("diskutil", "image") where arguments.dropFirst().first == "attach":
+      // diskutil's own output, recorded on macOS 27, with the rig's mount point in it
+      return ProgramResult(status: 0, output: Self.attachOutput(mountedAt: mount))
     case ("codesign", "-dvvv"):
       // codesign reports on standard error, which is in the output only when asked for
       guard mergingErrors else { return ok }
@@ -192,6 +185,16 @@ final class FakeUpdateEnvironment: UpdateEnvironment {
   }
 
   /// `gh attestation verify --format json` output naming `digest`.
+  /// The recorded `diskutil image attach --plist` output, its mount point replaced by `mount`.
+  static func attachOutput(mountedAt mount: URL) -> String {
+    let fixture = Bundle.module.url(
+      forResource: "diskutil-image-attach", withExtension: "plist", subdirectory: "Fixtures")
+    let recorded = fixture.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+    return recorded.replacing(
+      "/Users/example/Library/Application Support/LiveBridge/updates/0.1.3/mount-00000000-0000-0000-0000-000000000000",
+      with: mount.path)
+  }
+
   static func attestation(digest: String) -> String {
     """
     [{"verificationResult":{"statement":{"_type":"https://in-toto.io/Statement/v1",\
@@ -513,48 +516,36 @@ struct UpdaterTests {
         [.posixPermissions: 0o755], ofItemAtPath: rig.paths.applications.path)
     }
     #expect(try await rig.install() != .installing)
-    #expect(rig.log.runs(of: "hdiutil").contains(["detach", rig.mount.path]))
-  }
-
-  @Test func theImageIsAttachedReadOnlyWithoutBrowsingOrOpening() async throws {
-    let rig = try UpdateRig()
-    _ = try await rig.install()
-    let folder = rig.paths.updates.appending(path: "0.1.3")
-    #expect(
-      rig.log.runs(of: "hdiutil").first == [
-        "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountrandom", folder.path, "-plist",
-        folder.appending(path: "LiveBridge.dmg").path,
-      ])
-  }
-
-  static let macOS27 = OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0)
-
-  /// macOS 27 deprecates `hdiutil attach` and `detach` for `diskutil image attach` and `eject`.
-  @Test func onMacOS27TheImageIsAttachedWithDiskutil() async throws {
-    let rig = try UpdateRig()
-    rig.env.change { $0.os = Self.macOS27 }
-    _ = try await rig.install()
-    let folder = rig.paths.updates.appending(path: "0.1.3")
-    #expect(rig.log.runs(of: "hdiutil").isEmpty)
-    #expect(
-      rig.log.runs(of: "diskutil").first == [
-        "image", "attach", "--plist", "--readOnly", "--nobrowse", "--mountPoint",
-        folder.appending(path: "mount").path, folder.appending(path: "LiveBridge.dmg").path,
-      ])
-  }
-
-  // A minimum of 15.2 is met on 27, so that fault installs there.
-  @Test(arguments: BundleFault.allCases.filter { $0 != .newerMacOS })
-  func onMacOS27TheImageIsEjectedOnFailure(_ fault: BundleFault) async throws {
-    let rig = try UpdateRig()
-    rig.env.change { $0.os = Self.macOS27 }
-    try fault.apply(to: rig)
-    defer {
-      try? FileManager.default.setAttributes(
-        [.posixPermissions: 0o755], ofItemAtPath: rig.paths.applications.path)
-    }
-    #expect(try await rig.install() != .installing)
     #expect(rig.log.runs(of: "diskutil").contains(["eject", rig.mount.path]))
+  }
+
+  /// A fresh mount folder each run, so a volume a crash left mounted is never stacked on.
+  @Test func theImageIsAttachedReadOnlyWithoutBrowsingInAFreshFolder() async throws {
+    let rig = try UpdateRig()
+    _ = try await rig.install()
+    let folder = rig.paths.updates.appending(path: "0.1.3")
+    let attach = try #require(rig.log.runs(of: "diskutil").first)
+    #expect(
+      attach.prefix(6) == [
+        "image", "attach", "--plist", "--readOnly", "--nobrowse", "--mountPoint",
+      ])
+    let mount = URL(filePath: attach[6])
+    #expect(mount.deletingLastPathComponent().path == folder.path)
+    #expect(mount.lastPathComponent.hasPrefix("mount-"))
+    #expect(UUID(uuidString: String(mount.lastPathComponent.dropFirst(6))) != nil)
+    #expect(attach[7...] == [folder.appending(path: "LiveBridge.dmg").path])
+    #expect(rig.log.runs(of: "hdiutil").isEmpty)
+  }
+
+  @Test func diskutilsAttachOutputNamesTheMountPoint() throws {
+    let fixture = try #require(
+      Bundle.module.url(
+        forResource: "diskutil-image-attach", withExtension: "plist", subdirectory: "Fixtures"))
+    let mount =
+      "/Users/example/Library/Application Support/LiveBridge/updates/0.1.3/mount-00000000-0000-0000-0000-000000000000"
+    #expect(
+      UpdateBundleCheck.volume(attachPlist: try String(contentsOf: fixture, encoding: .utf8))
+        == .init(ejectTarget: mount, mountPoint: URL(filePath: mount)))
   }
 
   @Test func readOnlyApplicationsLeavesTheAppAsItWas() async throws {

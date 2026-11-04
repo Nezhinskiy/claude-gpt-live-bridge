@@ -3,24 +3,23 @@ import Foundation
 
 /// The pure readings the `Updater` makes of the image and of the programs it runs.
 enum UpdateBundleCheck {
-  /// What `hdiutil attach -plist` or `diskutil image attach --plist` attached: what `detach` or
-  /// `eject` is given (the mount point, or a device when nothing was mounted) and the mount
-  /// point, if any.
+  /// What `diskutil image attach --plist` attached: what `diskutil eject` is given (the mount
+  /// point, or a device when nothing was mounted) and the mount point, if any.
   struct Volume: Equatable {
-    var detachTarget: String?
+    var ejectTarget: String?
     var mountPoint: URL?
   }
 
-  /// The first mounted entity in the attach's property list; its mount point is detached,
+  /// The first mounted entity in the attach's property list; its mount point is ejected,
   /// or the first device when nothing was mounted.
   static func volume(attachPlist: String) -> Volume {
     let plist = try? PropertyListSerialization.propertyList(
       from: Data(attachPlist.utf8), format: nil)
     let entities = (plist as? [String: Any])?["system-entities"] as? [[String: Any]] ?? []
     if let mountPoint = entities.lazy.compactMap({ $0["mount-point"] as? String }).first {
-      return Volume(detachTarget: mountPoint, mountPoint: URL(filePath: mountPoint))
+      return Volume(ejectTarget: mountPoint, mountPoint: URL(filePath: mountPoint))
     }
-    return Volume(detachTarget: entities.lazy.compactMap { $0["dev-entry"] as? String }.first)
+    return Volume(ejectTarget: entities.lazy.compactMap { $0["dev-entry"] as? String }.first)
   }
 
   /// `url` is a directory and not a symbolic link.
