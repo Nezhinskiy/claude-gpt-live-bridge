@@ -119,7 +119,7 @@ that both test suites parse.
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
-| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn, `text` with `approval` alone what Claude wrote in the step that asks for a permission |
+| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn (none: a permission prompt), `text` what Claude wrote in the step that pauses |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
@@ -295,10 +295,16 @@ sequenceDiagram
 ### Approval notice
 
 The bridge never answers a permission prompt. When a voice turn hits one, the voice says that
-Claude is waiting, and what the main loop wrote in the model step that asks for it, such as "I'm
-going to delete build/ and re-run": the same step text a question carries (below), taken once,
-after the notice in the line and with code and tables removed. A subagent's prompt goes without
-it. The owner answers in Claude Code.
+Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and
+re-run", and that only the owner can answer it, in Claude Code.
+
+Both pauses of a voice turn, this prompt and Claude's question below, carry the text of the
+main loop's model step that pauses: the engine's turn end carries only the turn's last text, and
+a pause only itself, so that text would reach the voice no other way. The mod keeps it as the
+step streams, since the engine may run a tool before its step ends, and takes it once: a second
+pause in the same step goes without it, and so does a subagent's prompt. It goes as the
+activity's `text`, and the app puts it after the notice or the question's options, with code and
+tables removed, so the cut of a long line takes the text first.
 
 ```mermaid
 sequenceDiagram
@@ -309,7 +315,7 @@ sequenceDiagram
   participant Claude
   Claude->>Mod: classic.PermissionRequest (during a voice turn)
   Mod->>Bridge: POST /v1/activity approval (and the step's text)
-  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before: …"
+  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before asking: …"
   Codex-->>Owner: says so (or a chime if the line is closed)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
@@ -320,10 +326,8 @@ sequenceDiagram
 
 When Claude asks the owner a question during a voice turn (the AskUserQuestion dialog), the
 dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
-line. What Claude wrote in the same model step follows the options in that line: the engine's
-turn end carries only the turn's last text, so it would reach the voice no other way, and after
-the options the app's cut of a long line takes it before any choice. The voice explains it and talks it over from what it knows, without handoffs; the owner's
-next handoff to that session is the reply. It goes out at once as `reply` work, beside the
+line, followed by the step's text (above). The voice explains it and talks it over from what it
+knows, without handoffs; the owner's next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
 dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
 has not polled by then goes as a request of its own.
