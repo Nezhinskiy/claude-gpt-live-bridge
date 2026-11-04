@@ -413,13 +413,14 @@ says the speakable text at once is the model's choice; the smoke run checks that
 
 Decided by the owner on 2026-11-04, after item (n).
 
-A line from a session the voice handed a request, and that has not answered it, opens the closed
+A line from the target, when the voice handed it a request it has not answered, opens the closed
 line instead of chiming: its result, failure or question, and an approval or question notice
 while it works. The new session is seeded as usual with the target's conversation, which holds
-the request, and gets the line as context; no synthetic utterance is sent. The wait outlives the
-hang-up and ends with the session's answer, Stop, a new target or the target's conversation
-erased; a new target ends it because the line would be seeded with another session's
-conversation. When the reopened line closes with the line still unsaid (1 of 4 in item (n)), it
+the request, and gets the line as context; no synthetic utterance is sent. A line from a session
+that is not the target only chimes, and the owner switches to it; the line would otherwise be
+seeded with another session's conversation. The wait outlives the hang-up and a target change
+and ends with the session's answer or Stop, so switching back to the session lets its answer open
+the line. When the reopened line closes with the line still unsaid (1 of 4 in item (n)), it
 chimes and waits, as decided on 2026-11-01. The result window is unchanged: a result within it is
 still said on the open line. Each reopening is billed like any open line: the connect, the
 voice's words and the 20 s of silence before it closes.

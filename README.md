@@ -281,10 +281,11 @@ talking, while Claude's answer to a request you just made may still come, or to 
   after that handoff, billed like any open line, and the voice says Claude's answer once nobody
   is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
   Claude closes after the usual 20 seconds of silence.
-- Claude's answer to a request you handed it, when it comes after the line closed, opens the
-  line again and the voice says it, billed like any open line. Anything else that arrives while
-  the line is closed (a later update, another session's result) plays a chime and waits: the band
-  and the menu show it as unheard, and the voice tells you when you next speak
+- Claude's answer to a request you handed the session you are talking to, when it comes after
+  the line closed, opens the line again and the voice says it, billed like any open line.
+  Anything else that arrives while the line is closed (an answer in a session you switched away
+  from, a later update) plays a chime and waits: the band and the menu show it as unheard, and
+  the voice tells you when you next speak
   ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute

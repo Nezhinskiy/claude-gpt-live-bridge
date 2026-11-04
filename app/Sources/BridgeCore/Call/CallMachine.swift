@@ -72,10 +72,11 @@ public enum CallEffect: Equatable, Sendable {
 /// request may still be answered: speech opens it, silence or a new target closes it, and the
 /// microphone stays with local voice detection in between. After a handoff the line waits up to
 /// `resultWindowSeconds` from the latest one for that session's result, and says it as soon as
-/// nobody is speaking. A line from a session still awaited that arrives while the line is closed
-/// opens it, seeded with the conversation that holds the request, and the voice usually says it
-/// unprompted (ADR 0001 (n)); any other line, and one the reopened line left unsaid, is announced
-/// by a chime and waits until the owner next speaks. Pure: the bridge runs the effects.
+/// nobody is speaking. A line from the target that arrives while the line is closed and that
+/// session is still awaited opens it, seeded with the conversation that holds the request, and
+/// the voice usually says it unprompted (ADR 0001 (n)); any other line, one from a session that
+/// is not the target included, and one the reopened line left unsaid, is announced by a chime and
+/// waits until the owner next speaks. Pure: the bridge runs the effects.
 public struct CallMachine: Sendable {
   public static let noise = Problem.other(
     "The voice hung up: the microphone heard sound but no words for 90 seconds.")
@@ -93,9 +94,11 @@ public struct CallMachine: Sendable {
   public var pending: [VoiceLine] { unheard.map(\.line) }
   /// The results given before the voice's current reply began; only that reply can say them.
   private var replyCanSay: [VoiceLine]?
-  /// The sessions handed a request whose answer has not come. Kept across a hang-up: a line from
-  /// one opens the closed line. A new target, or its conversation erased, ends the wait.
+  /// The sessions handed a request whose answer has not come. Kept across a hang-up and a target
+  /// change: a line from one that is the target opens the closed line.
   public private(set) var awaited: Set<SessionID> = []
+  /// The session the owner chose to talk to; the bridge sets it before each delivery.
+  public var target: SessionID?
   /// The result window runs: silence does not close the line while a session is awaited, until
   /// `resultWindowSeconds` after the latest handoff.
   private var isWindowOpen = false
@@ -154,12 +157,10 @@ public struct CallMachine: Sendable {
       unheard.append(Unheard(line: result))
       guard let session = result.session, awaited.contains(session) else { return [.chime] }
       if result.kind.answers { awaited.remove(session) }
+      guard session == target else { return [.chime] }
       phase = .connecting
       isOpenedByResult = true
       return [.openRealtime]
-    case (.listening, .conversationChanged):
-      awaited = []
-      return []
     case (.connecting, .deliver(let result)):
       unheard.append(Unheard(line: result))
       return []
@@ -212,7 +213,6 @@ public struct CallMachine: Sendable {
       isWindowOpen = false
       return isSilenceDue ? [.closeRealtime] + hangUp() : []
     case (.connecting, .conversationChanged), (.live, .conversationChanged):
-      awaited = []
       return [.closeRealtime] + hangUp()
     case (.live, .silenceElapsed):
       if isWindowOpen, !awaited.isEmpty, !isSoundOn {

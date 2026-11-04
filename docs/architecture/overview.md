@@ -204,16 +204,18 @@ sequenceDiagram
 
 ### A result while the line is closed
 
-A line from a session that was handed a request and has not answered it (`CallMachine.awaited`:
-its result, failure or question, or an approval or question notice while it works) opens the
-closed line. The new realtime session is seeded with the target's conversation, which holds the
-request, and gets the line as context; the voice usually says it unprompted, about 5 to 8 s after
-connecting ([ADR 0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence
-rule closes the line and the line chimes and waits as below. The wait outlives a hang-up and ends
-with the session's answer, Stop, a new target or the target's conversation erased.
+A line from the target, when the target was handed a request and has not answered it
+(`CallMachine.awaited`: its result, failure or question, or an approval or question notice while
+it works), opens the closed line. The new realtime session is seeded with the target's
+conversation, which holds the request, and gets the line as context; the voice usually says it
+unprompted, about 5 to 8 s after connecting ([ADR 0001](../adr/0001-platform-findings.md) (n)).
+If it does not, the 20 s silence rule closes the line and the line chimes and waits as below. The
+wait outlives a hang-up and a target change, and ends with the session's answer or Stop: a
+session the owner switches away from and back to opens the line again.
 
-Any other line that arrives while the line is closed (a later update, a line from another
-session, a result whose reopened line said nothing) does not open it. It chimes and waits; the
+Any other line that arrives while the line is closed (one from a session that is not the target,
+a later update, a result whose reopened line said nothing) does not open it; the chime and the
+notification name the session, and the owner switches to it. It chimes and waits; the
 voice gets it when the owner next speaks and says it in a reply. A result for a session the open
 line is not waiting on is added as context and said in the voice's next reply.
 

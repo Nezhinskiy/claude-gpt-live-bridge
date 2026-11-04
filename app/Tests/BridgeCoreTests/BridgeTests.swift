@@ -546,9 +546,8 @@ struct BridgeTests {
     #expect(await !audio.calls.contains("chime"))
   }
 
-  /// A new target while the line is closed ends the wait: its result would open a line seeded
-  /// with another session's conversation, so it chimes instead.
-  @Test func aTargetChangeWhileClosedEndsTheWait() async throws {
+  /// An answer for a session that is not the target only chimes: the owner switches to it.
+  @Test func anAnswerForASessionNotTheTargetOnlyChimes() async throws {
     await live()
     await bridge.audioEvent(.speechEnded)
     try await handOff()
@@ -559,6 +558,21 @@ struct BridgeTests {
     try await answerFirstRequest()
     #expect(await eventually { await audio.calls.contains("chime") })
     #expect(await voice.opens.count == 1)
+  }
+
+  /// The wait outlives a target change: once its session is the target again, its answer opens
+  /// the line.
+  @Test func anAnswerOpensTheLineWhenItsSessionIsTheTargetAgain() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    try await join(b, "Beta")
+    try await post("/v1/target", TargetBody(sessionId: b))
+    #expect(await eventually { await bridge.status.call == .listening })
+    try await post("/v1/target", TargetBody(sessionId: a))
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.opens.count == 2 })
+    #expect(await !audio.calls.contains("chime"))
   }
 
   /// The last session leaving stops the call, as Start with none refuses: nobody is left to

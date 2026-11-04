@@ -2,9 +2,11 @@ import Testing
 
 @testable import BridgeCore
 
-/// One row of the call table: replay `given` from `off`, then `event` must give these effects.
+/// One row of the call table: replay `given` from `off` with `target` the target, then `event`
+/// must give these effects.
 struct Transition: CustomTestStringConvertible, Sendable {
   var testDescription: String
+  var target: SessionID?
   var given: [CallEvent]
   var event: CallEvent
   var phase: CallPhase
@@ -51,11 +53,11 @@ struct CallMachineTests {
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
-    _ effects: [CallEffect], pending: [VoiceLine] = []
+    _ effects: [CallEffect], pending: [VoiceLine] = [], target: SessionID? = alpha
   ) -> Transition {
     Transition(
-      testDescription: name, given: given, event: event, phase: phase, effects: effects,
-      pending: pending)
+      testDescription: name, target: target, given: given, event: event, phase: phase,
+      effects: effects, pending: pending)
   }
 
   static let table = [
@@ -182,8 +184,11 @@ struct CallMachineTests {
       .live, [.flushPreroll, .addContext(approval), arm, .problem(nil)],
       pending: [approval]),
     row(
-      "aTargetChangeEndsTheWait", closedWaiting + [.conversationChanged], fromAlpha, .listening,
-      [.chime], pending: [result]),
+      "aResultForASessionNotTheTargetOnlyChimes", closedWaiting, fromAlpha, .listening, [.chime],
+      pending: [result], target: beta),
+    row(
+      "theWaitOutlivesATargetChange", waiting + [.conversationChanged], fromAlpha, .connecting,
+      [.openRealtime], pending: [result]),
     row(
       "aLineFromAnotherSessionStillOnlyChimes", closedWaiting, deliver(a), .listening, [.chime],
       pending: [a]),
@@ -266,6 +271,7 @@ struct CallMachineTests {
 
   @Test(arguments: table) func transition(_ row: Transition) {
     var machine = CallMachine()
+    machine.target = row.target
     for event in row.given { _ = machine.handle(event) }
     #expect(machine.handle(row.event) == row.effects)
     #expect(machine.phase == row.phase)
