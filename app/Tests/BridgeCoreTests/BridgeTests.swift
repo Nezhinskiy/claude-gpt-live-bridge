@@ -348,7 +348,7 @@ struct BridgeTests {
     await live()
     voice.emit(.handoff(request(1)))
     #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
-    #expect(await audio.calls.filter { $0 == "confirmHandoff" }.count == 1)
+    #expect(await eventually { await audio.calls.filter { $0 == "confirmHandoff" }.count == 1 })
   }
 
   /// What the voice handed off shows in the conversation of the session it went to: here the
