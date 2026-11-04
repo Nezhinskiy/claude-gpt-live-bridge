@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- When Claude asks a question during a voice request, the voice also gets what Claude wrote just
+  before the question, not only the question and its options.
+
 ## [0.2.0]
 
 ### Added
