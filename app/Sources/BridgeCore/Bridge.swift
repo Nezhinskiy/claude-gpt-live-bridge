@@ -14,6 +14,8 @@ public actor Bridge: Router {
   private let notifier: (any ResultNotifying)?
   /// Settings' "Notify when a result is waiting", read at each chime.
   private let notifies: @Sendable () -> Bool
+  /// Settings' "Load context automatically", read each time a line opens.
+  private let autoContext: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -30,6 +32,11 @@ public actor Bridge: Router {
   /// Whether `lineSession` is set for the line opening now; until then a target change cannot
   /// be told from the target it will open with.
   private var lineKnowsSession = false
+  /// The context line the opening line was seeded with.
+  private var seededContext: String?
+  /// A summary for the opening line's session that came while it connected, added once the line
+  /// is connected unless the line was seeded with it.
+  private var heldContext: VoiceLine?
   private var problem: Problem?
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
@@ -51,10 +58,12 @@ public actor Bridge: Router {
     registry: SessionRegistry,
     realtime: @escaping @Sendable () async throws -> any RealtimeControlling, audio: any AudioSide,
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
-    notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true }
+    notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
+    autoContext: @escaping @Sendable () -> Bool = { false }
   ) {
     self.notifier = notifier
     self.notifies = notifies
+    self.autoContext = autoContext
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -285,14 +294,18 @@ public actor Bridge: Router {
     await send(timer.event)
   }
 
-  /// Opens the line with the target's conversation. Cancelled, it does nothing more: whoever
-  /// cancelled it closes what it opened. A line the voice closed itself (`CancellationError`)
-  /// says why in its `closed` event.
+  /// Opens the line with the target's conversation, and asks the target for its context with
+  /// Load context automatically on; the line does not wait for it. Cancelled, it does nothing
+  /// more: whoever cancelled it closes what it opened. A line the voice closed itself
+  /// (`CancellationError`) says why in its `closed` event.
   private func openLine() async {
     lineKnowsSession = false
+    seededContext = nil
+    heldContext = nil
     let session = await registry.target
     lineSession = session
     lineKnowsSession = true
+    if let session, autoContext() { await registry.requestContext(for: session, fetch: nil) }
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer()
@@ -301,11 +314,18 @@ public actor Bridge: Router {
       let tasks = if let session { await registry.openTasks(of: session) } else { [String]() }
       let items = conversation.initialItems(
         tasks: tasks, unheard: Set(machine.pending.map(\.text)))
+      seededContext = conversation.context
       let answer = try await voice.open(offerSDP: offer, items: items)
       try Task.checkCancellation()
       try await audio.applyAnswer(answer)
       try Task.checkCancellation()
       await send(.connected)
+      if let held = heldContext, held.session == session, held.text != seededContext,
+        machine.phase == .live
+      {
+        try? await voice.addContext(held.text)
+      }
+      heldContext = nil
     } catch {
       guard !Task.isCancelled, !(error is CancellationError) else { return }
       if let realtime, (error as? CodexProblem)?.endsCodex == true { await retire(realtime) }
@@ -472,8 +492,9 @@ public actor Bridge: Router {
   /// it is and kept in the session's conversation; an empty one (none, or it failed) keeps the
   /// stored line. When the line waits for it as its fetch's answer, it is said, with Claude's
   /// last reply as a `[LAST]` line that is never kept; with neither, the fetch failed.
-  /// Otherwise a live line about that session gets the summary at once, and Claude's last reply
-  /// goes nowhere.
+  /// Otherwise a live line about that session gets the summary at once, and one still
+  /// connecting gets it when connected; Claude's last reply goes nowhere. A summary equal to the
+  /// stored one is neither saved nor added again.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
@@ -482,7 +503,8 @@ public actor Bridge: Router {
       ? nil
       : AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
-    if let summary {
+    let changed = summary != nil && summary?.text != continuity[id].context
+    if let summary, changed {
       continuity.setContext(summary.text, for: id)
       save()
     }
@@ -494,8 +516,12 @@ public actor Bridge: Router {
       }
       let lines = [summary, last].compactMap { $0 }
       await send(.fetchAnswered(lines.isEmpty ? [fetchFailed(row.label, id)] : lines))
-    } else if let summary, machine.phase == .live, lineSession == id {
-      try? await realtime?.addContext(summary.text)
+    } else if let summary, changed, lineSession == id {
+      switch machine.phase {
+      case .live: try? await realtime?.addContext(summary.text)
+      case .connecting: heldContext = summary
+      default: break
+      }
     }
   }
 

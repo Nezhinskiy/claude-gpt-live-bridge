@@ -81,13 +81,8 @@ public actor SessionRegistry {
   /// The longest title kept; the label, the band and every voice line carry it.
   public static let maxTitle = 80
   public private(set) var target: SessionID?
-  /// Settings' automatic context, read each time a session becomes the target: it is then asked
-  /// for its summary.
-  private let autoContext: @Sendable () -> Bool
-
-  public init(time: any TimeSource, autoContext: @escaping @Sendable () -> Bool = { false }) {
+  public init(time: any TimeSource) {
     self.time = time
-    self.autoContext = autoContext
   }
 
   /// Adds the session, or renames it and refreshes its liveness if it already joined. A session
@@ -286,11 +281,7 @@ public actor SessionRegistry {
     return try change(&session)
   }
 
-  /// Makes `id` the target; with `autoContext` on it is asked for its summary.
-  private func retarget(_ id: SessionID?) {
-    target = id
-    if let id, autoContext() { sessions[id]?.wantsContext = true }
-  }
+  private func retarget(_ id: SessionID?) { target = id }
 
   private func drop(_ id: SessionID, labels: [SessionID: String], reason: String) -> Delivery? {
     guard let session = sessions.removeValue(forKey: id) else { return nil }

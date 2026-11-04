@@ -54,9 +54,8 @@ struct SettingsView: View {
       }
       Section("Context") {
         Toggle(
-          "Load a session's context automatically when it becomes the target",
-          isOn: setting(\.autoContext))
-        Text("Otherwise only Load context in the menu sends it.")
+          "Load context automatically when a line opens", isOn: setting(\.autoContext))
+        Text("Otherwise only Load context in the menu, or asking the voice, sends it.")
           .font(.caption).foregroundStyle(.secondary)
       }
       Section("General") {

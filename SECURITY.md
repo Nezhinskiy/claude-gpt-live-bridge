@@ -152,11 +152,13 @@ secret.
 - **A loaded context persists.** Each session's `[CONTEXT]` line is saved in the data folder
   with that session's conversation and given to every later realtime session while that session
   is the target, across Stop and Start and app restarts, until you press **New conversation**
-  with it as the target, load a new summary from it, or remove it from LiveBridge. The band's
-  Start sends one, and with **Load a session's context automatically when it becomes the
-  target** on in LiveBridge's Settings, a session sends a new one whenever it becomes the
-  target. One injected summary can therefore steer every later call with that session. Its recent conversation is carried over
-  the same way, including the lines the session sent the voice. A result from another session is
+  with it as the target, load a new summary from it, or remove it from LiveBridge. With **Load
+  context automatically when a line opens** on (the default) in LiveBridge's Settings, the
+  target session sends a new one whenever the app opens a line: a Start, a line reopened after
+  silence, the line after a target switch. The menu's Load context and the voice's fetch send
+  one too. One injected summary can therefore steer every later call with that session. Its
+  recent conversation is carried over the same way, including the lines the session sent the
+  voice. A result from another session is
   still spoken in whatever line is open, and the voice's reply to it stays in that line's
   conversation, so one session's text can still reach the conversation about another.
 

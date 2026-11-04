@@ -245,21 +245,16 @@ struct SessionRegistryTests {
     #expect(await registry.target == nil)
   }
 
-  /// The app's own setting decides.
-  /// Settings' automatic context is read each time a session becomes the target.
-  @Test func becomingTargetWithAutoContextAsksForContext() async throws {
-    let settings = SettingsStore(file: nil)
-    let registry = SessionRegistry(time: time, autoContext: { settings.current.autoContext })
-    try await registry.join(JoinBody(sessionId: a, title: "Example session"))
-    #expect(try await registry.poll(a) == nil)  // the setting is off
-    settings.update { $0.autoContext = true }
-    try await registry.join(JoinBody(sessionId: b, title: "Other session"))
-    #expect(try await registry.poll(b) == nil)  // not the target
+  /// Only a line the app opens asks for context (`Bridge.openLine`): a session that becomes the
+  /// target is asked for nothing.
+  @Test func becomingTargetAsksForNothing() async throws {
+    await join(a)
+    await join(b, "Other session")
+    #expect(try await registry.poll(a) == nil)
     try await registry.setTarget(b)
-    #expect(try await registry.poll(b) == .context)
     #expect(try await registry.poll(b) == nil)
-    await registry.requestContext(for: a, fetch: nil)
-    #expect(try await registry.poll(a) == .context)
+    await registry.leave(b)  // the target falls back to Example session
+    #expect(try await registry.poll(a) == nil)
   }
 
   var fetchFailed: Delivery {

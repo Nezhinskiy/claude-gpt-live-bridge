@@ -216,16 +216,16 @@ claude plugin uninstall livebridge@livebridge
 | `/live status` (या सिर्फ़ `/live`) | एक पंक्ति: call, target, न सुने गए नतीजे, आज के मिनट। |
 | `/live context` | voice को इस session का नया सारांश भेजता है, जिसे session का model लिखता है। |
 
-Command `/live` है, `/voice` नहीं, क्योंकि `/voice` Claude Code का अपना voice mode है। किसी session के
-target बनने पर उसका सारांश भी भेजा जाए या नहीं, यह कोई command नहीं है: यह सभी sessions के लिए एक
+Command `/live` है, `/voice` नहीं, क्योंकि `/voice` Claude Code का अपना voice mode है। हर बार line खुलने पर
+session का सारांश भी load किया जाए या नहीं, यह कोई command नहीं है: यह सभी sessions के लिए एक
 setting है, जो LiveBridge की [सेटिंग्स](#सेटिंग्स) window में है।
 
 ### बैंड और मेन्यू
 
 **Start** दबाएँ, prompt के ऊपर वाले band में या menu bar menu में, और बोलें।
 
-- **band का Start** अपने session को target बनाता है, call शुरू करता है और voice को session का
-  सारांश भेजता है ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से
+- **band का Start** अपने session को target बनाता है, call शुरू करता है; जो line वह खोलता है
+  वह session का सारांश load करती है ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से
   बात कर रही हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए
   session में band न दिखे, तो `/live on` उसे वापस ले आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
@@ -244,8 +244,9 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **Prompt** (डिफ़ॉल्ट रूप से खाली): voice के लिए आपके अपने निर्देश, जैसे "मुझसे Spanish में बात
   करो", अधिकतम 2,000 अक्षर। ये LiveBridge के अपने voice नियमों के बाद जोड़े जाते हैं, और दोनों में
   टकराव होने पर उन्हीं नियमों की चलती है, और अगली बार line खुलने से लागू होते हैं।
-- **Load a session's context automatically when it becomes the target** (डिफ़ॉल्ट रूप से बंद): सभी
-  sessions के लिए एक setting, जिसे app सँभालकर रखता है।
+- **Load context automatically when a line opens** (डिफ़ॉल्ट रूप से चालू): app जो भी
+  line खोलता है (Start, चुप्पी के बाद दोबारा खोली गई line, target बदलने के बाद की line) वह target से उसका
+  सारांश माँगती है और उसका इंतज़ार नहीं करती; सभी sessions के लिए एक setting, जिसे app सँभालकर रखता है।
 - **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
   chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
   hear it"), नतीजा खुद कभी नहीं। उस पर click करने से menu bar menu खुलता है।

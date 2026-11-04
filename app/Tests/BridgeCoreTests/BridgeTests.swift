@@ -105,7 +105,8 @@ struct BridgeTests {
   /// `dir` and `time` are given to restart the app on another test's data.
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
-    time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true }
+    time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
+    autoContext: Bool = false
   ) throws {
     self.time = time
     self.dir = try dir ?? temporaryDirectory()
@@ -115,7 +116,7 @@ struct BridgeTests {
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
-      notifier: notifier, notifies: notifies)
+      notifier: notifier, notifies: notifies, autoContext: { autoContext })
   }
 
   @discardableResult
@@ -781,6 +782,91 @@ struct BridgeTests {
     try await post("/v1/context", context("", last: "Two folders hold build output."))
     #expect(await voice.spoken == ["[LAST] Alpha: Two folders hold build output."])
     #expect(await bridge.current.context == summary)
+  }
+
+  // MARK: Context when a line opens
+
+  /// The first line a Start opens asks the target for its context; Claude gets no request.
+  @Test func openingALineAsksForContext() async throws {
+    let test = try BridgeTests(autoContext: true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// A line reopened after the voice closed it asks again.
+  @Test func reopeningALineAsksForContext() async throws {
+    let test = try BridgeTests(autoContext: true)
+    await test.live()
+    _ = try await test.registry.poll(test.a)
+    test.voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  /// The line after a target switch asks the new target, and the old target is not asked.
+  @Test func theLineAfterATargetSwitchAsksTheNewTarget() async throws {
+    let test = try BridgeTests(autoContext: true)
+    try await test.join(test.a, "Alpha")
+    try await test.join(test.b, "Beta")
+    await test.live()
+    _ = try await test.registry.poll(test.a)
+    await test.bridge.setTarget(test.b)
+    #expect(try await test.registry.poll(test.b) == nil)  // switching asks for nothing
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(try await test.registry.poll(test.b) == .context)
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// With Load context automatically off, a line opens without asking.
+  @Test func openingALineWithTheSettingOffAsksForNothing() async throws {
+    await live()
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  /// A summary that comes while the line connects is added once the line is connected.
+  @Test func contextThatArrivesWhileConnectingReachesTheLine() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    await voice.holdOpen()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.openWaiting == 1 })
+    try await post("/v1/context", context())
+    #expect(await voice.added.isEmpty)
+    await voice.releaseOpen()
+    await opening.value
+    #expect(await voice.added == [summary])
+  }
+
+  /// A summary for another session than the one the line is connecting to is not added to it.
+  @Test func contextForAnotherSessionDoesNotReachAConnectingLine() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    await voice.holdOpen()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.openWaiting == 1 })
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    await voice.releaseOpen()
+    await opening.value
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// The same summary again is neither added to the line a second time nor saved again.
+  @Test func anUnchangedContextIsNotAddedAgain() async throws {
+    await live()
+    try await post("/v1/context", context())
+    try await post("/v1/context", context())
+    #expect(await voice.added == [summary])
+  }
+
+  /// A summary that differs from the stored one is added.
+  @Test func aChangedContextIsAdded() async throws {
+    await live()
+    try await post("/v1/context", context())
+    try await post("/v1/context", context("Alpha's other work."))
+    #expect(await voice.added == [summary, "[CONTEXT] Alpha: Alpha's other work."])
   }
 
   // MARK: One conversation per session

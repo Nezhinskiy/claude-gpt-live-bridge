@@ -211,15 +211,15 @@ In the Claude Code session you want to talk to:
 | `/live context` | Sends the voice a new summary of this session, written by the session's model. |
 
 The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode. Whether a
-session's summary is also sent whenever it becomes the target is not a command: it is one setting
-for every session, in LiveBridge's [Settings](#settings) window.
+session's summary is also loaded whenever a line opens is not a command: it is one setting for
+every session, in LiveBridge's [Settings](#settings) window.
 
 ### The band and the menu
 
 Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
-- **The band's Start** makes its session the target, starts the call and sends the voice the
-  session's summary ([details](docs/architecture/overview.md#components)). While the call talks
+- **The band's Start** makes its session the target, starts the call; the line it opens
+  loads the session's summary ([details](docs/architecture/overview.md#components)). While the call talks
   to another session, the band shows **Talk here**. If the band is not there in a joined
   session, `/live on` brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
@@ -239,8 +239,10 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
-- **Load a session's context automatically when it becomes the target** (off by default): one
-  setting for every session, kept by the app.
+- **Load context automatically when a line opens** (on by default): every line the
+  app opens (a Start, a line reopened after silence, the line after a target switch) asks the
+  target for its summary and does not wait for it; one setting for every session, kept by the
+  app.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.

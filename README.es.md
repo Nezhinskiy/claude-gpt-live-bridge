@@ -223,15 +223,15 @@ En la sesión de Claude Code con la que quieras hablar:
 | `/live context` | Envía a la voz un nuevo resumen de esta sesión, escrito por el modelo de la sesión. |
 
 El comando es `/live` y no `/voice` porque `/voice` es el modo de voz propio de Claude Code. Que se
-envíe también el resumen de una sesión cada vez que pasa a ser el destino no es un comando: es un
+cargue también el resumen de una sesión cada vez que se abre una línea no es un comando: es un
 único ajuste para todas las sesiones, en la ventana de [Ajustes](#ajustes) de LiveBridge.
 
 ### La banda y el menú
 
 Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra de menús, y habla.
 
-- **El Start de la banda** convierte su sesión en el destino, inicia la llamada y envía a la voz el
-  resumen de la sesión ([detalles](docs/architecture/overview.md#components)). Mientras la llamada
+- **El Start de la banda** convierte su sesión en el destino, inicia la llamada; la línea que abre
+  carga el resumen de la sesión ([detalles](docs/architecture/overview.md#components)). Mientras la llamada
   habla con otra sesión, la banda muestra **Talk here**. Si la banda
   no aparece en una sesión unida, `/live on` la recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
@@ -250,8 +250,10 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
   hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
-- **Load a session's context automatically when it becomes the target** (desactivado por defecto):
-  un único ajuste para todas las sesiones, que guarda la aplicación.
+- **Load context automatically when a line opens** (activado por defecto): cada
+  línea que abre la aplicación (un Start, una línea reabierta tras el silencio, la línea tras
+  cambiar de destino) pide el resumen al destino y no lo espera; un único ajuste para todas las
+  sesiones, que guarda la aplicación.
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el

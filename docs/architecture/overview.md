@@ -97,9 +97,10 @@ draws a band above the prompt with the call's phase, the target, the unheard cou
 buttons Start/Stop and Talk here, with the problem sentence on a row of its own. A surface
 that has drawn no band for 3 s while the session is joined is asked for it again, and `/live on`
 in a joined session asks every surface for it. Start
-makes the session the target, starts the call and sends the session's summary (none for a
-session with no prompt yet; the last one again, with no model call, while no turn has completed
-since it was written), with a short note in the band while it goes. Talk here shows only while
+makes the session the target and starts the call; the line the app opens then asks the target
+for its summary (with Load context automatically on), which the mod writes (none for a session
+with no prompt yet; the last one again, with no model call, while no turn has completed since it
+was written), with a short note in the band while it goes. Talk here shows only while
 the call talks to another session, and moves it here. When the socket does not answer, it opens
 `/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
 to `open -g -b <bundle id>`.

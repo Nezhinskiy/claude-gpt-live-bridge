@@ -177,14 +177,14 @@ claude plugin uninstall livebridge@livebridge
 | `/live status`（或直接 `/live`） | 一行信息：通话、目标、未听取的结果、今日分钟数。 |
 | `/live context` | 向语音发送由该会话的模型撰写的、关于此会话的新摘要。 |
 
-命令是 `/live` 而不是 `/voice`，因为 `/voice` 是 Claude Code 自带的语音模式。会话成为目标时是否同时发送其摘要，并不是一个命令：
+命令是 `/live` 而不是 `/voice`，因为 `/voice` 是 Claude Code 自带的语音模式。线路打开时是否同时加载该会话的摘要，并不是一个命令：
 它是对所有会话生效的一项设置，位于 LiveBridge 的[设置](#设置)窗口中。
 
 ### 状态条与菜单
 
 在提示输入框上方的状态条或菜单栏菜单中点击 **Start**，然后开始说话。
 
-- **状态条上的 Start** 会让它所属的会话成为目标，开始通话，并把该会话的摘要发送给语音
+- **状态条上的 Start** 会让它所属的会话成为目标，开始通话；它打开的线路会加载该会话的摘要
   （[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
   状态条，`/live on` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
@@ -200,7 +200,7 @@ claude plugin uninstall livebridge@livebridge
 - **Voice**：你的 codex 提供的实时语音之一（窗口打开时由 codex 列出），或 **Codex default**。从线路下次打开起生效。
 - **Prompt**（默认为空）：你给语音的自定义指令，例如“用西班牙语和我说话”，最多 2,000 个字符。它们会追加在 LiveBridge
   为语音设定的规则之后；两者冲突时以 LiveBridge 的规则为准。从线路下次打开起生效。
-- **Load a session's context automatically when it becomes the target**（默认关闭）：对所有会话生效的一项设置，由应用保存。
+- **Load context automatically when a line opens**（默认开启）：应用打开的每一条线路（一次 Start、静默后重新打开的线路、切换目标后的线路）都会向目标索取摘要，且不等待它；对所有会话生效的一项设置，由应用保存。
 - **Notify when a result is waiting**（默认开启）：当线路关闭期间有结果在等待时，除提示音外，还会弹出一条 macOS 通知，其中写明会话名称
   （“Alpha has a new result — speak to hear it”），但绝不包含结果本身。点击通知会打开菜单栏菜单。
 - **Open at login**（默认关闭）。

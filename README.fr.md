@@ -234,7 +234,7 @@ Dans la session Claude Code à laquelle vous voulez parler :
 | `/live context` | Envoie à la voix un nouveau résumé de cette session, rédigé par le modèle de la session. |
 
 La commande est `/live`, et non `/voice`, car `/voice` est le mode vocal propre à Claude Code.
-Envoyer ou non le résumé d'une session chaque fois qu'elle devient la cible n'est pas une
+Charger ou non le résumé d'une session chaque fois qu'une ligne s'ouvre n'est pas une
 commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 [Settings](#réglages) de LiveBridge.
 
@@ -243,8 +243,8 @@ commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 Appuyez sur **Start**, dans la bande au-dessus du prompt ou dans le menu de la barre des menus, et
 parlez.
 
-- **Le Start de la bande** fait de sa session la cible, démarre l'appel et envoie à la voix le
-  résumé de la session ([détails](docs/architecture/overview.md#components)). Tant que l'appel
+- **Le Start de la bande** fait de sa session la cible, démarre l'appel ; la ligne qu'il ouvre
+  charge le résumé de la session ([détails](docs/architecture/overview.md#components)). Tant que l'appel
   parle à une autre session, la bande affiche **Talk here**. Si la bande
   n'apparaît pas dans une session rejointe, `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
@@ -265,8 +265,10 @@ parlez.
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
   ouverture de la ligne.
-- **Load a session's context automatically when it becomes the target** (désactivé par défaut) :
-  un réglage unique pour toutes les sessions, conservé par l'application.
+- **Load context automatically when a line opens** (activé par défaut) : chaque
+  ligne que l'application ouvre (un Start, une ligne rouverte après un silence, la ligne après un
+  changement de cible) demande son résumé à la cible sans l'attendre ; un réglage unique pour
+  toutes les sessions, conservé par l'application.
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
   attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
   new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
