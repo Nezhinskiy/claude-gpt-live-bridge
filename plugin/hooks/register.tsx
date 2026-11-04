@@ -9,7 +9,7 @@ import { summarize } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
 import { askedText, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
-import { clip, clipAtLine, originOf, TurnTracker } from './turns.ts'
+import { clip, clipToEnd, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
 import type { VoiceRequest } from './wire.ts'
@@ -269,12 +269,11 @@ function staleSummary(): void {
   summary = null
 }
 
-/** What Claude last said; an open question comes with the text that asked it, and is kept whole. */
+/** What Claude last said, its end kept; an open question comes with the text that asked it. */
 function lastText(): string {
-  if (asking === null) return clipAtLine(lastReply, LAST_LIMIT)
-  const { question } = asking
-  const said = clipAtLine(asking.step || lastReply, Math.max(0, LAST_LIMIT - question.length - 2))
-  return clipAtLine(said === '' ? question : `${said}\n\n${question}`, LAST_LIMIT)
+  if (asking === null) return clipToEnd(lastReply, LAST_LIMIT)
+  const said = asking.step || lastReply
+  return clipToEnd(said === '' ? asking.question : `${said}\n\n${asking.question}`, LAST_LIMIT)
 }
 
 /** The band's note on the summary; undefined takes it down. */

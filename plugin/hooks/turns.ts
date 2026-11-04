@@ -43,12 +43,16 @@ export function clip(text: string, limit: number): string {
   return text
 }
 
-/** `text` within `limit` characters, cut before its last line break when it is cut at all. */
-export function clipAtLine(text: string, limit: number): string {
-  const head = clip(text, limit)
-  if (head === text) return text
-  const cut = head.lastIndexOf('\n')
-  return cut > 0 ? head.slice(0, cut) : head
+/**
+ * The last `limit` characters of `text` (code points, so no surrogate pair is cut), from the start
+ * of a line when it is cut at all: the line the cut fell in goes whole.
+ */
+export function clipToEnd(text: string, limit: number): string {
+  const chars = [...text]
+  if (chars.length <= limit) return text
+  const window = chars.slice(chars.length - limit).join('')
+  const cut = window.indexOf('\n')
+  return cut < 0 ? window : window.slice(cut + 1)
 }
 
 /** A turn's origin from the `origin` of the `prompt.submit` before it (ADR 0001, item m). */

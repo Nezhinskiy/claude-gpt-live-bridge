@@ -196,13 +196,17 @@ test('anOpenQuestionComesWithTheTextThatAskedIt', async ($, on) => {
 
 test('aLongLastReplyIsClipped', async ($, on) => {
   const world = await joined($, on)
-  const answer = ('x'.repeat(97) + '\n').repeat(205).slice(0, 20_000)
+  const lines = Array.from({ length: 205 }, (_, i) => `line ${i} `.padEnd(97, 'x'))
+  const answer = lines.join('\n')
   await typedTurn($, 't1', answer)
   await appAsks(world)
   const [{ last }] = world.take('context') as [{ last: string }]
   expect(last.length).toBeLessThanOrEqual(8000)
   expect(last.length).toBeGreaterThan(7000)
-  expect(answer.startsWith(`${last}\n`)).toBe(true)
+  // The end is kept, from the start of a line, and the conclusion is in it.
+  expect(answer.endsWith(last)).toBe(true)
+  expect(answer[answer.length - last.length - 1]).toBe('\n')
+  expect(last.endsWith(lines.at(-1)!)).toBe(true)
 })
 
 test('aVoiceTurnKeepsTheSummaryCached', async ($, on) => {
