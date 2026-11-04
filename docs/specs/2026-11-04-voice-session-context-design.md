@@ -1,115 +1,122 @@
 # The voice knows the Claude session
 
-Status: proposed, 2026-11-04.
+Status: proposed, 2026-11-04. Revised the same day after a design, simplify and security review
+(`docs/reviews/2026-11-04-voice-context-review.md` on `review/voice-context`).
 
 ## Why
 
 The voice is the owner's way into one Claude Code session, yet it often does not know what is in
 it. Asked to "look at the chat", it said it would and did nothing: it has no tool, and the only
 action `codex` gives it is a handoff. It reads "the chat" as its own conversation. Context reaches
-it only when the band's Start or Load context asks for a summary, so a call started from the menu,
-a line reopened after silence, or a switch to another session starts from an old summary or none.
-An answer that came for a session that was not the target is heard only as a chime, and after the
-owner switches to it the voice neither knows that session nor says the answer.
+it only when the band's Start or Load context asks for a summary, so a call started from the menu
+or a line reopened after silence starts from an old summary or none.
 
 The owner wants the voice to have the session's current context at once and to refresh it on
 request, without making Claude do anything in the chat.
 
 ## What the owner sees
 
-- Any Start (the band, the menu, the socket) and every line the app opens again give the voice
-  the target's context. The line does not wait for it.
+- Every line the app opens (a Start's first line, a line reopened after silence, the line after a
+  target switch) gives the voice the target's context, unless **Load context automatically** is
+  off. The line does not wait for it.
 - Asked about "the chat", "the context", "what is there" or "have a look", the voice answers from
   what it has; if that does not cover it, it fetches the session's context itself and answers
-  from that, in its next reply. Nothing appears in Claude Code and Claude runs no turn.
-- Switching the target to another session during a call gives the voice that session's context,
-  and the voice says the answers that came for it while it was not the target.
-- The Conversation submenu shows a fetch as a line of its own (`Context requested`), not as a
-  Task.
+  from that, in its next reply. Claude runs no turn. The band shows "Loading context…" while the
+  summary is written, as it does today.
+- An older mod or app works as before: the new wire field is optional.
 
 ## Decisions
 
-- **When a summary is written.** At a Start, at a line opened again, at a target switch and on
-  the voice's request; each reuses the last summary while no turn has completed since it was
-  written (the mod's rule today), so only a session that moved costs a model call. No summary
-  after every turn: each is a call on the owner's Claude plan.
+- **When a summary is written.** When a line opens (Start, reopen, switch) and on the voice's
+  fetch. The mod reuses its last summary until a turn completes whose answer did not go to the
+  voice (a typed turn, `/clear`): the voice already heard a voice turn's `[RESULT]`. So a line
+  reopened after a voice turn costs no model call. No summary after every turn.
+- **Load context automatically stays, on by default.** It decides whether a line opening asks for
+  the summary; it is the owner's way to keep summaries off OpenAI unless asked. The fetch works
+  either way, since the owner's own question triggers it.
 - **How the voice asks.** `codex` declares no client tools to the realtime voice (checked against
-  `codex app-server generate-json-schema --experimental`, codex-cli 0.166.0: `thread/realtime/start`
-  takes no tools), so the voice asks with a handoff whose brief is exactly `refresh context`. The
-  app takes that handoff itself and never queues it for Claude. A brief that does not match goes
-  to Claude as any handoff: the owner still gets an answer, at the cost of a Claude turn. This is
-  a model instruction, not a control; it decides only where a request goes, never what Claude may
-  do.
+  `codex app-server generate-json-schema --experimental`, codex-cli 0.166.0:
+  `thread/realtime/start` takes no tools), so the voice asks with a handoff whose brief is exactly
+  `refresh context`, in English. `RealtimeSession` recognises it where it parses codex's handoff
+  item and emits its own event; it never reaches `route`, the question's route or Claude. A brief
+  that does not match goes to Claude as any handoff. This is a model instruction, not a control;
+  it decides only where a request goes.
 - **What a fetch returns.** The summary, as the `[CONTEXT]` line today, and Claude's last reply
-  word for word as a new `[LAST]` line, with the open question and its options when Claude is
-  waiting on one. The last reply needs no model call.
-- **"The chat" is the Claude session.** The voice prompt says so: the chat, its context, what is
-  there and having a look always mean the session the voice serves, never the voice's own
-  conversation.
+  as a `[LAST]` line: shaped as results are (code blocks and tables removed, redacted, one line),
+  its end kept within 2,000 characters, with Claude's open question and options when one is
+  waiting. `[LAST]` goes only in answer to a fetch: it is spoken, and neither stored, seeded into
+  a later line, nor appended quietly. A typed turn's reply reaches OpenAI only this way, when the
+  owner asked.
+- **"The chat" is the Claude session.** The voice prompt says so, and says that a question from a
+  typed turn waits at the keyboard: a spoken reply cannot answer it.
 
 ## Design
 
 ### Wire
 
-`POST /v1/context` gains an optional `last`: Claude's last reply, with the open question when
-there is one. An older mod sends no `last` and an older app ignores it. `Wire.swift`,
-`plugin/hooks/wire.ts` and `wire/fixtures/` change together: `context.json` with `last`, and the
-existing fixture without it.
+`POST /v1/context` gains an optional `last`. The mod clips it to 8,000 characters at a line
+break before posting (the socket takes 131,072 bytes). `Wire.swift`, `plugin/hooks/wire.ts` and
+`wire/fixtures/` change together: a new `context-last.json` beside `context.json`.
 
 ### Mod
 
-- On `Work.context` it sends the summary under today's cache rule and, in `last`, the final text
-  of the last main-loop turn. While Claude's `AskUserQuestion` is open, the question with its
-  options (`askedText`) follows that text.
-- The last reply is kept in `$.store` beside the join, so a reload keeps it.
+- It keeps in memory, like its summary, Claude's last main-loop reply (`turn.complete`'s answer,
+  or, while `AskUserQuestion` is open, the step text Claude wrote when it asked) and the open
+  question (`askedText`), typed turns included. `/clear` clears both.
+- On `Work.context` it posts the summary (or `''` when there is none or it failed) with `last`.
+  An empty session with no last reply posts nothing, as today.
+- The band's Start no longer asks for context itself: the line it opens does.
 
 ### App
 
-- **Taking the fetch.** `Bridge.route` normalises a handoff's brief (case, whitespace, trailing
-  punctuation). `refresh context` is not queued: the app asks the target for its context
-  (`registry.requestContext`), marks that context as awaited by the voice, records a
-  `Context requested` line, and the call machine holds the line open as after any handoff.
-- **Answering it.** When `/v1/context` comes for the awaited session, the `[CONTEXT]` line and,
-  when `last` is present, `[LAST] label: …` (redacted and cut by `AnswerShaper`, `[LAST]` to
-  2,000 characters) go to the live line as speech (`appendSpeech`) and count as the answer that
-  ends the wait. Context nobody awaited goes in quietly (`appendText`), as today. Both are kept
-  in the conversation, `[LAST]` as `continuity` keeps context today.
-- **Asking at the right moments.** `perform(.start)`, opening a line again, and every target
-  change (in or out of a call; the mod's cache makes an unchanged session free) ask the target
-  for its context, unasked and without holding anything up. The
-  Auto-context setting, which asked only on a target change, becomes this rule and goes.
-- **A switch says what was held.** Answers that came for a session while it was not the target
-  wait unheard (their chime is PR #27's). When that session becomes the target during a call,
-  they go to the line as speech after its context.
+- **The fetch.** `RealtimeEvent.contextFetch` comes from `RealtimeSession` for a brief whose
+  words are `refresh context`. The bridge asks `registry.target` for its context with a fetch
+  deadline (`SessionRegistry`, beside `wantsContext`), records nothing in the conversation, and
+  tells the call machine a fetch is awaited for that session (`CallEvent.fetchAsked`), which
+  holds the line open. With no target, it answers at once with the existing no-session line.
+- **The answer.** `/v1/context` for a session with a fetch due builds the `[CONTEXT]` line as
+  today (stored, seeded later) and, when `last` is present, the `[LAST]` line (not stored). Both
+  go to the machine as `CallEvent.fetchAnswered([VoiceLine])`, which speaks them on a live line
+  for that session (held while the owner speaks, said after the grace) and ends the fetch's wait;
+  they never enter `unheard` or `awaited`. An empty summary keeps the stored context.
+- **The timeout.** `sweep()` fails a fetch whose deadline passed (`ContextLoads.timeout`, 60 s)
+  with `[FAILED] label: context not available`, spoken as the fetch's answer. A session that
+  leaves, a target change, Stop and a closed line drop the fetch; context that comes after is
+  routine.
+- **Routine context.** `openLine` asks the target for context when Load context automatically is
+  on. Context for the line's session that arrives while the line connects is added once it is
+  connected; a context line equal to the stored one is not added or saved again.
 - **The voice prompt** (`VoicePrompt.swift`): the rule on "the chat"; to fetch, hand off exactly
-  `refresh context` instead of saying it will look; `[LAST]` is what Claude last wrote in the chat,
-  used and read out only when the owner asks for it.
+  `refresh context`; `[LAST]` is Claude's last reply in the chat, said in answer to the fetch; a
+  typed turn's question waits at the keyboard.
 
 ## Failures
 
-- **No summary within 60 s.** The mod gives up as today; the app ends the wait and the voice is
-  given `[FAILED] label: context not available` to say.
-- **No target, or it left.** The fetch is taken and answered at once with the no-session
-  sentence; nothing goes to Claude.
-- **An empty session.** No summary; `[LAST]` alone when there is a last reply, otherwise a line
-  to say that the session has no messages yet.
-- **Two fetches at once.** The second joins the first, as the mod's sends do today; the voice
-  gets one answer.
+- **No summary within 60 s, or the summary failed.** With a `last`, the voice gets `[LAST]` alone;
+  without one, `[FAILED] label: context not available`.
+- **No target.** The existing `[FAILED] LiveBridge: no Claude Code session is joined.`
+- **An empty session.** The mod posts nothing; the fetch fails after 60 s as above.
+- **Two fetches at once.** The second joins the first in the mod; the app keeps one deadline.
 
 ## Testing
 
-- BridgeCore: the brief is taken in any case and punctuation; a near miss goes to Claude; a fetch
-  is answered as speech and ends the wait; `[LAST]` is redacted and cut; Start, a reopened line
-  and a target change ask for context; the 60 s timeout; a `/v1/context` without `last` is
-  accepted; held answers are said after the context on a switch.
-- Mod: `last` comes from the last turn and from an open question and survives a reload; a fetch
-  with no new turn makes no model call.
-- Wire: both `context` fixtures decode on both sides.
-- By hand, once: `scripts/smoke.sh` with "look at the chat" ends in `refresh context` and a spoken
-  answer (about a minute of the owner's realtime voice).
+- BridgeCore: the brief is taken in any case, punctuation, quotes and backticks; a near miss goes
+  to Claude; a fetch with a question open keeps the question's route; a fetch while Claude works
+  on a handoff to the same session keeps that wait; the fetch's answer is spoken and is not
+  unheard; `[LAST]` drops a fenced block, is redacted and keeps its end; the 60 s timeout; a stale
+  fetch is dropped on a target change and on the session leaving; `openLine` asks only with the
+  setting on; context that arrives while connecting reaches the line.
+- Mod: `last` from the last turn, from the question step, and from an open typed-turn question;
+  `last` is clipped; a voice turn leaves the summary cached; `/clear` clears `last`.
+- Wire: both `context` fixtures round-trip on both sides.
+- By hand, once: `scripts/smoke.sh` gains a "look at the chat" case that passes on a
+  `refresh context` handoff the fake session never receives (about a minute of the owner's
+  realtime voice).
 
 ## Not in this
 
-- Mute and the line timers as settings wait for the synthetic first utterance (PR #27, ADR 0001
-  item (n)).
+- Saying the answers held for a session when the owner switches to it: it reworks how unheard
+  lines are kept per session and lands with PR #27 in a spec of its own.
+- Mute and the line timers as settings, which wait for the synthetic first utterance (PR #27,
+  ADR 0001 item (n)).
 - A summary after every turn.
