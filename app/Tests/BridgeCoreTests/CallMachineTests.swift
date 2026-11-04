@@ -248,6 +248,13 @@ struct CallMachineTests {
       "targetChangeWhileConnectingCloses", connecting, .conversationChanged, .listening,
       [.closeRealtime]),
     row("targetChangeWhileListeningChangesNothing", [.start], .conversationChanged, .listening, []),
+    row("aFetchIsConfirmed", live, .fetchAsked(alpha), .live, [.confirmHandoff]),
+    row(
+      "aFetchWhileConnectingIsConfirmed", connecting, .fetchAsked(alpha), .connecting,
+      [.confirmHandoff]),
+    row(
+      "aFetchAsTheLineClosesIsConfirmed", [.start], .fetchAsked(alpha), .listening,
+      [.confirmHandoff]),
     row(
       "fetchAnsweredSpeaksOnALiveLine", fetching, .fetchAnswered(fetched), .live,
       fetched.map { .speak($0) } + [arm]),

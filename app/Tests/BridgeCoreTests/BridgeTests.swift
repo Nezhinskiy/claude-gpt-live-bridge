@@ -706,6 +706,13 @@ struct BridgeTests {
     #expect(await lines().isEmpty)
   }
 
+  /// The app takes the voice's fetch itself, and confirms it with the handoff's sound.
+  @Test func aFetchIsConfirmedBySound() async throws {
+    await live()
+    try await fetch()
+    #expect(await eventually { await audio.calls.filter { $0 == "confirmHandoff" }.count == 1 })
+  }
+
   /// The fetch's answer, the summary and Claude's last reply, is spoken at once. It is not
   /// unheard: it neither chimes nor waits for a later line.
   @Test func aFetchsAnswerIsSpoken() async throws {

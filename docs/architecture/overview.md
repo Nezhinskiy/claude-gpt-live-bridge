@@ -361,8 +361,8 @@ sequenceDiagram
 
 Asked about "the chat" or what is in the session, the voice answers from what it has. When that
 does not cover it, it is instructed to hand off the brief `refresh context`. The app takes that
-handoff itself: it records nothing in the conversation, sends nothing to Claude, and asks the
-target for its context with a 60 s deadline. The call machine holds the line open for the answer
+handoff itself, with the handoff's short sound: it records nothing in the conversation, sends
+nothing to Claude, and asks the target for its context with a 60 s deadline. The call machine holds the line open for the answer
 (`fetching`). The mod posts the summary with Claude's last reply and open question; the app
 speaks the `[CONTEXT]` line (also stored, as any context is) and the `[LAST]` line (never stored,
 never seeded into a later line) as the fetch's answer, once nobody is speaking. Claude runs no
