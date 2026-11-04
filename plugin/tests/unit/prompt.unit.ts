@@ -87,3 +87,10 @@ test('claudesQuestionIsToldWithItsOptions', () => {
   assert.equal(askedText([{ question: 'Which name?', options: [{ label: 'out', description: 'Shorter.' }] }]),
     'Which name? Options: out: Shorter.')
 })
+
+test('theTextBeforeAQuestionFollowsItsOptions', () => {
+  const asked = [{ question: 'Which name?', options: [{ label: 'out' }] }]
+  assert.equal(askedText(asked, '  Two folders hold build output.\n'),
+    'Which name? Options: out. Claude wrote just before asking: Two folders hold build output.')
+  assert.equal(askedText(asked, '  '), 'Which name? Options: out.')
+})

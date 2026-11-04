@@ -449,6 +449,14 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // The engine's turn.complete carries only the turn's last text, and a question only its
+  // options: what Claude wrote in the step that asks would reach the voice in neither.
+  on('turn.step', async function* ($, e, next) {
+    const result = yield* next(e)
+    if (e.agentId === undefined) tracker.stepped(result.answer)
+    return result
+  })
+
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       const post = tracker.turnCompleted(e.turnId, e.answer, e.reason)
@@ -475,7 +483,7 @@ export const register: Register = on => {
     const answered = next(e)
     const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
     try {
-      await link.activity('approval', askedText(e.questions))
+      await link.activity('approval', askedText(e.questions, tracker.takeStepText()))
       const first = await Promise.race([answered, spoken])
       return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
     } finally {

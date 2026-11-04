@@ -82,7 +82,7 @@ prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
 for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
 queued audio into the peer, dropping silence until it has caught up. For updates,
 `SystemUpdateEnvironment` is the real `UpdateEnvironment` (an ephemeral `URLSession`, `gh`,
-`hdiutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
+`diskutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
 `UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced
 release's Install.
 
@@ -317,7 +317,9 @@ sequenceDiagram
 
 When Claude asks the owner a question during a voice turn (the AskUserQuestion dialog), the
 dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
-line. The voice explains it and talks it over from what it knows, without handoffs; the owner's
+line. What Claude wrote in the same model step follows the options in that line: the engine's
+turn end carries only the turn's last text, so it would reach the voice no other way, and after
+the options the app's cut of a long line takes it before any choice. The voice explains it and talks it over from what it knows, without handoffs; the owner's
 next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
 dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
@@ -331,7 +333,7 @@ sequenceDiagram
   participant Mod
   participant Claude
   Claude->>Mod: tool.call AskUserQuestion (during a voice turn)
-  Mod->>Bridge: POST /v1/activity approval + question
+  Mod->>Bridge: POST /v1/activity approval + question (and the step's text)
   Bridge->>Codex: "[ASKING] label: question. Options: …"
   Codex-->>Owner: explains, talks it over
   Owner->>Codex: decides, or asks Claude back
@@ -365,11 +367,11 @@ Install runs only from the owner's click, one run at a time (the actor's flag, a
    `updates/<X.Y.Z>/`, following redirects only to GitHub's asset hosts, and at most 100 MB.
 3. `gh attestation verify`, pinned to `release.yml`, the tag and GitHub-hosted runners, passes,
    and its attested digest equals the image's SHA-256.
-4. The image is attached read-only; its `LiveBridge.app` has the bundle id, the version and a
-   minimum macOS this Mac meets, and passes `codesign --verify --deep --strict`; its CDHash is
-   kept. It is copied with `ditto` to `/Applications/.LiveBridge-update-<uuid>.app`, the image is
-   detached on every path, and the staged copy must have the same CDHash before a quarantine
-   attribute on it is removed.
+4. The image is attached read-only with `diskutil image attach`, at a mount folder of the run's
+   own; its `LiveBridge.app` has the bundle id, the version and a minimum macOS this Mac meets,
+   and passes `codesign --verify --deep --strict`; its CDHash is kept. It is copied with `ditto`
+   to `/Applications/.LiveBridge-update-<uuid>.app`, an eject is attempted on every path, and
+   the staged copy must have the same CDHash before a quarantine attribute on it is removed.
 5. While any joined session has a request queued or in flight (`Bridge.hasOpenRequests`), the
    run waits (`waiting`).
 6. `claude plugin marketplace update livebridge` and `claude plugin update livebridge@livebridge`

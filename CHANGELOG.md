@@ -15,10 +15,19 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
+- The in-app update attaches and ejects the release image with `diskutil image attach` and
+  `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
+  a new folder of its own.
 - The voice's rule against promising a look without a handoff is one sentence shorter, and lets
   the voice ask you to confirm an action first. In 20 test runs it missed no handoff, against 3 of
   20 with the old wording: too few runs to call the failure fixed
   ([BR-001](docs/bugs/BR-001.md)).
+
+### Fixed
+
+- When Claude asks a question during a voice request, the voice also gets what Claude wrote just
+  before the question, in the same line after the options, with code blocks and tables removed
+  as from a result.
 
 ## [0.2.0]
 
