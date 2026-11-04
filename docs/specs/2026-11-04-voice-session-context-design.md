@@ -74,8 +74,9 @@ existing fixture without it.
   2,000 characters) go to the live line as speech (`appendSpeech`) and count as the answer that
   ends the wait. Context nobody awaited goes in quietly (`appendText`), as today. Both are kept
   in the conversation, `[LAST]` as `continuity` keeps context today.
-- **Asking at the right moments.** `perform(.start)`, opening a line again, and a target change
-  during a call ask the target for its context, unasked and without holding anything up. The
+- **Asking at the right moments.** `perform(.start)`, opening a line again, and every target
+  change (in or out of a call; the mod's cache makes an unchanged session free) ask the target
+  for its context, unasked and without holding anything up. The
   Auto-context setting, which asked only on a target change, becomes this rule and goes.
 - **A switch says what was held.** Answers that came for a session while it was not the target
   wait unheard (their chime is PR #27's). When that session becomes the target during a call,
