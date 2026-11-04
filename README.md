@@ -220,7 +220,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 - **The band's Start** makes its session the target, starts the call and sends the voice the
   session's summary ([details](docs/architecture/overview.md#components)). While the call talks
-  to another session, the band shows **Talk here**.
+  to another session, the band shows **Talk here**. If the band is not there in a joined
+  session, `/live on` brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
   for each request the voice handed to Claude), the minutes, **Settings…** and

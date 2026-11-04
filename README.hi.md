@@ -226,7 +226,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 - **band का Start** अपने session को target बनाता है, call शुरू करता है और voice को session का
   सारांश भेजता है ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से
-  बात कर रही हो, तब band **Talk here** दिखाता है।
+  बात कर रही हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए
+  session में band न दिखे, तो `/live on` उसे वापस ले आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), मिनट,
   **Settings…** और **Quit LiveBridge** होते हैं।
