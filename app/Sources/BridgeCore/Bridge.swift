@@ -448,7 +448,9 @@ public actor Bridge: Router {
       if let question = body.question {
         if machine.phase != .off { questionRoute = body.sessionId }
         await say(
-          AnswerShaper.line(.asking, label: row.label, body: question, session: body.sessionId))
+          AnswerShaper.line(
+            .asking, label: row.label, body: AnswerShaper.prose(question),
+            session: body.sessionId))
       } else {
         await say(
           AnswerShaper.line(

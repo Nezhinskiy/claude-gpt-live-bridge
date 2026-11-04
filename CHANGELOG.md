@@ -12,6 +12,12 @@ All notable changes to this project are listed here. The format follows
   `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
   a new folder of its own.
 
+### Fixed
+
+- When Claude asks a question during a voice request, the voice also gets what Claude wrote just
+  before the question, in the same line after the options, with code blocks and tables removed
+  as from a result.
+
 ## [0.2.0]
 
 ### Added
