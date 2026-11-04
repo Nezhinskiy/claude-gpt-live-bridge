@@ -243,10 +243,11 @@ commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 Appuyez sur **Start**, dans la bande au-dessus du prompt ou dans le menu de la barre des menus, et
 parlez.
 
-- **Le Start de la bande** fait de sa session la cible, démarre l'appel ; la ligne qu'il ouvre
-  charge le résumé de la session ([détails](docs/architecture/overview.md#components)). Tant que l'appel
-  parle à une autre session, la bande affiche **Talk here**. Si la bande
-  n'apparaît pas dans une session rejointe, `/live on` la fait revenir.
+- **Le Start de la bande** fait de sa session la cible, démarre l'appel ; avec
+  **Load context automatically when a line opens** activé, la ligne qu'il ouvre charge le résumé de la session
+  ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à une autre
+  session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session rejointe,
+  `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
   la conserve, les minutes, **Settings…** et **Quit LiveBridge**.
@@ -344,12 +345,13 @@ OpenAI, via la session temps réel de codex :
   quand la voix récupère le contexte de la session. Le sous-menu Conversation du menu affiche
   cette ligne exactement telle qu'elle est envoyée ;
 - la dernière réponse de Claude dans la session cible, y compris celle d'un tour que vous avez
-  tapé, et la question et les options sur lesquelles Claude attend quand il y en a une d'ouverte,
-  en une ligne `[LAST]` d'au plus 2 000 caractères, blocs de code et tableaux retirés, dont
-  la fin est conservée. Elle n'est envoyée que lorsque la voix récupère le contexte de la
-  session, ce qu'il lui est demandé de faire quand vous l'interrogez sur la session et que ce
-  qu'elle a ne suffit pas : c'est une instruction donnée à la voix, pas un contrôle. LiveBridge
-  ne l'enregistre pas ; ce que la voix en dit reste dans la conversation comme toute réponse ;
+  tapé, ou, tant que Claude attend la réponse à une question, ce que Claude a écrit en la posant,
+  puis la question et ses options, en une ligne `[LAST]` d'au plus 2 000 caractères, blocs de
+  code et tableaux retirés, dont la fin est conservée. Elle n'est envoyée que lorsque la voix
+  récupère le contexte de la session, ce qu'il lui est demandé de faire quand vous l'interrogez
+  sur la session et que ce qu'elle a ne suffit pas : c'est une instruction donnée à la voix, pas
+  un contrôle, et une question que la voix transmet à la place va à Claude comme une demande.
+  LiveBridge ne l'enregistre pas ; ce que la voix en dit reste dans la conversation comme toute réponse ;
 - avec chacune des lignes ci-dessus, le libellé de sa session : le titre de la session Claude
   Code, ou le nom du dossier de la session si elle n'en a pas ;
 - l'offre WebRTC, qui liste les adresses réseau locales du Mac comme candidats de connexion.

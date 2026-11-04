@@ -140,12 +140,13 @@ secret.
   above.
 - **The voice decides when Claude's last reply is sent.** The app sends the target's last reply
   as a `[LAST]` line ([what is sent](README.md#privacy)) only in answer to the voice's fetch: a
-  handoff whose brief is exactly `refresh context`, which the app answers itself and never
-  passes to Claude. The voice is told to fetch when you ask
-  about the session and what it has does not cover it. That is an instruction, not a control:
-  text that steers the voice can make it fetch, and the reply may be from a turn you typed. The
-  app does not save the `[LAST]` line or seed a later line with it, but what the voice says
-  about it stays in the conversation like any reply.
+  handoff whose brief is the words `refresh context` (in any case, with any punctuation, digits
+  ignored), which the app answers itself and never passes to Claude. The voice is told to fetch
+  when you ask about the session and what it has does not cover it. That is an instruction, not
+  a control: text that steers the voice can make it fetch, the reply may be from a turn you
+  typed, and a question the voice hands off instead goes to Claude as any request. The app does
+  not save the `[LAST]` line or seed a later line with it, but what the voice says about it stays
+  in the conversation like any reply.
 - **A handoff can hop between sessions.** The voice hands work to the target session, or to the
   session that asked the last question. So text that session A read can become a prompt in
   session B, which may run in a more permissive mode.
@@ -155,12 +156,12 @@ secret.
   with it as the target, load a new summary from it, or remove it from LiveBridge. With **Load
   context automatically when a line opens** on (the default) in LiveBridge's Settings, the
   target session sends a new one whenever the app opens a line: a Start, a line reopened after
-  silence, the line after a target switch. The menu's Load context and the voice's fetch send
-  one too. One injected summary can therefore steer every later call with that session. Its
-  recent conversation is carried over the same way, including the lines the session sent the
-  voice. A result from another session is
-  still spoken in whatever line is open, and the voice's reply to it stays in that line's
-  conversation, so one session's text can still reach the conversation about another.
+  silence, the line after a target switch. The menu's Load context, `/live context` and the
+  voice's fetch send one too. One injected summary can therefore steer every later call with
+  that session. Its recent conversation is carried over the same way, including the lines the
+  session sent the voice. A result from another session is still spoken in whatever line is
+  open, and the voice's reply to it stays in that line's conversation, so one session's text can
+  still reach the conversation about another.
 
 Join only sessions whose input you trust, press **New conversation** with a session as the
 target after it has read text you do not trust, and keep voice off for a session whose permission mode acts without

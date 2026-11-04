@@ -357,17 +357,18 @@ sequenceDiagram
 ### Fetching the context
 
 Asked about "the chat" or what is in the session, the voice answers from what it has. When that
-does not cover it, it hands off the brief `refresh context`. The app takes that handoff itself: it
-records nothing in the conversation, sends nothing to Claude, and asks the target for its context
-with a 60 s deadline. The call machine holds the line open for the answer (`fetching`). The mod
-posts the summary with Claude's last reply and open question; the app speaks the `[CONTEXT]` line
-(also stored, as any context is) and the `[LAST]` line (never stored, never seeded into a later
-line) as the fetch's answer, once nobody is speaking. Claude runs no turn. With no context within
-60 s the voice gets `[FAILED] label: context not available`; with no target, the no-session
-sentence at once. A target change, the session leaving, Stop and a closed line drop the wait, and
-context that comes after is routine. That the brief is exactly `refresh context` is a model
-instruction, not a control: it decides only where a request goes, and a brief that does not match
-goes to Claude as any handoff.
+does not cover it, it is instructed to hand off the brief `refresh context`. The app takes that
+handoff itself: it records nothing in the conversation, sends nothing to Claude, and asks the
+target for its context with a 60 s deadline. The call machine holds the line open for the answer
+(`fetching`). The mod posts the summary with Claude's last reply and open question; the app
+speaks the `[CONTEXT]` line (also stored, as any context is) and the `[LAST]` line (never stored,
+never seeded into a later line) as the fetch's answer, once nobody is speaking. Claude runs no
+turn for the fetch. With no context within 60 s the voice gets `[FAILED] label: context not
+available`; with no target, the no-session sentence at once. A target change, the session
+leaving, Stop and a closed line drop the wait, and context that comes after is routine. That the
+voice writes the brief `refresh context` is a model instruction, not a control: the brief decides
+only where a request goes, and a brief that does not match, the owner's own question included,
+goes to Claude as any handoff and runs a Claude turn.
 
 ```mermaid
 sequenceDiagram

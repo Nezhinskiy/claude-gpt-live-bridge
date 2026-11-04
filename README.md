@@ -218,10 +218,11 @@ every session, in LiveBridge's [Settings](#settings) window.
 
 Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
-- **The band's Start** makes its session the target, starts the call; the line it opens
-  loads the session's summary ([details](docs/architecture/overview.md#components)). While the call talks
-  to another session, the band shows **Talk here**. If the band is not there in a joined
-  session, `/live on` brings it back.
+- **The band's Start** makes its session the target, starts the call; with **Load context
+  automatically when a line opens** on, the line it opens loads the session's summary
+  ([details](docs/architecture/overview.md#components)). While the call talks to another
+  session, the band shows **Talk here**. If the band is not there in a joined session,
+  `/live on` brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
   for each request the voice handed to Claude), the minutes, **Settings…** and
@@ -315,20 +316,20 @@ session:
   when it is loaded and sent every time the line opens while that session is the target, across
   Stop and Start and app restarts, and when the voice fetches the session's context. The menu's
   Conversation submenu shows that line exactly as it is sent;
-- Claude's last reply in the target session, a turn you typed included, and the question and
-  options Claude waits on when one is open, as one `[LAST]` line of at most 2,000 characters
-  with code blocks and tables removed and its end kept. It is sent
-  only when the voice fetches the session's context, which it is told to do when you ask about
-  the session and what it has does not cover it: an instruction to the voice, not a control.
-  LiveBridge does not save it; what the voice says about it stays in the conversation like any
-  reply;
+- Claude's last reply in the target session, a turn you typed included, or, while Claude waits
+  on a question, what Claude wrote when it asked, then the question and its options, as one
+  `[LAST]` line of at most 2,000 characters with code blocks and tables removed and its end
+  kept. It is sent only when the voice fetches the session's context, which it is told to do
+  when you ask about the session and what it has does not cover it: an instruction to the voice,
+  not a control, and a question it hands off instead goes to Claude as a request. LiveBridge
+  does not save it; what the voice says about it stays in the conversation like any reply;
 - with every line above, its session's label: the Claude Code session title, or the session
   folder's name when it has none;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
 
-Results, questions, updates, summaries and Claude's last reply pass through a redactor of known credential shapes
-first (private keys, JWTs, common API tokens, URL passwords, `password=`-style fields). It is a
-list of patterns, not a guarantee.
+Results, questions, updates, summaries and Claude's last reply pass through a redactor of known
+credential shapes first (private keys, JWTs, common API tokens, URL passwords, `password=`-style
+fields). It is a list of patterns, not a guarantee.
 
 The codex thread that carries the voice is ephemeral and read-only, with every codex feature
 turned off except where it keeps your login and how it uses your proxy, and every MCP server

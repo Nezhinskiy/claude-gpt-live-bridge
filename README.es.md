@@ -230,10 +230,11 @@ cargue también el resumen de una sesión cada vez que se abre una línea no es 
 
 Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra de menús, y habla.
 
-- **El Start de la banda** convierte su sesión en el destino, inicia la llamada; la línea que abre
-  carga el resumen de la sesión ([detalles](docs/architecture/overview.md#components)). Mientras la llamada
-  habla con otra sesión, la banda muestra **Talk here**. Si la banda
-  no aparece en una sesión unida, `/live on` la recupera.
+- **El Start de la banda** convierte su sesión en el destino, inicia la llamada; con
+  **Load context automatically when a line opens** activado, la línea que abre carga el resumen de la sesión
+  ([detalles](docs/architecture/overview.md#components)). Mientras la llamada habla con otra
+  sesión, la banda muestra **Talk here**. Si la banda no aparece en una sesión unida,
+  `/live on` la recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
   conserva LiveBridge, los minutos, **Settings…** y **Quit LiveBridge**.
@@ -327,10 +328,12 @@ la sesión en tiempo real de codex:
   contexto de la sesión. El submenú Conversation del menú muestra esa línea exactamente como se
   envía;
 - la última respuesta de Claude en la sesión de destino, también la de un turno que escribiste,
-  y la pregunta y las opciones que Claude espera cuando hay una abierta, como una línea `[LAST]` de como máximo 2000 caracteres, sin bloques de código ni tablas y
-  conservando su final. Solo se envía cuando la voz obtiene el contexto de la sesión, algo que se
-  le indica hacer cuando preguntas por la sesión y lo que ya tiene no basta: es una instrucción a
-  la voz, no un control. LiveBridge no la guarda; lo que la voz diga sobre ella queda en la
+  o, mientras Claude espera respuesta a una pregunta, lo que Claude escribió al hacerla y luego la
+  pregunta y sus opciones, como una línea `[LAST]` de como máximo 2000 caracteres, sin bloques de
+  código ni tablas y conservando su final. Solo se envía cuando la voz obtiene el contexto de la
+  sesión, algo que se le indica hacer cuando preguntas por la sesión y lo que ya tiene no basta:
+  es una instrucción a la voz, no un control, y una pregunta que la voz entregue en su lugar va a
+  Claude como una petición. LiveBridge no la guarda; lo que la voz diga sobre ella queda en la
   conversación como cualquier respuesta;
 - con cada línea anterior, la etiqueta de su sesión: el título de la sesión de Claude Code o, si no
   tiene, el nombre de la carpeta de la sesión;

@@ -9,10 +9,11 @@ All notable changes to this project are listed here. The format follows
 ### Added
 
 - The voice can look at the Claude Code session. Ask it about "the chat" or what is in the
-  session and, when what it has does not cover that, it fetches the session's context itself and
-  answers from it: the summary, and Claude's last reply (a turn you typed included) with its open
-  question and options. Claude runs no turn for it. The reply is sent only for that fetch and is
-  not saved. If no context arrives within 60 seconds, the voice says so.
+  session and, when what it has does not cover that, it is instructed to fetch the session's
+  context itself and answer from it: the summary, and Claude's last reply (a turn you typed
+  included) with its open question and options. Claude runs no turn for a fetch; a question the
+  voice hands off instead goes to Claude as before, as a Claude turn. The reply is sent only for
+  that fetch and is not saved. If no context arrives within 60 seconds, the voice says so.
 
 ### Changed
 
