@@ -44,7 +44,9 @@ public enum CallEvent: Equatable, Sendable {
   case graceElapsed
   /// The voice is saying something (a transcript delta); the owner's words were recognised.
   case assistantSpeaking, userTranscribed
-  case deliver(VoiceLine)
+  /// `opensLine`: the bridge found that the line opens a closed line (the target's answer or
+  /// question, while the target's conversation holds a turn of the owner's).
+  case deliver(VoiceLine, opensLine: Bool = false)
   case remoteClosed(Problem)
   case audioFailed(Problem)
   /// The open line carries a conversation that is not the target's any more: another session
@@ -55,6 +57,9 @@ public enum CallEvent: Equatable, Sendable {
 /// What the bridge does in reply, in order.
 public enum CallEffect: Equatable, Sendable {
   case openRealtime, closeRealtime, startLocalVAD, stopLocalVAD, flushPreroll
+  /// Opens the line for a line that arrived: without the pre-roll, as nobody spoke, and without
+  /// holding up the delivery while it connects.
+  case openRealtimeForResult
   case addContext(VoiceLine)
   /// Replaces any armed timer; when it elapses the bridge sends `silenceElapsed`.
   case armSilenceTimer(seconds: Int)
@@ -69,14 +74,12 @@ public enum CallEffect: Equatable, Sendable {
 }
 
 /// The billing-aware call. The realtime session is open only while someone speaks or a handed-off
-/// request may still be answered: speech opens it, silence or a new target closes it, and the
-/// microphone stays with local voice detection in between. After a handoff the line waits up to
-/// `resultWindowSeconds` from the latest one for that session's result, and says it as soon as
-/// nobody is speaking. A line from the target that arrives while the line is closed and that
-/// session is still awaited opens it, seeded with the conversation that holds the request, and
-/// the voice usually says it unprompted (ADR 0001 (n)); any other line, one from a session that
-/// is not the target included, and one the reopened line left unsaid, is announced by a chime and
-/// waits until the owner next speaks. Pure: the bridge runs the effects.
+/// request may still be answered: speech, or a line the bridge says opens it, opens it; silence
+/// or a new target closes it; the microphone stays with local voice detection in between. After a
+/// handoff the line waits up to `resultWindowSeconds` from the latest one for that session's
+/// result, and says it as soon as nobody is speaking. Any other line that arrives while the line
+/// is closed, and one an opened line left unsaid, is announced by a chime and waits until the
+/// owner next speaks. Pure: the bridge runs the effects.
 public struct CallMachine: Sendable {
   public static let noise = Problem.other(
     "The voice hung up: the microphone heard sound but no words for 90 seconds.")
@@ -94,23 +97,17 @@ public struct CallMachine: Sendable {
   public var pending: [VoiceLine] { unheard.map(\.line) }
   /// The results given before the voice's current reply began; only that reply can say them.
   private var replyCanSay: [VoiceLine]?
-  /// The sessions handed a request whose answer has not come. Kept across a hang-up and a target
-  /// change: a line from one that is the target opens the closed line.
+  /// The sessions handed a request whose result the open line waits for; while any is, silence
+  /// does not close it, until `resultWindowSeconds` after the latest handoff.
   public private(set) var awaited: Set<SessionID> = []
-  /// The session the owner chose to talk to; the bridge sets it before each delivery.
-  public var target: SessionID?
-  /// The result window runs: silence does not close the line while a session is awaited, until
-  /// `resultWindowSeconds` after the latest handoff.
-  private var isWindowOpen = false
   /// The silence timer elapsed while the line waited for a result.
   private var isSilenceDue = false
-  /// A line from an awaited session opened this line, so one left unsaid chimes even when the
-  /// line never connected.
-  private var isOpenedByResult = false
   /// The voice is saying a reply: a transcript delta came and its reply has not finished.
   private var isVoiceSpeaking = false
   /// The next finished reply is the handoff's acknowledgement, which says no result.
   private var isAckUnfinished = false
+  /// The line connecting was opened by a line that arrived, not by speech.
+  private var isOpeningForResult = false
   /// Local voice detection hears sound; the timer then allows `noiseCapSeconds`.
   private var isSoundOn = false
   public static let silenceSeconds = 20
@@ -153,24 +150,23 @@ public struct CallMachine: Sendable {
       isSoundOn = true
       phase = .connecting
       return [.openRealtime]
-    case (.listening, .deliver(let result)):
+    case (.listening, .deliver(let result, let opensLine)):
       unheard.append(Unheard(line: result))
-      guard let session = result.session, awaited.contains(session) else { return [.chime] }
-      if result.kind.answers { awaited.remove(session) }
-      guard session == target else { return [.chime] }
+      guard opensLine else { return [.chime] }
       phase = .connecting
-      isOpenedByResult = true
-      return [.openRealtime]
-    case (.connecting, .deliver(let result)):
+      isOpeningForResult = true
+      return [.openRealtimeForResult]
+    case (.connecting, .deliver(let result, _)):
       unheard.append(Unheard(line: result))
       return []
     case (.connecting, .connected):
       phase = .live
+      isOpeningForResult = false
       return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return [.problem(reason)] + hangUp()
-    case (.live, .deliver(let result)):  // a result the voice never speaks still hangs up
+    case (.live, .deliver(let result, _)):  // a result the voice never speaks still hangs up
       guard let session = result.session, awaited.contains(session) else {
         unheard.append(Unheard(line: result))
         return [.addContext(result), armSilence()]
@@ -192,7 +188,6 @@ public struct CallMachine: Sendable {
       isAckUnfinished = true
       guard let session else { return [] }
       awaited.insert(session)
-      isWindowOpen = true
       return [.armResultWindow(seconds: Self.resultWindowSeconds)]
     case (.live, .assistantFinishedSpeaking(let text)):
       let canSay = replyCanSay ?? []
@@ -209,13 +204,13 @@ public struct CallMachine: Sendable {
       unheard = unheard.map { Unheard(line: $0.line) }
       return held.map { .speak($0) } + [armSilence()]
     case (.live, .resultWindowElapsed):
-      guard isWindowOpen else { return [] }
-      isWindowOpen = false
+      guard !awaited.isEmpty else { return [] }
+      awaited = []
       return isSilenceDue ? [.closeRealtime] + hangUp() : []
     case (.connecting, .conversationChanged), (.live, .conversationChanged):
       return [.closeRealtime] + hangUp()
     case (.live, .silenceElapsed):
-      if isWindowOpen, !awaited.isEmpty, !isSoundOn {
+      if !awaited.isEmpty, !isSoundOn {
         isSilenceDue = true
         return []
       }
@@ -226,9 +221,13 @@ public struct CallMachine: Sendable {
   }
 
   /// Drops unheard results, such as one a newer request to the same session superseded, also
-  /// one held to be said.
-  public mutating func withdraw(where isSuperseded: (VoiceLine) -> Bool) {
+  /// one held to be said. A line still connecting for what was dropped closes: nothing is left
+  /// to say on it, and nobody spoke.
+  @discardableResult
+  public mutating func withdraw(where isSuperseded: (VoiceLine) -> Bool) -> [CallEffect] {
     unheard.removeAll { isSuperseded($0.line) }
+    guard phase == .connecting, isOpeningForResult, unheard.isEmpty else { return [] }
+    return [.closeRealtime] + hangUp()
   }
 
   /// A session got a new id (`/clear`): the line waits for it, and its results stay its own,
@@ -244,21 +243,19 @@ public struct CallMachine: Sendable {
     replyCanSay = replyCanSay?.map(moved)
   }
 
-  /// Back to local listening; `pending` and `awaited` are kept, and a chime says so when the line
-  /// was open or a result opened it.
+  /// Back to local listening; `pending` is kept, and a chime says it waits.
   private mutating func hangUp() -> [CallEffect] {
-    let chimes = (phase == .live || isOpenedByResult) && !pending.isEmpty
     defer {
       phase = .listening
-      isWindowOpen = false
-      isOpenedByResult = false
+      isOpeningForResult = false
+      awaited = []
       unheard = unheard.map { Unheard(line: $0.line) }
       isSilenceDue = false
       isVoiceSpeaking = false
       isAckUnfinished = false
       replyCanSay = nil
     }
-    return chimes ? [.chime] : []
+    return pending.isEmpty ? [] : [.chime]
   }
 
   private mutating func end(with effects: [CallEffect]) -> [CallEffect] {

@@ -115,12 +115,16 @@ public actor Bridge: Router {
     }
   }
 
-  /// Runs `work` as the connection attempt, until it ends or is cancelled.
-  private func attempt(_ work: @escaping @Sendable () async -> Void) async {
+  /// Runs `work` as the connection attempt, until it ends or is cancelled; `waits` false
+  /// returns once it has started.
+  private func attempt(waits: Bool = true, _ work: @escaping @Sendable () async -> Void) async {
     let task = Task { await work() }
     connecting = task
-    await task.value
-    if connecting == task { connecting = nil }
+    let ended = Task {
+      await task.value
+      if connecting == task { connecting = nil }
+    }
+    if waits { await ended.value }
   }
 
   /// Start: launches codex, so a problem with it shows at once, then listens.
@@ -240,7 +244,8 @@ public actor Bridge: Router {
 
   private func run(_ effect: CallEffect) async {
     switch effect {
-    case .openRealtime: await attempt { await self.openLine() }
+    case .openRealtime: await attempt { await self.openLine(preroll: true) }
+    case .openRealtimeForResult: await attempt(waits: false) { await self.openLine(preroll: false) }
     case .closeRealtime:
       connecting?.cancel()
       connecting = nil
@@ -288,14 +293,14 @@ public actor Bridge: Router {
   /// Opens the line with the target's conversation. Cancelled, it does nothing more: whoever
   /// cancelled it closes what it opened. A line the voice closed itself (`CancellationError`)
   /// says why in its `closed` event.
-  private func openLine() async {
+  private func openLine(preroll: Bool) async {
     lineKnowsSession = false
     let session = await registry.target
     lineSession = session
     lineKnowsSession = true
     do {
       let voice = try await controller()
-      let offer = try await audio.makeOffer()
+      let offer = try await audio.makeOffer(preroll: preroll)
       // only the session's own conversation, context and open tasks: never another session's
       let conversation = session.map { continuity[$0] } ?? Conversation()
       let tasks = if let session { await registry.openTasks(of: session) } else { [String]() }
@@ -384,8 +389,25 @@ public actor Bridge: Router {
   /// the open line is about, and spoken in the line as it is.
   private func say(_ line: VoiceLine) async {
     record(.claude, line.text, in: line.session)
-    machine.target = await registry.target  // only the target's line opens a closed line
-    await send(.deliver(line))
+    await send(.deliver(line, opensLine: await opensLine(line)))
+  }
+
+  /// Whether `line` opens a closed line: an answer or a question from the target, whose
+  /// conversation holds a turn of the owner's. A line seeded without one stays silent
+  /// (ADR 0001 (b), (n)); an approval notice the voice cannot settle, and an update, chime.
+  private func opensLine(_ line: VoiceLine) async -> Bool {
+    guard let session = line.session, line.kind.answers || line.kind == .asking else {
+      return false
+    }
+    let target = await registry.target
+    return session == target && continuity[session].lines.contains { $0.speaker == .owner }
+  }
+
+  /// Drops unheard lines; a line opened only for them closes.
+  private func withdraw(where isSuperseded: (VoiceLine) -> Bool) async {
+    let effects = machine.withdraw(where: isSuperseded)
+    for effect in effects { await run(effect) }
+    if !effects.isEmpty { await changed() }
   }
 
   /// A new target closes a line opened with another session's conversation; the next speech
@@ -416,7 +438,7 @@ public actor Bridge: Router {
     questionRoute = nil
     for id in [route, await registry.target].compactMap({ $0 }) {
       guard (try? await registry.enqueue(request, for: id)) != nil else { continue }
-      machine.withdraw { $0.session == id }
+      await withdraw { $0.session == id }
       record(.handoff, request.brief, in: id)
       return id
     }
@@ -458,7 +480,7 @@ public actor Bridge: Router {
       }
     case (true, false):
       if questionRoute == body.sessionId { questionRoute = nil }
-      machine.withdraw { $0.session == body.sessionId && [.approval, .asking].contains($0.kind) }
+      await withdraw { $0.session == body.sessionId && [.approval, .asking].contains($0.kind) }
     default: break
     }
   }

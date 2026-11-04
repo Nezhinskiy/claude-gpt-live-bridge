@@ -2,11 +2,9 @@ import Testing
 
 @testable import BridgeCore
 
-/// One row of the call table: replay `given` from `off` with `target` the target, then `event`
-/// must give these effects.
+/// One row of the call table: replay `given` from `off`, then `event` must give these effects.
 struct Transition: CustomTestStringConvertible, Sendable {
   var testDescription: String
-  var target: SessionID?
   var given: [CallEvent]
   var event: CallEvent
   var phase: CallPhase
@@ -40,24 +38,23 @@ struct CallMachineTests {
   static let told: [CallEvent] = live + [deliver(result), .assistantSpeaking]
   static func said(_ text: String) -> CallEvent { .assistantFinishedSpeaking(text) }
   static func deliver(_ line: VoiceLine) -> CallEvent { .deliver(line) }
+  /// A line the bridge says opens a closed line: the target's answer or question.
+  static func opening(_ line: VoiceLine) -> CallEvent { .deliver(line, opensLine: true) }
+  static let asking = alphas(.asking, "Which branch?")
   /// A line from Alpha, the session the request was handed to.
   static let fromAlpha = deliver(result)
   static let window = CallEffect.armResultWindow(seconds: 120)
   static let grace = CallEffect.armGrace(milliseconds: 800)
   /// A request handed to Alpha and acknowledged; the owner has stopped talking.
   static let waiting: [CallEvent] = live + [.handedOff(alpha), .assistantSpeaking, said("On it.")]
-  /// The same request, the line since closed by silence after the window.
-  static let closedWaiting: [CallEvent] = waiting + [.silenceElapsed, .resultWindowElapsed]
-  /// Alpha's result opened the line again.
-  static let reopened: [CallEvent] = closedWaiting + [fromAlpha]
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
-    _ effects: [CallEffect], pending: [VoiceLine] = [], target: SessionID? = alpha
+    _ effects: [CallEffect], pending: [VoiceLine] = []
   ) -> Transition {
     Transition(
-      testDescription: name, target: target, given: given, event: event, phase: phase,
-      effects: effects, pending: pending)
+      testDescription: name, given: given, event: event, phase: phase, effects: effects,
+      pending: pending)
   }
 
   static let table = [
@@ -80,11 +77,29 @@ struct CallMachineTests {
       "connectAfterSpeechEndedArmsSilence", connecting + [.speechEnded], .connected, .live,
       [.flushPreroll, arm, .problem(nil)]),
     row(
-      "failedConnectKeepsResultsUnheard", unheard, .connectFailed(r), .listening,
-      [.problem(r)], pending: [a]),
+      "failedConnectChimesForUnheardResults", unheard, .connectFailed(r), .listening,
+      [.problem(r), .chime], pending: [a]),
     row(
-      "closeWhileConnectingKeepsResultsUnheard", unheard, .remoteClosed(r), .listening,
-      [.problem(r)], pending: [a]),
+      "closeWhileConnectingChimesForUnheardResults", unheard, .remoteClosed(r), .listening,
+      [.problem(r), .chime], pending: [a]),
+    row(
+      "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
+      [.openRealtimeForResult], pending: [result]),
+    row(
+      "theOpenedLineGetsItAsContext", [.start, opening(result)], .connected, .live,
+      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
+    row(
+      "anOpenedLineLeftSilentChimes", [.start, opening(result), .connected], .silenceElapsed,
+      .listening, [.closeRealtime, .chime], pending: [result]),
+    row(
+      "aFailedOpeningChimes", [.start, opening(result)], .connectFailed(r), .listening,
+      [.problem(r), .chime], pending: [result]),
+    row(
+      "anOpeningLineWhileConnectingWaitsForTheConnect", connecting, opening(result),
+      .connecting, [], pending: [result]),
+    row(
+      "anOpeningLineOnALiveLineIsALine", live, opening(a), .live, [.addContext(a), arm],
+      pending: [a]),
     row(
       "deliverWhileLiveIsAddedAndReArmsSilence", live, deliver(a), .live,
       [.addContext(a), arm], pending: [a]),
@@ -162,36 +177,8 @@ struct CallMachineTests {
       waiting + [.speechStarted, .resultWindowElapsed, .speechEnded], .silenceElapsed,
       .listening, [.closeRealtime]),
     row(
-      "aResultAfterTheWindowIsStillAwaited", waiting + [.speechStarted, .resultWindowElapsed],
-      fromAlpha, .live, [cap], pending: [result]),
-    row(
-      "anAwaitedResultOpensTheClosedLine", closedWaiting, fromAlpha, .connecting,
-      [.openRealtime], pending: [result]),
-    row(
-      "theReopenedLineGetsTheResult", reopened, .connected, .live,
-      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
-    row(
-      "aReopenedLineLeftSilentChimes", reopened + [.connected], .silenceElapsed, .listening,
-      [.closeRealtime, .chime], pending: [result]),
-    row(
-      "aReopenFailingChimes", reopened, .connectFailed(r), .listening, [.problem(r), .chime],
-      pending: [result]),
-    row(
-      "anAnsweredSessionNoLongerOpensTheLine", reopened + [.connected, .silenceElapsed],
-      deliver(update), .listening, [.chime], pending: [result, update]),
-    row(
-      "anApprovalOpensTheLineAndKeepsTheWait", closedWaiting + [deliver(approval)], .connected,
-      .live, [.flushPreroll, .addContext(approval), arm, .problem(nil)],
-      pending: [approval]),
-    row(
-      "aResultForASessionNotTheTargetOnlyChimes", closedWaiting, fromAlpha, .listening, [.chime],
-      pending: [result], target: beta),
-    row(
-      "theWaitOutlivesATargetChange", waiting + [.conversationChanged], fromAlpha, .connecting,
-      [.openRealtime], pending: [result]),
-    row(
-      "aLineFromAnotherSessionStillOnlyChimes", closedWaiting, deliver(a), .listening, [.chime],
-      pending: [a]),
+      "aResultAfterTheWindowIsOnlyContext", waiting + [.speechStarted, .resultWindowElapsed],
+      fromAlpha, .live, [.addContext(result), cap], pending: [result]),
     row(
       "earlyResultIsSpokenAtOnce", waiting, fromAlpha, .live, [.speak(result), arm],
       pending: [result]),
@@ -271,7 +258,6 @@ struct CallMachineTests {
 
   @Test(arguments: table) func transition(_ row: Transition) {
     var machine = CallMachine()
-    machine.target = row.target
     for event in row.given { _ = machine.handle(event) }
     #expect(machine.handle(row.event) == row.effects)
     #expect(machine.phase == row.phase)
@@ -289,6 +275,25 @@ struct CallMachineTests {
     var answer = Self.result
     answer.session = cleared
     #expect(machine.handle(.deliver(answer)) == [.speak(answer), Self.arm])
+  }
+
+  /// A question withdrawn while the line it opened still connects leaves nothing to say: the
+  /// line closes, and nothing chimes.
+  @Test func withdrawingWhatOpenedTheLineClosesIt() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.opening(Self.asking)] { _ = machine.handle(event) }
+    #expect(machine.withdraw { $0 == Self.asking } == [.closeRealtime])
+    #expect(machine.phase == .listening)
+  }
+
+  /// A line the owner opened by speaking stays, whatever is withdrawn from it.
+  @Test func withdrawingKeepsALineTheOwnerOpened() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.deliver(Self.asking), .speechStarted] {
+      _ = machine.handle(event)
+    }
+    #expect(machine.withdraw { $0 == Self.asking } == [])
+    #expect(machine.phase == .connecting)
   }
 
   /// A result held while the owner spoke is withdrawn with the rest: nothing is left to say.

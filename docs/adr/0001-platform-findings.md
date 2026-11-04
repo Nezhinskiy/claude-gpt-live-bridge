@@ -232,8 +232,8 @@ began earlier.
 - The probe kept the realtime line open 476 s in all (about $0.40 at
   [GPT-Live's $0.05 a minute](https://learn.chatgpt.com/docs/pricing)).
 
-The owner decided on this the same day (below): a result for a session the voice handed a
-request opens the closed line, without a nudge, and the chime stays the fallback. A nudge would
+The owner decided on this the same day (below): the target's answer or question opens the
+closed line, without a nudge, and the chime stays the fallback. A nudge would
 make the answer prompt but needs wording that is no request ("Hmm." did not reach a result, so it
 is untested) and a filter that keeps it out of the conversation and the menu.
 
@@ -364,7 +364,8 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 - Silent-frame dropping shortens pauses in the replayed part of an utterance and leaves up to
   about 0.5 to 1 s of lag until the speaker pauses; the first word is never lost.
 - A result that arrives after the voice session hung up is heard only once the owner speaks
-  again; until then the owner gets a chime and an unheard count, not the result itself.
+  again; until then the owner gets a chime and an unheard count, not the result itself. The
+  target's answer or question now opens the line instead (decision of 2026-11-04, below).
 - Not yet observed, and to be checked by hand in the desktop app before release: the microphone
   path with a granted permission (and whether it avoids the Local Network prompt), which events
   fire for a permission dialog, the origin of a task-notification turn, `$.process.run` in a
@@ -384,14 +385,14 @@ Accepted, 2026-11-01. Items marked inferred or documented-only above stay open u
 Decided by the owner on 2026-11-01, after the findings above.
 
 When an answer, a question or a later update arrives while no realtime session is open, the app
-plays a short chime and does not open a session for it. Item (b) shows why: a fresh session with
-no user turn does not speak appended text or initial items, so reopening one would spend session
-time and still leave the result unsaid. Item (n) later found that a session seeded with the owner's request
-usually does say it; for a session still awaited, the decision of 2026-11-04 below replaces
-this one. The result waits in the app, counted as unheard in the
-Claude Code band and the popover. When the owner next speaks and a session connects, every waiting
-result is given to the voice as context, and the voice speaks each one once, with its session's
-label. A failed connection keeps the results waiting; nothing is retried on its own.
+plays a short chime and does not open a session for it. Item (b) shows why: a fresh session with no
+user turn does not speak appended text or initial items, so reopening one would spend session time
+and still leave the result unsaid. Item (n) later found that a session seeded with the owner's
+request usually does say it; for the target's answer or question, the decision of 2026-11-04 below
+replaces this one. The result waits in the app, counted as unheard in the Claude Code band and the
+popover. When the owner next speaks and a session connects, every waiting result is given to the
+voice as context, and the voice speaks each one once, with its session's label. A failed connection
+keeps the results waiting; nothing is retried on its own.
 
 ## Decision: the line waits for a handoff's result
 
@@ -413,15 +414,15 @@ says the speakable text at once is the model's choice; the smoke run checks that
 
 Decided by the owner on 2026-11-04, after item (n).
 
-A line from the target, when the voice handed it a request it has not answered, opens the closed
-line instead of chiming: its result, failure or question, and an approval or question notice
-while it works. The new session is seeded as usual with the target's conversation, which holds
-the request, and gets the line as context; no synthetic utterance is sent. A line from a session
-that is not the target only chimes, and the owner switches to it; the line would otherwise be
-seeded with another session's conversation. The wait outlives the hang-up and a target change
-and ends with the session's answer or Stop, so switching back to the session lets its answer open
-the line. When the reopened line closes with the line still unsaid (1 of 4 in item (n)), it
-chimes and waits, as decided on 2026-11-01. The result window is unchanged: a result within it is
-still said on the open line. Each reopening is billed like any open line: the connect, the
-voice's words and the 20 s of silence before it closes.
-
+A line from the target opens the closed line instead of chiming when it is an answer (a result,
+failure or question) or a question Claude asks while it works, and the target's conversation holds a
+turn of the owner's, which item (n) found a seeded line needs to speak. The bridge decides this from
+the registry's target and the conversation and passes it with the delivery; the call machine keeps
+no copy of either. A line from a session that is not the target only chimes, and the owner switches
+to it; so do an approval notice, which the voice cannot settle, and a later update. The new session
+is seeded as usual, starts without the pre-roll, as nobody spoke, and gets the line as context; no
+synthetic utterance is sent. The connect does not hold up the mod's request that brought the line,
+and a question answered at the keyboard while its line still connects closes it. When the opened
+line closes with the line still unsaid (item (n)), it chimes and waits, as decided on 2026-11-01; so
+does a connect that fails. The result window is unchanged. Each opening is billed like any open
+line: the connect, the voice's words and the 20 s of silence before it closes.

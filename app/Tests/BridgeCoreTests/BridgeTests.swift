@@ -73,7 +73,12 @@ actor FakeAudio: AudioSide {
   func failAnswers() { answerFails = true }
   func startListening() { calls.append("startListening") }
   func stopListening() { calls.append("stopListening") }
-  func makeOffer() -> String { "offer" }
+  /// Whether each offer carried the pre-roll.
+  var offers: [Bool] = []
+  func makeOffer(preroll: Bool) -> String {
+    offers.append(preroll)
+    return "offer"
+  }
   func applyAnswer(_ sdp: String) throws {
     if answerFails { throw CodexProblem.protocolMismatch("no session.started") }
     calls.append("applyAnswer")
@@ -526,10 +531,11 @@ struct BridgeTests {
   }
 
   /// Silence does not close a line that waits for a result; the window does, and the result
-  /// after it opens the line again to be said.
+  /// after it opens the line again, without the pre-roll, to be said.
   @Test func anUnansweredHandoffClosesTheLineAfterTheWindow() async throws {
     await live()
     await bridge.audioEvent(.speechEnded)
+    voice.emit(.userUtterance("Example request 1"))
     try await handOff()
     #expect(await eventually { time.sleepers >= 4 })  // sweep, 2 silence timers, window
     for second in 1..<CallMachine.resultWindowSeconds {
@@ -542,37 +548,82 @@ struct BridgeTests {
     #expect(await eventually { await bridge.status.call == .listening })
     try await answerFirstRequest()
     #expect(await eventually { await voice.opens.count == 2 })
-    #expect(await eventually { await bridge.status.call == .live })
+    #expect(await audio.offers == [true, false])
     #expect(await !audio.calls.contains("chime"))
+  }
+
+  /// The owner asked Alpha, the target, for something, and the line has since closed.
+  func closedAfterARequest() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    voice.emit(.userUtterance("Example request 1"))
+    try await handOff()
+    voice.emit(.closed(.other("closed")))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
+  /// The answer opens the line without holding the mod's request while it connects.
+  @Test func anOpeningAnswerDoesNotWaitForTheConnect() async throws {
+    try await closedAfterARequest()
+    await voice.holdOpen()
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.openWaiting == 1 })
+    await voice.releaseOpen()
+    #expect(await eventually { await bridge.status.call == .live })
   }
 
   /// An answer for a session that is not the target only chimes: the owner switches to it.
   @Test func anAnswerForASessionNotTheTargetOnlyChimes() async throws {
-    await live()
-    await bridge.audioEvent(.speechEnded)
-    try await handOff()
+    try await closedAfterARequest()
     try await join(b, "Beta")
-    voice.emit(.closed(.other("closed")))
-    #expect(await eventually { await bridge.status.call == .listening })
     try await post("/v1/target", TargetBody(sessionId: b))
     try await answerFirstRequest()
     #expect(await eventually { await audio.calls.contains("chime") })
     #expect(await voice.opens.count == 1)
   }
 
-  /// The wait outlives a target change: once its session is the target again, its answer opens
-  /// the line.
+  /// Once its session is the target again, an answer opens the line.
   @Test func anAnswerOpensTheLineWhenItsSessionIsTheTargetAgain() async throws {
-    await live()
-    await bridge.audioEvent(.speechEnded)
-    try await handOff()
+    try await closedAfterARequest()
     try await join(b, "Beta")
     try await post("/v1/target", TargetBody(sessionId: b))
-    #expect(await eventually { await bridge.status.call == .listening })
     try await post("/v1/target", TargetBody(sessionId: a))
     try await answerFirstRequest()
     #expect(await eventually { await voice.opens.count == 2 })
     #expect(await !audio.calls.contains("chime"))
+  }
+
+  /// With the target's conversation erased, a new line would hold no request of the owner's and
+  /// stay silent (ADR 0001 (b)), so the answer only chimes.
+  @Test func anAnswerAfterNewConversationOnlyChimes() async throws {
+    try await closedAfterARequest()
+    await bridge.newConversation()
+    try await answerFirstRequest()
+    #expect(await eventually { await audio.calls.contains("chime") })
+    #expect(await voice.opens.count == 1)
+  }
+
+  /// After the answer, an update and an approval notice, which the voice cannot settle, only
+  /// chime; a question Claude asks opens the line.
+  @Test func aQuestionOpensTheLineAnUpdateAndAnApprovalChime() async throws {
+    try await closedAfterARequest()
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.opens.count == 2 })
+    voice.emit(.closed(.other("closed")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    let chimes = { await audio.calls.filter { $0 == "chime" }.count }
+    let before = await chimes()
+    try await post(
+      "/v1/answer",
+      AnswerBody(sessionId: a, id: request(1).id, status: .update, text: "Tests pass.", reason: nil)
+    )
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
+    #expect(await chimes() == before + 2)
+    #expect(await voice.opens.count == 2)
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .approval, question: "Which branch?"))
+    #expect(await eventually { await voice.opens.count == 3 })
   }
 
   /// The last session leaving stops the call, as Start with none refuses: nobody is left to
