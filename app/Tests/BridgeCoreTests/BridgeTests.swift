@@ -181,6 +181,24 @@ struct BridgeTests {
     #expect(await voices.made.count == 2)
   }
 
+  /// The only session leaving while codex is still launching stops the Start there, as a Stop
+  /// then would: it says why at once, the launched codex is ended and the microphone stays off.
+  @Test func lastSessionLeavingDuringStartLeavesTheCallOff() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    await voices.setSlow()
+    async let start: Void = test.bridge.perform(.start)
+    #expect(await eventually { await voices.waiting == 1 })
+    try await test.post("/v1/leave", LeaveBody(sessionId: a))
+    #expect(await test.bridge.status.problem == Problem.noSession.sentence)
+    await voices.finishLaunch()
+    _ = await start
+    #expect(await test.bridge.status.call == .off)
+    #expect(await voices.made.first?.shutdowns == 1)
+    #expect(await !test.audio.calls.contains("startListening"))
+  }
+
   /// A codex that ended (it exited, or stopped answering) is not used again: the next speech
   /// launches a fresh one.
   @Test func aCodexThatEndedIsReplacedAtTheNextSpeech() async throws {
@@ -319,6 +337,21 @@ struct BridgeTests {
     #expect(await voice.added == ["[ASKING] Alpha: \(question)"])
     voice.emit(.handoff(request(2)))
     #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
+  }
+
+  /// What the voice handed off shows in the conversation of the session it went to: here the
+  /// one that asked, not the target.
+  @Test func handoffIsShownInTheSessionItWentTo() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await answer(request(1), from: b, .question, "Which branch?")
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(b) == .request(request(2)) })
+    #expect(await lines().isEmpty)
+    await bridge.setTarget(b)
+    #expect(
+      await lines() == ["Claude: [QUESTION] Beta: Which branch?", "Task: Example request 2"])
   }
 
   /// A question answered in Claude Code is withdrawn from the voice and routes nothing.
@@ -512,16 +545,14 @@ struct BridgeTests {
     #expect(await voice.spoken.isEmpty)
   }
 
-  /// With no session joined, the failure arrives with the handoff; the ack must not hang up on it.
-  @Test func failureWithNoSessionIsHeard() async throws {
+  /// The last session leaving stops the call, as Start with none refuses: nobody is left to
+  /// talk to.
+  @Test func lastSessionLeavingStopsTheCall() async throws {
     await live()
     try await post("/v1/leave", LeaveBody(sessionId: a))
-    await bridge.audioEvent(.speechEnded)
-    voice.emit(.handoff(request(1)))
-    voice.emit(.assistantUtterance("On it."))
-    #expect(await eventually { await bridge.status.unheard == 1 })
-    #expect(await voice.added == ["[FAILED] LiveBridge: no Claude Code session is joined."])
-    #expect(await bridge.status.call == .live)
+    #expect(await bridge.status.call == .off)
+    #expect(await bridge.status.problem == Problem.noSession.sentence)
+    #expect(await voice.shutdowns == 1)
   }
 
   @Test func newerRequestSupersedesAnUnheardResult() async throws {

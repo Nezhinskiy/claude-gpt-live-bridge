@@ -36,8 +36,8 @@ The contract a port must keep is [the wire](docs/architecture/overview.md#the-wi
   (`LoginItem.swift`, on `SMAppService`) and the WKWebView that hosts the audio page
   (`AudioHost.swift`).
 - `app/Sources/LiveBridge/Resources/audio/`: the audio page, which owns the microphone, the voice
-  detector, the pre-roll and the WebRTC peer. Its pure modules are tested with
-  `node --test app/Tests/AudioJSTests`.
+  detector, the pre-roll and the WebRTC peer. Its pure modules are tested in
+  `app/Tests/AudioJSTests`, which `scripts/check.sh` runs.
 - `app/Sources/BridgeCore/Audio/MicrophoneAccess.swift`: macOS's microphone permission.
 - `app/Sources/BridgeCore/Server/UnixHTTPServer.swift`: the socket server, on Apple's Network
   framework. `app/Sources/BridgeCore/Paths.swift`: where the app keeps its files and its socket.
@@ -115,10 +115,20 @@ report the rate if it keeps failing.
 
 ## Releasing
 
-The app and the mod share one version (`check.sh` holds them equal). Pushing the tag
-`v<version>` runs `.github/workflows/release.yml` on a GitHub-hosted macOS runner: it refuses a
-tag that does not match `Info.plist`, builds the image with `scripts/build-app.sh --package`,
-attests it, and creates the tag's Release with `LiveBridge.dmg` attached.
+The app and the mod share one version. The release commit sets it in `app/Support/Info.plist`
+and `plugin/.claude-plugin/plugin.json`, moves `.claude-plugin/marketplace.json`'s `ref` to the
+new tag `v<version>` (the mod is installed and updated from that tag), and renames
+`CHANGELOG.md`'s Unreleased section to the version; `check.sh` fails when the three versions
+differ (`scripts/tests/release-guards.test.sh` for the `ref`).
+
+Push the tag right after the release pull request merges: until it exists, the marketplace on the
+default branch names a tag that does not, and installing or updating the mod fails. Pushing the
+tag `v<version>` runs `.github/workflows/release.yml` on a GitHub-hosted macOS runner: it refuses
+a tag that does not match `Info.plist` or the marketplace's `ref`, builds the image with `scripts/build-app.sh --package`,
+attests it, and creates the tag's Release with `LiveBridge.dmg` attached. The app's in-app update
+verifies that attestation pinned to this workflow, the tag and GitHub-hosted runners
+([SECURITY.md](SECURITY.md#what-an-update-installs)), so a release built any other way does not
+install.
 
 ## Running the app while you work
 

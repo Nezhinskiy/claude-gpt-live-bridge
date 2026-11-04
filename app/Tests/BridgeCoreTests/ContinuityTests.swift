@@ -41,6 +41,20 @@ struct ContinuityTests {
       ])
   }
 
+  /// A handoff line is for the menu only: an open request goes in as its task line, so the
+  /// voice is not given it twice.
+  @Test func handoffLinesAreLeftOutOfItems() {
+    var conversation = Conversation()
+    conversation.record(.owner, "run the tests")
+    conversation.record(.handoff, "Run the test suite.")
+    conversation.record(.voice, "I'll pass it on.")
+    #expect(
+      conversation.initialItems(tasks: []) == [
+        InitialItem(role: .user, text: "run the tests"),
+        InitialItem(role: .assistant, text: "I'll pass it on."),
+      ])
+  }
+
   @Test func eachSessionHasItsOwnConversation() {
     var continuity = Continuity()
     continuity.record(.owner, "teal", in: a)

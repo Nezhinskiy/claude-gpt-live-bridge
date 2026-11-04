@@ -27,6 +27,8 @@ const ANSWER_LIMIT = 32_000
 const CONTEXT_TIMEOUT_MS = 60_000
 /** How long the band says "Context sent". */
 const SENT_NOTE_MS = 3_000
+/** How long the polled band may go undrawn before every surface is asked for it again. */
+const UNDRAWN_MS = 3_000
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
@@ -43,6 +45,8 @@ let link: BridgeLink | null = null
 let home = ''
 let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
+/** When a surface last asked for the band while this session was joined. */
+let drawnAt = 0
 let approval: { tool: string; agent: string | undefined } | null = null
 /** Answers the question Claude asked in a voice turn with the owner's spoken reply, while it is open. */
 let answerQuestion: ((text: string) => void) | null = null
@@ -135,12 +139,19 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   const isJoined = (await link?.join({ sessionId, title, ...(byOwner && { owner: true }) })) === true
   await save($)
   await setBand($, {})
-  // Writing the band redraws only the instances that read it. A surface that asked for the
-  // band before this hook could run (the desktop app opening a new session asks a process with
-  // no hooks) holds it as drawn by nobody and asks again only when told to.
-  $.ui.invalidate('ui.render')
+  redrawBand($)
   link?.start(() => tick($))
   return isJoined
+}
+
+/**
+ * Asks every surface for the band. Writing the band redraws only the instances that read it: a
+ * surface that asked for the band before this hook could run (the desktop app opening a new
+ * session asks a process with no hooks), or that dropped it, holds it as drawn by nobody and
+ * asks again only when told to.
+ */
+function redrawBand($: EngineInterface): void {
+  $.ui.invalidate('ui.render')
 }
 
 async function turnOff($: EngineInterface): Promise<void> {
@@ -198,6 +209,13 @@ async function tick($: EngineInterface): Promise<void> {
     isOffline: false, status: bandStatus(reply.status, self),
     ...(note && { problem: note }), ...(now?.context && { context: now.context }),
   }))
+  // That write redraws each surface that shows the band; one that asked for none for a while
+  // lost it, and is asked again.
+  const at = await $.clock.now()
+  if (at - drawnAt >= UNDRAWN_MS) {
+    drawnAt = at
+    redrawBand($)
+  }
   const work = reply.work
   if (work?.kind === 'request') {
     // Queued behind an off or a removal that came in while this poll ran: those fail it in the app.
@@ -319,7 +337,10 @@ async function live($: EngineInterface, args: string): Promise<string> {
   if (verb === 'status') return statusText($)
   if (verb === 'on') {
     return serial(async () => {
-      if (link?.session) return 'This session has already joined LiveBridge.'
+      if (link?.session) {
+        redrawBand($)  // the owner's way back to a band the surface lost
+        return 'This session has already joined LiveBridge.'
+      }
       // No title here: a new session's is still the one Claude Code derives from its folder, and
       // the app shows the name the session is given next, once the poll follows it.
       return (await turnOn($, true))
@@ -450,7 +471,7 @@ export const register: Register = on => {
   // free text, so the owner may ask back instead of choosing; returning before the dialog's
   // own answer closes it.
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
-    if (e.agentId !== undefined || tracker.current === null || !link?.session) return next(e)
+    if (e.agentId !== undefined || tracker.running === null || !link?.session) return next(e)
     const answered = next(e)
     const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
     try {
@@ -466,7 +487,7 @@ export const register: Register = on => {
   // ADR 0001 (i): a permission request that reaches the person during a voice turn. Claude's
   // question has its own report above.
   on('classic.PermissionRequest', async ($, e, next) => {
-    if (tracker.current !== null && e.tool_name !== 'AskUserQuestion') {
+    if (tracker.running !== null && e.tool_name !== 'AskUserQuestion') {
       approval = { tool: e.tool_name, agent: e.agent_id }
       await link?.activity('approval')
     }
@@ -487,7 +508,9 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const state = await read($, band)
-    if (state === null || e.props.hasSurvey || !link?.session) return next(e)
+    if (state === null || !link?.session) return next(e)
+    drawnAt = await $.clock.now()
+    if (e.props.hasSurvey) return next(e)
     return drawBand($, e, state, {
       start: () => void startHere($),
       stop: () => void link?.call('stop'),

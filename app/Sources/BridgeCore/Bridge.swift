@@ -100,6 +100,12 @@ public actor Bridge: Router {
   public func perform(_ action: CallAction) async {
     switch action {
     case .start:
+      guard await registry.target != nil else {
+        problem = .noSession
+        await changed()
+        return
+      }
+      // after the look, so a second Start that came in meanwhile finds this one under way
       guard machine.phase == .off, connecting == nil else { return }
       await attempt { await self.launch() }
     case .stop:
@@ -119,11 +125,6 @@ public actor Bridge: Router {
 
   /// Start: launches codex, so a problem with it shows at once, then listens.
   private func launch() async {
-    guard await registry.target != nil else {
-      problem = .noSession
-      await changed()
-      return
-    }
     do { _ = try await controller() } catch {
       guard !Task.isCancelled else { return }  // a Stop came first
       problem = Problem(error)
@@ -134,6 +135,9 @@ public actor Bridge: Router {
     callStart = time.now
     await send(.start)
   }
+
+  /// Whether any session has a request open, which an update installs only after.
+  public var hasOpenRequests: Bool { get async { await registry.hasOpenRequests } }
 
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
   public func loadContext() async {
@@ -384,11 +388,17 @@ public actor Bridge: Router {
   }
 
   /// A new target closes a line opened with another session's conversation; the next speech
-  /// opens it with the target's. With no session left there is no conversation to switch to,
-  /// so the line stays open.
+  /// opens it with the target's. With no session left nobody is there to talk to, so the call
+  /// stops as Stop does, a Start still launching codex included, and says why, as Start with no
+  /// session does.
   private func followTarget() async {
-    guard isLineOpen, lineKnowsSession, let target = await registry.target, target != lineSession
-    else { return }
+    guard machine.phase != .off || connecting != nil else { return }
+    guard let target = await registry.target else {
+      problem = .noSession
+      await perform(.stop)
+      return
+    }
+    guard isLineOpen, lineKnowsSession, target != lineSession else { return }
     await send(.conversationChanged)
   }
 
@@ -397,14 +407,16 @@ public actor Bridge: Router {
   // MARK: Routing
 
   /// A handoff goes to the session that asked the last question, else to the target. It
-  /// supersedes that session's results the owner has not heard yet. Returns the session it went
-  /// to, or nil when none is joined.
+  /// supersedes that session's results the owner has not heard yet, and its brief is kept in
+  /// that session's conversation, so the menu shows its queue took it. Returns the session it
+  /// went to, or nil when none is joined.
   private func route(_ request: VoiceRequest) async -> SessionID? {
     let route = questionRoute
     questionRoute = nil
     for id in [route, await registry.target].compactMap({ $0 }) {
       guard (try? await registry.enqueue(request, for: id)) != nil else { continue }
       machine.withdraw { $0.session == id }
+      record(.handoff, request.brief, in: id)
       return id
     }
     return nil

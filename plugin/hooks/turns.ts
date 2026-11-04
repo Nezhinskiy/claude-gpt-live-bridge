@@ -65,10 +65,13 @@ export class TurnTracker {
     this.#turns = new Map(saved?.turns ?? [])
   }
 
-  /** The voice request whose turn runs or waits to start. */
-  get current(): RequestId | null {
+  /**
+   * The voice request whose turn runs now. One waiting to start does not count: until its turn
+   * starts, the running turn is someone else's, and so are its questions and approvals.
+   */
+  get running(): RequestId | null {
     for (const turn of this.#turns.values()) if (turn.isVoice) return turn.id
-    return this.#pending
+    return null
   }
 
   /** A voice request was submitted; its turn starts once the session is idle. */

@@ -112,7 +112,16 @@ test('aSummaryThatNeverComesStopsLoadingAfterAMinute', async ($, on) => {
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await band.press({ key: 'call' })
   expect(await note(band)).toBe('Loading context…')
-  await world.clock.advance(60_000)
+  // The minute keeps its own timer, so the app holds its reply to the poll meanwhile: the clock
+  // crosses the minute with one held poll instead of sixty, each a round trip a loaded machine
+  // slows.
+  let release = () => {}
+  world.holdNext = new Promise<void>(resolve => { release = resolve })
+  await world.clock.advance(59_999)
+  expect(await note(band)).toBe('Loading context…')
+  await world.clock.advance(1)
+  release()
+  world.holdNext = null
   expect(await note(band)).toBeUndefined()
   expect(world.logs.some(line => line.includes('could not summarise'))).toBe(true)
   // The next Start tries again instead of waiting on the lost one.

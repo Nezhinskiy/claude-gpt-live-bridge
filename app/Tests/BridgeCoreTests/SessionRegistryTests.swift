@@ -27,6 +27,18 @@ struct SessionRegistryTests {
     AnswerBody(sessionId: session ?? a, id: request.id, status: status, text: "done", reason: nil)
   }
 
+  @Test func openRequestsCountQueuedAndInFlight() async throws {
+    await join(a)
+    #expect(await !registry.hasOpenRequests)
+    let first = request(1)
+    try await registry.enqueue(first, for: a)
+    #expect(await registry.hasOpenRequests)
+    _ = try await registry.poll(a)
+    #expect(await registry.hasOpenRequests)
+    _ = try await registry.complete(answer(first))
+    #expect(await !registry.hasOpenRequests)
+  }
+
   /// Sweeps once a second for `seconds` while `a` and `b` poll; what the sweeps delivered.
   func run(_ seconds: Int) async -> [Delivery] {
     var deliveries: [Delivery] = []

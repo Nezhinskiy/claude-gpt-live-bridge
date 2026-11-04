@@ -16,6 +16,7 @@ flowchart LR
       Server["HTTP on a Unix socket<br/>(0700 run directory)"]
       Codex["RealtimeSession + JSON-RPC client"]
       Audio["Invisible WKWebView<br/>mic, voice detection, pre-roll, WebRTC"]
+      Updater["Updater actor<br/>check, verify, swap"]
     end
     CodexProc["codex app-server<br/>(read-only, tools off)"]
     subgraph Engine["Claude Code session"]
@@ -24,7 +25,10 @@ flowchart LR
     end
   end
   OpenAI[("OpenAI realtime")]
+  GitHub[("GitHub")]
   UI --- Bridge
+  UI --- Updater
+  Updater -- "release check; on Install: image, gh, claude plugin" --> GitHub
   Server --- Bridge
   Bridge --- Codex
   Bridge --- Audio
@@ -43,10 +47,12 @@ microphone or Claude:
   is pure; `Bridge` runs the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
-  flight for 10 minutes fails; either is reported to the voice as `[FAILED]`.
+  flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
+  session was the last one, which stops the call ([failure behaviour](#failure-behaviour)).
 - `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
-  (the owner's, the voice's and the lines the session sent the voice) and the context loaded
-  from it. Each new realtime session is seeded with the target's conversation and only the
+  (the owner's, the voice's, the lines the session sent the voice and the brief of each request
+  its queue took) and the context loaded from it. Each new realtime session is seeded with the
+  target's conversation, less those briefs (an open request goes in as its task), and only the
   target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
   mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
   own session's conversation. New conversation forgets the target's, removing a session forgets
@@ -58,6 +64,14 @@ microphone or Claude:
   text`, of at most 2,000 characters, with the label cut to 120 characters, without code blocks
   or tables, and with credentials redacted.
 - `UnixHTTPServer` and `Wire`: the mod's routes (below).
+- `Update/`: the in-app update ([below](#update)). `AppVersion` and `Release` parse a version
+  and GitHub's `releases/latest` reply strictly; `UpdatePolicy` says when a check is due and
+  which copy may update; `DownloadRules` limits redirects to GitHub's hosts and the size of a
+  download; `UpdateBundleCheck` reads the image's app and the programs' output; `UpdateRecord`
+  and `UpdateState` are what a run leaves for the next launch; `UpdateProblem` gives each failure
+  its sentence. `Updater` is the actor that runs a check or an install through
+  `UpdateEnvironment`, a protocol over the network, the programs, the swap and the relaunch, so
+  the tests use a fake.
 
 **`LiveBridge`** (the app target) wires `BridgeCore` to the menu bar, to `SMAppService` for Open at
 login, and to `AudioHost`: one `WKWebView` in an invisible window (one point, fully transparent,
@@ -66,15 +80,23 @@ does not consider visible), serving the bundled audio page under its own URL sch
 page opens the microphone, the app asks macOS for it itself (WebKit's request never shows the
 prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
 for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
-queued audio into the peer, dropping silence until it has caught up.
+queued audio into the peer, dropping silence until it has caught up. For updates,
+`SystemUpdateEnvironment` is the real `UpdateEnvironment` (an ephemeral `URLSession`, `gh`,
+`hdiutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
+`UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced
+release's Install.
 
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
 desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
 and joins again when that title changes, polls it once a second, submits each voice request to
 the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
-origin. It draws a band above the prompt with the call's phase, the target, the unheard count
-and the buttons Start/Stop and Talk here, with the problem sentence on a row of its own. Start
+origin. A voice turn is one that has started: while a voice request waits for the running turn
+to end, that turn's questions, and the notice of its permission prompts, stay in Claude Code. It
+draws a band above the prompt with the call's phase, the target, the unheard count and the
+buttons Start/Stop and Talk here, with the problem sentence on a row of its own. A surface
+that has drawn no band for 3 s while the session is joined is asked for it again, and `/live on`
+in a joined session asks every surface for it. Start
 makes the session the target, starts the call and sends the session's summary (none for a
 session with no prompt yet; the last one again, with no model call, while no turn has completed
 since it was written), with a short note in the band while it goes. Talk here shows only while
@@ -316,11 +338,73 @@ sequenceDiagram
   Mod->>Bridge: POST /v1/activity working
 ```
 
+### Update
+
+Only the copy at `/Applications/LiveBridge.app` (the bundle, symlinks resolved, is that path, and
+the path is not a symlink) makes an `Updater`; any other copy says so in Settings and never
+checks. A check asks `https://api.github.com/repos/getLiveBridge/LiveBridge/releases/latest`
+and reports `available` for a plain `vX.Y.Z` tag newer than the running version. With
+**Check for updates automatically** on (`Settings.checkUpdatesAutomatically`, nil meaning on for a
+release build and off for one with `LBSourceBuild`), the app asks at launch, every
+`UpdatePolicy.tick` (15 minutes) and on wake whether a check is due: 24 hours since the last
+one GitHub answered, or a clock that moved back; a check that did not reach GitHub (common right
+after a wake) is tried again at the next tick. A newer release is announced once per version, by a
+notification with an Install action and a menu item; `updates/state.json` keeps the last check's
+time and the versions announced.
+
+Install runs only from the owner's click, one run at a time (the actor's flag, and the lock file
+`updates/lock` against a second instance). Programs start by absolute path except `gh` and
+`claude`, which are found on the owner's shell `PATH` as `codex` is, and each has a timeout
+(30 s, 120 s for `claude`):
+
+1. `gh` is found and `gh auth status` passes, or nothing is downloaded.
+2. The image is downloaded from the release URL built from the version into
+   `updates/<X.Y.Z>/`, following redirects only to GitHub's asset hosts, and at most 100 MB.
+3. `gh attestation verify`, pinned to `release.yml`, the tag and GitHub-hosted runners, passes,
+   and its attested digest equals the image's SHA-256.
+4. The image is attached read-only; its `LiveBridge.app` has the bundle id, the version and a
+   minimum macOS this Mac meets, and passes `codesign --verify --deep --strict`; its CDHash is
+   kept. It is copied with `ditto` to `/Applications/.LiveBridge-update-<uuid>.app`, the image is
+   detached on every path, and the staged copy must have the same CDHash before a quarantine
+   attribute on it is removed.
+5. While any joined session has a request queued or in flight (`Bridge.hasOpenRequests`), the
+   run waits (`waiting`).
+6. `claude plugin marketplace update livebridge` and `claude plugin update livebridge@livebridge`
+   run in the data folder; `claude plugin list --json` must then report the release's version,
+   or the record carries the two commands for the owner.
+7. The wait of step 5 again, then the call stops and the wait runs once more (for a request
+   opened just before the stop); the staged copy is checked again (a directory, not a symlink,
+   the same CDHash, `codesign` passes) and swapped with the installed app by
+   `renamex_np(…, RENAME_SWAP)`. From here any launch of the path, the mod's included, starts the
+   new version; the running process keeps its binary.
+8. `updates/record.json` is written, a `/bin/sh` loop (`RelaunchScript`) waits for this process
+   to exit and then `open`s the app, a second apart, until a process of the owner's runs the
+   installed app's own executable (a `LiveBridge` built elsewhere does not count) or ten
+   attempts have passed, and the app quits.
+
+A failure before the swap, step 7's own re-check included, leaves the installed app as it was
+and removes the staged copy; the image folder is removed on every path. When it comes after step
+6 updated the mod, the mod stays at the new version, and the failure's sentence says so
+(`UpdateProblem.modAlreadyUpdated`). Why the install waits for
+the owner's click, and what that costs, is
+[ADR 0002](../adr/0002-the-app-updates-itself-on-the-owners-click.md).
+
+**At launch**, the installed copy removes every `/Applications/.LiveBridge-update-*.app` (the old
+bundle, or a copy a crashed run left) and, unless `updates` is a symlink, every version folder and
+the lock in it. It reads `updates/record.json`: Settings shows it until the next update, and
+`LiveBridge updated to X.Y.Z` is posted once (the record is marked first). With automatic checks
+on, a release announced before and newer than the running app is looked up again so the menu
+keeps offering it. The bridge's socket is bound in the meantime, retrying every 200 ms for up to
+10 s while the old instance still answers on it; an instance that stops removes the socket file
+only if it is still the one it bound.
+
 ## Failure behaviour
 
 - **No session joined:** Start is disabled in the menu. From the band or the socket, Start
   does nothing but report "No Claude Code session has joined: run /live on in a session, then
-  start."; the sentence goes when a session joins.
+  start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
+  session closing, the menu's ×, or no poll for 5 s) stops a call that is on, a Start still
+  launching codex included, as Stop does, and reports the same sentence.
 - **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
   gives no answer within 10 s.

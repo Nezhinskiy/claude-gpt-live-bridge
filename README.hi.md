@@ -34,13 +34,17 @@ permission mode से काम करता है, और voice आपको 
 
 <p align="center"><img src="site/assets/demo.gif" alt="LiveBridge के ज़रिए Claude Code session से बात करना" width="100%"></p>
 
-**डिज़ाइन से ही लोकल।** कोई telemetry नहीं और अपना कोई server नहीं: LiveBridge आपके Mac पर
-आपके अपने codex और आपके अपने Claude Code के बीच एक bridge है। App और mod सिर्फ़ एक Unix socket
-पर बात करते हैं, जिसे केवल आपका user खोल सकता है, और app किसी network port पर listen नहीं करता।
-आपके Mac से सिर्फ़ वही traffic बाहर जाता है जो ये दोनों tools पहले से भेजते हैं: voice line का
-traffic आपके codex के ज़रिए OpenAI को, सिर्फ़ तब जब line खुली हो, और Claude का काम आपके Claude Code
-session के ज़रिए Anthropic को। [गोपनीयता](#गोपनीयता) में ठीक-ठीक लिखा है कि OpenAI तक क्या पहुँचता
-है; [SECURITY.md](SECURITY.md) बताता है कि यह किस चीज़ से बचाता है और किस चीज़ से नहीं।
+**डिज़ाइन से ही लोकल।** कोई telemetry नहीं और अपना कोई server नहीं: LiveBridge आपके Mac पर आपके अपने
+codex और आपके अपने Claude Code के बीच एक bridge है। App और mod सिर्फ़ एक Unix socket पर बात करते
+हैं, जिसे केवल आपका user खोल सकता है, और app किसी network port पर listen नहीं करता। जो traffic ये
+दोनों tools पहले से भेजते हैं (voice line का traffic आपके codex के ज़रिए OpenAI को, सिर्फ़ तब जब
+line खुली हो, और Claude का काम आपके Claude Code session के ज़रिए Anthropic को), उसके अलावा app का
+अपना traffic सिर्फ़ [updates](#अपडेट-करना) के लिए है: GitHub से नए release की अपने-आप होने वाली जाँच
+(दिन में एक बार, और हर launch पर जब तक उसके बताए release को install न किया गया हो), जिसे आप बंद कर
+सकते हैं; **Check for update** दबाने पर वही जाँच; नए release की सूचना देने पर `gh auth status`; और
+**Install** click करने पर download, उसकी जाँच और mod का update। [गोपनीयता](#गोपनीयता) में ठीक-ठीक
+लिखा है कि OpenAI तक क्या पहुँचता है, और GitHub को भेजे जाने वाले app के requests के नाम भी वहीं
+हैं; [SECURITY.md](SECURITY.md) बताता है कि यह किस चीज़ से बचाता है और किस चीज़ से नहीं।
 
 > **अनौपचारिक।** इसका Anthropic या OpenAI से कोई संबंध नहीं है, और न ही उनका समर्थन या सपोर्ट
 > इसे हासिल है। यह codex के experimental realtime API पर निर्भर है, जो codex के किसी भी release
@@ -71,9 +75,9 @@ scripts/build-app.sh --release
 उसे कैसे जाँचें और खोलें, यह [डिस्क इमेज से](#डिस्क-इमेज-से) में है। mod दोनों तरीकों में एक ही
 तरह install होता है।
 
-अगर पहले से खुले session में `/live` नहीं मिलता, तो session दोबारा खोलें
-([क्यों](#ज्ञात-सीमाएँ))। Upgrade, अनुमतियाँ, upgrade के बाद भी microphone की अनुमति बनाए रखना और
-uninstall करना [इंस्टॉल करना](#इंस्टॉल-करना) में हैं।
+अगर पहले से खुले session में `/live` नहीं मिलता, तो session दोबारा खोलें ([क्यों](#ज्ञात-सीमाएँ))।
+Update, अनुमतियाँ, नए build के बाद भी microphone की अनुमति बनाए रखना और uninstall करना
+[इंस्टॉल करना](#इंस्टॉल-करना) में हैं।
 
 ## आवश्यकताएँ
 
@@ -90,9 +94,10 @@ uninstall करना [इंस्टॉल करना](#इंस्टॉ�
 
 ## इंस्टॉल करना
 
-mod इस repository के marketplace से आता है ([त्वरित शुरुआत](#त्वरित-शुरुआत) के commands)।
-App दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके।
-दोनों में वह ad hoc signed होता है और notarized नहीं होता।
+mod इस repository के marketplace से आता है ([त्वरित शुरुआत](#त्वरित-शुरुआत) के commands), जो नवीनतम
+release के tag की ओर इशारा करता है, इसलिए आप जो mod install करते हैं वह उसी release का होता है। App
+दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके। दोनों में वह
+ad hoc signed होता है और notarized नहीं होता।
 
 ### डिस्क इमेज से
 
@@ -102,36 +107,77 @@ App दोनों तरीकों में `/Applications` में ज�
 2. उसे [GitHub CLI](https://cli.github.com) से जाँचें, उसी folder में जहाँ आपने उसे सेव किया है:
 
    ```sh
-   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge
+   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge \
+     --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
+     --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners
    ```
 
-   यह जाँच सिर्फ़ ऐसी image के लिए पास होती है जिसे इस repository के
-   [release workflow](.github/workflows/release.yml) ने release के tag से build किया हो। image के
-   स्रोत का यही एकमात्र प्रमाण है: ad hoc signature किसी का नाम नहीं बताता।
+   जहाँ `vX.Y.Z` release का tag है, जैसा उसके page पर लिखा है। यह जाँच सिर्फ़ ऐसी image के लिए पास
+   होती है जिसे इस repository के [release workflow](.github/workflows/release.yml) ने उसी tag से,
+   GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। image के स्रोत का
+   यही एकमात्र प्रमाण है: ad hoc signature किसी का नाम नहीं बताता। यह इस बात का प्रमाण नहीं है कि
+   किसी ने code की समीक्षा की है।
 3. उसे खोलें और LiveBridge को Applications में drag करें।
 4. पहली बार launch करने पर macOS app को तब तक block रखता है जब तक आप उसे System Settings > Privacy &
    Security > **Open Anyway** में अनुमति न दें।
 
-Upgrade करने के लिए, app को किसी नए release वाले app से बदल दें। हर upgrade के बाद macOS
-microphone के लिए दोबारा पूछता है।
-
 ### सोर्स से
 
-`scripts/build-app.sh --release` app को build करता है, उसे `/Applications` में install करता है
-(आपके account को वहाँ लिखने का अधिकार होना चाहिए, जैसा administrator के पास होता है) और खोल देता है।
-Upgrade के लिए इसे फिर से चलाएँ। Build ad hoc signed होता है, इसलिए हर upgrade के बाद macOS
-microphone के लिए दोबारा पूछता है। अनुमति बनाए रखने के लिए `scripts/build-app.sh --make-signing-identity`
-एक बार चलाएँ: यह पहले पूछता है, फिर आपके login keychain में एक self-signed code-signing certificate
-बनाता है, और बाद के release builds उसी से sign होते हैं।
+`scripts/build-app.sh --release` app को build करता है, उसे `/Applications` में install करता है (आपके
+account को वहाँ लिखने का अधिकार होना चाहिए, जैसा administrator के पास होता है) और खोल देता है।
+दोबारा build करने के लिए इसे फिर से चलाएँ। Build ad hoc signed होता है, इसलिए हर नए build के बाद
+macOS microphone के लिए दोबारा पूछता है। अनुमति बनाए रखने के लिए
+`scripts/build-app.sh --make-signing-identity` एक बार चलाएँ: यह पहले पूछता है, फिर आपके login
+keychain में एक self-signed code-signing certificate बनाता है, और बाद के release builds उसी से sign
+होते हैं।
+
+marketplace mod को पिछले release के tag पर pin करता है, इसलिए default branch से बना app उसी release
+के mod के साथ चलता है। दोनों को मिलाने के लिए release का tag build करें (`git checkout vX.Y.Z`), या
+`claude --plugin-dir plugin` से working tree का mod load करें।
+
+source से बना build updates की जाँच अपने-आप तभी करता है जब आप Settings में इसे चालू करें। Update
+install करने पर वह release की image से बदल जाता है, जो ad hoc signed है, इसलिए self-signed
+certificate फिर लागू नहीं रहता; **Install** यह बताता है और पहले पूछता है।
+
+### अपडेट करना
+
+LiveBridge app और अपने mod को तभी update करता है जब आप **Install** click करें, अपने-आप कभी नहीं।
+सिर्फ़ `/Applications/LiveBridge.app` वाली copy update होती है; कोई और copy Settings में यही बताती
+है।
+
+- **Check for updates automatically**, Settings में (डिफ़ॉल्ट रूप से चालू, source से बने build के
+  लिए बंद): दिन में एक बार app GitHub से पूछता है कि नवीनतम release कौन-सा है। नए release की सूचना
+  एक ही बार दी जाती है, एक notification से जिसका **Install** उसे install करता है, और menu bar menu
+  में **Install LiveBridge X.Y.Z…** तब तक रहता है जब तक वह install न हो जाए; इस item को बनाए रखने के
+  लिए app हर launch पर GitHub से फिर पूछता है। Settings का **Check for update** तुरंत पूछता है।
+- **Install** के लिए [GitHub CLI](https://cli.github.com) में login होना चाहिए (`gh auth login`);
+  इसके बिना Install कुछ भी download नहीं करता और release page का link देता है। यह release की image
+  download करता है, उसे ऊपर वाले उसी `gh attestation verify` से जाँचता है, फिर उसके अंदर के app को
+  जाँचता है, और जब तक हर जाँच पास न हो, कुछ install नहीं करता। जब तक Claude किसी voice request पर
+  काम कर रहा हो, यह इंतज़ार करता है, `claude plugin marketplace update livebridge` और
+  `claude plugin update livebridge@livebridge` से mod update करता है, call रोकता है, नए app को एक ही
+  step में उसकी जगह रखता है और उसे खोलता है।
+- इसके बाद Settings बताता है कि update किस version से हुआ। अगर mod update नहीं हो सका, तो वहाँ ये
+  दोनों commands दिखते हैं ताकि आप इन्हें खुद चलाएँ। पहले से खुले Claude Code sessions restart होने
+  तक पुराना mod ही रखते हैं।
+- update का download कोई quarantine attribute नहीं लगाता, इसलिए macOS को updated app का पहला launch
+  वैसे block नहीं करना चाहिए जैसे पहले download को किया था; यह code से निकलता है और अभी असल में देखा
+  नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं
+  ([SECURITY.md](SECURITY.md#what-an-update-installs))। हाँ, update के बाद पहले **Start** पर macOS
+  microphone के लिए दोबारा पूछता है, क्योंकि हर release ad hoc signed होता है।
+
+हाथ से update करने के लिए, हर session में `/live off` चलाएँ (app जवाब देना बंद करते ही mod
+`/Applications` वाला app फिर खोल देता है), LiveBridge बंद करें, नई image ऊपर बताए तरीके से install
+करें और दोनों `claude plugin` commands चलाएँ।
 
 ### अनुमतियाँ
 
 पहली बार Start करने पर macOS से microphone माँगा जाता है। अगर मना कर दिया गया, तो call एक वाक्य के
 साथ रुक जाती है और menu bar menu का **Open Microphone Settings** Privacy & Security > Microphone खोल
-देता है, जहाँ आप LiveBridge को अनुमति देते हैं। ad hoc signature के साथ macOS हर upgrade के बाद फिर
-पूछता है (ऊपर देखें)। macOS यह भी पूछ सकता है कि क्या LiveBridge आपके local network पर devices खोज
-सकता है। voice line को यह दूसरी अनुमति भी चाहिए; इसके बिना call एक वाक्य के साथ रुक जाती है, जो
-बताता है कि इसे कहाँ allow करना है।
+देता है, जहाँ आप LiveBridge को अनुमति देते हैं। ad hoc signature के साथ macOS हर update या नए build
+के बाद पहले Start पर फिर पूछता है (ऊपर देखें)। macOS यह भी पूछ सकता है कि क्या LiveBridge आपके local
+network पर devices खोज सकता है। voice line को यह दूसरी अनुमति भी चाहिए; इसके बिना call एक वाक्य के
+साथ रुक जाती है, जो बताता है कि इसे कहाँ allow करना है।
 
 ### अनइंस्टॉल करना
 
@@ -151,6 +197,10 @@ rm -rf /Applications/LiveBridge.app ~/Library/Application\ Support/LiveBridge \
 tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
+
+इनमें से कोई भी तरीका `/Applications/.LiveBridge-update-….app` नाम की copy नहीं हटाता, जो install के
+बीच में रुका update छोड़ सकता है। app ऐसी copies अगले launch पर हटा देता है; uninstall के बाद, अगर
+ऐसी copy हो तो उसे हाथ से हटाएँ।
 
 ## उपयोग
 
@@ -176,7 +226,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 - **band का Start** अपने session को target बनाता है, call शुरू करता है और voice को session का
   सारांश भेजता है ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से
-  बात कर रही हो, तब band **Talk here** दिखाता है।
+  बात कर रही हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए
+  session में band न दिखे, तो `/live on` उसे वापस ले आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), मिनट,
   **Settings…** और **Quit LiveBridge** होते हैं।
@@ -199,6 +250,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
   hear it"), नतीजा खुद कभी नहीं। उस पर click करने से menu bar menu खुलता है।
 - **Open at login** (डिफ़ॉल्ट रूप से बंद)।
+- **Updates**: चल रहा version, **Check for update**, **Check for updates automatically** और पिछले
+  update ने क्या किया ([अपडेट करना](#अपडेट-करना))।
 
 ### वॉइस क्या करता है
 
@@ -272,12 +325,23 @@ voice को ले जाने वाला codex thread अस्थायी
 है; वह सिर्फ़ बात करने के लिए है। Claude का काम Anthropic को वैसे ही जाता है जैसे आपका Claude Code
 session हमेशा भेजता है।
 
-आपके Mac पर app अपनी settings, usage meter और, सबसे हाल में इस्तेमाल हुए 20 sessions में से हर एक की,
-उसकी हाल की conversation और उससे आख़िरी बार load की गई context पंक्ति `~/Library/Application Support/LiveBridge`
-में रखता है। किसी session की पंक्तियाँ तब जाती हैं जब आप उसे target रखकर **New conversation** दबाते हैं
-या उसे × से हटाते हैं। जो session चला गया है, उसकी पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए
-20 sessions उन्हें बाहर न धकेल दें; उन्हें जल्दी मिटाने के लिए, उसी session में फिर से `/live on` चलाएँ
-और **New conversation** दबाएँ। Uninstall करने से वे सब हट जाती हैं।
+Updates के लिए app GitHub से बात करता है। **Check for updates automatically** चालू होने पर, दिन में
+एक बार (और हर launch पर, जब तक उसके बताए release को install न किया गया हो) वह बिना credentials के
+GitHub के API से पूछता है कि नवीनतम release कौन-सा है; GitHub आपके Mac का IP address देखता है।
+Settings का **Check for update** दबाने पर वही request जाता है। अपने-आप होने वाली जाँच में नया
+release मिलने पर app `gh auth status` चलाता है, यह बताने के लिए कि image जाँची जा सकती है या नहीं।
+सिर्फ़ जब आप **Install** click करते हैं, तभी वह image download करता है और `gh attestation verify` व
+`claude plugin` चलाता है, जो आपके अपने logins से GitHub तक, और `gh` के trust root के लिए Sigstore
+तक, पहुँचते हैं। [SECURITY.md](SECURITY.md#what-leaves-the-mac) में हर request की सूची है।
+
+आपके Mac पर app अपनी settings, usage meter, update की पिछली जाँच का समय और जिन versions की सूचना दी
+गई, पिछले update ने क्या किया, और, सबसे हाल में इस्तेमाल हुए 20 sessions में से हर एक की, उसकी हाल
+की conversation और उससे आख़िरी बार load की गई context पंक्ति
+`~/Library/Application Support/LiveBridge` में रखता है। किसी session की पंक्तियाँ तब जाती हैं जब आप
+उसे target रखकर **New conversation** दबाते हैं या उसे × से हटाते हैं। जो session चला गया है, उसकी
+पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए 20 sessions उन्हें बाहर न धकेल दें; उन्हें
+जल्दी मिटाने के लिए, उसी session में फिर से `/live on` चलाएँ और **New conversation** दबाएँ।
+Uninstall करने से वे सब हट जाती हैं।
 
 [SECURITY.md](SECURITY.md) में threat model है: संक्षेप में, जो कुछ भी आपका microphone सुन सकता है
 वह एक ऐसा अनुरोध बन सकता है जिसे Claude session के अपने permission mode के तहत चलाता है।

@@ -2,8 +2,8 @@ import AppKit
 import BridgeCore
 import SwiftUI
 
-/// LiveBridge's Settings: the voice and its prompt, notifications, automatic context and Open
-/// at login. The settings are read from and written to `AppModel.settings`, their one copy.
+/// LiveBridge's Settings: the voice and its prompt, notifications, automatic context, Open at
+/// login and updates. The settings are read from and written to `AppModel.settings`, their one copy.
 struct SettingsView: View {
   @Bindable var model: AppModel
 
@@ -66,6 +66,7 @@ struct SettingsView: View {
             .font(.caption).symbolRenderingMode(.multicolor)
         }
       }
+      UpdateSection(model: model)
     }
     .formStyle(.grouped)
     .frame(width: 460)

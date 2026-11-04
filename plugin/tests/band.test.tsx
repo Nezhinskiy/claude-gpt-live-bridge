@@ -82,6 +82,34 @@ test('joiningAsksEverySurfaceToDrawTheBandAgain', async ($, on) => {
   expect(world.invalidated).toEqual(['ui.render'])
 })
 
+test('liveOnWhenJoinedAsksForTheBandAgain', async ($, on) => {
+  // The owner's way to bring back a band the surface lost: /live on draws it, joined or not.
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.invalidated.length = 0
+  await $.command.run({ ...LIVE, args: 'on' })
+  expect(world.invalidated).toEqual(['ui.render'])
+})
+
+test('aBandNobodyDrawsIsAskedForAgain', async ($, on) => {
+  // The poll writes the band each second, which redraws every surface that drew it; a surface
+  // that dropped it draws nothing again by itself, so a band undrawn for a while is asked for.
+  const world = await joined($, on)
+  world.invalidated.length = 0
+  await world.clock.advance(5000)
+  expect(world.invalidated).toContain('ui.render')
+})
+
+test('aDrawnBandIsNotAskedForAgain', async ($, on) => {
+  const world = await joined($, on)
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  world.invalidated.length = 0
+  await world.clock.advance(5000)
+  expect(world.invalidated).toEqual([])
+  await band.unmount()
+})
+
 const OTHER = '11111111-0000-0000-0000-000000000002'
 const elsewhere = (call: 'off' | 'listening'): StatusReply => ({
   call, unheard: 0, minutesToday: 0,

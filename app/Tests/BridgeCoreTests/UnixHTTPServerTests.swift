@@ -20,7 +20,7 @@ struct UnixHTTPServerTests {
 
   func withServer(_ body: () async throws -> Void) async throws {
     let server = try UnixHTTPServer(socketPath: socket, router: router)
-    try server.start()
+    try await server.start()
     defer { server.stop() }
     try await body()
   }
@@ -101,7 +101,42 @@ struct UnixHTTPServerTests {
   @Test func secondServerDoesNotStealTheSocket() async throws {
     try await withServer {
       let second = try UnixHTTPServer(socketPath: socket, router: router)
-      #expect(throws: ServerError.socketInUse(socket.path)) { try second.start() }
+      await #expect(throws: ServerError.socketInUse(socket.path)) { try await second.start() }
+    }
+  }
+
+  @Test func bindRetriesWhileAnotherInstanceAnswers() async throws {
+    let first = try UnixHTTPServer(socketPath: socket, router: router)
+    try await first.start()
+    defer { first.stop() }
+    let second = try UnixHTTPServer(socketPath: socket, router: router)
+    defer { second.stop() }
+    let binding = Task { try await second.start(retryFor: .seconds(2)) }
+    try await Task.sleep(for: .milliseconds(300))
+    first.stop()
+    try await binding.value
+    let reply = try await exchange(post("/v1/answer", Data("{}".utf8)))
+    #expect(reply.status == 200)
+  }
+
+  @Test func stopLeavesASocketAnotherInstanceBound() async throws {
+    let first = try UnixHTTPServer(socketPath: socket, router: router)
+    try await first.start()
+    // The new instance's socket takes the path while the old one is still stopping.
+    let successor = socket.appendingPathExtension("new")
+    FileManager.default.createFile(atPath: successor.path, contents: Data())
+    #expect(rename(successor.path, socket.path) == 0)
+    defer { try? FileManager.default.removeItem(at: socket) }
+    first.stop()
+    #expect(FileManager.default.fileExists(atPath: socket.path))
+  }
+
+  @Test func bindGivesUpAfterTheRetry() async throws {
+    try await withServer {
+      let second = try UnixHTTPServer(socketPath: socket, router: router)
+      await #expect(throws: ServerError.socketInUse(socket.path)) {
+        try await second.start(retryFor: .milliseconds(400))
+      }
     }
   }
 
