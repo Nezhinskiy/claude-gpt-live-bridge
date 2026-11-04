@@ -71,8 +71,9 @@ public enum CallEffect: Equatable, Sendable {
   /// Asks the open line to say a result now.
   case speak(VoiceLine)
   case chime
-  /// A handoff, or the voice's fetch of a session's context, was queued for a session; without
-  /// this sound the owner cannot tell it from a voice that only said it would look (BR-001).
+  /// A handoff, or the voice's fetch that the open line waits for, was queued for a session;
+  /// without this sound the owner cannot tell it from a voice that only said it would look
+  /// (BR-001).
   case confirmHandoff
   case problem(Problem?)
 }
@@ -164,8 +165,7 @@ public struct CallMachine: Sendable {
     case (.connecting, .deliver(let result)):
       unheard.append(Unheard(line: result))
       return []
-    case (.listening, .handedOff(.some)), (.connecting, .handedOff(.some)),
-      (.listening, .fetchAsked), (.connecting, .fetchAsked):
+    case (.listening, .handedOff(.some)), (.connecting, .handedOff(.some)):
       return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
