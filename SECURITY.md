@@ -81,7 +81,9 @@ voices.
   the Mac can replace that app, as it can do worse with `sudo`. Only if that path does not open
   does the mod ask Launch Services for the bundle id, which trusts whichever app claims it. The
   disk image's origin is checked with `gh attestation verify`, as the README's
-  [Install](README.md#from-the-disk-image) says.
+  [Install](README.md#from-the-disk-image) says. LiveBridge itself replaces the app at that path
+  with a release, and only when you click **Install**
+  ([What an update installs](#what-an-update-installs)).
 - **Other plugins in the same Claude Code engine are trusted.** They share the engine with the
   mod and can see or submit the same prompts. Install only plugins you trust.
 
@@ -151,6 +153,82 @@ Join only sessions whose input you trust, press **New conversation** with a sess
 target after it has read text you do not trust, and keep voice off for a session whose permission mode acts without
 asking.
 
+### What an update installs
+
+The app replaces itself in `/Applications` with a release that a reply from GitHub names, and
+only when you click **Install**: in Settings, in the menu bar menu or in the notification that
+announces the release. A check, automatic or from Settings, only reads which release is the
+latest (and, for a release the automatic check announces, runs `gh auth status`); nothing
+downloads or installs without that click. Only the copy at `/Applications/LiveBridge.app` checks
+or installs: the running bundle, symlinks resolved, must be that path, and the path must not be
+a symlink. The click is what keeps a release from reaching a Mac by itself; the checks below
+decide what may be installed
+([ADR 0002](docs/adr/0002-the-app-updates-itself-on-the-owners-click.md) records why). Nothing
+installs unless each passes:
+
+- **The release.** The reply's tag must be `vX.Y.Z` with plain integers (no suffix, sign or
+  leading zero) and newer than the running version, so an update never installs an older or the
+  same version. The image's address is built from that version under
+  `https://github.com/getLiveBridge/LiveBridge/releases/download/`, never taken from the reply.
+  The requests send no credentials or cookies, follow a redirect only over https to GitHub's own
+  hosts (`api.github.com` for the check; `github.com`, `objects.githubusercontent.com` and
+  `release-assets.githubusercontent.com` for the image), and an image over 100 MB is refused.
+- **Its origin.** `gh` must be installed and signed in, or nothing is downloaded. Then
+
+  ```sh
+  gh attestation verify <image> --repo getLiveBridge/LiveBridge \
+    --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
+    --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners --format json
+  ```
+
+  must pass, and the digest it attests must equal the downloaded image's SHA-256. This proves
+  that the image was built by `release.yml` from tag `vX.Y.Z` of this repository, on a
+  GitHub-hosted runner, and was not changed since, in transit or on GitHub. It does not prove
+  that anyone reviewed the code at that tag: anyone who can push a tag to this repository can
+  produce a release that passes. It also rests on the `gh` found on your shell's `PATH`, which a
+  process running as you could replace, as it could do worse (above).
+- **The app inside.** The image is attached read-only and must hold `LiveBridge.app` with the
+  bundle identifier `com.getlivebridge.livebridge`, the release's version, when it names one an
+  `LSMinimumSystemVersion` this Mac meets, and a signature that passes
+  `codesign --verify --deep --strict`. The app is signed ad hoc, so `codesign` proves only that
+  the bundle is whole as signed, not who signed it: it is not an origin check. Its CDHash is
+  recorded, and the copy staged in `/Applications` must still have it, be a directory and not a
+  symlink, and pass `codesign` again at the moment of the swap.
+- **The swap.** The staged copy is exchanged with the installed app in one
+  `renamex_np(…, RENAME_SWAP)` call in the same folder, so there is never a moment without an app
+  at the path. A failure before the swap leaves the installed app as it was and removes the
+  staged copy and the image. When it comes after the mod was updated, the mod stays at the new
+  version, and the failure says so.
+
+**An updated app skips Gatekeeper's first-launch block.** The download sets no quarantine
+attribute (the app does not set `LSFileQuarantineEnabled`), and one found on the staged copy is
+removed from that copy alone, after its CDHash matched. It follows that macOS does not block the
+new version's first launch, as it blocks a first install from the disk image until you allow it;
+this has not yet been observed on a real update. Either way, the checks above are the gate.
+
+**The mod is fetched with git and is not attested.** `claude plugin marketplace update
+livebridge` and `claude plugin update livebridge@livebridge` fetch it over HTTPS from this
+repository, at the tag the marketplace names (each release commit pins it to its own tag). A
+tag is only as fixed as the repository's push rights keep it, and nothing checks the mod's
+origin beyond that. The app then requires the installed mod's version to equal the release's,
+and otherwise shows you the two commands to run.
+
+**LiveBridge never runs `claude` with `-y` or `--accept-command`.** A command that asks for a
+person's confirmation is a Claude Code prompt, which LiveBridge never answers. Such a command
+fails or times out after 120 seconds, and Settings shows the commands for you to run. They run
+in the app's data folder, so no project's settings apply to them.
+
+A build from source (`scripts/build-app.sh --release`, marked `LBSourceBuild` in its
+`Info.plist`) checks by itself only once you turn that on, and **Install** asks before it
+replaces the build with the release image. No build has a switch that skips the attestation. A
+debug build reads `LIVEBRIDGE_RELEASES_URL`, when set, in place of the GitHub API address, for
+testing; `scripts/check.sh` fails if a release binary contains that name.
+
+**The microphone prompt after an update.** Each release is signed ad hoc, so macOS asks for the
+microphone again at the first **Start** after an update. Expect that prompt then, at the very
+first Start, and after an install by hand or a rebuild from source. LiveBridge does not
+otherwise reset the permission, so a prompt at another time is worth a second look.
+
 ### What leaves the Mac
 
 The list of what goes to OpenAI, and when, is in the README's
@@ -160,11 +238,32 @@ Settings starts another codex to list the voices; what codex sends on its own is
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
 session sends its work to Anthropic as it always does. LiveBridge has no telemetry.
 
+For updates, the app itself makes two kinds of request, and no others: the release check and the
+image download below. It also runs `gh` and `claude` for the requests listed below; what `gh`
+and `claude` send on their own besides is theirs, as with codex.
+
+- **The release check**, the app's own:
+  `GET https://api.github.com/repos/getLiveBridge/LiveBridge/releases/latest`, without
+  credentials or cookies. It shows GitHub your Mac's IP address and LiveBridge's user agent.
+  With **Check for updates automatically** on, it runs when a check is due (a day after the last
+  one, or the clock moved back before it; asked at launch, every 15 minutes and on wake) and
+  once at launch while a release it announced is newer than the running app; **Check for
+  update** in Settings, and an Install from a notification posted before a relaunch, send it
+  too.
+- **`gh auth status`**, when the automatic check finds a release not announced before and before
+  every install, under your own GitHub login.
+- After you click **Install**: the image download from `github.com`, the app's own, without
+  credentials or cookies (GitHub counts downloads); `gh attestation verify`, which fetches the
+  image's attestation from GitHub under your login and Sigstore's trust root from Sigstore; and
+  `claude plugin marketplace update` and `claude plugin update`, which fetch this repository
+  with git.
+
 Notifications never carry a result, but they name its session, and a session's title is often
 written from its conversation. With macOS's **Show previews** set to show on the lock screen,
 that title can be read there.
 
 ### Out of scope
 
-A compromised user account, macOS itself, codex, Claude Code and its engine, and the models'
-behaviour beyond what the instructions above ask of them.
+A compromised user account, macOS itself, codex, Claude Code and its engine, GitHub, Sigstore
+and the `gh` CLI that an update's checks rely on, and the models' behaviour beyond what the
+instructions above ask of them.

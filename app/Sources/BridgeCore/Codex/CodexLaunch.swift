@@ -67,10 +67,10 @@ public enum CodexLaunch {
     "respect_system_proxy", "secret_auth_storage", "system_proxy_fallback",
   ]
 
-  /// The first `codex` in `searchPath`.
-  public static func locate(searchPath: [String]) -> URL? {
+  /// The first executable `program` (`codex` unless named) in `searchPath`.
+  public static func locate(_ program: String = "codex", searchPath: [String]) -> URL? {
     let files = FileManager.default
-    return searchPath.lazy.map { URL(filePath: $0).appending(path: "codex") }
+    return searchPath.lazy.map { URL(filePath: $0).appending(path: program) }
       .first { files.isExecutableFile(atPath: $0.path) }
   }
 
@@ -156,12 +156,14 @@ public enum CodexLaunch {
     }
   }
 
-  /// Runs `executable` and returns its exit status and output, or `nil` when it gives no
-  /// answer within `timeout` (it is then killed: an interactive shell ignores `SIGTERM`).
+  /// Runs `executable` in `cwd` (the app's own when nil) and returns its exit status and
+  /// standard output, with its standard error too when `mergingErrors`, or `nil` when it gives
+  /// no answer within `timeout` (it is then killed: an interactive shell ignores `SIGTERM`).
   /// Throws `notInstalled` when it cannot start. Output goes to a file: a child it leaves
   /// running could hold a pipe open.
-  static func run(
-    _ executable: URL, _ arguments: [String], searchPath: [String] = [], timeout: Duration
+  public static func run(
+    _ executable: URL, _ arguments: [String], searchPath: [String] = [], cwd: URL? = nil,
+    mergingErrors: Bool = false, timeout: Duration
   ) async throws -> (status: Int32, output: String)? {
     let out = FileManager.default.temporaryDirectory.appending(path: "lb-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: out) }
@@ -173,9 +175,10 @@ public enum CodexLaunch {
     process.executableURL = executable
     process.arguments = arguments
     process.use(searchPath: searchPath)
+    process.currentDirectoryURL = cwd
     process.standardInput = FileHandle.nullDevice
     process.standardOutput = file
-    process.standardError = FileHandle.nullDevice
+    process.standardError = mergingErrors ? file : FileHandle.nullDevice
     do { try process.run() } catch { throw CodexProblem.notInstalled }
     let deadline = ContinuousClock.now + timeout
     while process.isRunning, ContinuousClock.now < deadline {

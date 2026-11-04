@@ -62,6 +62,16 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current == Settings(voice: "marin", prompt: "Hi."))
   }
 
+  /// A file from before the update setting reads with it unset, which leaves the choice to the
+  /// build (`UpdatePolicy.checksAutomatically`).
+  @Test func anOlderSettingsFileLeavesUpdateChecksUnset() throws {
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"voice":"marin","autoContext":true}"#.utf8).write(to: file)
+    #expect(SettingsStore(file: file).current.checkUpdatesAutomatically == nil)
+    SettingsStore(file: file).update { $0.checkUpdatesAutomatically = false }
+    #expect(SettingsStore(file: file).current.checkUpdatesAutomatically == false)
+  }
+
   /// The Settings window follows the store: a change is observed where it was read.
   @Test func aChangeIsObserved() throws {
     let store = SettingsStore(file: nil)

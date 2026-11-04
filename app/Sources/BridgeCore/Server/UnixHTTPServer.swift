@@ -25,6 +25,8 @@ public final class UnixHTTPServer: Sendable {
   private let router: any Router
   private let listener: NWListener
   private let queue = DispatchQueue(label: "livebridge.http")
+  /// The inode of the socket file this server bound; `stop` removes only that file.
+  private let boundInode = OSAllocatedUnfairLock<UInt64?>(initialState: nil)
 
   public init(socketPath: URL, router: any Router) throws {
     guard socketPath.path.utf8.count <= Paths.maxSocketPathBytes else {
@@ -37,9 +39,20 @@ public final class UnixHTTPServer: Sendable {
     listener = try NWListener(using: parameters)
   }
 
-  /// Binds the socket, replacing a stale socket file that nothing accepts on, and returns once
-  /// the listener is ready.
-  public func start() throws {
+  /// Binds the socket and returns once the listener is ready. While another process still
+  /// accepts on it, tries again every 200 ms for up to `retryFor` (a relaunched app waiting for
+  /// the old instance to quit), then throws `socketInUse`.
+  public func start(retryFor: Duration = .zero) async throws {
+    let deadline = ContinuousClock.now + retryFor
+    while true {
+      do { return try bind() } catch ServerError.socketInUse where ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(200))
+      }
+    }
+  }
+
+  /// One attempt: replaces a stale socket file that nothing accepts on.
+  private func bind() throws {
     if FileManager.default.fileExists(atPath: socketPath) {
       if Self.somethingAccepts(at: socketPath) { throw ServerError.socketInUse(socketPath) }
       try FileManager.default.removeItem(atPath: socketPath)
@@ -67,11 +80,22 @@ public final class UnixHTTPServer: Sendable {
       stop()
       throw ServerError.startFailed(reason)
     }
+    boundInode.withLock { $0 = Self.inode(at: socketPath) }
   }
 
+  /// Stops listening and removes the socket file, unless another instance has bound a socket at
+  /// the path since (an app relaunched after an update binds as soon as this one stops answering).
   public func stop() {
     listener.cancel()
+    guard let bound = boundInode.withLock({ $0 }), Self.inode(at: socketPath) == bound else {
+      return
+    }
     try? FileManager.default.removeItem(atPath: socketPath)
+  }
+
+  private static func inode(at path: String) -> UInt64? {
+    var info = stat()
+    return lstat(path, &info) == 0 ? UInt64(info.st_ino) : nil
   }
 
   private static func receive(_ connection: NWConnection, _ buffer: Data, router: any Router) {

@@ -136,6 +136,9 @@ public actor Bridge: Router {
     await send(.start)
   }
 
+  /// Whether any session has a request open, which an update installs only after.
+  public var hasOpenRequests: Bool { get async { await registry.hasOpenRequests } }
+
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
   public func loadContext() async {
     guard let target = await registry.target else { return }

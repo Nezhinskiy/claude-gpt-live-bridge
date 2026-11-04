@@ -1,5 +1,6 @@
 /// What the menu bar menu holds for one status, top to bottom, as a plain value: the call card,
-/// the sessions, the target's whole conversation, the minutes, Settings and Quit. The app renders it
+/// the sessions, the target's whole conversation, the minutes, an update to install, Settings and
+/// Quit. The app renders it
 /// into an `NSMenu`, the custom rows as hosted SwiftUI views and the rest as native items, so
 /// the menu has the system's own corners, material and shadow. Pure.
 public struct MenuContent: Sendable, Equatable {
@@ -12,13 +13,15 @@ public struct MenuContent: Sendable, Equatable {
   /// What a native item does.
   public enum Command: Sendable, Equatable {
     case copyJoinCommand, loadContext, newConversation, settings, quit
+    /// Installs the release announced, this version.
+    case installUpdate(AppVersion)
 
     /// With ⌘, as the system's menus have it; empty for none.
     public var keyEquivalent: String {
       switch self {
       case .settings: ","
       case .quit: "q"
-      case .copyJoinCommand, .loadContext, .newConversation: ""
+      case .copyJoinCommand, .loadContext, .newConversation, .installUpdate: ""
       }
     }
   }
@@ -64,11 +67,20 @@ public struct MenuContent: Sendable, Equatable {
   public let items: [Item]
 
   /// `problem` is the app's own or the bridge's; `update` is nil while there is no bridge.
-  public init(update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState) {
-    let footer: [Item] = [
-      .command(.settings, title: "Settings…", isEnabled: true),
-      .command(.quit, title: "Quit LiveBridge", isEnabled: true),
-    ]
+  /// `available` is a newer release found and not yet installed: the menu offers to install it.
+  public init(
+    update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
+    available: AppVersion?
+  ) {
+    let install: [Item] =
+      available.map {
+        [.command(.installUpdate($0), title: "Install LiveBridge \($0)…", isEnabled: true)]
+      } ?? []
+    let footer: [Item] =
+      install + [
+        .command(.settings, title: "Settings…", isEnabled: true),
+        .command(.quit, title: "Quit LiveBridge", isEnabled: true),
+      ]
     let shown = update.map { StatusPresentation($0.status) }
     let card = CallCard(
       headline: shown?.headline ?? (problem == nil ? "Starting…" : "Off"),

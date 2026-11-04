@@ -138,9 +138,11 @@
     <ol class="steps">
       <li class="step">
         <h3>Install the app</h3>
-        <p><a href="https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg">Download LiveBridge.dmg</a> from the latest GitHub Release. GitHub Actions builds it from the release’s tagged commit and attests it; to check that your file is that build, run this with the <a href="https://cli.github.com">GitHub CLI</a> in the folder you saved it to:</p>
+        <p><a href="https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg">Download LiveBridge.dmg</a> from the latest GitHub Release. GitHub Actions builds it from the release’s tag and attests it; to check that your file is that build, unchanged, run this with the <a href="https://cli.github.com">GitHub CLI</a> in the folder you saved it to, with <code>vX.Y.Z</code> the release’s tag:</p>
         <div class="code">
-          <pre><code>gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge</code></pre>
+          <pre><code>gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge \
+  --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
+  --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners</code></pre>
           <button class="copy" type="button" hidden>Copy</button>
         </div>
         <p>Then open it and drag LiveBridge to Applications.</p>
@@ -180,7 +182,7 @@ claude plugin install livebridge@livebridge</code></pre>
     <dl class="highlights">
       <div>
         <dt>Local by design</dt>
-        <dd>No telemetry and no server of its own. The app listens on no network port. The only traffic that leaves your Mac is what codex and Claude Code already send: the voice line to OpenAI while it is open, and Claude’s work to Anthropic. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists exactly what reaches OpenAI.</dd>
+        <dd>No telemetry and no server of its own. The app listens on no network port. Besides what codex and Claude Code already send (the voice line to OpenAI while it is open, and Claude’s work to Anthropic), the app’s only traffic of its own is for updates: an automatic check with GitHub for a new release (daily, and at launch while one it announced is not installed), which you can turn off; the same check when you press Check for update; <code>gh auth status</code> when a new release is announced; and the download, its verification and the mod’s update when you click Install. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists exactly what reaches OpenAI and names the requests the app makes to GitHub.</dd>
       </div>
       <div>
         <dt>Billing-aware</dt>

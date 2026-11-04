@@ -1,7 +1,12 @@
 # Builds the disk image on a version tag (v0.1.0 and on), attaches it to that tag's GitHub
-# Release and attests its build provenance, so a downloader can check with
-# `gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge` that this workflow built
-# it from the tagged commit. The image is signed ad hoc and not notarized; no secret is used.
+# Release and attests its build provenance. A downloader checks it, with vX.Y.Z the release's tag:
+#   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge \
+#     --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
+#     --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners
+# That proves this workflow built the image from that tag of this repository, on a GitHub-hosted
+# runner, and that it is unchanged since; it does not prove that anyone reviewed the code. The
+# app's in-app update runs the same check. The image is signed ad hoc and not notarized; no
+# secret is used.
 name: Release
 
 on:
@@ -31,6 +36,13 @@ jobs:
           version=$(plutil -extract CFBundleShortVersionString raw app/Support/Info.plist)
           if [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "the tag is $GITHUB_REF_NAME but Info.plist says $version" >&2
+            exit 1
+          fi
+      - name: Check the marketplace pins the mod to the tag
+        run: |
+          ref=$(plutil -extract plugins.0.source.ref raw .claude-plugin/marketplace.json || true)
+          if [ "$GITHUB_REF_NAME" != "$ref" ]; then
+            echo "the tag is $GITHUB_REF_NAME but marketplace.json pins the mod to $ref" >&2
             exit 1
           fi
       - name: Package

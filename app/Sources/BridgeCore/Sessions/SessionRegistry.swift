@@ -223,6 +223,9 @@ public actor SessionRegistry {
     return deliveries
   }
 
+  /// Whether any session has a request queued or in flight.
+  public var hasOpenRequests: Bool { sessions.values.contains { $0.hasOpenRequest } }
+
   /// The requests not answered yet, as `[TASK] <label>: <brief>` lines for the voice; an
   /// older request a newer one superseded is left out. Given a session, only its own.
   public func openTasks(of only: SessionID? = nil) -> [String] {

@@ -13,14 +13,19 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.
   public var prompt: String
+  /// Check GitHub for a newer release once a day; nil leaves it to the build, on for a release
+  /// build and off for one from source (`UpdatePolicy.checksAutomatically`).
+  public var checkUpdatesAutomatically: Bool?
 
   public init(
-    voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true, prompt: String = ""
+    voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true,
+    prompt: String = "", checkUpdatesAutomatically: Bool? = nil
   ) {
     self.voice = voice
     self.autoContext = autoContext
     self.notifyResults = notifyResults
     self.prompt = prompt
+    self.checkUpdatesAutomatically = checkUpdatesAutomatically
   }
 
   /// A field the file lacks keeps its default, and one it no longer has (`model`) is ignored.
@@ -30,6 +35,8 @@ public struct Settings: Codable, Sendable, Equatable {
     autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? false
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
+    checkUpdatesAutomatically = try container.decodeIfPresent(
+      Bool.self, forKey: .checkUpdatesAutomatically)
   }
 }
 

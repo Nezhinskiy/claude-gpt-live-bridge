@@ -1,4 +1,5 @@
-/// What the menu asks before it erases a session's conversation.
+/// What the app asks before it erases a session's conversation, or replaces a build from source
+/// with a release.
 public struct Confirmation: Sendable, Equatable {
   public let title: String
   public let message: String
@@ -23,5 +24,15 @@ public struct Confirmation: Sendable, Equatable {
         "\(label) leaves LiveBridge and its conversation with the voice is erased. "
         + "Run \(StatusPresentation.joinCommand) in that session to join again.",
       confirm: "Remove")
+  }
+
+  /// Install, in a build from source (`build-app.sh --release`), of release `version`.
+  public static func replaceSourceBuild(version: AppVersion) -> Confirmation {
+    Confirmation(
+      title: "Replace this build from source with LiveBridge \(version)?",
+      message:
+        "The release image replaces the build from source. It is signed ad hoc, so a "
+        + "self-signed identity from build-app.sh --make-signing-identity no longer applies.",
+      confirm: "Install")
   }
 }
