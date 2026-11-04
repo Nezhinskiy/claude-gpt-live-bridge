@@ -143,9 +143,9 @@ request is queued for a session, in any phase of the line, the app plays a short
 ([BR-001](../bugs/BR-001.md)). The line stays open for its result up to
 `CallMachine.resultWindowSeconds` (120 s) after the latest handoff, however silent it is (sound
 without words still closes it after 90 s). A result from a session handed a request in that
-window is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the owner
-(local voice detection) nor the voice is speaking; when either was, the bridge waits until both
-are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
+window is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once
+neither the owner (local voice detection) nor the voice is speaking; when either was, the bridge
+waits until both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
 line. A window that passes with no result closes the line once it is silent; that result chimes
 later as below. A line with no handoff waiting keeps the plain silence rule, so an exchange that
 sends nothing to Claude costs no more than before. codex has no request that makes the v3 voice
