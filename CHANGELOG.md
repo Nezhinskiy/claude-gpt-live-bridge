@@ -10,7 +10,8 @@ All notable changes to this project are listed here. The format follows
 
 - A short tick confirms each request the voice hands to Claude. The voice sometimes says it is
   looking without handing the request off; with no tick you know nothing was sent
-  ([BR-001](docs/bugs/BR-001.md)).
+  ([BR-001](docs/bugs/BR-001.md)). **Settings > Notifications > Play a sound when a request
+  reaches Claude** turns it off.
 
 ### Changed
 

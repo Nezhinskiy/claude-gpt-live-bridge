@@ -10,6 +10,8 @@ public struct Settings: Codable, Sendable, Equatable {
   public var autoContext: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
+  /// Play a short sound when a handoff reaches a session (BR-001).
+  public var confirmHandoffs: Bool
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.
   public var prompt: String
@@ -19,11 +21,12 @@ public struct Settings: Codable, Sendable, Equatable {
 
   public init(
     voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true,
-    prompt: String = "", checkUpdatesAutomatically: Bool? = nil
+    confirmHandoffs: Bool = true, prompt: String = "", checkUpdatesAutomatically: Bool? = nil
   ) {
     self.voice = voice
     self.autoContext = autoContext
     self.notifyResults = notifyResults
+    self.confirmHandoffs = confirmHandoffs
     self.prompt = prompt
     self.checkUpdatesAutomatically = checkUpdatesAutomatically
   }
@@ -34,6 +37,7 @@ public struct Settings: Codable, Sendable, Equatable {
     voice = try container.decodeIfPresent(String.self, forKey: .voice)
     autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? false
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
+    confirmHandoffs = try container.decodeIfPresent(Bool.self, forKey: .confirmHandoffs) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     checkUpdatesAutomatically = try container.decodeIfPresent(
       Bool.self, forKey: .checkUpdatesAutomatically)

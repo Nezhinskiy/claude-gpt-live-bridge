@@ -241,6 +241,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   which win where the two disagree, and apply from the next time the line opens.
 - **Load a session's context automatically when it becomes the target** (off by default): one
   setting for every session, kept by the app.
+- **Play a sound when a request reaches Claude** (on by default): the tick for each handoff
+  ([what it tells you](#billing-aware-by-design)).
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
@@ -281,8 +283,9 @@ talking, or while Claude's answer to a request you just made may still come:
   after that handoff, billed like any open line, and the voice says Claude's answer once nobody
   is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
   Claude closes after the usual 20 seconds of silence.
-- Each handoff that reaches a Claude Code session plays a short tick. If the voice says it is
-  looking and no tick follows, nothing was sent to Claude ([known limitations](#known-limitations)).
+- Each handoff that reaches a Claude Code session plays a short tick (Settings can turn it off).
+  If the voice says it is looking and no tick follows, nothing was sent to Claude
+  ([known limitations](#known-limitations)).
 - A result that arrives later, while the line is closed, plays a chime and waits: the band and
   the menu show it as unheard, and the voice tells you when you next speak
   ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).

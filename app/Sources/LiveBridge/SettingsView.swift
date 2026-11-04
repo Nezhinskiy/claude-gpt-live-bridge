@@ -37,6 +37,12 @@ struct SettingsView: View {
         .font(.caption).foregroundStyle(.secondary)
       }
       Section("Notifications") {
+        Toggle("Play a sound when a request reaches Claude", isOn: setting(\.confirmHandoffs))
+        Text(
+          "The voice sometimes says it is looking without sending the request; with no sound, "
+            + "nothing reached Claude, so say it again."
+        )
+        .font(.caption).foregroundStyle(.secondary)
         Toggle(
           "Notify when a result is waiting",
           isOn: Binding {
