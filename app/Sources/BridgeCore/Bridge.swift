@@ -404,14 +404,16 @@ public actor Bridge: Router {
   // MARK: Routing
 
   /// A handoff goes to the session that asked the last question, else to the target. It
-  /// supersedes that session's results the owner has not heard yet. Returns the session it went
-  /// to, or nil when none is joined.
+  /// supersedes that session's results the owner has not heard yet, and its brief is kept in
+  /// that session's conversation, so the menu shows its queue took it. Returns the session it
+  /// went to, or nil when none is joined.
   private func route(_ request: VoiceRequest) async -> SessionID? {
     let route = questionRoute
     questionRoute = nil
     for id in [route, await registry.target].compactMap({ $0 }) {
       guard (try? await registry.enqueue(request, for: id)) != nil else { continue }
       machine.withdraw { $0.session == id }
+      record(.handoff, request.brief, in: id)
       return id
     }
     return nil
