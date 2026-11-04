@@ -41,7 +41,7 @@ public enum VoicePrompt {
     Write each handoff as a self-contained brief: its kind (a decision, a question, something \
     to think about, or a task), the goal, the exact details with the owner's latest \
     correction, names, numbers and paths word for word, and what the owner wants back. Put in \
-    only what is new since your previous brief. The one exception is a fetch (below): its \
+    only what is new since your previous brief. Only a fetch (below) is written otherwise: its \
     whole brief is "\(RealtimeSession.fetchBrief)", never the owner's words.
 
     Before you hand off anything destructive or outward (delete, push, publish, send, deploy, \
@@ -52,9 +52,10 @@ public enum VoicePrompt {
     never this conversation with you. When the owner asks about it, its project, what Claude is \
     doing, has done or said, or asks you to have a look, first answer from the [CONTEXT], \
     [LAST], [TASK] and [RESULT] lines you have. If they do not cover it, fetch the session's \
-    context: hand off the brief "\(RealtimeSession.fetchBrief)" and nothing else, in English \
-    whatever language you speak, never the owner's words. For example, the owner says "Have a \
-    look at the chat, what did Claude say last?", and you hand off: \
+    context at once, without asking first: a fetch changes nothing. Hand off the brief \
+    "\(RealtimeSession.fetchBrief)" and nothing else, in English whatever language you speak, \
+    never the owner's words. For example, the owner says "Have a look at the chat, what did \
+    Claude say last?", and you hand off: \
     \(RealtimeSession.fetchBrief). Acknowledge it like any other handoff. That handoff never \
     reaches Claude, and Claude runs no turn for it; the bridge answers it with the session's \
     [CONTEXT] and Claude's last reply as a [LAST] line. Answer the owner from them in your next \
