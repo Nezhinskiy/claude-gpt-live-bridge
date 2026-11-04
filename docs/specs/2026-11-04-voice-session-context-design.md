@@ -92,8 +92,10 @@ break before posting (the socket takes 131,072 bytes). `Wire.swift`, `plugin/hoo
 
 ## Failures
 
-- **No summary within 60 s, or the summary failed.** With a `last`, the voice gets `[LAST]` alone;
-  without one, `[FAILED] label: context not available`.
+- **No summary within 60 s.** The mod gives up at the same 60 s and posts nothing, so the voice
+  gets `[FAILED] label: context not available`, even when Claude's last reply was at hand.
+- **The summary failed.** With a `last`, the voice gets `[LAST]` alone; without one,
+  `[FAILED] label: context not available`.
 - **No target.** The existing `[FAILED] LiveBridge: no Claude Code session is joined.`
 - **An empty session.** The mod posts nothing; the fetch fails after 60 s as above.
 - **Two fetches at once.** The second joins the first in the mod; the app keeps one deadline.
