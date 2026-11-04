@@ -104,7 +104,7 @@ export class BridgeLink {
   }
 
   /** `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only). */
-  async activity(state: SessionActivity, said: Pick<ActivityBody, 'question' | 'text'> = {}): Promise<void> {
+  async activity(state: SessionActivity, said: Omit<ActivityBody, 'sessionId' | 'state'> = {}): Promise<void> {
     await this.#forSession('activity', { state, ...said })
   }
 

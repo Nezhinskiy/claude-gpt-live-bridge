@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { FRAMING, voicePrompt } from '../../hooks/prompt.ts'
-import { clip, FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
+import { ANSWER_LIMIT, clip, FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
 
 const ID = '00000000-0000-0000-0000-00000000000a'
 const framed = (id: string) =>
@@ -113,10 +113,19 @@ test('clipCutsWholeCharactersOnly', () => {
 
 test('aStepsTextIsTakenOnce', () => {
   const tracker = new TurnTracker()
-  tracker.stepped('Two folders hold build output.')
+  tracker.stepStarted()
+  tracker.streamed('Two folders ')
+  tracker.streamed('hold build output.')
   assert.equal(tracker.takeStepText(), 'Two folders hold build output.')
   assert.equal(tracker.takeStepText(), '')
-  tracker.stepped('Looking.')
-  tracker.stepped('')
+  tracker.streamed('Looking.')
+  tracker.stepStarted()
   assert.equal(tracker.takeStepText(), '')
+})
+
+test('aStepsTextIsCutToAnAnswersLimit', () => {
+  const tracker = new TurnTracker()
+  tracker.stepStarted()
+  tracker.streamed('a'.repeat(ANSWER_LIMIT + 1))
+  assert.equal(tracker.takeStepText(), 'a'.repeat(ANSWER_LIMIT))
 })

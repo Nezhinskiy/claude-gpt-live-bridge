@@ -54,20 +54,14 @@ export type AskedQuestion = {
   multiSelect?: boolean
 }
 
-/**
- * What Claude asks the owner, options and their descriptions included, for the voice to put,
- * then `before`: what Claude wrote in the step that asks.
- */
-export function askedText(questions: readonly AskedQuestion[], before = ''): string {
-  const asked = questions.map(({ question, options = [], multiSelect }) => {
+/** What Claude asks the owner, options and their descriptions included, for the voice to put. */
+export function askedText(questions: readonly AskedQuestion[]): string {
+  return questions.map(({ question, options = [], multiSelect }) => {
     const choices = options.map(o => (o.description ? `${o.label}: ${o.description}` : o.label))
     const kind = multiSelect === true ? 'Options, any of them' : 'Options'
     const listed = choices.join('; ')
     return choices.length === 0 ? question : `${question} ${kind}: ${listed}${/[.!?]$/.test(listed) ? '' : '.'}`
   }).join(' ')
-  // After the options, so the app's cut of a long line takes the text, never a choice.
-  const said = before.trim()
-  return said === '' ? asked : `${asked} Claude wrote just before asking: ${said}`
 }
 
 /** The owner's reply as the dialog's free-text answer, said to come by voice. */
