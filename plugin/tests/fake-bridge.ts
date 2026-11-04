@@ -35,6 +35,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
       await hold
     }
   }
+  // The model beneath the mod: each step it is asked for answers `world.stepText` as its text.
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: world.stepText, toolUses: [], stopReason: 'end_turn', usage: null }
+  })
   on('store.get', (_, e) => ({ value: world.stored.get(e.key) }))
   on('store.set', async (_, e) => (await held(), world.stored.set(e.key, e.value), { value: undefined }))
   on('store.delete', async (_, e) => (await held(), world.stored.delete(e.key), { value: undefined }))
@@ -59,6 +63,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     logs: [] as string[],
     /** Every event the mod asked the engine to run again (`$.ui.invalidate`), in order. */
     invalidated: [] as string[],
+    /** The visible text of the next model step. */
+    stepText: '',
     summary: 'Goal: tidy the example project.',
     /** How many prompts the session has had; 0 is a new session with nothing to summarise. */
     turns: 1,
@@ -204,21 +210,10 @@ export const ASKED = [{
   options: [{ label: 'build', description: 'the default' }, { label: 'out', description: 'shorter' }],
 }]
 
-/**
- * The model beneath the mod: each step it is asked for answers `text` as its visible text. The
- * hook must be on before the test first calls `$`.
- */
-export function model(on: On) {
-  const said = { text: '' }
-  on('turn.step', async function* ($, e) {
-    return { turnId: e.turnId, index: e.index, answer: said.text, toolUses: [], stopReason: 'tool_use', usage: null }
-  })
-  return {
-    async step($: Engine, turnId: string, text: string) {
-      said.text = text
-      const stream = $.turn.step({ turnId, index: 0, model: 'example-model', messageCount: 1 })
-      for await (const _ of stream) { /* drain */ }
-      return stream.result
-    },
-  }
+/** One model step of turn `turnId` (a subagent's, with `agentId`) whose visible text is `text`. */
+export async function step($: Engine, world: ReturnType<typeof fakeWorld>, turnId: string, text: string, agentId?: string) {
+  world.stepText = text
+  const stream = $.turn.step({ turnId, index: 0, model: 'example-model', messageCount: 1, ...(agentId && { agentId }) })
+  for await (const chunk of stream) void chunk
+  return stream.result
 }

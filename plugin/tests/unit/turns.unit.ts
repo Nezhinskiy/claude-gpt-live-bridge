@@ -128,3 +128,13 @@ test('clipToEndKeepsTheWindowWhenItHoldsNoLineBreak', () => {
 test('clipToEndNeverSplitsASurrogatePair', () => {
   assert.equal(clipToEnd('a😀😀😀', 2), '😀😀')
 })
+
+test('aStepsTextIsTakenOnce', () => {
+  const tracker = new TurnTracker()
+  tracker.stepped('Two folders hold build output.')
+  assert.equal(tracker.takeStepText(), 'Two folders hold build output.')
+  assert.equal(tracker.takeStepText(), '')
+  tracker.stepped('Looking.')
+  tracker.stepped('')
+  assert.equal(tracker.takeStepText(), '')
+})

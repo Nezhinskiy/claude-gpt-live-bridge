@@ -108,7 +108,9 @@ with no prompt yet; the last one again, with no model call, while no turn has co
 was written), with a short note in the band while it goes. The mod also keeps, in memory, Claude's
 last reply in the main loop (a turn the owner typed included) and the question Claude waits on
 while one is open, and posts them with the summary as `last`, clipped to its last 8,000
-characters at a line start; `/clear` forgets them. Talk here shows only while
+characters at a line start; `/clear` forgets them. While a question is open, what Claude wrote in
+the step that asked it stands in for the last reply: the mod takes that text from its turn
+tracker once, for both the `[ASKING]` line and `last`, which carries it once, before the question. Talk here shows only while
 the call talks to another session, and moves it here. When the socket does not answer, it opens
 `/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
 to `open -g -b <bundle id>`.
@@ -326,9 +328,9 @@ sequenceDiagram
 
 When Claude asks the owner a question during a voice turn (the AskUserQuestion dialog), the
 dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
-line. What Claude wrote in the same model step goes just before it, as an `update` answer that
-leaves the request open: the engine's turn end carries only the turn's last text, so that text
-would reach the voice no other way. The voice explains it and talks it over from what it knows, without handoffs; the owner's
+line. What Claude wrote in the same model step follows the options in that line: the engine's
+turn end carries only the turn's last text, so it would reach the voice no other way, and after
+the options the app's cut of a long line takes it before any choice. The voice explains it and talks it over from what it knows, without handoffs; the owner's
 next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
 dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
@@ -342,8 +344,7 @@ sequenceDiagram
   participant Mod
   participant Claude
   Claude->>Mod: tool.call AskUserQuestion (during a voice turn)
-  Mod->>Bridge: POST /v1/answer update (the step's text, if any)
-  Mod->>Bridge: POST /v1/activity approval + question
+  Mod->>Bridge: POST /v1/activity approval + question (and the step's text)
   Bridge->>Codex: "[ASKING] label: question. Options: …"
   Codex-->>Owner: explains, talks it over
   Owner->>Codex: decides, or asks Claude back

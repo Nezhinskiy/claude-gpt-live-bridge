@@ -27,7 +27,8 @@ All notable changes to this project are listed here. The format follows
 ### Fixed
 
 - When Claude asks a question during a voice request, the voice also gets what Claude wrote just
-  before the question, not only the question and its options.
+  before the question, in the same line after the options, with code blocks and tables removed
+  as from a result.
 
 ## [0.2.0]
 

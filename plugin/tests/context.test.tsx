@@ -6,7 +6,7 @@ import type { Engine, TestBody } from 'claude-code/testing'
 
 import { askedText, voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { ASKED, BAND, fakeWorld, framed, ID, LIVE, model } from './fake-bridge.ts'
+import { ASKED, BAND, fakeWorld, framed, ID, LIVE, step } from './fake-bridge.ts'
 
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
 const SUMMARY = { sessionId: ID, summary: 'Goal: tidy the example project.' }
@@ -181,10 +181,9 @@ test('aContextCarriesClaudesLastReply', async ($, on) => {
 })
 
 test('anOpenQuestionComesWithTheTextThatAskedIt', async ($, on) => {
-  const claude = model(on)
   const world = await joined($, on)
   await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
-  await claude.step($, 't1', 'Two folders.')
+  await step($, world, 't1', 'Two folders.')
   const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
   await appAsks(world)
   expect(world.take('context')).toEqual([{ ...SUMMARY, last: `Two folders.\n\n${askedText(ASKED)}` }])

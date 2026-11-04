@@ -24,7 +24,7 @@ public enum AnswerShaper {
       body: prose.allSatisfy(\.isWhitespace) ? noProse : prose, session: session)
   }
 
-  /// The text without fenced code blocks and table rows, its lines joined by spaces.
+  /// `text` without its fenced code blocks and table rows, its lines joined by spaces.
   public static func prose(_ text: String) -> String {
     text.replacing(/```[\s\S]*?(```|\z)/, with: "\n")
       .split(whereSeparator: \.isNewline).filter { !$0.trimmingPrefix(/\s*/).hasPrefix("|") }

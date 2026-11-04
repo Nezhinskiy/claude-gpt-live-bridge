@@ -326,6 +326,20 @@ struct BridgeTests {
 
   /// A question Claude asks mid-turn reaches the voice whole, and the owner's next handoff goes
   /// to that session as its reply, though another session is the target.
+  /// What Claude wrote before asking rides in the question's line, its code and tables removed
+  /// as from a result.
+  @Test func aQuestionsLineHasNoCodeOrTables() async throws {
+    try await join(a, "Alpha")
+    try await registry.enqueue(request(1), for: a)
+    #expect(try await registry.poll(a) == .request(request(1)))
+    await live()
+    let question =
+      "Which name? Options: out. Claude wrote just before asking: Two folders.\n```\nrm -rf build\n```\n| a | b |\nPick one."
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question))
+    let said = "Which name? Options: out. Claude wrote just before asking: Two folders. Pick one."
+    #expect(await voice.added == ["[ASKING] Alpha: \(said)"])
+  }
+
   @Test func replyToClaudesQuestionGoesToTheAskingSession() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
