@@ -2,6 +2,7 @@
 // HTTP over the socket, a registry record for the session title, and the engine's answers.
 import type { On } from 'claude-code'
 import { mock } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 
 import { FRAMING } from '../hooks/prompt.ts'
 import { socketPath } from '../hooks/wire.ts'
@@ -34,6 +35,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
       await hold
     }
   }
+  // The model beneath the mod: each step it is asked for answers `world.stepText` as its text.
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: world.stepText, toolUses: [], stopReason: 'end_turn', usage: null }
+  })
   on('store.get', (_, e) => ({ value: world.stored.get(e.key) }))
   on('store.set', async (_, e) => (await held(), world.stored.set(e.key, e.value), { value: undefined }))
   on('store.delete', async (_, e) => (await held(), world.stored.delete(e.key), { value: undefined }))
@@ -58,6 +63,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     logs: [] as string[],
     /** Every event the mod asked the engine to run again (`$.ui.invalidate`), in order. */
     invalidated: [] as string[],
+    /** The visible text of the next model step. */
+    stepText: '',
     summary: 'Goal: tidy the example project.',
     /** How many prompts the session has had; 0 is a new session with nothing to summarise. */
     turns: 1,
@@ -196,3 +203,11 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
 /** How the engine starts the turn of a prompt this plugin submitted (ADR 0001, item j). */
 export const framed = (text: string) =>
   `${FRAMING}${text}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns — it starts this turn in the user's place. Address the message above.`
+
+/** One model step of turn `turnId` (a subagent's, with `agentId`) whose visible text is `text`. */
+export async function step($: Engine, world: ReturnType<typeof fakeWorld>, turnId: string, text: string, agentId?: string) {
+  world.stepText = text
+  const stream = $.turn.step({ turnId, index: 0, model: 'example-model', messageCount: 1, ...(agentId && { agentId }) })
+  for await (const chunk of stream) void chunk
+  return stream.result
+}

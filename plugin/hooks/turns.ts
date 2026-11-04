@@ -58,6 +58,8 @@ export class TurnTracker {
   #pending: RequestId | null
   #followUp: FollowUp | null
   #turns: Map<string, Tracked>
+  /** The visible text of the main loop's last model step, until a question takes it. */
+  #stepText = ''
 
   constructor(saved?: TurnSnapshot) {
     this.#pending = saved?.pending ?? null
@@ -72,6 +74,22 @@ export class TurnTracker {
   get running(): RequestId | null {
     for (const turn of this.#turns.values()) if (turn.isVoice) return turn.id
     return null
+  }
+
+  /** The main loop's model step ended with `text` visible (empty when it only called tools). */
+  stepped(text: string): void {
+    this.#stepText = text
+  }
+
+  /**
+   * What the last step wrote, for the question it asked: the engine's turn end carries only the
+   * turn's last text, and a question only its options. Taken once, so a second question in the
+   * same step does not repeat it.
+   */
+  takeStepText(): string {
+    const text = this.#stepText
+    this.#stepText = ''
+    return text
   }
 
   /** A voice request was submitted; its turn starts once the session is idle. */

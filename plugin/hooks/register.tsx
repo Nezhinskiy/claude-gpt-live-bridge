@@ -44,7 +44,6 @@ let home = ''
 let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
 /** The visible text of the main loop's last model step: what Claude wrote beside a tool call. */
-let stepText = ''
 let approval: { tool: string; agent: string | undefined } | null = null
 /** Answers the question Claude asked in a voice turn with the owner's spoken reply, while it is open. */
 let answerQuestion: ((text: string) => void) | null = null
@@ -434,7 +433,7 @@ export const register: Register = on => {
   // options: what Claude wrote in the step that asks would reach the voice in neither.
   on('turn.step', async function* ($, e, next) {
     const result = yield* next(e)
-    if (e.agentId === undefined) stepText = result.answer
+    if (e.agentId === undefined) tracker.stepped(result.answer)
     return result
   })
 
@@ -463,13 +462,8 @@ export const register: Register = on => {
     if (e.agentId !== undefined || tracker.running === null || !link?.session) return next(e)
     const answered = next(e)
     const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
-    const id = tracker.running
-    const said = stepText.trim()
-    stepText = ''
     try {
-      // What Claude wrote before asking goes first, as an update that leaves the request open.
-      if (said !== '') await link.answer({ id, status: 'update', text: clip(said, ANSWER_LIMIT) })
-      await link.activity('approval', askedText(e.questions))
+      await link.activity('approval', askedText(e.questions, tracker.takeStepText()))
       const first = await Promise.race([answered, spoken])
       return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
     } finally {

@@ -110,3 +110,13 @@ test('clipCutsWholeCharactersOnly', () => {
   // In a `u` pattern a pair is one character, so only a lone surrogate matches.
   for (let limit = 0; limit < 8; limit++) assert.ok(!/[\uD800-\uDFFF]/u.test(clip('a😀'.repeat(4), limit)))
 })
+
+test('aStepsTextIsTakenOnce', () => {
+  const tracker = new TurnTracker()
+  tracker.stepped('Two folders hold build output.')
+  assert.equal(tracker.takeStepText(), 'Two folders hold build output.')
+  assert.equal(tracker.takeStepText(), '')
+  tracker.stepped('Looking.')
+  tracker.stepped('')
+  assert.equal(tracker.takeStepText(), '')
+})
