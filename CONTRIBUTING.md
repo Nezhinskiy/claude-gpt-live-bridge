@@ -36,8 +36,8 @@ The contract a port must keep is [the wire](docs/architecture/overview.md#the-wi
   (`LoginItem.swift`, on `SMAppService`) and the WKWebView that hosts the audio page
   (`AudioHost.swift`).
 - `app/Sources/LiveBridge/Resources/audio/`: the audio page, which owns the microphone, the voice
-  detector, the pre-roll and the WebRTC peer. Its pure modules are tested with
-  `node --test app/Tests/AudioJSTests`.
+  detector, the pre-roll and the WebRTC peer. Its pure modules are tested in
+  `app/Tests/AudioJSTests`, which `scripts/check.sh` runs.
 - `app/Sources/BridgeCore/Audio/MicrophoneAccess.swift`: macOS's microphone permission.
 - `app/Sources/BridgeCore/Server/UnixHTTPServer.swift`: the socket server, on Apple's Network
   framework. `app/Sources/BridgeCore/Paths.swift`: where the app keeps its files and its socket.
