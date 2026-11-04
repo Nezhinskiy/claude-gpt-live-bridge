@@ -22,14 +22,14 @@ public enum UpdateStatus: Equatable, Sendable {
 /// so a second instance of the app cannot run one beside it. Every program starts through
 /// `environment.run`.
 public actor Updater {
-  /// The time a check-like program (`gh`, `hdiutil`, `codesign`, `ditto`, `xattr`) is given.
+  /// The time a check-like program (`gh`, `diskutil`, `codesign`, `ditto`, `xattr`) is given.
   static let checkTimeout: Duration = .seconds(30)
   /// The time each `claude` command is given.
   static let claudeTimeout: Duration = .seconds(120)
   /// The largest image downloaded.
   static let imageLimit = 100 * 1024 * 1024
   static let signerWorkflow = "\(Release.repository)/.github/workflows/release.yml"
-  static let hdiutil = URL(filePath: "/usr/bin/hdiutil")
+  static let diskutil = URL(filePath: "/usr/sbin/diskutil")
   static let codesign = URL(filePath: "/usr/bin/codesign")
   static let ditto = URL(filePath: "/usr/bin/ditto")
   static let xattr = URL(filePath: "/usr/bin/xattr")
@@ -275,22 +275,26 @@ public actor Updater {
   }
 
   /// Attaches the image, checks its app and copies it into a new staged copy; the image is
-  /// detached on every path. A failure after the staged copy exists removes it.
+  /// ejected on every path. A failure after the staged copy exists removes it.
   private func stage(_ image: URL, in folder: URL, version: AppVersion) async throws(UpdateProblem)
     -> Staged
   {
+    // A fresh folder each run, so a volume a crash left mounted is never stacked on; made here,
+    // since diskutil before macOS 27 refuses a mount point that does not exist.
+    let mount = folder.appending(path: "mount-\(UUID().uuidString)")
+    guard mkdir(mount.path, 0o700) == 0 else { throw .notWritable }
     let arguments = [
-      "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountrandom", folder.path, "-plist",
+      "image", "attach", "--plist", "--readOnly", "--nobrowse", "--mountPoint", mount.path,
       image.path,
     ]
     let attach = await environment.run(
-      Self.hdiutil, arguments, cwd: nil, timeout: Self.checkTimeout)
+      Self.diskutil, arguments, cwd: nil, timeout: Self.checkTimeout)
     guard let attach, attach.status == 0 else { throw .noApp }
     let volume = UpdateBundleCheck.volume(attachPlist: attach.output)
     defer {
-      if let target = volume.detachTarget {
+      if let target = volume.ejectTarget {
         _ = await environment.run(
-          Self.hdiutil, ["detach", target], cwd: nil, timeout: Self.checkTimeout)
+          Self.diskutil, ["eject", target], cwd: nil, timeout: Self.checkTimeout)
       }
     }
     guard let mountPoint = volume.mountPoint else { throw .noApp }

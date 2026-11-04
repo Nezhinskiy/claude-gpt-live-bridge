@@ -24,6 +24,9 @@ All notable changes to this project are listed here. The format follows
   reopened after a voice request costs no new summary.
 - The voice's instructions say that "the chat" is the Claude Code session, and that a question
   from a turn you typed waits at the keyboard.
+- The in-app update attaches and ejects the release image with `diskutil image attach` and
+  `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
+  a new folder of its own.
 
 ### Fixed
 
