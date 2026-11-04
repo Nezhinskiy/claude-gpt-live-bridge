@@ -244,6 +244,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   app opens (a Start, a line reopened after silence, the line after a target switch) asks the
   target for its summary and does not wait for it; one setting for every session, kept by the
   app.
+- **Play a sound when a request is queued for Claude** (on by default): a short sound for each
+  request the voice hands off ([why](#known-limitations)).
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
@@ -360,6 +362,12 @@ can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
+- The voice sometimes says it is looking ("On it", "Looking now") without handing the request
+  off, so nothing reaches Claude: about one request in five in
+  [testing](docs/bugs/BR-001.md), with the voice's rule against it in place. The app plays a
+  short sound when it queues a request for Claude; if the voice says it is looking and no sound
+  follows, say the request again. The app cannot tell such a promise from an answer by its
+  words, since the voice speaks your language.
 - A result that arrives while the line waits for it goes to the voice as text to say; codex has
   no call that makes the voice speak at once, so the model decides when. In testing it spoke
   within a few seconds. If it does not, the result stays unheard: the voice says it after your

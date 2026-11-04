@@ -255,6 +255,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   línea que abre la aplicación (un Start, una línea reabierta tras el silencio, la línea tras
   cambiar de destino) pide el resumen al destino y no lo espera; un único ajuste para todas las
   sesiones, que guarda la aplicación.
+- **Play a sound when a request is queued for Claude** (activado por defecto): un sonido breve por
+  cada petición que la voz pasa a Claude ([por qué](#limitaciones-conocidas)).
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
@@ -372,6 +374,12 @@ sesión.
 
 ## Limitaciones conocidas
 
+- A veces la voz dice que está mirando ("On it", "Looking now") sin pasar la petición, así que a
+  Claude no le llega nada: más o menos una petición de cada cinco en las
+  [pruebas](docs/bugs/BR-001.md), aunque la regla de la voz lo prohíbe. La aplicación emite un
+  sonido breve cuando pone una petición en la cola de Claude; si la voz dice que está mirando y no
+  suena nada, repite la petición. La aplicación no puede distinguir esa promesa de una respuesta
+  por sus palabras, porque la voz habla tu idioma.
 - Un resultado que llega mientras la línea lo espera pasa a la voz como texto para decir; codex no
   tiene ninguna llamada que haga hablar a la voz de inmediato, así que el modelo decide cuándo. En
   las pruebas habló en pocos segundos. Si no lo hace, el resultado queda sin escuchar: la voz lo

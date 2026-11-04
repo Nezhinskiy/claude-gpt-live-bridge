@@ -71,6 +71,9 @@ public enum CallEffect: Equatable, Sendable {
   /// Asks the open line to say a result now.
   case speak(VoiceLine)
   case chime
+  /// A handoff was queued for a session; without this sound the owner cannot tell it from a
+  /// voice that only said it would look (BR-001).
+  case confirmHandoff
   case problem(Problem?)
 }
 
@@ -161,6 +164,8 @@ public struct CallMachine: Sendable {
     case (.connecting, .deliver(let result)):
       unheard.append(Unheard(line: result))
       return []
+    case (.listening, .handedOff(.some)), (.connecting, .handedOff(.some)):
+      return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
       return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
@@ -189,7 +194,7 @@ public struct CallMachine: Sendable {
       isAckUnfinished = true
       guard let session else { return [] }
       awaited.insert(session)
-      return [.armResultWindow(seconds: Self.resultWindowSeconds)]
+      return [.confirmHandoff, .armResultWindow(seconds: Self.resultWindowSeconds)]
     case (.live, .fetchAsked(let session)):
       isAckUnfinished = true  // the fetch is a handoff to codex, which acknowledges it
       fetching = session

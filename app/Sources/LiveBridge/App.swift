@@ -156,6 +156,7 @@ final class AppModel {
         audio: audio, meter: UsageMeterStore(file: data.appending(path: "usage.json"), time: time),
         continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier,
         notifies: { settings.current.notifyResults },
+        confirmsHandoffs: { settings.current.confirmHandoffs },
         autoContext: { settings.current.autoContext })
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge

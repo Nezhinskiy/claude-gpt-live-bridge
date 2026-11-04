@@ -14,6 +14,8 @@ public actor Bridge: Router {
   private let notifier: (any ResultNotifying)?
   /// Settings' "Notify when a result is waiting", read at each chime.
   private let notifies: @Sendable () -> Bool
+  /// Settings' "Play a sound when a request is queued for Claude", read at each handoff.
+  private let confirmsHandoffs: @Sendable () -> Bool
   /// Settings' "Load context automatically", read each time a line opens.
   private let autoContext: @Sendable () -> Bool
   private var machine = CallMachine()
@@ -59,10 +61,12 @@ public actor Bridge: Router {
     realtime: @escaping @Sendable () async throws -> any RealtimeControlling, audio: any AudioSide,
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
+    confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
     autoContext: @escaping @Sendable () -> Bool = { false }
   ) {
     self.notifier = notifier
     self.notifies = notifies
+    self.confirmsHandoffs = confirmsHandoffs
     self.autoContext = autoContext
     self.registry = registry
     makeRealtime = realtime
@@ -266,6 +270,7 @@ public actor Bridge: Router {
     case .chime:
       await audio.chime()
       await notifyWaiting()
+    case .confirmHandoff: if confirmsHandoffs() { await audio.confirmHandoff() }
     case .problem(let shown): problem = shown
     }
   }
