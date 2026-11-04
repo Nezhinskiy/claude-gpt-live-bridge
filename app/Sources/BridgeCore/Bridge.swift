@@ -161,10 +161,11 @@ public actor Bridge: Router {
     await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
   }
 
-  /// Forgets the target's conversation; its next realtime session starts fresh.
+  /// Forgets the target's conversation; its next realtime session starts fresh, and a closed
+  /// line no longer opens for a result the forgotten conversation asked for.
   public func newConversation() async {
     guard let target = await registry.target else { return }
-    if isLineOpen, lineKnowsSession, lineSession == target { await send(.conversationChanged) }
+    if lineKnowsSession, lineSession == target { await send(.conversationChanged) }
     await forgetConversation(of: target)
   }
 
@@ -388,7 +389,9 @@ public actor Bridge: Router {
   }
 
   /// A new target closes a line opened with another session's conversation; the next speech
-  /// opens it with the target's. With no session left nobody is there to talk to, so the call
+  /// opens it with the target's. While the line is closed it ends the wait for a result, which
+  /// would open a line seeded with the new target's conversation. With no session left nobody is
+  /// there to talk to, so the call
   /// stops as Stop does, a Start still launching codex included, and says why, as Start with no
   /// session does.
   private func followTarget() async {
@@ -398,7 +401,8 @@ public actor Bridge: Router {
       await perform(.stop)
       return
     }
-    guard isLineOpen, lineKnowsSession, target != lineSession else { return }
+    guard lineKnowsSession, target != lineSession, isLineOpen || !machine.awaited.isEmpty
+    else { return }
     await send(.conversationChanged)
   }
 

@@ -44,6 +44,10 @@ struct CallMachineTests {
   static let grace = CallEffect.armGrace(milliseconds: 800)
   /// A request handed to Alpha and acknowledged; the owner has stopped talking.
   static let waiting: [CallEvent] = live + [.handedOff(alpha), .assistantSpeaking, said("On it.")]
+  /// The same request, the line since closed by silence after the window.
+  static let closedWaiting: [CallEvent] = waiting + [.silenceElapsed, .resultWindowElapsed]
+  /// Alpha's result opened the line again.
+  static let reopened: [CallEvent] = closedWaiting + [fromAlpha]
 
   static func row(
     _ name: String, _ given: [CallEvent], _ event: CallEvent, _ phase: CallPhase,
@@ -156,8 +160,33 @@ struct CallMachineTests {
       waiting + [.speechStarted, .resultWindowElapsed, .speechEnded], .silenceElapsed,
       .listening, [.closeRealtime]),
     row(
-      "aResultAfterTheWindowIsOnlyContext", waiting + [.speechStarted, .resultWindowElapsed],
-      fromAlpha, .live, [.addContext(result), cap], pending: [result]),
+      "aResultAfterTheWindowIsStillAwaited", waiting + [.speechStarted, .resultWindowElapsed],
+      fromAlpha, .live, [cap], pending: [result]),
+    row(
+      "anAwaitedResultOpensTheClosedLine", closedWaiting, fromAlpha, .connecting,
+      [.openRealtime], pending: [result]),
+    row(
+      "theReopenedLineGetsTheResult", reopened, .connected, .live,
+      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
+    row(
+      "aReopenedLineLeftSilentChimes", reopened + [.connected], .silenceElapsed, .listening,
+      [.closeRealtime, .chime], pending: [result]),
+    row(
+      "aReopenFailingChimes", reopened, .connectFailed(r), .listening, [.problem(r), .chime],
+      pending: [result]),
+    row(
+      "anAnsweredSessionNoLongerOpensTheLine", reopened + [.connected, .silenceElapsed],
+      deliver(update), .listening, [.chime], pending: [result, update]),
+    row(
+      "anApprovalOpensTheLineAndKeepsTheWait", closedWaiting + [deliver(approval)], .connected,
+      .live, [.flushPreroll, .addContext(approval), arm, .problem(nil)],
+      pending: [approval]),
+    row(
+      "aTargetChangeEndsTheWait", closedWaiting + [.conversationChanged], fromAlpha, .listening,
+      [.chime], pending: [result]),
+    row(
+      "aLineFromAnotherSessionStillOnlyChimes", closedWaiting, deliver(a), .listening, [.chime],
+      pending: [a]),
     row(
       "earlyResultIsSpokenAtOnce", waiting, fromAlpha, .live, [.speak(result), arm],
       pending: [result]),

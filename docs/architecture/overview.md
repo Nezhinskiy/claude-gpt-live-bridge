@@ -144,8 +144,8 @@ handoff, however silent it is (sound without words still closes it after 90 s). 
 to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the owner
 (local voice detection) nor the voice is speaking; when either was, the bridge waits until both
 are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
-line. A window that passes with no result closes the line once it is silent; that result chimes
-later as below. A line with no handoff waiting keeps the plain silence rule, so an exchange that
+line. A window that passes with no result closes the line once it is silent; when the result
+comes, it opens the line again, as below. A line with no handoff waiting keeps the plain silence rule, so an exchange that
 sends nothing to Claude costs no more than before. codex has no request that makes the v3 voice
 respond, so whether it says the speakable text at once is the model's choice
 ([ADR 0001](../adr/0001-platform-findings.md) (b)).
@@ -204,10 +204,18 @@ sequenceDiagram
 
 ### A result while the line is closed
 
-A result that arrives while the line is closed (after the window, or after a hang-up) does not
-reopen it. It chimes and waits; the voice gets it when the owner next speaks and says it in a
-reply. A result for a session the open line is not waiting on is added as context and said in
-the voice's next reply.
+A line from a session that was handed a request and has not answered it (`CallMachine.awaited`:
+its result, failure or question, or an approval or question notice while it works) opens the
+closed line. The new realtime session is seeded with the target's conversation, which holds the
+request, and gets the line as context; the voice usually says it unprompted, about 5 to 8 s after
+connecting ([ADR 0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence
+rule closes the line and the line chimes and waits as below. The wait outlives a hang-up and ends
+with the session's answer, Stop, a new target or the target's conversation erased.
+
+Any other line that arrives while the line is closed (a later update, a line from another
+session, a result whose reopened line said nothing) does not open it. It chimes and waits; the
+voice gets it when the owner next speaks and says it in a reply. A result for a session the open
+line is not waiting on is added as context and said in the voice's next reply.
 
 ```mermaid
 sequenceDiagram
@@ -284,7 +292,7 @@ sequenceDiagram
   Note over Claude: later: a background task notifies, a new turn starts
   Claude-->>Mod: that turn ends
   Mod->>Bridge: POST /v1/answer update (same request id)
-  Bridge->>Codex: "[UPDATE] label: …" (or chime and wait if closed)
+  Bridge->>Codex: "[UPDATE] label: …" (or chime and wait if closed: the request was answered)
   Codex-->>Owner: the update
   Note over Mod: a typed turn ends the follow-up window
 ```
@@ -304,7 +312,7 @@ sequenceDiagram
   Claude->>Mod: classic.PermissionRequest (during a voice turn)
   Mod->>Bridge: POST /v1/activity approval
   Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval"
-  Codex-->>Owner: says so (or a chime if the line is closed)
+  Codex-->>Owner: says so (a closed line opens for it, as for a result)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
   Mod->>Bridge: POST /v1/activity working

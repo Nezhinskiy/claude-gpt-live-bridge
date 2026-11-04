@@ -72,7 +72,8 @@ public struct StatusPresentation: Sendable, Equatable {
             ? "Run \(Self.joinCommand) in a Claude Code session to start."
             : "Start to talk to your sessions."
         )
-      case .listening: ("Listening — line closed", "The line opens when you speak.")
+      case .listening:
+        ("Listening — line closed", "The line opens when you speak or Claude answers you.")
       case .connecting: ("Connecting…", "Opening the voice line.")
       case .live: ("Live", target.map { "Talking to \($0)" } ?? "No session has joined yet.")
       }

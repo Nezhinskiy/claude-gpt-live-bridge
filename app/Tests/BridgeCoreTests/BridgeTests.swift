@@ -525,8 +525,8 @@ struct BridgeTests {
     #expect(await voice.spoken.isEmpty)
   }
 
-  /// Silence does not close a line that waits for a result; the window does, and a result after
-  /// it chimes as before.
+  /// Silence does not close a line that waits for a result; the window does, and the result
+  /// after it opens the line again to be said.
   @Test func anUnansweredHandoffClosesTheLineAfterTheWindow() async throws {
     await live()
     await bridge.audioEvent(.speechEnded)
@@ -541,8 +541,24 @@ struct BridgeTests {
     time.advance(by: .seconds(1))
     #expect(await eventually { await bridge.status.call == .listening })
     try await answerFirstRequest()
-    #expect(await audio.calls.contains("chime"))
-    #expect(await voice.spoken.isEmpty)
+    #expect(await eventually { await voice.opens.count == 2 })
+    #expect(await eventually { await bridge.status.call == .live })
+    #expect(await !audio.calls.contains("chime"))
+  }
+
+  /// A new target while the line is closed ends the wait: its result would open a line seeded
+  /// with another session's conversation, so it chimes instead.
+  @Test func aTargetChangeWhileClosedEndsTheWait() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    try await join(b, "Beta")
+    voice.emit(.closed(.other("closed")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    try await post("/v1/target", TargetBody(sessionId: b))
+    try await answerFirstRequest()
+    #expect(await eventually { await audio.calls.contains("chime") })
+    #expect(await voice.opens.count == 1)
   }
 
   /// The last session leaving stops the call, as Start with none refuses: nobody is left to
