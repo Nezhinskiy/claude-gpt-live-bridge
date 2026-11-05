@@ -92,8 +92,6 @@ public struct CallMachine: Sendable {
     let line: VoiceLine
     /// An awaited result that arrived while someone spoke; said once everyone is silent.
     var isHeld = false
-    /// The line opened the closed line: the new line is to say it at once.
-    var opensLine = false
   }
 
   /// The results the voice has not said yet, oldest first: waiting for the owner to speak, or
@@ -156,7 +154,7 @@ public struct CallMachine: Sendable {
       phase = .connecting
       return [.openRealtime]
     case (.listening, .deliver(let result, let opensLine)):
-      unheard.append(Unheard(line: result, opensLine: opensLine))
+      unheard.append(Unheard(line: result))
       guard opensLine else { return [.chime] }
       phase = .connecting
       isOpeningForResult = true
@@ -169,11 +167,7 @@ public struct CallMachine: Sendable {
     case (.connecting, .connected):
       phase = .live
       isOpeningForResult = false
-      // What opened the line is said at once (appendSpeech); as context the voice took 5-8 s to
-      // take it up, or never did (ADR 0001 (n)). The rest is context, as on any line.
-      let lines = unheard.map { $0.opensLine ? CallEffect.speak($0.line) : .addContext($0.line) }
-      for index in unheard.indices { unheard[index].opensLine = false }
-      return [.flushPreroll] + lines + [armSilence(), .problem(nil)]
+      return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return [.problem(reason)] + hangUp()
