@@ -18,8 +18,8 @@ All notable changes to this project are listed here. The format follows
 - **Load context automatically** is now on by default and means "when a line opens": every line
   the app opens (a Start, a line reopened after silence, the line after a target switch) asks the
   target for its summary, and the line does not wait for it. The band's Start no longer asks for
-  it separately. The mod reuses its summary until a turn you typed completes, so a line
-  reopened after a voice request costs no new summary.
+  it separately. The mod reuses its summary until a turn the voice did not hear completes (a turn
+  you typed, say) or you `/clear`, so a line reopened after a voice request costs no new summary.
 - The voice's instructions say that "the chat" is the Claude Code session, and that a question
   about it that the voice's lines do not cover is handed off to Claude.
 - The in-app update attaches and ejects the release image with `diskutil image attach` and

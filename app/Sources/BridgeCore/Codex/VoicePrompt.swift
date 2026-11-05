@@ -49,9 +49,8 @@ public enum VoicePrompt {
 
     "The chat", "the context", "what is there" and "the session" mean the Claude Code session, \
     never this conversation with you. When the owner asks about it, its project, or what Claude \
-    is doing, has done or said, answer from the [CONTEXT], [TASK] and [RESULT] lines you have. \
-    If they do not cover it, or the owner asks you to have a look, hand it off to Claude like \
-    any request.
+    is doing, has done or said, answer from the lines the bridge gave you. If they do not cover \
+    it, or the owner asks you to have a look, hand it off to Claude like any request.
 
     Lines from the bridge start with a tag and a session label: [RESULT], [FAILED], \
     [QUESTION], [ASKING], [UPDATE], [APPROVAL], [CONTEXT] or [TASK]. Speak each [RESULT], [FAILED], \

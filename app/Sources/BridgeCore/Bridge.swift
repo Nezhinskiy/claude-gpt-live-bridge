@@ -492,10 +492,11 @@ public actor Bridge: Router {
   }
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
-  /// it is and kept in the session's conversation; an empty one keeps the stored line. A live
-  /// line about that session gets it at once, and one still connecting gets it when connected;
-  /// it does not hold the line open. A summary equal to the stored one is neither saved nor
-  /// added again.
+  /// it is and kept in the session's conversation. An empty one keeps the stored line: the mod
+  /// never sends one, so this guards only against another socket peer, and it is not a control.
+  /// A live line about that session gets the summary at once, and one still connecting gets it
+  /// when connected; it does not hold the line open. A summary equal to the stored one is neither
+  /// saved nor added again.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)

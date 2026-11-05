@@ -52,8 +52,9 @@ let note: string | null = null
 let recordFile: string | null = null
 let lastScan = -Infinity
 /**
- * The last summary the model wrote, while no turn has completed since: sending it again costs
- * no model call. Kept in memory only, as the transcript it summarises is the session's own.
+ * The last summary the model wrote, until a turn whose answer did not go to the voice completes,
+ * or `/clear`: sending it again costs no model call. Kept in memory only, as the transcript it
+ * summarises is the session's own.
  */
 let summary: string | null = null
 /**

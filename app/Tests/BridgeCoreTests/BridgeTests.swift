@@ -723,7 +723,8 @@ struct BridgeTests {
     ContextBody(sessionId: a, summary: summary)
   }
 
-  /// An empty summary (the session has none) keeps the stored context and reaches no line.
+  /// An empty summary keeps the stored context and reaches no line. The mod never sends one; the
+  /// guard is against another socket peer, not a control.
   @Test func anEmptySummaryKeepsTheStoredContext() async throws {
     try await join(a, "Alpha")
     try await post("/v1/context", context())
@@ -822,7 +823,7 @@ struct BridgeTests {
     #expect(await voice.added.isEmpty)
   }
 
-  /// The same summary again is neither added to the line a second time nor saved again.
+  /// The same summary again is not added to the line a second time.
   @Test func anUnchangedContextIsNotAddedAgain() async throws {
     await live()
     try await post("/v1/context", context())

@@ -5,7 +5,9 @@ Claude Code session shipped. The fetch (`refresh context`), the `[LAST]` line an
 `last` were taken out after six real smoke runs: the voice never sent `refresh context`, because
 on GPT-Live the handoff brief codex reports (`input_transcript`, from the server's
 `delegation.created` item) was the owner's own words verbatim every time, so a prompt rule cannot
-make the voice send a fixed brief. That part is kept on branch `feat/voice-context-fetch`. Revised
+make the voice send a fixed brief. That part is kept on branch `feat/voice-context-fetch`. The
+shipped "the chat" rule sends a question the voice's lines do not cover to Claude as an ordinary
+handoff, a Claude turn, not the fetch. Revised
 on 2026-11-04 after a design, simplify and security review
 (`docs/reviews/2026-11-04-voice-context-review.md` on `review/voice-context`).
 
