@@ -172,7 +172,8 @@ copie l'indique dans Settings.
   arrête l'appel, met la nouvelle application en place en une seule étape et l'ouvre.
 - Ensuite, Settings indique la version d'origine de la mise à jour. Si le mod n'a pas pu être mis
   à jour, il affiche ces deux commandes pour que vous les exécutiez vous-même. Les sessions
-  Claude Code déjà ouvertes gardent l'ancien mod jusqu'à leur redémarrage.
+  Claude Code déjà ouvertes gardent l'ancien mod jusqu'à leur redémarrage ; Settings liste
+  celles qui sont rejointes et l'utilisent encore.
 - Le téléchargement de la mise à jour ne pose pas d'attribut de quarantaine, donc macOS ne
   devrait pas bloquer le premier lancement de l'application mise à jour comme il a bloqué le
   premier téléchargement ; cela découle du code et n'a pas encore été observé. Les vérifications

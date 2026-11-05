@@ -159,7 +159,7 @@ LiveBridge app और अपने mod को तभी update करता ह�
   step में उसकी जगह रखता है और उसे खोलता है।
 - इसके बाद Settings बताता है कि update किस version से हुआ। अगर mod update नहीं हो सका, तो वहाँ ये
   दोनों commands दिखते हैं ताकि आप इन्हें खुद चलाएँ। पहले से खुले Claude Code sessions restart होने
-  तक पुराना mod ही रखते हैं।
+  तक पुराना mod ही रखते हैं; Settings उन जुड़े sessions को दिखाता है जो अब भी उसे चला रहे हैं।
 - update का download कोई quarantine attribute नहीं लगाता, इसलिए macOS को updated app का पहला launch
   वैसे block नहीं करना चाहिए जैसे पहले download को किया था; यह code से निकलता है और अभी असल में देखा
   नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं

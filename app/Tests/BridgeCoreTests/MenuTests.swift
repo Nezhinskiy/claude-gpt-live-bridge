@@ -76,7 +76,8 @@ struct MenuContentTests {
             isTarget: $0 == target)
         },
         minutesToday: 31.4, problem: problem?.sentence, unheard: unheard),
-      problem: problem, minutesThisCall: 4.2, context: context, conversation: lines)
+      problem: problem, minutesThisCall: 4.2, context: context, conversation: lines,
+      labelsOnAnOlderMod: [])
   }
 
   static func menu(

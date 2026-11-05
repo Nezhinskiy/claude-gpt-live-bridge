@@ -153,7 +153,7 @@ the copy at `/Applications/LiveBridge.app` updates; any other copy says so in Se
   step and opens it.
 - Afterwards Settings says which version it updated from. If the mod could not be updated, it
   shows those two commands for you to run. Claude Code sessions already open keep the old mod
-  until they restart.
+  until they restart; Settings lists the joined ones that still do.
 - The update's download sets no quarantine attribute, so macOS should not block the updated
   app's first launch as it blocked the first download; this follows from the code and has not
   yet been observed. The checks above are what stands in its place

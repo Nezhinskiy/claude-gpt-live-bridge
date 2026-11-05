@@ -28,6 +28,7 @@ const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will n
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
 const LATE_REPLY = 'LiveBridge: the reply said by voice came after the question was answered here; Claude did not get it.'
+const UNREAD_VERSION = 'LiveBridge: the mod could not read its version from its plugin.json; Settings will list this session as on the old mod.'
 const USAGE = 'Usage: /live on | off | target | status | context'
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
@@ -38,6 +39,8 @@ const band = atom({ plugin: 'livebridge', key: 'band' } as const, null)
 
 let link: BridgeLink | null = null
 let home = ''
+/** This mod's version, from its own plugin.json at load, for the app's Settings; undefined if unread. */
+let modVersion: string | undefined
 let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
 /** When a surface last asked for the band while this session was joined. */
@@ -103,7 +106,7 @@ function enqueue($: EngineInterface, work: () => Promise<void>): void {
  */
 async function readTitle($: EngineInterface, sessionId: string, isPoll = false): Promise<string | null> {
   const dir = `${home}/.claude/sessions`
-  const read = (name: string) => $.fs.read(`${dir}/${name}`).then(text => parseRecord(String(text)), () => null)
+  const read = (name: string) => readJSON($, `${dir}/${name}`)
   let records: unknown[] = recordFile === null ? [] : [await read(recordFile)]
   if (recordIndex(records, sessionId) < 0) {
     recordFile = null
@@ -119,12 +122,30 @@ async function readTitle($: EngineInterface, sessionId: string, isPoll = false):
   return titleFromRegistry(records, sessionId) ?? fallbackTitle(await $.session.cwd())
 }
 
+/** The JSON in the file at `path`, or null when it cannot be read or parsed. */
+function readJSON($: EngineInterface, path: string): Promise<unknown> {
+  return $.fs.read(path).then(text => parseRecord(String(text)), () => null)
+}
+
 function parseRecord(text: string): unknown {
   try {
     return JSON.parse(text)
   } catch {
     return null
   }
+}
+
+/**
+ * The version in this mod's plugin.json, read when the module loads, so it is the version of the
+ * code that runs; undefined, and said, when it cannot be read: Settings then lists the session
+ * as on the old mod.
+ */
+async function ownVersion($: EngineInterface): Promise<string | undefined> {
+  const manifest = await readJSON($, `${$.plugin.root}/.claude-plugin/plugin.json`)
+  const version = (manifest as { version?: unknown } | null)?.version
+  if (typeof version === 'string') return version
+  $.ui.log(UNREAD_VERSION)
+  return undefined
 }
 
 /** Joins; `byOwner` when the owner typed /live on (a reload's resume is not their decision). */
@@ -135,7 +156,7 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   const sessionId = await $.session.id()
   const title = (await readTitle($, sessionId)) ?? ''
   // Only the owner's own join brings back a session they removed.
-  const isJoined = (await link?.join({ sessionId, title, ...(byOwner && { owner: true }) })) === true
+  const isJoined = (await link?.join({ sessionId, title, modVersion, ...(byOwner && { owner: true }) })) === true
   await save($)
   await setBand($, {})
   redrawBand($)
@@ -403,6 +424,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await declareCommand($)
     home = (await $.env.get('HOME')) ?? ''
+    modVersion = await ownVersion($)
     link = new BridgeLink({
       fetch: (url, init) => $.http.fetch(url, init),
       run: argv => $.process.run(argv),

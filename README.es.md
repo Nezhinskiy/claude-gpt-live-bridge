@@ -164,7 +164,7 @@ Settings.
   detiene la llamada, pone la aplicación nueva en su sitio en un solo paso y la abre.
 - Después, Settings indica desde qué versión se actualizó. Si no se pudo actualizar el mod,
   muestra esos dos comandos para que los ejecutes tú. Las sesiones de Claude Code ya abiertas
-  conservan el mod antiguo hasta que se reinician.
+  conservan el mod antiguo hasta que se reinician; Settings lista las unidas que aún lo usan.
 - La descarga de la actualización no pone el atributo de cuarentena, así que macOS no debería
   bloquear el primer arranque de la aplicación actualizada como bloqueó la primera descarga; esto
   se deduce del código y aún no se ha observado. Las comprobaciones de arriba ocupan ese lugar
