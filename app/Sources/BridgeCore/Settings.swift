@@ -6,7 +6,8 @@ import os
 public struct Settings: Codable, Sendable, Equatable {
   /// The realtime voice; nil leaves the choice to codex.
   public var voice: String?
-  /// Ask a session for its context summary whenever it becomes the target.
+  /// Ask the target for its context summary whenever a line opens: a Start, a line reopened
+  /// after silence, the line after a target switch.
   public var autoContext: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
@@ -20,7 +21,7 @@ public struct Settings: Codable, Sendable, Equatable {
   public var checkUpdatesAutomatically: Bool?
 
   public init(
-    voice: String? = nil, autoContext: Bool = false, notifyResults: Bool = true,
+    voice: String? = nil, autoContext: Bool = true, notifyResults: Bool = true,
     confirmHandoffs: Bool = true, prompt: String = "", checkUpdatesAutomatically: Bool? = nil
   ) {
     self.voice = voice
@@ -35,7 +36,7 @@ public struct Settings: Codable, Sendable, Equatable {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     voice = try container.decodeIfPresent(String.self, forKey: .voice)
-    autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? false
+    autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? true
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     confirmHandoffs = try container.decodeIfPresent(Bool.self, forKey: .confirmHandoffs) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""

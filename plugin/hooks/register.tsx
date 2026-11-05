@@ -52,11 +52,15 @@ let note: string | null = null
 let recordFile: string | null = null
 let lastScan = -Infinity
 /**
- * The last summary the model wrote, while no turn has completed since: sending it again costs
- * no model call. Kept in memory only, as the transcript it summarises is the session's own.
+ * The last summary the model wrote, until a turn whose answer did not go to the voice completes,
+ * or `/clear`: sending it again costs no model call. Kept in memory only, as the transcript it
+ * summarises is the session's own.
  */
 let summary: string | null = null
-/** Counts completed main turns, so a summary written across one is not kept as current. */
+/**
+ * Counts completed main turns whose answer did not go to the voice, so a summary written across
+ * one is not kept as current: the voice already heard a voice turn's answer.
+ */
 let turnsDone = 0
 /** The summary on its way, which a second ask joins instead of asking the model again. */
 let sending: Promise<ContextOutcome> | null = null
@@ -308,7 +312,7 @@ async function writeAndPost($: EngineInterface, isFresh: boolean, send: number):
   }
 }
 
-/** The summary asked for by the app or the band, which have no reply line of their own. */
+/** The summary asked for by the app, which has no reply line of its own. */
 async function contextAsked($: EngineInterface): Promise<void> {
   // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
   if ((await sendContext($, false)) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
@@ -358,12 +362,11 @@ async function live($: EngineInterface, args: string): Promise<string> {
 }
 
 /**
- * The band's Start: a call started from a session talks to that session, and the voice gets the
- * session's summary as the call starts, without holding it up.
+ * The band's Start: a call started from a session talks to that session. The line the app opens
+ * asks for the session's context itself.
  */
-async function startHere($: EngineInterface): Promise<void> {
+async function startHere(): Promise<void> {
   await link?.target()
-  void contextAsked($)
   await link?.call('start')
 }
 
@@ -468,7 +471,7 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       const post = tracker.turnCompleted(e.turnId, e.answer, e.reason)
-      staleSummary()
+      if (!post) staleSummary()  // a voice turn's answer went to the voice: the summary still holds
       approval = null
       await save($)
       const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
@@ -528,7 +531,7 @@ export const register: Register = on => {
     drawnAt = await $.clock.now()
     if (e.props.hasSurvey) return next(e)
     return drawBand($, e, state, {
-      start: () => void startHere($),
+      start: () => void startHere(),
       stop: () => void link?.call('stop'),
       target: () => void link?.target(),
     })

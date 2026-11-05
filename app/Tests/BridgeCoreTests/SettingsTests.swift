@@ -9,8 +9,19 @@ struct SettingsStoreTests {
   @Test func defaultsUntilChanged() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     let store = SettingsStore(file: file)
-    #expect(store.current == Settings(voice: nil, autoContext: false, notifyResults: true))
+    #expect(store.current == Settings(voice: nil, autoContext: true, notifyResults: true))
     #expect(store.current.prompt == "")
+  }
+
+  /// A line the app opens loads the session's context unless the owner turned that off; a file
+  /// from before the setting, or without the key, reads it on.
+  @Test func loadContextAutomaticallyIsOnByDefault() throws {
+    #expect(Settings().autoContext)
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
+    #expect(SettingsStore(file: file).current.autoContext)
+    SettingsStore(file: file).update { $0.autoContext = false }
+    #expect(!SettingsStore(file: file).current.autoContext)
   }
 
   @Test func changesAreKeptAcrossRestarts() throws {
@@ -56,7 +67,7 @@ struct SettingsStoreTests {
     try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
     #expect(
       SettingsStore(file: file).current
-        == Settings(voice: "marin", autoContext: false, notifyResults: true))
+        == Settings(voice: "marin", autoContext: true, notifyResults: true))
     try Data(#"{"voice":"marin","model":"gpt-realtime-example","prompt":"Hi."}"#.utf8)
       .write(to: file)
     #expect(SettingsStore(file: file).current == Settings(voice: "marin", prompt: "Hi."))
