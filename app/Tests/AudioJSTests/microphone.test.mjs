@@ -201,16 +201,19 @@ test('anAcquisitionThatGotNothingAttachesNothing', async () => {
   assert.equal(watched.length, 0);
 });
 
-test('microphoneFailureNamesTheCause', () => {
+test('aRefusedMicrophoneIsReportedAsDenied', () => {
   assert.deepEqual(microphoneFailure(namedError('NotAllowedError')), { type: 'microphoneDenied' });
-  const reasons = ['NotFoundError', 'MicTimeoutError', 'NotReadableError'].map((name) => {
-    const failure = microphoneFailure(namedError(name));
-    assert.equal(failure.type, 'audioFailed');
-    assert.equal(typeof failure.reason, 'string');
-    return failure.reason;
-  });
-  assert.equal(new Set(reasons).size, 3, 'each cause has its own sentence');
-  assert.equal(microphoneFailure(undefined).reason, reasons[2], 'anything else reads as busy');
+});
+
+test('eachOtherCauseHasItsOwnSentence', () => {
+  const failures = ['NotFoundError', 'MicTimeoutError', 'NotReadableError'].map((name) =>
+    microphoneFailure(namedError(name)));
+  assert.ok(failures.every((failure) => failure.type === 'audioFailed' && typeof failure.reason === 'string'));
+  assert.equal(new Set(failures.map((failure) => failure.reason)).size, 3);
+});
+
+test('anUnknownFailureReadsAsABusyMicrophone', () => {
+  assert.equal(microphoneFailure(undefined).reason, microphoneFailure(namedError('NotReadableError')).reason);
 });
 
 test('theTimeoutSentenceNamesTheDeadline', () => {

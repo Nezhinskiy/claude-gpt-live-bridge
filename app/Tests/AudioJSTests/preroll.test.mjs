@@ -42,20 +42,29 @@ test('catchUpKeepsEverySpokenFrameAndLiveAudio', () => {
   }
 });
 
-test('nothingRecordedBeforeAResetReachesTheLine', () => {
+test('aResetEmptiesThePreroll', () => {
   const line = createLineAudio({ sampleRate: 48000 });
   line.write(frame(0.5));
   line.reset();
   line.hold(true);
-  assert.equal(line.pull(), null, 'the pre-roll was emptied');
+  assert.equal(line.pull(), null);
+});
 
-  const held = createLineAudio({ sampleRate: 48000 });
-  held.hold(true);
-  held.write(frame(0.5));
-  held.reset();
-  held.write(frame(0.25));
-  assert.equal(held.pull(), null, 'the queue was cleared and the hold ended');
-  held.hold(true);
-  assert.equal(held.pull()[0], 0.25, 'only what came after the reset reaches the line');
-  assert.equal(held.pull(), null);
+test('aResetClearsWhatWasQueuedForTheLine', () => {
+  const line = createLineAudio({ sampleRate: 48000 });
+  line.hold(true);
+  line.write(frame(0.5));
+  line.reset();
+  line.hold(true);
+  assert.equal(line.pull(), null);
+});
+
+test('aResetEndsTheHoldSoWhatFollowsFillsThePreroll', () => {
+  const line = createLineAudio({ sampleRate: 48000 });
+  line.hold(true);
+  line.reset();
+  line.write(frame(0.25));
+  assert.equal(line.pull(), null, 'nothing is queued');
+  line.hold(true);
+  assert.equal(line.pull()[0], 0.25, 'the next hold takes it from the pre-roll');
 });

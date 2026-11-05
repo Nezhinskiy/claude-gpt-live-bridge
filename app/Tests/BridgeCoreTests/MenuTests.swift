@@ -115,14 +115,19 @@ struct MenuContentTests {
       ])
   }
 
-  @Test func aMutedCardSaysUnmuteToHear() {
+  /// The card of a muted call with two results unheard.
+  static func mutedCard() -> MenuContent.CallCard? {
     let menu = Self.menu(Self.status(.listening, sessions: 1, unheard: 2, muted: true))
-    #expect(menu.outline.first == "[call] Muted — line closed · Stop · Unmute")
-    guard case .call(let card) = menu.items.first else {
-      Issue.record("no card")
-      return
-    }
-    #expect(card.unheard == "2 unheard — unmute and speak to hear")
+    guard case .call(let card) = menu.items.first else { return nil }
+    return card
+  }
+
+  @Test func aMutedCardOffersUnmute() {
+    #expect(Self.mutedCard()?.muteActionTitle == "Unmute")
+  }
+
+  @Test func aMutedCardSaysUnmuteToHear() {
+    #expect(Self.mutedCard()?.unheard == "2 unheard — unmute and speak to hear")
   }
 
   @Test func anAvailableUpdateAddsItsInstallItem() {

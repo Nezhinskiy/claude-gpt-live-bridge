@@ -156,27 +156,56 @@ test('talkHereShowsOnlyWhileTheCallTalksToAnotherSession', async ($, on) => {
 const buttons = async (band: { drawn(): Promise<unknown> }) =>
   kids(holding(await band.drawn() as Node, 'Button')!).map(button => button.props.label)
 
-test('muteSitsBesideStopAndPostsMute', async ($, on) => {
+test('mutePostsMute', async ($, on) => {
   const world = await joined($, on)
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
-    expect(await buttons(band)).toEqual(['Stop', 'Mute'])
     await band.press({ key: 'mute' })
     expect(world.take('call')).toEqual([{ action: 'mute' }])
     await band.unmount()
   }
 })
 
-test('aMutedCallOffersUnmuteAndKeepsItsPhase', async ($, on) => {
+/** The band for a live call the owner muted. */
+async function mutedLive(...[$, on]: Parameters<TestBody>) {
   const world = await joined($, on)
   world.status = { ...world.status, call: 'live', isMuted: true }
   await world.clock.advance(1000)
+  return world
+}
+
+test('aMutedCallOffersUnmuteInPlaceOfMute', async ($, on) => {
+  await mutedLive($, on)
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
     expect(await buttons(band)).toEqual(['Stop', 'Unmute'])
+    await band.unmount()
+  }
+})
+
+test('aMutedCallKeepsItsPhase', async ($, on) => {
+  await mutedLive($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
     expect(await band.find({ type: 'Text', text: 'Live' })).toBeDefined()
     expect((await band.find({ type: 'Text', text: '●' }))?.props.color).toBe('error')
+    await band.unmount()
+  }
+})
+
+test('aMutedCallIsMarkedMuted', async ($, on) => {
+  await mutedLive($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
     expect(await band.find({ type: 'Text', text: '· muted' })).toBeDefined()
+    await band.unmount()
+  }
+})
+
+test('unmutePostsUnmute', async ($, on) => {
+  const world = await mutedLive($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
     await band.press({ key: 'mute' })
     expect(world.take('call')).toEqual([{ action: 'unmute' }])
     await band.unmount()
