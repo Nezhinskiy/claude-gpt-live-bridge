@@ -42,11 +42,14 @@ flowchart LR
 **`BridgeCore`** (Swift library, no UI) holds every rule, so it is tested without codex, a
 microphone or Claude:
 
-- `CallMachine`: the call's phase — `off`, `listening` (microphone and local voice detection
-  only), `connecting`, `live` (a realtime session is open) — and the effects of each event. It
-  also keeps `isMuted`, orthogonal to the phase: while muted the microphone is released, speech
-  is ignored, and a result from Claude still opens the line. Mute closes no line; an open line
-  closes as it would without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs the effects in order.
+- `CallMachine`: the call's phase — `off`, `listening` (microphone and local voice detection only),
+  `connecting`, `live` (a realtime session is open) — and the effects of each event. It also keeps
+  `isMuted`, orthogonal to the phase: while muted the microphone is released, speech is ignored, and
+  a result from Claude still opens the line. Mute closes no line. It ends the owner's speech only if
+  they were speaking; then an open line's silence is counted from Mute (20 s), as if they had
+  stopped speaking when they pressed it, and a line that was already quiet closes when it would have
+  without Mute. A held result can still keep a line open up to 120 s, as without Mute. Stop and an
+  audio failure reset it. It is pure; `Bridge` runs the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
@@ -99,16 +102,15 @@ origin. A voice turn is one that has started: while a voice request waits for th
 to end, that turn's questions, and the notice of its permission prompts, stay in Claude Code. It
 draws a band above the prompt with the call's phase, the target, the unheard count and the
 buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries `isMuted`, with a
-`· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own. A surface
-that has drawn no band for 3 s while the session is joined is asked for it again, and `/live on`
-in a joined session asks every surface for it. Start
-makes the session the target and starts the call; the line the app opens then asks the target
-for its summary (with Load context automatically on), which the mod writes (none for a session
-with no prompt yet; the last one again, with no model call, until a turn whose answer the voice
-did not get completes, or `/clear`), with a short note in the band while it goes. Talk here shows only while
-the call talks to another session, and moves it here. When the socket does not answer, it opens
-`/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
-to `open -g -b <bundle id>`.
+`· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own.
+A surface that has drawn no band for 3 s while the session is joined is asked for it again, and
+`/live on` in a joined session asks every surface for it. Start makes the session the target and
+starts the call; the line the app opens then asks the target for its summary (with Load context
+automatically on), which the mod writes (none for a session with no prompt yet; the last one again,
+with no model call, until a turn whose answer the voice did not get completes, or `/clear`), with a
+short note in the band while it goes. Talk here shows only while the call talks to another session,
+and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
+both install routes put it, with `open -g`, and falls back to `open -g -b <bundle id>`.
 
 ## The wire
 

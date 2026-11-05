@@ -228,13 +228,13 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   for each request the voice handed to Claude), the minutes, **Star LiveBridge on GitHub**
   (opens the repository's page), **Settings…** and **Quit LiveBridge**.
 - **Mute** (beside **Stop**, in the band and in the menu's call card; **Unmute** while muted)
-  releases your microphone while the call goes on: an answer from Claude still opens the line
-  and the voice says it. The band keeps the phase and adds `· muted`; the menu says "Muted —
-  line closed" while no line is open. Mute does not close a line: one that is open closes
-  as it would without Mute, and is billed like any silence, so Mute does not save
-  realtime minutes. **Unmute** takes the microphone again, and the call ends with the reason if
-  it cannot (denied, busy, missing). **Stop** ends the call and the mute; the next **Start**
-  begins unmuted. Mute is not a lock: any process running as you can unmute
+  releases your microphone while the call goes on: an answer from Claude still opens the line and
+  the voice says it. The band keeps the phase and adds `· muted`; the menu says "Muted — line
+  closed" while no line is open. Mute does not close a line: an open line closes as if you had
+  stopped speaking when you pressed Mute, and is billed like any silence, so Mute does not save
+  realtime minutes. **Unmute** takes the microphone again, and the call ends with the reason if it
+  cannot (denied, busy, missing). **Stop** ends the call and the mute; the next **Start** begins
+  unmuted. Mute is not a lock: any process running as you can unmute
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **New conversation…** erases the target's conversation and its loaded context, and a
   session's × removes it and erases its own; both ask first. The voice starts afresh from the

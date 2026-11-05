@@ -13,8 +13,9 @@ All notable changes to this project are listed here. The format follows
 - **Mute** beside Stop, in the band above the prompt and in the menu's call card (**Unmute**
   while muted), releases the microphone while the call goes on: an answer from Claude still opens
   the line and the voice says it. While muted LiveBridge holds no microphone, and macOS's
-  microphone indicator shows it. Mute does not close an open line, which closes as it would
-  without Mute, so it does not save realtime minutes, and it is not a control against
+  microphone indicator shows it. Mute does not close an open line: it closes as if you had
+  stopped speaking when you pressed Mute (the usual silence, counted from Mute if you were
+  speaking), so Mute does not save realtime minutes, and it is not a control against
   other processes running as you ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 
 ### Changed

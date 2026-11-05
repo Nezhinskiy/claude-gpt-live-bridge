@@ -25,8 +25,10 @@ on, so an answer from Claude still opens the line and is said.
   too, and the line opens empty.
 - The call goes on: an answer, question or approval notice from the target still opens the closed
   line and the voice says it (as since 0.3.0). A result held while the owner was speaking is said
-  after the usual grace. A line that is open when the owner mutes closes as it would
-  without Mute.
+  after the usual grace. An open line closes as if the owner had stopped speaking when
+  they pressed Mute: if they were speaking, its silence (20 s) is counted from Mute; if the line was
+  already quiet, Mute does not change when it closes. A held handoff result can still keep a line
+  open up to 120 s, as without Mute. Mute never saves realtime minutes.
 - **Unmute** takes the microphone again and waits for it, as Start does, up to the page's 10 s
   microphone deadline; until it is back, the menu, and the band that pressed it, may still show
   Muted. Speech then opens the line as before. A failed Unmute ends the call with its reason.
@@ -65,13 +67,14 @@ on, so an answer from Claude still opens the line and is said.
 
 ### App
 
-- `CallMachine` keeps `isMuted`, orthogonal to the phase. `.mute` while the call is on and
-  unmuted sets it and returns `.muteMicrophone` followed by what `.speechEnded` returns: speech
-  ends at Mute, so on a live line the silence timer re-arms at 20 s, and a result held while the
-  owner spoke gets its grace. `.unmute` while muted clears it and returns `.unmuteMicrophone`. A
-  second Mute or Unmute does nothing, and both do nothing while the call is off. `.speechStarted`
-  while muted is ignored in every phase. Stop and an audio failure reset the machine, the mute
-  with it.
+- `CallMachine` keeps `isMuted`, orthogonal to the phase. `.mute` while the call is on and unmuted
+  sets it and returns `.muteMicrophone`; if the owner was speaking, it is followed by what
+  `.speechEnded` returns: speech ends at Mute, so on a live line the silence timer re-arms at 20 s,
+  and a result held while the owner spoke gets its grace. If they were not speaking, nothing follows
+  and the line's timers are unchanged. `.unmute` while muted clears it and returns
+  `.unmuteMicrophone`. A second Mute or Unmute does nothing, and both do nothing while the call is
+  off. `.speechStarted` while muted is ignored in every phase. Stop and an audio failure reset the
+  machine, the mute with it.
 - `Bridge` performs the two actions as call events, runs the two effects on `AudioSide`'s
   `muteMicrophone()` and `unmuteMicrophone()`, and its status carries `isMuted`.
 - `AudioHost`: `muteMicrophone()` calls `LB.mute()`; `unmuteMicrophone()` calls `LB.unmute()` and,
