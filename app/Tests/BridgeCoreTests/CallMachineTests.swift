@@ -85,9 +85,11 @@ struct CallMachineTests {
     row(
       "speechWhileMutedOnAConnectingLineDoesNotPinIt", connecting + [.mute, .speechStarted],
       .connected, .live, [.flushPreroll, arm, .problem(nil)]),
+    row("muteOnAQuietLiveLineLeavesItsSilenceRunning", live, .mute, .live, [.muteMicrophone]),
     row(
-      "muteOnALineAResultOpenedKeepsTheFirstWordWait", [.start, opening(result), .connected],
-      .mute, .live, [.muteMicrophone, firstWord], pending: [result]),
+      "muteOnALineAResultOpenedDoesNotExtendTheFirstWordWait",
+      [.start, opening(result), .connected], .mute, .live, [.muteMicrophone],
+      pending: [result]),
     row("aSecondMuteDoesNothing", live + [.mute], .mute, .live, []),
     row(
       "unmuteTakesTheMicrophoneAgain", [.start, .mute], .unmute, .listening,

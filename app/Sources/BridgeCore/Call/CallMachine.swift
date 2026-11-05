@@ -163,7 +163,8 @@ public struct CallMachine: Sendable {
     case (_, .mute):
       guard !isMuted else { return [] }
       isMuted = true
-      return [.muteMicrophone] + handle(.speechEnded)
+      // speech ends at Mute; a quiet line keeps the silence it was counting
+      return [.muteMicrophone] + (isSoundOn ? handle(.speechEnded) : [])
     case (_, .unmute):
       guard isMuted else { return [] }
       isMuted = false
