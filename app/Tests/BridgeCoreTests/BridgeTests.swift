@@ -637,6 +637,15 @@ struct BridgeTests {
     #expect(await eventually { await bridge.status.call == .listening })
   }
 
+  /// The line an answer opens is given that answer to say, not as context.
+  @Test func anOpenedLineIsGivenTheAnswerToSay() async throws {
+    try await closedAfterARequest()
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.spoken.count == 1 })
+    #expect(await voice.spoken.first?.hasPrefix("[RESULT]") == true)
+    #expect(await !voice.added.contains { $0.hasPrefix("[RESULT]") })
+  }
+
   /// The answer opens the line without holding the mod's request while it connects.
   @Test func anOpeningAnswerDoesNotWaitForTheConnect() async throws {
     try await closedAfterARequest()

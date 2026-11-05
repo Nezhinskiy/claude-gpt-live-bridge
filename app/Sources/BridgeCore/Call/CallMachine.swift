@@ -90,10 +90,9 @@ public struct CallMachine: Sendable {
 
   private struct Unheard: Sendable {
     let line: VoiceLine
-    /// An awaited result that arrived while someone spoke; said once everyone is silent.
+    /// To be said (`speak`) once everyone is silent: an awaited result that arrived while
+    /// someone spoke, or the line that opened the closed line.
     var isHeld = false
-    /// The line opened the closed line: the new line is to say it at once.
-    var opensLine = false
   }
 
   /// The results the voice has not said yet, oldest first: waiting for the owner to speak, or
@@ -156,7 +155,7 @@ public struct CallMachine: Sendable {
       phase = .connecting
       return [.openRealtime]
     case (.listening, .deliver(let result, let opensLine)):
-      unheard.append(Unheard(line: result, opensLine: opensLine))
+      unheard.append(Unheard(line: result, isHeld: opensLine))
       guard opensLine else { return [.chime] }
       phase = .connecting
       isOpeningForResult = true
@@ -166,13 +165,20 @@ public struct CallMachine: Sendable {
       return []
     case (.listening, .handedOff(.some)), (.connecting, .handedOff(.some)):
       return [.confirmHandoff]  // queued all the same; no line waits for it
+    case (.connecting, .speechStarted):  // the owner may speak while an answer's line connects
+      isSoundOn = true
+      return []
     case (.connecting, .connected):
       phase = .live
       isOpeningForResult = false
-      // What opened the line is said at once (appendSpeech); as context the voice took 5-8 s to
-      // take it up, or never did (ADR 0001 (n)). The rest is context, as on any line.
-      let lines = unheard.map { $0.opensLine ? CallEffect.speak($0.line) : .addContext($0.line) }
-      for index in unheard.indices { unheard[index].opensLine = false }
+      // What opened the line is given to say (appendSpeech), unless the owner is speaking: then
+      // it is held and said after the grace, as on a live line. As context the voice was slow
+      // to take it up, or never did (ADR 0001 (n)). The rest is context, as on any line.
+      let isQuiet = !isSoundOn
+      let lines: [CallEffect] = unheard.compactMap {
+        !$0.isHeld ? .addContext($0.line) : isQuiet ? .speak($0.line) : nil
+      }
+      if isQuiet { unheard = unheard.map { Unheard(line: $0.line) } }
       return [.flushPreroll] + lines + [armSilence(), .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
