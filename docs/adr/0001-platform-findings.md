@@ -238,6 +238,23 @@ opens the closed line, without a nudge, and the chime stays the fallback. A nudg
 answer prompt but needs wording that is no request ("Hmm." did not reach a result, so it is
 untested) and a filter that keeps it out of the conversation and the menu.
 
+Measured again on 2026-11-05 with the line given as speakable text (`appendSpeech`, PR #34 at
+`58c729a`), the same probe otherwise: `resultWindowSeconds` set to 0 in the working tree only, no
+nudge. 6 runs, 5 of them reached a result; the connect is the mod's `/v1/answer` to `live`.
+
+| Run | Connect | `live` to the end of the first segment | Said |
+|---|---|---|---|
+| 1 | 1.7 s | 6.9 s | yes |
+| 2 | 2.0 s | 8.6 s | yes |
+| 4 | 3.1 s | — | no: silent, closed after 20 s |
+| 5 | 1.3 s | 7.0 s | yes |
+| 6 | 1.3 s | 5.8 s | yes |
+| 3 | — | — | not reached: the voice said "Mm-hmm." and handed nothing off |
+
+`appendSpeech` made the voice no faster (5.8 to 8.6 s against 5.4 to 7.7 s as context) and no more
+reliable (silent in 1 of 5 against 1 of 4); from the answer to the end of the first segment the
+owner waited 7.1 to 10.6 s. These runs kept the line open 287 s, about $0.24.
+
 ### Claude Code mod API
 
 **(e) Session title.** Observed against the desktop app's own session list: for each of 5
@@ -425,11 +442,12 @@ Claude Code, as before. The bridge decides this from the registry's target and t
 passes it with the delivery; the call machine keeps no copy of either. A line from a session that is
 not the target only chimes, and the owner switches to it; so does a later update. The new session is
 seeded as usual, starts without the pre-roll, as nobody spoke, and gets the line to say with
-`appendSpeech`, held until the owner is silent if they speak while it connects (amended
-2026-11-05 at the owner's request to shorten the 7 to 15 s the owner waited, after item (n)
-found the voice slow to take up the line as context; not yet measured); any other unheard line
-goes as context. No synthetic utterance is sent. The connect does not hold up the mod's request that brought the line,
-and a question or approval settled at the keyboard while its line still connects closes it. When the
-opened line closes with the line still unsaid (item (n)), it chimes and waits, as decided on
-2026-11-01; so does a connect that fails. The result window is unchanged. Each opening is billed
-like any open line: the connect, the voice's words and the 20 s of silence before it closes.
+`appendSpeech`, held until the owner is silent if they speak while it connects (amended 2026-11-05
+at the owner's request to shorten the 7 to 15 s the owner waited, after item (n) found the voice
+slow to take up the line as context; item (n) then measured it no faster); any other unheard line
+goes as context. No synthetic utterance is sent. The connect does not hold up the mod's request that
+brought the line, and a question or approval settled at the keyboard while its line still connects
+closes it. When the opened line closes with the line still unsaid (item (n)), it chimes and waits,
+as decided on 2026-11-01; so does a connect that fails. The result window is unchanged. Each opening
+is billed like any open line: the connect, the voice's words and the 20 s of silence before it
+closes.

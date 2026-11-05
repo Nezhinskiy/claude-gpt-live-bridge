@@ -9,9 +9,10 @@ All notable changes to this project are listed here. The format follows
 ### Fixed
 
 - A voice line that Claude's answer opens is given that answer as speakable text (`appendSpeech`,
-  the call used for a result the line waits for), not as context, which the voice took 5 to 8
-  seconds to take up or left unsaid. If you speak while the line connects, the answer waits until
-  you stop.
+  the call used for a result the line waits for), not as context. Measured, the voice was no
+  faster with it (it finished its first words 6 to 9 seconds after the line connected) and still
+  stayed silent in 1 of 5 runs ([measurement](docs/adr/0001-platform-findings.md)). If you speak
+  while the line connects, the answer waits until you stop.
 
 ## [0.3.0]
 
