@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A voice line that Claude's answer opens is given that answer to say at once, not as context the
+  voice took 5 to 15 seconds to take up, or left unsaid.
+
 ## [0.3.0]
 
 ### Added

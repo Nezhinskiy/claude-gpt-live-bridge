@@ -85,9 +85,15 @@ struct CallMachineTests {
     row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
       [.openRealtimeForResult], pending: [result]),
+    // To be said at once (appendSpeech), not left for the voice to take up (appendText):
+    // given as context, the voice took 5-8 s to start, or said nothing (ADR 0001 (n)).
     row(
-      "theOpenedLineGetsItAsContext", [.start, opening(result)], .connected, .live,
-      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
+      "theOpenedLineSaysWhatOpenedIt", [.start, opening(result)], .connected, .live,
+      [.flushPreroll, .speak(result), arm, .problem(nil)], pending: [result]),
+    row(
+      "theOpenedLineGetsOtherUnheardLinesAsContext", [.start, deliver(a), opening(result)],
+      .connected, .live,
+      [.flushPreroll, .addContext(a), .speak(result), arm, .problem(nil)], pending: [a, result]),
     row(
       "anOpenedLineLeftSilentChimes", [.start, opening(result), .connected], .silenceElapsed,
       .listening, [.closeRealtime, .chime], pending: [result]),
