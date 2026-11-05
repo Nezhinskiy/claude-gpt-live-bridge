@@ -387,7 +387,7 @@ sesión.
   las pruebas habló en pocos segundos. Si no lo hace, el resultado queda sin escuchar: la voz lo
   dice tras tus siguientes palabras, o suena un timbre cuando se cierra la línea.
 - Cuando la respuesta de Claude vuelve a abrir la línea, a veces la voz se queda callada
-  ([medido](docs/adr/0001-platform-findings.md)). La línea se cierra entonces a los 20 segundos y
+  ([medido](docs/adr/0001-platform-findings.md)). La línea se cierra entonces a los 5 segundos y
   la respuesta suena con un timbre y queda en espera, como abajo.
 - Cuando tus siguientes palabras reabren la línea, a veces la voz responde solo a ellas y no dice el
   resultado en espera. El resultado no se pierde: sigue esperando, suena un timbre y publica una
