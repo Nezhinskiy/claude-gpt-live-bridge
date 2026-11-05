@@ -1,0 +1,5 @@
+{
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "state": "approval",
+  "text": "I'm going to delete build/ and run the tests again."
+}

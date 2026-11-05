@@ -177,21 +177,22 @@ claude plugin uninstall livebridge@livebridge
 | `/live status`（或直接 `/live`） | 一行信息：通话、目标、未听取的结果、今日分钟数。 |
 | `/live context` | 向语音发送由该会话的模型撰写的、关于此会话的新摘要。 |
 
-命令是 `/live` 而不是 `/voice`，因为 `/voice` 是 Claude Code 自带的语音模式。会话成为目标时是否同时发送其摘要，并不是一个命令：
+命令是 `/live` 而不是 `/voice`，因为 `/voice` 是 Claude Code 自带的语音模式。线路打开时是否同时加载该会话的摘要，并不是一个命令：
 它是对所有会话生效的一项设置，位于 LiveBridge 的[设置](#设置)窗口中。
 
 ### 状态条与菜单
 
 在提示输入框上方的状态条或菜单栏菜单中点击 **Start**，然后开始说话。
 
-- **状态条上的 Start** 会让它所属的会话成为目标，开始通话，并把该会话的摘要发送给语音
-  （[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
+- **状态条上的 Start** 会让它所属的会话成为目标并开始通话；**Load context automatically when a line opens**开启时，它打开的线路会加载
+  该会话的摘要（[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
   状态条，`/live on` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
   **Load context**、LiveBridge 保存的目标会话 **Conversation**、分钟数、
   **Settings…** 和 **Quit LiveBridge**。
 - **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。
-  语音从线路下次打开时重新开始，而在被移除的会话中执行 `/live on` 可让它重新加入。
+  语音从线路下次打开时重新开始，除非 **Load context automatically when a line opens** 已开启：那条线路会再次加载同一会话记录的摘要，
+  因此请先关闭该设置，或在该会话中执行 `/clear`。在被移除的会话中执行 `/live on` 可让它重新加入。
 
 ### 设置
 
@@ -200,7 +201,7 @@ claude plugin uninstall livebridge@livebridge
 - **Voice**：你的 codex 提供的实时语音之一（窗口打开时由 codex 列出），或 **Codex default**。从线路下次打开起生效。
 - **Prompt**（默认为空）：你给语音的自定义指令，例如“用西班牙语和我说话”，最多 2,000 个字符。它们会追加在 LiveBridge
   为语音设定的规则之后；两者冲突时以 LiveBridge 的规则为准。从线路下次打开起生效。
-- **Load a session's context automatically when it becomes the target**（默认关闭）：对所有会话生效的一项设置，由应用保存。
+- **Load context automatically when a line opens**（默认开启）：应用打开的每一条线路（一次 Start、静默后重新打开的线路、切换目标后的线路）都会向目标索取摘要，且不等待它；对所有会话生效的一项设置，由应用保存。
 - **Play a sound when a request is queued for Claude**（默认开启）：语音每转交一个请求给 Claude，就播放一声短音（[原因](#已知限制)）。
 - **Notify when a result is waiting**（默认开启）：当线路关闭期间有结果在等待时，除提示音外，还会弹出一条 macOS 通知，其中写明会话名称
   （“Alpha has a new result — speak to hear it”），但绝不包含结果本身。点击通知会打开菜单栏菜单。
@@ -241,7 +242,7 @@ LiveBridge 没有遥测，也不监听任何网络端口；模组通过一个只
 - 语音的指令：LiveBridge 自己的规则，其后是你在设置中写下的 **Prompt**（如果有）；
 - 目标会话最近的对话（最多最后 24 行），用于在新的实时会话中继续对话；
 - 目标会话中仍未完成的请求，以其单行简述的形式；
-- 每条结果、问题、更新和审批通知，各为一行，最多 2,000 个字符，已去除代码块和表格。Claude 在一轮中途提出的问题还会附带 Claude 提问前刚写下的内容。更新是指后台任务通知所触发的后续一轮中 Claude 的答复，
+- 每条结果、问题、更新和审批通知，各为一行，最多 2,000 个字符，已去除代码块和表格。Claude 在一轮中途提出的问题，以及 Claude 主循环（而非子代理）请求权限时的审批通知，还会附带 Claude 在此之前刚写下的内容。更新是指后台任务通知所触发的后续一轮中 Claude 的答复，
   在一次语音请求之后最长 10 分钟内，且持续到会话中开始任何其他一轮为止；
 - 目标会话的上下文摘要，为一行，最多 1,500 个字符。它在加载时保存，并且只要该会话是目标，每次线路打开时都会发送，
   Stop 和 Start 之间以及应用重启之后也是如此。菜单的 Conversation 子菜单会原样显示这一行的发送内容；

@@ -101,8 +101,8 @@ plugin test`. Without `claude` the script says that half was not checked and sti
 installs Claude Code (a pinned version) on the Xcode 27 macOS runner and runs the same script,
 which fails there if `claude` is missing.
 
-The end-to-end smoke test drives the real codex and opens one or two short realtime voice
-sessions on your ChatGPT plan, about a minute of voice:
+The end-to-end smoke test drives the real codex and spends your ChatGPT plan's realtime voice;
+the header of `scripts/smoke.sh` says how much and what a pass is:
 
 ```sh
 scripts/smoke.sh

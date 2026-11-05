@@ -223,23 +223,26 @@ En la sesión de Claude Code con la que quieras hablar:
 | `/live context` | Envía a la voz un nuevo resumen de esta sesión, escrito por el modelo de la sesión. |
 
 El comando es `/live` y no `/voice` porque `/voice` es el modo de voz propio de Claude Code. Que se
-envíe también el resumen de una sesión cada vez que pasa a ser el destino no es un comando: es un
+cargue también el resumen de una sesión cada vez que se abre una línea no es un comando: es un
 único ajuste para todas las sesiones, en la ventana de [Ajustes](#ajustes) de LiveBridge.
 
 ### La banda y el menú
 
 Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra de menús, y habla.
 
-- **El Start de la banda** convierte su sesión en el destino, inicia la llamada y envía a la voz el
-  resumen de la sesión ([detalles](docs/architecture/overview.md#components)). Mientras la llamada
-  habla con otra sesión, la banda muestra **Talk here**. Si la banda
-  no aparece en una sesión unida, `/live on` la recupera.
+- **El Start de la banda** convierte su sesión en el destino e inicia la llamada; con
+  **Load context automatically when a line opens** activado, la línea que abre carga el resumen de la sesión
+  ([detalles](docs/architecture/overview.md#components)). Mientras la llamada habla con otra
+  sesión, la banda muestra **Talk here**. Si la banda no aparece en una sesión unida,
+  `/live on` la recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
   conserva LiveBridge, los minutos, **Settings…** y **Quit LiveBridge**.
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
-  que se abre la línea, y `/live on` en una sesión eliminada la une de nuevo.
+  que se abre la línea, salvo con **Load context automatically when a line opens** activado: esa
+  línea vuelve a cargar un resumen de la misma transcripción de la sesión, así que desactiva el
+  ajuste o haz `/clear` en la sesión antes. `/live on` en una sesión eliminada la une de nuevo.
 
 ### Ajustes
 
@@ -250,8 +253,10 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
   hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
-- **Load a session's context automatically when it becomes the target** (desactivado por defecto):
-  un único ajuste para todas las sesiones, que guarda la aplicación.
+- **Load context automatically when a line opens** (activado por defecto): cada
+  línea que abre la aplicación (un Start, una línea reabierta tras el silencio, la línea tras
+  cambiar de destino) pide el resumen al destino y no lo espera; un único ajuste para todas las
+  sesiones, que guarda la aplicación.
 - **Play a sound when a request is queued for Claude** (activado por defecto): un sonido breve por
   cada petición que la voz pasa a Claude ([por qué](#limitaciones-conocidas)).
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
@@ -323,10 +328,12 @@ la sesión en tiempo real de codex:
   en una nueva sesión en tiempo real;
 - las peticiones de la sesión de destino aún abiertas, como sus resúmenes de una línea;
 - cada resultado, pregunta, actualización y aviso de aprobación, como una línea de como máximo 2000
-  caracteres, sin bloques de código ni tablas. Una pregunta que Claude hace a mitad de turno lleva
-  también lo que Claude escribió justo antes de hacerla. Una actualización es la respuesta de Claude en un
-  turno posterior iniciado por la notificación de una tarea en segundo plano, durante hasta 10
-  minutos después de una petición por voz y hasta que empiece cualquier otro turno en la sesión;
+  caracteres, sin bloques de código ni tablas. Una pregunta que Claude hace a mitad de turno, y el
+  aviso de aprobación de un permiso que pide el bucle principal de Claude (no un subagente),
+  llevan también lo que Claude escribió justo antes de pedirlo. Una actualización es la respuesta
+  de Claude en un turno posterior iniciado por la notificación de una tarea en segundo plano,
+  durante hasta 10 minutos después de una petición por voz y hasta que empiece cualquier otro
+  turno en la sesión;
 - el resumen de contexto de la sesión de destino, como una línea de como máximo 1500 caracteres. Se
   guarda cuando se carga y se envía cada vez que se abre la línea mientras esa sesión es el
   destino, a través de Stop y Start y de los reinicios de la aplicación. El submenú Conversation del

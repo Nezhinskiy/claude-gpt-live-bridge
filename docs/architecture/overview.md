@@ -97,9 +97,10 @@ draws a band above the prompt with the call's phase, the target, the unheard cou
 buttons Start/Stop and Talk here, with the problem sentence on a row of its own. A surface
 that has drawn no band for 3 s while the session is joined is asked for it again, and `/live on`
 in a joined session asks every surface for it. Start
-makes the session the target, starts the call and sends the session's summary (none for a
-session with no prompt yet; the last one again, with no model call, while no turn has completed
-since it was written), with a short note in the band while it goes. Talk here shows only while
+makes the session the target and starts the call; the line the app opens then asks the target
+for its summary (with Load context automatically on), which the mod writes (none for a session
+with no prompt yet; the last one again, with no model call, until a turn whose answer the voice
+did not get completes, or `/clear`), with a short note in the band while it goes. Talk here shows only while
 the call talks to another session, and moves it here. When the socket does not answer, it opens
 `/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
 to `open -g -b <bundle id>`.
@@ -119,7 +120,7 @@ that both test suites parse.
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
-| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn |
+| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn (none: a permission prompt), `text` what Claude wrote in the step that pauses |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
@@ -187,7 +188,10 @@ sequenceDiagram
 The realtime session is billed while open, so silence closes it. Voice detection keeps running
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
-target's conversation.
+target's conversation. Every line the app opens, a reopened one included, also asks the target for
+its context when **Load context automatically** is on (the default); the line does not wait for
+it, and a summary that comes while the line connects is added once it is connected, unless the
+line was seeded with the same one.
 
 ```mermaid
 sequenceDiagram
@@ -308,7 +312,16 @@ sequenceDiagram
 ### Approval notice
 
 The bridge never answers a permission prompt. When a voice turn hits one, the voice says that
-Claude is waiting; the owner answers in Claude Code.
+Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and
+re-run", and that only the owner can answer it, in Claude Code.
+
+Both pauses of a voice turn, this prompt and Claude's question below, carry the text of the
+main loop's model step that pauses: the engine's turn end carries only the turn's last text, and
+a pause only itself, so that text would reach the voice no other way. The mod keeps it as the
+step streams, since the engine may run a tool before its step ends, and takes it once: a second
+pause in the same step goes without it, and so does a subagent's prompt. It goes as the
+activity's `text`, and the app puts it after the notice or the question's options, with code and
+tables removed, so the cut of a long line takes the text first.
 
 ```mermaid
 sequenceDiagram
@@ -318,8 +331,8 @@ sequenceDiagram
   participant Mod
   participant Claude
   Claude->>Mod: classic.PermissionRequest (during a voice turn)
-  Mod->>Bridge: POST /v1/activity approval
-  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval"
+  Mod->>Bridge: POST /v1/activity approval (and the step's text)
+  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before asking: …"
   Codex-->>Owner: says so (a closed line opens for it, as for a result)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
@@ -330,10 +343,8 @@ sequenceDiagram
 
 When Claude asks the owner a question during a voice turn (the AskUserQuestion dialog), the
 dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
-line. What Claude wrote in the same model step follows the options in that line: the engine's
-turn end carries only the turn's last text, so it would reach the voice no other way, and after
-the options the app's cut of a long line takes it before any choice. The voice explains it and talks it over from what it knows, without handoffs; the owner's
-next handoff to that session is the reply. It goes out at once as `reply` work, beside the
+line, followed by the step's text (above). The voice explains it and talks it over from what it
+knows, without handoffs; the owner's next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
 dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
 has not polled by then goes as a request of its own.

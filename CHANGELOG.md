@@ -15,6 +15,13 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
+- **Load context automatically** is now on by default and means "when a line opens": every line
+  the app opens (a Start, a line reopened after silence, the line after a target switch) asks the
+  target for its summary, and the line does not wait for it. The band's Start no longer asks for
+  it separately. The mod reuses its summary until a turn the voice did not hear completes (a turn
+  you typed, say) or you `/clear`, so a line reopened after a voice request costs no new summary.
+- The voice's instructions say that "the chat" is the Claude Code session, and that a question
+  about it that the voice's lines do not cover is handed off to Claude.
 - The in-app update attaches and ejects the release image with `diskutil image attach` and
   `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
   a new folder of its own.
@@ -34,6 +41,12 @@ All notable changes to this project are listed here. The format follows
 - When Claude asks a question during a voice request, the voice also gets what Claude wrote just
   before the question, in the same line after the options, with code blocks and tables removed
   as from a result.
+- When a voice request stops at a permission prompt, the approval notice also carries what Claude
+  wrote in the step that asks for it, such as "I'm going to delete build/ and re-run", with code
+  blocks and tables removed. The voice only reports the prompt and tells you to answer it in
+  Claude Code. Both pauses now take the step's text as it streams, so a tool that starts before
+  its step ends still gets that step's text, and a long text is cut so the question still reaches
+  the app.
 
 ## [0.2.0]
 

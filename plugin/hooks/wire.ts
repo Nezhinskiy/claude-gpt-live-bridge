@@ -48,9 +48,12 @@ export type AnswerBody =
 export type SessionActivity = 'idle' | 'working' | 'approval';
 /**
  * `question`, with `approval`: Claude asked the owner this in a voice turn and waits for the
- * reply, which the voice may hand over as a `reply` work item.
+ * reply, which the voice may hand over as a `reply` work item; without it, a permission prompt
+ * waits, which the voice only reports. `text`, with `approval`: what Claude wrote in the step
+ * that pauses.
  */
-export type ActivityBody = { sessionId: SessionId; state: SessionActivity; question?: string };
+export type ActivityBody =
+  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
 export type CallAction = 'start' | 'stop';

@@ -35,8 +35,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
       await hold
     }
   }
-  // The model beneath the mod: each step it is asked for answers `world.stepText` as its text.
+  // The model beneath the mod: each step it is asked for streams `world.stepText` as its text.
   on('turn.step', async function* (_, e) {
+    if (world.stepText !== '') yield { kind: 'text', index: 0, text: world.stepText }
     return { turnId: e.turnId, index: e.index, answer: world.stepText, toolUses: [], stopReason: 'end_turn', usage: null }
   })
   on('store.get', (_, e) => ({ value: world.stored.get(e.key) }))

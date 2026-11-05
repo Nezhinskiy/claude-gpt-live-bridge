@@ -30,6 +30,15 @@ public enum AnswerShaper {
       .joined(separator: " ")
   }
 
+  /// `head`, a question or a notice, then what Claude wrote in the step that paused on it, its
+  /// code and tables removed. After `head`, so the cut of a long line takes the text, never it.
+  public static func paused(_ head: String, wrote text: String?) -> String {
+    let said = prose(text ?? "")
+    if said.allSatisfy(\.isWhitespace) { return head }
+    let end = head.last.map { ".!?".contains($0) } == true ? "" : "."
+    return "\(head)\(end) Claude wrote just before asking: \(said)"
+  }
+
   /// `[TAG] label: body` as exactly one line of at most `limit` characters, the label cut to
   /// `maxLabel` and the body redacted,
   /// so a session's text cannot pose as another delivery: every opening or closing bracket of
