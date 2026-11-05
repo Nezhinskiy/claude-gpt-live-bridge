@@ -309,10 +309,11 @@ session के ज़रिए OpenAI को यह जाता है:
   जारी रखा जा सके;
 - target session के अभी खुले अनुरोध, उनके एक-पंक्ति के सार (brief) के रूप में;
 - हर नतीजा, सवाल, update और approval notice, अधिकतम 2,000 अक्षरों की एक पंक्ति के रूप में, code
-  blocks और tables हटाकर। Turn के बीच Claude का पूछा सवाल वह text भी साथ लाता है जो Claude ने
-  उसे पूछने से ठीक पहले लिखा। Update, Claude का जवाब है जो किसी background task के notification से शुरू हुए
-  बाद के turn में आता है, voice अनुरोध के बाद 10 मिनट तक और तब तक जब तक session में कोई दूसरा turn
-  शुरू न हो;
+  blocks और tables हटाकर। Turn के बीच Claude का पूछा सवाल, और Claude के main loop (subagent
+  नहीं) की permission prompt का approval notice, वह text भी साथ लाते हैं जो Claude ने पूछने से
+  ठीक पहले लिखा। Update, Claude का जवाब है जो किसी background task के notification से शुरू हुए
+  बाद के turn में आता है, voice अनुरोध के बाद 10 मिनट तक और तब तक जब तक session में कोई दूसरा
+  turn शुरू न हो;
 - target session का context सारांश, अधिकतम 1,500 अक्षरों की एक पंक्ति के रूप में। यह load होने पर सेव
   होता है और जब भी line खुलती है और वह session target होता है, तब भेजा जाता है, Stop और Start के
   पार और app के restart के बाद भी। Menu का Conversation submenu उस पंक्ति को ठीक वैसी ही दिखाता है

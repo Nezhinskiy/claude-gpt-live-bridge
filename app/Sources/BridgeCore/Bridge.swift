@@ -464,7 +464,7 @@ public actor Bridge: Router {
 
   /// A session that starts waiting for approval sends the voice a notice, which goes once the
   /// approval is settled. A question Claude asked goes to the voice whole, and the next handoff
-  /// is routed to that session as its reply.
+  /// is routed to that session as its reply. Either carries what Claude wrote before it.
   private func activity(_ body: ActivityBody) async {
     guard let row = try? await label(of: body.sessionId) else { return }
     await registry.setActivity(body)
@@ -474,12 +474,14 @@ public actor Bridge: Router {
         if machine.phase != .off { questionRoute = body.sessionId }
         await say(
           AnswerShaper.line(
-            .asking, label: row.label, body: AnswerShaper.prose(question),
+            .asking, label: row.label,
+            body: AnswerShaper.paused(AnswerShaper.prose(question), wrote: body.text),
             session: body.sessionId))
       } else {
         await say(
           AnswerShaper.line(
-            .approval, label: row.label, body: "Claude is waiting for your approval",
+            .approval, label: row.label,
+            body: AnswerShaper.paused("Claude is waiting for your approval", wrote: body.text),
             session: body.sessionId))
       }
     case (true, false):
