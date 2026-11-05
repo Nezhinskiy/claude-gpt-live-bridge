@@ -100,10 +100,9 @@ async function acquire(isCurrent) {
   return { node, stop: () => stopTracks(stream), onEnded: (handler) => (track.onended = handler) };
 }
 
+/** Named only: `microphoneFailure` says it by its name. */
 function micLate() {
-  const error = new Error('The microphone did not start in time.');
-  error.name = 'MicTimeoutError';
-  return error;
+  return Object.assign(new Error(), { name: 'MicTimeoutError' });
 }
 
 const mic = createMicrophone({
