@@ -25,7 +25,10 @@ export function createMicrophone({ acquire, connect, disconnect, watchDevices, o
     current = null;
   }
 
-  function letGo() {
+  /** Mute and Stop: the token moves first, so an acquisition pending now keeps nothing. */
+  function letGo(stayMuted) {
+    token++;
+    muted = stayMuted;
     drop();
     watchDevices(null);
   }
@@ -62,10 +65,7 @@ export function createMicrophone({ acquire, connect, disconnect, watchDevices, o
   return {
     attach,
     mute() {
-      if (muted) return;
-      token++;
-      muted = true;
-      letGo();
+      if (!muted) letGo(true);
     },
     async unmute() {
       if (!muted) return true;
@@ -75,9 +75,7 @@ export function createMicrophone({ acquire, connect, disconnect, watchDevices, o
     deviceChanged,
     /** Stop: the microphone goes, and the mute with it. */
     release() {
-      token++;
-      muted = false;
-      letGo();
+      letGo(false);
     },
     get muted() {
       return muted;
