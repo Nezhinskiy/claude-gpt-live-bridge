@@ -146,15 +146,19 @@ secret.
   context automatically when a line opens** on (the default) in LiveBridge's Settings, the
   target session sends a new one whenever the app opens a line: a Start, a line reopened after
   silence, the line after a target switch. The menu's Load context and `/live context` send one
-  too. One injected summary can therefore steer every later call with that session. Its recent
+  too. One injected summary can therefore steer every later call with that session, and **New
+  conversation** alone does not end that while the setting is on: the next line the app opens
+  loads a summary of the same transcript again, the text the session read included. Its recent
   conversation is carried over the same way, including the lines the session sent the voice. A
   result from another session is still spoken in whatever line is open, and the voice's reply to
   it stays in that line's conversation, so one session's text can still reach the conversation
   about another.
 
-Join only sessions whose input you trust, press **New conversation** with a session as the
-target after it has read text you do not trust, and keep voice off for a session whose permission mode acts without
-asking.
+Join only sessions whose input you trust. After a session has read text you do not trust, turn
+**Load context automatically when a line opens** off or `/clear` that session, then press **New
+conversation** with it as the target; with the setting on and the transcript unchanged, the next
+line loads a summary of the same text again. Keep voice off for a session whose permission mode
+acts without asking.
 
 ### What an update installs
 

@@ -224,7 +224,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 **Start** दबाएँ, prompt के ऊपर वाले band में या menu bar menu में, और बोलें।
 
-- **band का Start** अपने session को target बनाता है, call शुरू करता है; **Load context automatically when a line opens**
+- **band का Start** अपने session को target बनाता है और call शुरू करता है; **Load context automatically when a line opens**
   चालू हो तो जो line वह खोलता है वह session का सारांश load करती है
   ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही
   हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे
@@ -234,7 +234,9 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   **Settings…** और **Quit LiveBridge** होते हैं।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
-  line खुलने से नए सिरे से शुरू होता है, और हटाए गए session में `/live on` उसे फिर से जोड़ देता है।
+  line खुलने से नए सिरे से शुरू होता है, सिवाय तब जब **Load context automatically when a line opens**
+  चालू हो: वह line उसी session के transcript का सारांश फिर से load करती है, इसलिए पहले setting बंद
+  करें या session में `/clear` करें। हटाए गए session में `/live on` उसे फिर से जोड़ देता है।
 
 ### सेटिंग्स
 

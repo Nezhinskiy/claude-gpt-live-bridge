@@ -243,7 +243,7 @@ commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 Appuyez sur **Start**, dans la bande au-dessus du prompt ou dans le menu de la barre des menus, et
 parlez.
 
-- **Le Start de la bande** fait de sa session la cible, démarre l'appel ; avec
+- **Le Start de la bande** fait de sa session la cible et démarre l'appel ; avec
   **Load context automatically when a line opens** activé, la ligne qu'il ouvre charge le résumé de la session
   ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à une autre
   session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session rejointe,
@@ -253,8 +253,10 @@ parlez.
   la conserve, les minutes, **Settings…** et **Quit LiveBridge**.
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
-  repart de zéro à la prochaine ouverture de la ligne, et `/live on` dans une session retirée la
-  rejoint de nouveau.
+  repart de zéro à la prochaine ouverture de la ligne, sauf si **Load context automatically when
+  a line opens** est activé : cette ligne recharge un résumé de la même transcription de la
+  session, donc désactivez le réglage ou faites `/clear` dans la session avant. `/live on` dans
+  une session retirée la rejoint de nouveau.
 
 ### Réglages
 

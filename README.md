@@ -218,7 +218,7 @@ every session, in LiveBridge's [Settings](#settings) window.
 
 Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
-- **The band's Start** makes its session the target, starts the call; with **Load context
+- **The band's Start** makes its session the target and starts the call; with **Load context
   automatically when a line opens** on, the line it opens loads the session's summary
   ([details](docs/architecture/overview.md#components)). While the call talks to another
   session, the band shows **Talk here**. If the band is not there in a joined session,
@@ -229,7 +229,9 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   **Quit LiveBridge**.
 - **New conversation…** erases the target's conversation and its loaded context, and a
   session's × removes it and erases its own; both ask first. The voice starts afresh from the
-  next time the line opens, and `/live on` in a removed session joins it again.
+  next time the line opens, unless **Load context automatically when a line opens** is on: that
+  line loads a summary of the same session's transcript again, so turn the setting off or
+  `/clear` the session first. `/live on` in a removed session joins it again.
 
 ### Settings
 

@@ -230,7 +230,7 @@ cargue también el resumen de una sesión cada vez que se abre una línea no es 
 
 Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra de menús, y habla.
 
-- **El Start de la banda** convierte su sesión en el destino, inicia la llamada; con
+- **El Start de la banda** convierte su sesión en el destino e inicia la llamada; con
   **Load context automatically when a line opens** activado, la línea que abre carga el resumen de la sesión
   ([detalles](docs/architecture/overview.md#components)). Mientras la llamada habla con otra
   sesión, la banda muestra **Talk here**. Si la banda no aparece en una sesión unida,
@@ -240,7 +240,9 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   conserva LiveBridge, los minutos, **Settings…** y **Quit LiveBridge**.
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
-  que se abre la línea, y `/live on` en una sesión eliminada la une de nuevo.
+  que se abre la línea, salvo con **Load context automatically when a line opens** activado: esa
+  línea vuelve a cargar un resumen de la misma transcripción de la sesión, así que desactiva el
+  ajuste o haz `/clear` en la sesión antes. `/live on` en una sesión eliminada la une de nuevo.
 
 ### Ajustes
 
