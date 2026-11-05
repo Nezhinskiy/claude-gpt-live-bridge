@@ -51,7 +51,7 @@ const SHAPES: Record<string, Shape> = {
     reason: optional(S),
   }),
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop'] } }),
-  'context': fields<Wire.ContextBody>({ sessionId: S, summary: S, last: optional(S) }),
+  'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
   'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean') }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),

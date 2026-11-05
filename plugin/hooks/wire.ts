@@ -51,8 +51,7 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  * reply, which the voice may hand over as a `reply` work item.
  */
 export type ActivityBody = { sessionId: SessionId; state: SessionActivity; question?: string };
-/** `last`: Claude's last reply in the session, when there is one. */
-export type ContextBody = { sessionId: SessionId; summary: string; last?: string };
+export type ContextBody = { sessionId: SessionId; summary: string };
 
 export type CallAction = 'start' | 'stop';
 export type CallBody = { action: CallAction };

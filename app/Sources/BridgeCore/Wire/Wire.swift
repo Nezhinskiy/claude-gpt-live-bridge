@@ -112,11 +112,9 @@ public struct ActivityBody: Codable, Sendable, Equatable {
 }
 
 /// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`.
-/// `last`: Claude's last reply in the session, when there is one.
 public struct ContextBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var summary: String
-  public var last: String?
 }
 
 public enum CallAction: String, Codable, Sendable { case start, stop }
