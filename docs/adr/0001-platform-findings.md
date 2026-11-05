@@ -238,6 +238,93 @@ opens the closed line, without a nudge, and the chime stays the fallback. A nudg
 answer prompt but needs wording that is no request ("Hmm." did not reach a result, so it is
 untested) and a filter that keeps it out of the conversation and the menu.
 
+Measured again on 2026-11-05 with the line given as speakable text (`appendSpeech`, PR #34 at
+`58c729a`, since reverted), the same probe otherwise: `resultWindowSeconds` set to 0 in the working
+tree only, no nudge. 6 runs, 5 of them reached a result; the connect is the mod's `/v1/answer` to
+`live`.
+
+| Run | Connect | `live` to the end of the first segment | Said |
+|---|---|---|---|
+| 1 | 1.7 s | 6.9 s | yes |
+| 2 | 2.0 s | 8.6 s | yes |
+| 4 | 3.1 s | — | no: silent, closed after 20 s |
+| 5 | 1.3 s | 7.0 s | yes |
+| 6 | 1.3 s | 5.8 s | yes |
+| 3 | — | — | not reached: the voice said "Mm-hmm." and handed nothing off |
+
+`appendSpeech` made the voice no faster (5.8 to 8.6 s against 5.4 to 7.7 s as context) and no more
+reliable (silent in 1 of 5 against 1 of 4); from the answer to the end of the first segment the
+owner waited 7.1 to 10.6 s. These runs kept the line open 287 s, about $0.24.
+
+A neutral synthetic utterance, probed the same day on `dev` at `12f142e` (the opener as context
+again): once a line a result opened was connected, the audio page queued a short `say` phrase into
+the peer's track, as in the speech runs above; `resultWindowSeconds` 0 in the working tree only,
+otherwise the same probe. Each run reached a result.
+
+| Run | Phrase | Connect | `live` to the end of the first segment | Said | The phrase |
+|---|---|---|---|---|---|
+| A1 | "Mm-hm." | 2.6 s | 10.5 s | yes | no transcript, no turn |
+| A2 | "Mm-hm." | 1.5 s | 6.1 s | yes | no transcript, no turn |
+| B1 | "Okay." | 1.7 s | 2.5 s (the segment broke at the phrase; one answer) | yes | heard as the owner's "Okay" |
+| B2 | "Okay." | 1.5 s | 7.3 s | yes | heard as the owner's "Okay" |
+| B3 | "Okay." | 1.7 s | 8.1 s | yes | heard as the owner's "Okay" |
+
+Neither phrase made the voice reliably faster. "Mm-hm." was not heard as a turn at all; "Okay." was,
+and went into the conversation as the owner's line, but the voice still took 7 to 8 s in 2 of 3
+runs. Neither was handed off or caused a repeat, and every run said the result, a sample too small
+to call a change against 1 silent run in 4 or 5. Only a question ("Any news?") made the voice answer
+within about 2 s, and a question is what the voice may hand off. These runs kept the line open
+275 s, about $0.23.
+
+An explicit cue, probed next on `dev` at `12f142e` with the same set-up, adding what the times above
+lack: the moment the voice starts. A probe-only change logged, in milliseconds, the delivery, the
+connect, each assistant transcript delta (the voice speaking) and each user transcript. A silent
+phrase was the control.
+
+| Run | Phrase | Delivery to connect | Connect to the voice speaking | Said |
+|---|---|---|---|---|
+| Control 1 | silence | 1.9 s | — | no: silent, closed after 20 s |
+| Control 2 | silence | 2.0 s | 1.4 s | yes |
+| G1 | "Go ahead." | 1.4 s | 0.9 s | yes |
+| G2 | "Go ahead." | 1.5 s | 2.0 s | yes |
+| L1 | "I'm listening." | 1.6 s | 0.9 s | yes |
+| L2 | "I'm listening." | 1.4 s | 1.1 s | yes |
+| O2 | "Go on." | 1.6 s | 0.9 s | yes |
+
+One more "Go on." run never reached a result: the voice acknowledged the request without handing it
+off.
+
+- When the voice speaks on a reopened line, it starts about 1 to 2 s after the connect, cue or not
+  (control 2). The 5.4 to 8.6 s measured above are the end of the first transcript segment, which
+  lags the speech by several seconds; they overstate the wait.
+- With a cue the voice spoke in 5 of 5 runs, starting 0.9 to 2.0 s after the connect, often before
+  the cue's own transcript arrived (about 2.9 s). Without one it stayed silent in 1 of 2 here, 1 of
+  4 and 1 of 5 above. The sample is small: the cue looks like a fix for the silent line, not for a
+  slow one.
+- No cue was handed off or caused a repeat. Each went into the conversation as the owner's line
+  ("You: Go ahead"), so shipping one needs a filter. "Go ahead." and "Go on." also read as consent:
+  after an `[ASKING]` line the next handoff is routed to Claude as the owner's reply, so a cue there
+  could answer Claude's question. "I'm listening." asks for nothing and consents to nothing.
+- These runs kept the line open 405 s, about $0.34.
+
+Six more runs the same day, "I'm listening." and silence in turn:
+
+| Run | Phrase | Delivery to connect | Connect to the voice speaking | Said |
+|---|---|---|---|---|
+| L3 | "I'm listening." | 3.1 s | 1.0 s | yes |
+| Control 3 | silence | 1.3 s | 0.8 s | yes |
+| L4 | "I'm listening." | 1.3 s | — | no: silent, and no transcript of the cue |
+| Control 4 | silence | 1.8 s | — | no: silent |
+| L5 | "I'm listening." | 1.8 s | 0.8 s | yes |
+| Control 5 | silence | 1.3 s | 0.7 s | yes |
+
+- In all: with a cue the voice spoke in 7 of 8 runs, "I'm listening." in 4 of 5; with silence in 3
+  of 5 here, and, as context with no cue, 3 of 4 and 4 of 5 above, 10 of 14 in all. That is too few
+  runs to tell a cue from chance, and one silent run with a cue shows it is no guarantee.
+- Whenever the voice spoke it started 0.7 to 2.0 s after the connect, with or without a cue: a
+  silent line is the failure, not a slow one.
+- These runs kept the line open 310 s, about $0.26.
+
 ### Claude Code mod API
 
 **(e) Session title.** Observed against the desktop app's own session list: for each of 5

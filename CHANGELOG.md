@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
+  want to support the project.
+
 ### Changed
 
 - A voice line that Claude's answer opens now closes and chimes when nobody has spoken on it 5

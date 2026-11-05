@@ -209,6 +209,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
       case .copyJoinCommand: #selector(copyJoinCommand)
       case .loadContext: #selector(loadContext)
       case .newConversation: #selector(newConversation)
+      case .starOnGitHub: #selector(starOnGitHub)
       case .settings: #selector(showSettings)
       case .quit: #selector(quit)
       case .installUpdate: #selector(installUpdate(_:))
@@ -239,6 +240,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   @objc private func newConversation() { later { [model] in model.newConversation() } }
 
   @objc private func showSettings() { later { [model] in model.showSettings() } }
+
+  @objc private func starOnGitHub() { NSWorkspace.shared.open(Release.repositoryPage) }
 
   @objc private func quit() { NSApp.terminate(nil) }
 

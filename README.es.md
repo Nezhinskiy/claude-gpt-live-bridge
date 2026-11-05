@@ -237,7 +237,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   `/live on` la recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
-  conserva LiveBridge, los minutos, **Settings…** y **Quit LiveBridge**.
+  conserva LiveBridge, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
+  **Settings…** y **Quit LiveBridge**.
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
   que se abre la línea, salvo con **Load context automatically when a line opens** activado: esa

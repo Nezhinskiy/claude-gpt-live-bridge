@@ -108,6 +108,7 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
+        "Star LiveBridge on GitHub",
         "Settings… ⌘,",
         "Quit LiveBridge ⌘Q",
       ])
@@ -149,6 +150,7 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
+        "Star LiveBridge on GitHub",
         "Settings… ⌘,",
         "Quit LiveBridge ⌘Q",
       ])
@@ -228,9 +230,12 @@ struct MenuContentTests {
     #expect(card.canAct)
   }
 
-  @Test func withoutABridgeOnlyTheProblemSettingsAndQuitAreLeft() throws {
+  @Test func withoutABridgeOnlyTheProblemAndTheFooterAreLeft() throws {
     let menu = Self.menu(nil, problem: .other("LiveBridge could not start its bridge: boom"))
-    #expect(menu.outline == ["[call] Off", "---", "Settings… ⌘,", "Quit LiveBridge ⌘Q"])
+    #expect(
+      menu.outline == [
+        "[call] Off", "---", "Star LiveBridge on GitHub", "Settings… ⌘,", "Quit LiveBridge ⌘Q",
+      ])
     let card = try #require(Self.card(menu))
     #expect(card.problem == "LiveBridge could not start its bridge: boom")
     #expect(card.action == nil)
