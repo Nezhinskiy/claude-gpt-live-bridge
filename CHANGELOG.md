@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0]
+
 ### Added
 
 - A short sound when the app queues a request the voice handed off. The voice sometimes says it
@@ -47,6 +49,12 @@ All notable changes to this project are listed here. The format follows
   Claude Code. Both pauses now take the step's text as it streams, so a tool that starts before
   its step ends still gets that step's text, and a long text is cut so the question still reaches
   the app.
+
+### Note
+
+- This release was not tried end to end against the real voice: the line that a result,
+  question or approval opens, the context a line loads when it opens, and the text that comes
+  with a question or an approval are covered by tests only.
 
 ## [0.2.0]
 
