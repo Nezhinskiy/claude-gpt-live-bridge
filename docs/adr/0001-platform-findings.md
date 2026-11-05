@@ -273,8 +273,39 @@ Neither phrase made the voice reliably faster. "Mm-hm." was not heard as a turn 
 and went into the conversation as the owner's line, but the voice still took 7 to 8 s in 2 of 3
 runs. Neither was handed off or caused a repeat, and every run said the result, a sample too small
 to call a change against 1 silent run in 4 or 5. Only a question ("Any news?") made the voice answer
-within about 2 s, and a question is what the voice may hand off. These runs kept the line open 275
-s, about $0.23.
+within about 2 s, and a question is what the voice may hand off. These runs kept the line open
+275 s, about $0.23.
+
+An explicit cue, probed next on `dev` at `12f142e` with the same set-up, adding what the times above
+lack: the moment the voice starts. A probe-only change logged, in milliseconds, the delivery, the
+connect, each assistant transcript delta (the voice speaking) and each user transcript. A silent
+phrase was the control.
+
+| Run | Phrase | Delivery to connect | Connect to the voice speaking | Said |
+|---|---|---|---|---|
+| Control 1 | silence | 1.9 s | — | no: silent, closed after 20 s |
+| Control 2 | silence | 2.0 s | 1.4 s | yes |
+| G1 | "Go ahead." | 1.4 s | 0.9 s | yes |
+| G2 | "Go ahead." | 1.5 s | 2.0 s | yes |
+| L1 | "I'm listening." | 1.6 s | 0.9 s | yes |
+| L2 | "I'm listening." | 1.4 s | 1.1 s | yes |
+| O2 | "Go on." | 1.6 s | 0.9 s | yes |
+
+One more "Go on." run never reached a result: the voice acknowledged the request without handing it
+off.
+
+- When the voice speaks on a reopened line, it starts about 1 to 2 s after the connect, cue or not
+  (control 2). The 5.4 to 8.6 s measured above are the end of the first transcript segment, which
+  lags the speech by several seconds; they overstate the wait.
+- With a cue the voice spoke in 5 of 5 runs, starting 0.9 to 2.0 s after the connect, often before
+  the cue's own transcript arrived (about 2.9 s). Without one it stayed silent in 1 of 2 here, 1 of
+  4 and 1 of 5 above. The sample is small: the cue looks like a fix for the silent line, not for a
+  slow one.
+- No cue was handed off or caused a repeat. Each went into the conversation as the owner's line
+  ("You: Go ahead"), so shipping one needs a filter. "Go ahead." and "Go on." also read as consent:
+  after an `[ASKING]` line the next handoff is routed to Claude as the owner's reply, so a cue there
+  could answer Claude's question. "I'm listening." asks for nothing and consents to nothing.
+- These runs kept the line open 405 s, about $0.34.
 
 ### Claude Code mod API
 
