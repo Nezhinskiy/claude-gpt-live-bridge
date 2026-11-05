@@ -34,6 +34,8 @@ public struct Release: Equatable, Sendable {
   static let imageName = "LiveBridge.dmg"
   /// The repository that publishes the releases.
   public static let repository = "getLiveBridge/LiveBridge"
+  /// Its page on GitHub, where the menu's star item goes.
+  public static let repositoryPage = URL(string: "https://github.com/\(repository)")!
   /// GitHub's latest release of LiveBridge.
   public static let latestURL = URL(
     string: "https://api.github.com/repos/\(repository)/releases/latest")!

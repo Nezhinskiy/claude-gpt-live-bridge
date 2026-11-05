@@ -107,6 +107,7 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
+        "Star LiveBridge on GitHub",
         "Settings… ⌘,",
         "Quit LiveBridge ⌘Q",
       ])
@@ -117,6 +118,14 @@ struct MenuContentTests {
     let install = outline.firstIndex(of: "Install LiveBridge 0.1.3…")
     let settings = outline.firstIndex(of: "Settings… ⌘,")
     #expect(install != nil && settings != nil && install! < settings!)
+  }
+
+  /// The classic way to support an open-source app, beside Settings.
+  @Test func theMenuOffersAStarOnGitHub() {
+    let outline = Self.menu(Self.status(sessions: 0), available: nil).outline
+    let star = outline.firstIndex(of: "Star LiveBridge on GitHub")
+    let settings = outline.firstIndex(of: "Settings… ⌘,")
+    #expect(star != nil && settings != nil && star! + 1 == settings!)
   }
 
   @Test func noUpdateAddsNoInstallItem() {
@@ -148,6 +157,7 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
+        "Star LiveBridge on GitHub",
         "Settings… ⌘,",
         "Quit LiveBridge ⌘Q",
       ])
@@ -227,9 +237,12 @@ struct MenuContentTests {
     #expect(card.canAct)
   }
 
-  @Test func withoutABridgeOnlyTheProblemSettingsAndQuitAreLeft() throws {
+  @Test func withoutABridgeOnlyTheProblemAndTheFooterAreLeft() throws {
     let menu = Self.menu(nil, problem: .other("LiveBridge could not start its bridge: boom"))
-    #expect(menu.outline == ["[call] Off", "---", "Settings… ⌘,", "Quit LiveBridge ⌘Q"])
+    #expect(
+      menu.outline == [
+        "[call] Off", "---", "Star LiveBridge on GitHub", "Settings… ⌘,", "Quit LiveBridge ⌘Q",
+      ])
     let card = try #require(Self.card(menu))
     #expect(card.problem == "LiveBridge could not start its bridge: boom")
     #expect(card.action == nil)

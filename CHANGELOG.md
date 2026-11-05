@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
+  want to support the project.
+
 ## [0.3.0]
 
 ### Added
