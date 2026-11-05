@@ -307,6 +307,24 @@ off.
   could answer Claude's question. "I'm listening." asks for nothing and consents to nothing.
 - These runs kept the line open 405 s, about $0.34.
 
+Six more runs the same day, "I'm listening." and silence in turn:
+
+| Run | Phrase | Delivery to connect | Connect to the voice speaking | Said |
+|---|---|---|---|---|
+| L3 | "I'm listening." | 3.1 s | 1.0 s | yes |
+| Control 3 | silence | 1.3 s | 0.8 s | yes |
+| L4 | "I'm listening." | 1.3 s | — | no: silent, and no transcript of the cue |
+| Control 4 | silence | 1.8 s | — | no: silent |
+| L5 | "I'm listening." | 1.8 s | 0.8 s | yes |
+| Control 5 | silence | 1.3 s | 0.7 s | yes |
+
+- In all: with a cue the voice spoke in 7 of 8 runs, "I'm listening." in 4 of 5; with silence in 3
+  of 5 here, and, as context with no cue, 3 of 4 and 4 of 5 above, 10 of 14 in all. That is too few
+  runs to tell a cue from chance, and one silent run with a cue shows it is no guarantee.
+- Whenever the voice spoke it started 0.7 to 2.0 s after the connect, with or without a cue: a
+  silent line is the failure, not a slow one.
+- These runs kept the line open 310 s, about $0.26.
+
 ### Claude Code mod API
 
 **(e) Session title.** Observed against the desktop app's own session list: for each of 5
