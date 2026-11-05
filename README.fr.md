@@ -257,7 +257,7 @@ parlez.
   micro est coupé) libère votre microphone pendant que l'appel continue : une réponse de Claude
   ouvre toujours la ligne et la voix la dit. La bande garde la phase et ajoute `· muted` ; le menu
   affiche « Muted — line closed » tant qu'aucune ligne n'est ouverte. Mute ne ferme pas la ligne :
-  une ligne ouverte le reste jusqu'à ce que les 20 secondes de silence la ferment, facturée comme
+  une ligne ouverte se ferme comme elle le ferait sans Mute, et est facturée comme
   n'importe quel silence, donc Mute n'économise pas de minutes temps réel. **Unmute** reprend le
   microphone et, s'il n'y parvient pas (refusé, occupé, absent), l'appel se termine avec la
   raison. **Stop** termine l'appel et la coupure ; le **Start** suivant commence micro actif. Mute

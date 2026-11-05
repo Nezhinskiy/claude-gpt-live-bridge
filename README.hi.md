@@ -235,8 +235,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
   चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice उसे
   बोलती है। band phase वैसी ही रखता है और `· muted` जोड़ता है; जब कोई line खुली न हो, menu "Muted — line
-  closed" कहता है। Mute line बंद नहीं करता: खुली line तब तक खुली रहती है जब तक 20 सेकंड की चुप्पी
-  उसे बंद न कर दे, और किसी भी चुप्पी की तरह billed होती है, इसलिए Mute से realtime minutes नहीं
+  closed" कहता है। Mute line बंद नहीं करता: खुली line वैसे ही बंद होती है जैसे Mute के बिना होती,
+  और किसी भी चुप्पी की तरह billed होती है, इसलिए Mute से realtime minutes नहीं
   बचते। **Unmute** microphone फिर लेता है, और न ले पाए (मना किया गया, busy, मौजूद नहीं) तो call
   कारण के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted
   शुरू होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है

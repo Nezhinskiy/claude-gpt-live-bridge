@@ -45,8 +45,8 @@ microphone or Claude:
 - `CallMachine`: the call's phase — `off`, `listening` (microphone and local voice detection
   only), `connecting`, `live` (a realtime session is open) — and the effects of each event. It
   also keeps `isMuted`, orthogonal to the phase: while muted the microphone is released, speech
-  is ignored, and a result from Claude still opens the line. Mute closes no line; the 20 s silence
-  rule does, as without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs the effects in order.
+  is ignored, and a result from Claude still opens the line. Mute closes no line; an open line
+  closes as it would without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped

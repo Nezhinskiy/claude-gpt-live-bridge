@@ -243,8 +243,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   está silenciado) libera tu micrófono mientras la llamada continúa: una respuesta de Claude sigue
   abriendo la línea y la voz la dice. La banda mantiene la fase y añade `· muted`; el menú dice
   "Muted — line closed" mientras no hay línea abierta. Mute no cierra la línea: una línea abierta
-  sigue abierta hasta que la cierran los 20 segundos de silencio, facturada como cualquier
-  silencio, así que Mute no ahorra minutos de tiempo real. **Unmute** vuelve a tomar el micrófono y,
+  se cierra como lo haría sin Mute, y se factura como cualquier silencio, así que Mute no ahorra minutos de tiempo real. **Unmute** vuelve a tomar el micrófono y,
   si no puede (denegado, ocupado, ausente), la llamada termina con el motivo. **Stop** termina la
   llamada y el silencio; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo:
   cualquier proceso que se ejecute como tú puede quitarlo
