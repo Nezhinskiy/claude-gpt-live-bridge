@@ -81,6 +81,9 @@ struct CallMachineTests {
       "muteWhileConnectingArmsTheSilenceOnConnect", connecting + [.mute], .connected, .live,
       [.flushPreroll, arm, .problem(nil)]),
     row(
+      "speechWhileMutedOnAConnectingLineDoesNotPinIt", connecting + [.mute, .speechStarted],
+      .connected, .live, [.flushPreroll, arm, .problem(nil)]),
+    row(
       "muteOnALineAResultOpenedKeepsTheFirstWordWait", [.start, opening(result), .connected],
       .mute, .live, [.muteMicrophone, firstWord], pending: [result]),
     row("aSecondMuteDoesNothing", live + [.mute], .mute, .live, []),
