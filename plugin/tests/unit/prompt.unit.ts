@@ -87,3 +87,4 @@ test('claudesQuestionIsToldWithItsOptions', () => {
   assert.equal(askedText([{ question: 'Which name?', options: [{ label: 'out', description: 'Shorter.' }] }]),
     'Which name? Options: out: Shorter.')
 })
+

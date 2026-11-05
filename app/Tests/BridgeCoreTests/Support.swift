@@ -48,9 +48,12 @@ final class TestTime: TimeSource {
   /// How many sleepers are waiting; tests wait for a timer to be armed before advancing.
   var sleepers: Int { state.withLock { $0.sleepers.count } }
 
-  func sleep(for duration: Duration) async throws {
+  /// When each waiting sleeper wakes; a test waits for the timer it needs by its deadline.
+  var deadlines: [Date] { state.withLock { $0.sleepers.map(\.deadline) } }
+
+  func sleep(until deadline: Date) async throws {
     await withCheckedContinuation { wake in
-      state.withLock { $0.sleepers.append(($0.now + duration.timeInterval, wake)) }
+      state.withLock { $0.sleepers.append((deadline, wake)) }
       advance(by: .zero)
     }
     try Task.checkCancellation()
@@ -64,11 +67,5 @@ final class TestTime: TimeSource {
       return due
     }
     for sleeper in due { sleeper.wake.resume() }
-  }
-}
-
-extension Duration {
-  var timeInterval: TimeInterval {
-    Double(components.seconds) + Double(components.attoseconds) / 1e18
   }
 }

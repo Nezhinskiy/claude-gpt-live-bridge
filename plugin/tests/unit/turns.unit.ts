@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { FRAMING, voicePrompt } from '../../hooks/prompt.ts'
-import { clip, FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
+import { ANSWER_LIMIT, clip, FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
 
 const ID = '00000000-0000-0000-0000-00000000000a'
 const framed = (id: string) =>
@@ -109,4 +109,23 @@ test('clipCutsWholeCharactersOnly', () => {
   assert.equal(clip('short', 10), 'short')
   // In a `u` pattern a pair is one character, so only a lone surrogate matches.
   for (let limit = 0; limit < 8; limit++) assert.ok(!/[\uD800-\uDFFF]/u.test(clip('a😀'.repeat(4), limit)))
+})
+
+test('aStepsTextIsTakenOnce', () => {
+  const tracker = new TurnTracker()
+  tracker.stepStarted()
+  tracker.streamed('Two folders ')
+  tracker.streamed('hold build output.')
+  assert.equal(tracker.takeStepText(), 'Two folders hold build output.')
+  assert.equal(tracker.takeStepText(), '')
+  tracker.streamed('Looking.')
+  tracker.stepStarted()
+  assert.equal(tracker.takeStepText(), '')
+})
+
+test('aStepsTextIsCutToAnAnswersLimit', () => {
+  const tracker = new TurnTracker()
+  tracker.stepStarted()
+  tracker.streamed('a'.repeat(ANSWER_LIMIT + 1))
+  assert.equal(tracker.takeStepText(), 'a'.repeat(ANSWER_LIMIT))
 })

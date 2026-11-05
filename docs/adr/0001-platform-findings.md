@@ -7,7 +7,7 @@ app runs `codex app-server` on the user's ChatGPT login, opens an OpenAI realtim
 through it, and relays the voice model's handoffs to a Claude Code session through the mod.
 Before any of that is built, a throwaway spike checked the platform facts the design rests on.
 This record keeps what was measured, how, and what we decided from it. Items are lettered (a)
-to (m) so later work can cite them.
+to (n) so later work can cite them.
 
 Tested on: macOS 27.0.1 (Apple Silicon), Swift 6.4.2, `codex-cli 0.166.0` (realtime `v3`,
 `outputModality: "audio"`, ChatGPT plan with realtime), Claude Code 2.1.309. The codex realtime
@@ -141,7 +141,8 @@ second session then completed a full handoff.
   said "On it, checking now" or "I'll take a look", and the websocket carried no
   `delegation.created` at all, so nothing reached the client. With a rule telling the voice to
   hand off at once, before it speaks, and never to promise a look without a handoff in the same
-  turn, 5 of 5 runs delegated.
+  turn, 5 of 5 runs delegated. Later runs put the miss rate with the rule near one in five
+  ([BR-001](../bugs/BR-001.md)).
 - `initialItems` is honoured with WebRTC transport: seeded with a user item naming a colour, the
   voice answered "What is my favourite colour?" with that colour; without the items it said it
   did not know.
@@ -197,6 +198,45 @@ connected (two from plugins, one from apps, one from the user's config).
 The names come from `config/read` (`config.mcp_servers` keys). `mcpServerStatus/list` reports
 each server's state in `runtimeStatus` (`notStarted`, `starting`, `connected`,
 `authenticationRequired`, `failed`, `cancelled`, `disabled`, or `null`).
+
+**(n) A line opened by a result, and a synthetic first utterance.** Observed, 2026-11-04,
+`codex-cli 0.166.0`, 11 runs of a probe build that was never committed: the debug app with
+`--fake-mic` (a `say` request at 6 s, silence after), `resultWindowSeconds` set to 0, a result
+that arrives while the line is closed opening the line instead of chiming, and the smoke test's
+fake session answering 30 s after it took the request. The second line was seeded as usual:
+`initialItems` holding the owner's request and the voice's acknowledgement, then the result as
+`appendText`. In the speech runs the audio page then queued a `say` phrase into the peer's
+track, not played locally and not seen by the voice detector. Times are from `live` to the
+first assistant `transcript/done` (the end of the first segment, polled every 250 ms), so speech
+began earlier.
+
+| Run | Nudge | Handoff of the request | Second line |
+|---|---|---|---|
+| 1 | none | — | Local Network not yet allowed for the ad hoc debug build; no line |
+| 2, 4, 5 | none | yes | the voice said the result unprompted; first segment 7.7, 5.4, 7.4 s |
+| 6 | none | yes | silent; closed after 20 s, the result left unheard |
+| 7 | "Any news?" | yes | the result, first segment at 1.3 s |
+| 10 | "Any news?" | yes | began the result at 1.3 s, then handed "Any news" to Claude as a new request and said it was checking; the result was not finished |
+| 11 | "Any news?" | yes | began the result at 2.0 s, then said it again in full 25 s later |
+| 3, 8, 9 | none, "Any news?", "Hmm." | no: the voice said "On it" / "Looking now" without delegating | not reached |
+
+- A session that has a user turn in its `initialItems` does speak a result added after it,
+  without a user turn of its own: 3 of 4 runs. This narrows item (b), whose fresh sessions had no
+  user turn at all and said nothing.
+- A synthetic utterance is heard as the owner's (the smoke test relies on this too) and makes the
+  voice answer within about 2 s: 3 of 3. It is a turn like any other, so the voice may act on its
+  words: a question ("Any news?") became a handoff in 1 of 3 and a repeat in 1 of 3. Its
+  transcript arrives as a `user` line and goes into the conversation unless filtered.
+- `transport.dtmf.send` was not tried; the speech runs answered the question it was meant to.
+- In 3 of 11 runs the voice acknowledged the request without delegating, the failure item (b)
+  measured at 3 of 6 before the prompt rule and 0 of 5 after it.
+- The probe kept the realtime line open 476 s in all (about $0.40 at
+  [GPT-Live's $0.05 a minute](https://learn.chatgpt.com/docs/pricing)).
+
+The owner decided on this the same day (below): the target's answer, question or approval notice
+opens the closed line, without a nudge, and the chime stays the fallback. A nudge would make the
+answer prompt but needs wording that is no request ("Hmm." did not reach a result, so it is
+untested) and a filter that keeps it out of the conversation and the menu.
 
 ### Claude Code mod API
 
@@ -325,7 +365,9 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 - Silent-frame dropping shortens pauses in the replayed part of an utterance and leaves up to
   about 0.5 to 1 s of lag until the speaker pauses; the first word is never lost.
 - A result that arrives after the voice session hung up is heard only once the owner speaks
-  again; until then the owner gets a chime and an unheard count, not the result itself.
+  again; until then the owner gets a chime and an unheard count, not the result itself. The
+  target's answer, question or approval notice now opens the line instead (decision of
+  2026-11-04, below).
 - Not yet observed, and to be checked by hand in the desktop app before release: the microphone
   path with a granted permission (and whether it avoids the Local Network prompt), which events
   fire for a permission dialog, the origin of a task-notification turn, `$.process.run` in a
@@ -345,12 +387,14 @@ Accepted, 2026-11-01. Items marked inferred or documented-only above stay open u
 Decided by the owner on 2026-11-01, after the findings above.
 
 When an answer, a question or a later update arrives while no realtime session is open, the app
-plays a short chime and does not open a session for it. Item (b) shows why: a fresh session with
-no user turn does not speak appended text or initial items, so reopening one would spend session
-time and still leave the result unsaid. The result waits in the app, counted as unheard in the
-Claude Code band and the popover. When the owner next speaks and a session connects, every waiting
-result is given to the voice as context, and the voice speaks each one once, with its session's
-label. A failed connection keeps the results waiting; nothing is retried on its own.
+plays a short chime and does not open a session for it. Item (b) shows why: a fresh session with no
+user turn does not speak appended text or initial items, so reopening one would spend session time
+and still leave the result unsaid. Item (n) later found that a session seeded with the owner's
+request usually does say it; for the target's answer, question or approval notice, the decision of
+2026-11-04 below replaces this one. The result waits in the app, counted as unheard in the Claude
+Code band and the popover. When the owner next speaks and a session connects, every waiting result
+is given to the voice as context, and the voice speaks each one once, with its session's label. A
+failed connection keeps the results waiting; nothing is retried on its own.
 
 ## Decision: the line waits for a handoff's result
 
@@ -367,3 +411,21 @@ result chimes when it comes, as decided above. The window applies only to handof
 none waiting keeps the 20 s rule. The window is billed: up to two minutes of open line per
 handoff. Since codex offers no way to make a V3 voice respond now (item (b)), whether the voice
 says the speakable text at once is the model's choice; the smoke run checks that it does.
+
+## Decision: a result opens the closed line
+
+Decided by the owner on 2026-11-04, after item (n).
+
+A line from the target opens the closed line instead of chiming when it is an answer (a result,
+failure or question), a question Claude asks or a permission prompt it waits on while it works, and
+the target's conversation holds a turn of the owner's, which item (n) found a seeded line needs to
+speak. For an approval notice the voice only says that Claude waits; the owner answers the prompt in
+Claude Code, as before. The bridge decides this from the registry's target and the conversation and
+passes it with the delivery; the call machine keeps no copy of either. A line from a session that is
+not the target only chimes, and the owner switches to it; so does a later update. The new session is
+seeded as usual, starts without the pre-roll, as nobody spoke, and gets the line as context; no
+synthetic utterance is sent. The connect does not hold up the mod's request that brought the line,
+and a question or approval settled at the keyboard while its line still connects closes it. When the
+opened line closes with the line still unsaid (item (n)), it chimes and waits, as decided on
+2026-11-01; so does a connect that fails. The result window is unchanged. Each opening is billed
+like any open line: the connect, the voice's words and the 20 s of silence before it closes.

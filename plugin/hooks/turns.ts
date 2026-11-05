@@ -3,6 +3,11 @@
 import { voiceRequestId } from './prompt.ts'
 import type { AnswerStatus, RequestId } from './wire.ts'
 
+/**
+ * In characters: under the app's 131,072-byte body limit even at four UTF-8 bytes each; the app
+ * shortens answers for speech itself.
+ */
+export const ANSWER_LIMIT = 32_000
 /** How long after a voice request its background work still reports to the voice. */
 export const FOLLOW_UP_MS = 10 * 60_000
 
@@ -58,6 +63,8 @@ export class TurnTracker {
   #pending: RequestId | null
   #followUp: FollowUp | null
   #turns: Map<string, Tracked>
+  /** The visible text of the main loop's model step so far, until a question or an approval takes it. */
+  #stepText = ''
 
   constructor(saved?: TurnSnapshot) {
     this.#pending = saved?.pending ?? null
@@ -72,6 +79,27 @@ export class TurnTracker {
   get running(): RequestId | null {
     for (const turn of this.#turns.values()) if (turn.isVoice) return turn.id
     return null
+  }
+
+  /** The main loop's next model step starts: nothing of it is written yet. */
+  stepStarted(): void {
+    this.#stepText = ''
+  }
+
+  /** The main loop's model step streamed `text` of its visible text. */
+  streamed(text: string): void {
+    this.#stepText += text
+  }
+
+  /**
+   * What the step wrote, for the question or permission prompt it pauses on: the engine's turn
+   * end carries only the turn's last text, and a pause only itself. Taken once, so a second pause
+   * in the same step does not repeat it, and cut to `ANSWER_LIMIT`.
+   */
+  takeStepText(): string {
+    const text = clip(this.#stepText, ANSWER_LIMIT)
+    this.#stepText = ''
+    return text
   }
 
   /** A voice request was submitted; its turn starts once the session is idle. */

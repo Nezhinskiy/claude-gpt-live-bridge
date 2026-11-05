@@ -211,24 +211,27 @@ In the Claude Code session you want to talk to:
 | `/live context` | Sends the voice a new summary of this session, written by the session's model. |
 
 The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode. Whether a
-session's summary is also sent whenever it becomes the target is not a command: it is one setting
-for every session, in LiveBridge's [Settings](#settings) window.
+session's summary is also loaded whenever a line opens is not a command: it is one setting for
+every session, in LiveBridge's [Settings](#settings) window.
 
 ### The band and the menu
 
 Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
-- **The band's Start** makes its session the target, starts the call and sends the voice the
-  session's summary ([details](docs/architecture/overview.md#components)). While the call talks
-  to another session, the band shows **Talk here**. If the band is not there in a joined
-  session, `/live on` brings it back.
+- **The band's Start** makes its session the target and starts the call; with **Load context
+  automatically when a line opens** on, the line it opens loads the session's summary
+  ([details](docs/architecture/overview.md#components)). While the call talks to another
+  session, the band shows **Talk here**. If the band is not there in a joined session,
+  `/live on` brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
   for each request the voice handed to Claude), the minutes, **Settings…** and
   **Quit LiveBridge**.
 - **New conversation…** erases the target's conversation and its loaded context, and a
   session's × removes it and erases its own; both ask first. The voice starts afresh from the
-  next time the line opens, and `/live on` in a removed session joins it again.
+  next time the line opens, unless **Load context automatically when a line opens** is on: that
+  line loads a summary of the same session's transcript again, so turn the setting off or
+  `/clear` the session first. `/live on` in a removed session joins it again.
 
 ### Settings
 
@@ -239,8 +242,12 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
-- **Load a session's context automatically when it becomes the target** (off by default): one
-  setting for every session, kept by the app.
+- **Load context automatically when a line opens** (on by default): every line the
+  app opens (a Start, a line reopened after silence, the line after a target switch) asks the
+  target for its summary and does not wait for it; one setting for every session, kept by the
+  app.
+- **Play a sound when a request is queued for Claude** (on by default): a short sound for each
+  request the voice hands off ([why](#known-limitations)).
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
@@ -269,7 +276,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 ## Billing-aware by design
 
 A realtime voice session costs while it is open, so LiveBridge opens it only while someone is
-talking, or while Claude's answer to a request you just made may still come:
+talking, while Claude's answer to a request you just made may still come, or to say that answer,
+a question Claude asks you, or that Claude waits for your approval:
 
 - While a call is on and nobody is talking, the microphone feeds only a voice detector on your
   Mac. Nothing is sent anywhere.
@@ -281,15 +289,20 @@ talking, or while Claude's answer to a request you just made may still come:
   after that handoff, billed like any open line, and the voice says Claude's answer once nobody
   is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
   Claude closes after the usual 20 seconds of silence.
-- A result that arrives later, while the line is closed, plays a chime and waits: the band and
-  the menu show it as unheard, and the voice tells you when you next speak
+- Claude's answer to a request you handed the session you are talking to, a question Claude asks
+  you there, or a permission prompt it waits on opens the line again when it comes after the line
+  closed, and the voice says it, billed like any open line. Anything else that arrives while the
+  line is closed (anything from a session you switched away from, a later update) plays a chime
+  and waits: the band and the menu show it as unheard, and the voice tells you when you next speak
   ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
   ago. A new target switches the conversation: an open line closes, and your next words open it
   with the new target's.
-- The menu shows the minutes the line was open, as measured by the app; how your plan meters
-  realtime voice is not published.
+- The menu shows the minutes the line was open, as measured by the app. OpenAI prices desktop
+  voice per minute of your Codex budget, and on its API the same model family bills silence too
+  ([details](docs/research/2026-11-04-gpt-live-billing.md)); your plan's own usage page is the
+  authority.
 
 ## Privacy
 
@@ -297,7 +310,8 @@ LiveBridge has no telemetry and listens on no network port; the mod talks to the
 socket in a folder only your user can open. What goes to OpenAI, through codex's realtime
 session:
 
-- microphone audio while the line is open, from 2 seconds before you started speaking until it
+- microphone audio while the line is open, from 2 seconds before you started speaking (or, for
+  a line Claude's answer, question or approval notice opened, from when it opened) until it
   closes;
 - the voice's instructions: LiveBridge's own rules, then your Settings **Prompt** if you wrote
   one;
@@ -305,8 +319,10 @@ session:
   realtime session;
 - the target session's requests still open, as their one-line briefs;
 - each result, question, update and approval notice, as one line of at most 2,000 characters,
-  with code blocks and tables removed. An update is Claude's answer in a later turn started by a
-  background task's notification, for up to 10 minutes after a voice request and until any other
+  with code blocks and tables removed. A question Claude asks mid-turn, and the approval notice
+  for a permission prompt of Claude's main loop (not a subagent's), also carry what Claude wrote
+  just before asking. An update is Claude's answer in a later turn started by a background
+  task's notification, for up to 10 minutes after a voice request and until any other
   turn starts in the session;
 - the target session's context summary, as one line of at most 1,500 characters. It is saved
   when it is loaded and sent every time the line opens while that session is the target, across
@@ -347,10 +363,19 @@ can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
+- The voice sometimes says it is looking ("On it", "Looking now") without handing the request
+  off, so nothing reaches Claude: about one request in five in
+  [testing](docs/bugs/BR-001.md), with the voice's rule against it in place. The app plays a
+  short sound when it queues a request for Claude; if the voice says it is looking and no sound
+  follows, say the request again. The app cannot tell such a promise from an answer by its
+  words, since the voice speaks your language.
 - A result that arrives while the line waits for it goes to the voice as text to say; codex has
   no call that makes the voice speak at once, so the model decides when. In testing it spoke
   within a few seconds. If it does not, the result stays unheard: the voice says it after your
   next words, or it chimes when the line closes.
+- When Claude's answer opens the line again, the voice sometimes stays silent
+  ([measured](docs/adr/0001-platform-findings.md)). The line then closes after 20 seconds and
+  the answer chimes and waits, as below.
 - When your next words reopen the line, the voice sometimes answers only them and does not say
   the waiting result. The result is not lost: it stays waiting, chimes and posts a notification
   when the line closes, and goes to the voice again the next time the line opens.

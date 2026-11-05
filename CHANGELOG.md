@@ -6,6 +6,56 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0]
+
+### Added
+
+- A short sound when the app queues a request the voice handed off. The voice sometimes says it
+  is looking without handing the request off; with no sound, nothing was queued
+  ([BR-001](docs/bugs/BR-001.md)). **Settings > Notifications > Play a sound when a request is
+  queued for Claude** turns it off.
+
+### Changed
+
+- **Load context automatically** is now on by default and means "when a line opens": every line
+  the app opens (a Start, a line reopened after silence, the line after a target switch) asks the
+  target for its summary, and the line does not wait for it. The band's Start no longer asks for
+  it separately. The mod reuses its summary until a turn the voice did not hear completes (a turn
+  you typed, say) or you `/clear`, so a line reopened after a voice request costs no new summary.
+- The voice's instructions say that "the chat" is the Claude Code session, and that a question
+  about it that the voice's lines do not cover is handed off to Claude.
+- The in-app update attaches and ejects the release image with `diskutil image attach` and
+  `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
+  a new folder of its own.
+- The voice's rule against promising a look without a handoff is one sentence shorter, and lets
+  the voice ask you to confirm an action first. In 20 test runs it missed no handoff, against 3 of
+  20 with the old wording: too few runs to call the failure fixed
+  ([BR-001](docs/bugs/BR-001.md)).
+- Claude's answer to a request you handed the session you are talking to, a question Claude asks
+  you there, or a permission prompt it waits on now opens the closed voice line, and the voice
+  says it, instead of only chiming. It is billed like any open line; if the voice stays silent,
+  the line closes after 20 seconds and chimes as before. Anything from another session, and a
+  later update, still only chimes
+  ([billing](README.md#billing-aware-by-design), [privacy](README.md#privacy)).
+
+### Fixed
+
+- When Claude asks a question during a voice request, the voice also gets what Claude wrote just
+  before the question, in the same line after the options, with code blocks and tables removed
+  as from a result.
+- When a voice request stops at a permission prompt, the approval notice also carries what Claude
+  wrote in the step that asks for it, such as "I'm going to delete build/ and re-run", with code
+  blocks and tables removed. The voice only reports the prompt and tells you to answer it in
+  Claude Code. Both pauses now take the step's text as it streams, so a tool that starts before
+  its step ends still gets that step's text, and a long text is cut so the question still reaches
+  the app.
+
+### Note
+
+- This release was not tried end to end against the real voice: the line that a result,
+  question or approval opens, the context a line loads when it opens, and the text that comes
+  with a question or an approval are covered by tests only.
+
 ## [0.2.0]
 
 ### Added

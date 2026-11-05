@@ -23,6 +23,10 @@ final class AudioHost: NSObject, AudioSide {
   private var navigation: WKNavigation?
   private var loaded = false
   private var waiting: [CheckedContinuation<Void, Never>] = []
+  /// The bundled `audio/handoff.wav`, which `scripts/render-sound.mjs` renders.
+  private let handoffSound = Bundle.module.url(
+    forResource: "handoff", withExtension: "wav", subdirectory: "audio"
+  ).flatMap { NSSound(contentsOf: $0, byReference: true) }
 
   /// `fakeMic` (debug builds only) replaces the microphone with a WAV file.
   init(fakeMic: URL?) {
@@ -60,8 +64,11 @@ final class AudioHost: NSObject, AudioSide {
 
   func stopListening() async { _ = try? await call("LB.stop()") }
 
-  func makeOffer() async throws -> String {
-    guard let sdp = try await call("return await LB.makeOffer()") as? String else {
+  func makeOffer(preroll: Bool) async throws -> String {
+    guard
+      let sdp = try await call("return await LB.makeOffer(preroll)", ["preroll": preroll])
+        as? String
+    else {
       throw PageError(message: "The audio page returned no offer.")
     }
     return sdp
@@ -76,6 +83,8 @@ final class AudioHost: NSObject, AudioSide {
   func closePeer() async { _ = try? await call("LB.closePeer()") }
 
   func chime() async { NSSound(named: "Glass")?.play() }
+
+  func confirmHandoff() async { handoffSound?.play() }
 
   /// macOS's answer for the microphone, asking it first if it never was (its prompt then
   /// shows); nil when the page may open the microphone.

@@ -61,11 +61,13 @@ function process(event) {
   if (++frames % 4 === 0) post({ type: 'level', value: Math.min(1, Math.max(0, (dbfs(level) + 60) / 50)) });
 }
 
-/** From the first word on, the pre-roll and what follows queue for the line. */
-function hold() {
+/** From the first word on, the pre-roll and what follows queue for the line; `keep` false drops
+ * the pre-roll, for a line nobody spoke on. */
+function hold(keep = true) {
   if (holding) return;
   holding = true;
   const kept = preroll.drain();
+  if (!keep) return;
   for (let i = kept.length % FRAME; i < kept.length; i += FRAME) catchUp.push(kept.subarray(i, i + FRAME));
 }
 
@@ -164,9 +166,9 @@ function gathered(peer) {
 
 const closed = () => new Error('The voice line was closed.');
 
-async function makeOffer() {
+async function makeOffer(keepPreroll = true) {
   dropPeer();
-  hold();
+  hold(keepPreroll);
   out = ctx.createMediaStreamDestination();
   pump.connect(out);
   const peer = (pc = new RTCPeerConnection());

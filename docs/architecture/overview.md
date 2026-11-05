@@ -82,7 +82,7 @@ prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
 for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
 queued audio into the peer, dropping silence until it has caught up. For updates,
 `SystemUpdateEnvironment` is the real `UpdateEnvironment` (an ephemeral `URLSession`, `gh`,
-`hdiutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
+`diskutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
 `UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced
 release's Install.
 
@@ -97,9 +97,10 @@ draws a band above the prompt with the call's phase, the target, the unheard cou
 buttons Start/Stop and Talk here, with the problem sentence on a row of its own. A surface
 that has drawn no band for 3 s while the session is joined is asked for it again, and `/live on`
 in a joined session asks every surface for it. Start
-makes the session the target, starts the call and sends the session's summary (none for a
-session with no prompt yet; the last one again, with no model call, while no turn has completed
-since it was written), with a short note in the band while it goes. Talk here shows only while
+makes the session the target and starts the call; the line the app opens then asks the target
+for its summary (with Load context automatically on), which the mod writes (none for a session
+with no prompt yet; the last one again, with no model call, until a turn whose answer the voice
+did not get completes, or `/clear`), with a short note in the band while it goes. Talk here shows only while
 the call talks to another session, and moves it here. When the socket does not answer, it opens
 `/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
 to `open -g -b <bundle id>`.
@@ -119,7 +120,7 @@ that both test suites parse.
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
-| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn |
+| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn (none: a permission prompt), `text` what Claude wrote in the step that pauses |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
@@ -138,16 +139,18 @@ again, as it does after a `404` (the app restarted).
 
 ### Handoff
 
-The owner speaks; the line opens with the pre-roll, the voice hands the request off, and the line
-stays open for its result up to `CallMachine.resultWindowSeconds` (120 s) after the latest
-handoff, however silent it is (sound without words still closes it after 90 s). A result from a session handed a request in that window is given
-to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the owner
-(local voice detection) nor the voice is speaking; when either was, the bridge waits until both
-are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
-line. A window that passes with no result closes the line once it is silent; that result chimes
-later as below. A line with no handoff waiting keeps the plain silence rule, so an exchange that
-sends nothing to Claude costs no more than before. codex has no request that makes the v3 voice
-respond, so whether it says the speakable text at once is the model's choice
+The owner speaks; the line opens with the pre-roll and the voice hands the request off. Once the
+request is queued for a session, in any phase of the line, the app plays a short sound
+([BR-001](../bugs/BR-001.md)). The line stays open for its result up to
+`CallMachine.resultWindowSeconds` (120 s) after the latest handoff, however silent it is (sound
+without words still closes it after 90 s). A result from a session handed a request in that window
+is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the
+owner (local voice detection) nor the voice is speaking; when either was, the bridge waits until
+both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
+line. A window that passes with no result closes the line once it is silent; when the result comes,
+it opens the line again, as below. A line with no handoff waiting keeps the plain silence rule, so
+an exchange that sends nothing to Claude costs no more than before. codex has no request that makes
+the v3 voice respond, so whether it says the speakable text at once is the model's choice
 ([ADR 0001](../adr/0001-platform-findings.md) (b)).
 
 ```mermaid
@@ -168,6 +171,7 @@ sequenceDiagram
   Page->>Codex: the queued speech, then live audio
   Codex-->>Bridge: handoff_request (brief + transcript)
   Bridge->>Bridge: enqueue for the target, arm the 120 s result window
+  Bridge->>Owner: a short sound (queued)
   Codex-->>Owner: "On it."
   Mod->>Bridge: GET /v1/next
   Bridge-->>Mod: work: request
@@ -184,7 +188,10 @@ sequenceDiagram
 The realtime session is billed while open, so silence closes it. Voice detection keeps running
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
-target's conversation.
+target's conversation. Every line the app opens, a reopened one included, also asks the target for
+its context when **Load context automatically** is on (the default); the line does not wait for
+it, and a summary that comes while the line connects is added once it is connected, unless the
+line was seeded with the same one.
 
 ```mermaid
 sequenceDiagram
@@ -204,10 +211,23 @@ sequenceDiagram
 
 ### A result while the line is closed
 
-A result that arrives while the line is closed (after the window, or after a hang-up) does not
-reopen it. It chimes and waits; the voice gets it when the owner next speaks and says it in a
-reply. A result for a session the open line is not waiting on is added as context and said in
-the voice's next reply.
+An answer, a question or an approval notice from the target (its result, failure or question, or a
+question Claude asks or a permission prompt it waits on while it works) opens the closed line when
+the target's conversation holds a turn of the owner's; a line seeded without one stays silent ([ADR
+0001](../adr/0001-platform-findings.md) (b)). The bridge decides this from the registry's target and
+the conversation, and passes it with the delivery. The new realtime session is seeded with the
+target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
+the voice usually says it unprompted, within about 8 s of connecting ([ADR
+0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence rule closes the line,
+and the line chimes and waits as below. The mod's request that brought the line does not wait for
+the connect, and a question or approval the owner settles at the keyboard while its line still
+connects closes that line.
+
+Any other line that arrives while the line is closed (one from a session that is not the target, a
+later update) does not open it. It chimes, the notification names the session, and the line waits;
+the voice gets it when the owner next speaks and says it in a reply. A connect that fails with lines
+unheard chimes too. A result for a session the open line is not waiting on is added as context and
+said in the voice's next reply.
 
 ```mermaid
 sequenceDiagram
@@ -292,7 +312,16 @@ sequenceDiagram
 ### Approval notice
 
 The bridge never answers a permission prompt. When a voice turn hits one, the voice says that
-Claude is waiting; the owner answers in Claude Code.
+Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and
+re-run", and that only the owner can answer it, in Claude Code.
+
+Both pauses of a voice turn, this prompt and Claude's question below, carry the text of the
+main loop's model step that pauses: the engine's turn end carries only the turn's last text, and
+a pause only itself, so that text would reach the voice no other way. The mod keeps it as the
+step streams, since the engine may run a tool before its step ends, and takes it once: a second
+pause in the same step goes without it, and so does a subagent's prompt. It goes as the
+activity's `text`, and the app puts it after the notice or the question's options, with code and
+tables removed, so the cut of a long line takes the text first.
 
 ```mermaid
 sequenceDiagram
@@ -302,9 +331,9 @@ sequenceDiagram
   participant Mod
   participant Claude
   Claude->>Mod: classic.PermissionRequest (during a voice turn)
-  Mod->>Bridge: POST /v1/activity approval
-  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval"
-  Codex-->>Owner: says so (or a chime if the line is closed)
+  Mod->>Bridge: POST /v1/activity approval (and the step's text)
+  Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before asking: …"
+  Codex-->>Owner: says so (a closed line opens for it, as for a result)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
   Mod->>Bridge: POST /v1/activity working
@@ -314,8 +343,8 @@ sequenceDiagram
 
 When Claude asks the owner a question during a voice turn (the AskUserQuestion dialog), the
 dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
-line. The voice explains it and talks it over from what it knows, without handoffs; the owner's
-next handoff to that session is the reply. It goes out at once as `reply` work, beside the
+line, followed by the step's text (above). The voice explains it and talks it over from what it
+knows, without handoffs; the owner's next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
 dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
 has not polled by then goes as a request of its own.
@@ -328,7 +357,7 @@ sequenceDiagram
   participant Mod
   participant Claude
   Claude->>Mod: tool.call AskUserQuestion (during a voice turn)
-  Mod->>Bridge: POST /v1/activity approval + question
+  Mod->>Bridge: POST /v1/activity approval + question (and the step's text)
   Bridge->>Codex: "[ASKING] label: question. Options: …"
   Codex-->>Owner: explains, talks it over
   Owner->>Codex: decides, or asks Claude back
@@ -362,11 +391,11 @@ Install runs only from the owner's click, one run at a time (the actor's flag, a
    `updates/<X.Y.Z>/`, following redirects only to GitHub's asset hosts, and at most 100 MB.
 3. `gh attestation verify`, pinned to `release.yml`, the tag and GitHub-hosted runners, passes,
    and its attested digest equals the image's SHA-256.
-4. The image is attached read-only; its `LiveBridge.app` has the bundle id, the version and a
-   minimum macOS this Mac meets, and passes `codesign --verify --deep --strict`; its CDHash is
-   kept. It is copied with `ditto` to `/Applications/.LiveBridge-update-<uuid>.app`, the image is
-   detached on every path, and the staged copy must have the same CDHash before a quarantine
-   attribute on it is removed.
+4. The image is attached read-only with `diskutil image attach`, at a mount folder of the run's
+   own; its `LiveBridge.app` has the bundle id, the version and a minimum macOS this Mac meets,
+   and passes `codesign --verify --deep --strict`; its CDHash is kept. It is copied with `ditto`
+   to `/Applications/.LiveBridge-update-<uuid>.app`, an eject is attempted on every path, and
+   the staged copy must have the same CDHash before a quarantine attribute on it is removed.
 5. While any joined session has a request queued or in flight (`Bridge.hasOpenRequests`), the
    run waits (`waiting`).
 6. `claude plugin marketplace update livebridge` and `claude plugin update livebridge@livebridge`

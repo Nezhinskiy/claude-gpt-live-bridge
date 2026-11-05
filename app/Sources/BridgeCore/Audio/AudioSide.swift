@@ -31,7 +31,8 @@ public enum AudioEvent: Sendable, Equatable {
 public protocol AudioSide: Sendable {
   func startListening() async
   func stopListening() async
-  func makeOffer() async throws -> String
+  /// `preroll`: the line starts with the 2 s before it opened; false for a line nobody spoke on.
+  func makeOffer(preroll: Bool) async throws -> String
   /// Applies the answer SDP and returns once the session is ready (the data channel's
   /// `session.started`, ADR 0001 (d)).
   func applyAnswer(_ sdp: String) async throws
@@ -39,4 +40,6 @@ public protocol AudioSide: Sendable {
   func closePeer() async
   /// The short sound for a result that waits until the owner next speaks.
   func chime() async
+  /// The short sound that confirms a handoff was queued for a session (BR-001).
+  func confirmHandoff() async
 }

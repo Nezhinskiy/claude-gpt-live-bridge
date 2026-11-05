@@ -38,6 +38,9 @@ struct CallMachineTests {
   static let told: [CallEvent] = live + [deliver(result), .assistantSpeaking]
   static func said(_ text: String) -> CallEvent { .assistantFinishedSpeaking(text) }
   static func deliver(_ line: VoiceLine) -> CallEvent { .deliver(line) }
+  /// A line the bridge says opens a closed line: the target's answer or question.
+  static func opening(_ line: VoiceLine) -> CallEvent { .deliver(line, opensLine: true) }
+  static let asking = alphas(.asking, "Which branch?")
   /// A line from Alpha, the session the request was handed to.
   static let fromAlpha = deliver(result)
   static let window = CallEffect.armResultWindow(seconds: 120)
@@ -74,11 +77,29 @@ struct CallMachineTests {
       "connectAfterSpeechEndedArmsSilence", connecting + [.speechEnded], .connected, .live,
       [.flushPreroll, arm, .problem(nil)]),
     row(
-      "failedConnectKeepsResultsUnheard", unheard, .connectFailed(r), .listening,
-      [.problem(r)], pending: [a]),
+      "failedConnectChimesForUnheardResults", unheard, .connectFailed(r), .listening,
+      [.problem(r), .chime], pending: [a]),
     row(
-      "closeWhileConnectingKeepsResultsUnheard", unheard, .remoteClosed(r), .listening,
-      [.problem(r)], pending: [a]),
+      "closeWhileConnectingChimesForUnheardResults", unheard, .remoteClosed(r), .listening,
+      [.problem(r), .chime], pending: [a]),
+    row(
+      "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
+      [.openRealtimeForResult], pending: [result]),
+    row(
+      "theOpenedLineGetsItAsContext", [.start, opening(result)], .connected, .live,
+      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
+    row(
+      "anOpenedLineLeftSilentChimes", [.start, opening(result), .connected], .silenceElapsed,
+      .listening, [.closeRealtime, .chime], pending: [result]),
+    row(
+      "aFailedOpeningChimes", [.start, opening(result)], .connectFailed(r), .listening,
+      [.problem(r), .chime], pending: [result]),
+    row(
+      "anOpeningLineWhileConnectingWaitsForTheConnect", connecting, opening(result),
+      .connecting, [], pending: [result]),
+    row(
+      "anOpeningLineOnALiveLineIsALine", live, opening(a), .live, [.addContext(a), arm],
+      pending: [a]),
     row(
       "deliverWhileLiveIsAddedAndReArmsSilence", live, deliver(a), .live,
       [.addContext(a), arm], pending: [a]),
@@ -125,9 +146,19 @@ struct CallMachineTests {
       [.closeRealtime, .problem(CallMachine.noise)]),
     row("replyArmsTheSilenceTimer", live, said("Hello."), .live, [arm]),
     row("speakingVoiceReArmsTheTimer", live, .assistantSpeaking, .live, [arm]),
-    row("handoffOpensTheResultWindow", live, .handedOff(alpha), .live, [window]),
-    row("aLaterHandoffRestartsTheWindow", waiting, .handedOff(alpha), .live, [window]),
-    row("handoffToNoSessionOpensNoWindow", live, .handedOff(nil), .live, []),
+    row(
+      "handoffIsConfirmedAndOpensTheResultWindow", live, .handedOff(alpha), .live,
+      [.confirmHandoff, window]),
+    row(
+      "aLaterHandoffIsConfirmedAndRestartsTheWindow", waiting, .handedOff(alpha), .live,
+      [.confirmHandoff, window]),
+    row("handoffToNoSessionIsNotConfirmedAndOpensNoWindow", live, .handedOff(nil), .live, []),
+    row(
+      "aHandoffWhileConnectingIsConfirmed", connecting, .handedOff(alpha), .connecting,
+      [.confirmHandoff]),
+    row(
+      "aHandoffAsTheLineClosesIsConfirmed", [.start], .handedOff(alpha), .listening,
+      [.confirmHandoff]),
     row(
       "ackKeepsTheLineOpenForTheResult", live + [.handedOff(alpha), .assistantSpeaking],
       said("On it."), .live, [arm]),
@@ -254,6 +285,25 @@ struct CallMachineTests {
     var answer = Self.result
     answer.session = cleared
     #expect(machine.handle(.deliver(answer)) == [.speak(answer), Self.arm])
+  }
+
+  /// A question withdrawn while the line it opened still connects leaves nothing to say: the
+  /// line closes, and nothing chimes.
+  @Test func withdrawingWhatOpenedTheLineClosesIt() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.opening(Self.asking)] { _ = machine.handle(event) }
+    #expect(machine.withdraw { $0 == Self.asking } == [.closeRealtime])
+    #expect(machine.phase == .listening)
+  }
+
+  /// A line the owner opened by speaking stays, whatever is withdrawn from it.
+  @Test func withdrawingKeepsALineTheOwnerOpened() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.deliver(Self.asking), .speechStarted] {
+      _ = machine.handle(event)
+    }
+    #expect(machine.withdraw { $0 == Self.asking } == [])
+    #expect(machine.phase == .connecting)
   }
 
   /// A result held while the owner spoke is withdrawn with the rest: nothing is left to say.

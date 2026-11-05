@@ -37,6 +37,12 @@ struct SettingsView: View {
         .font(.caption).foregroundStyle(.secondary)
       }
       Section("Notifications") {
+        Toggle("Play a sound when a request is queued for Claude", isOn: setting(\.confirmHandoffs))
+        Text(
+          "The voice sometimes says it is looking without sending the request; with no sound, "
+            + "nothing was queued, so say it again."
+        )
+        .font(.caption).foregroundStyle(.secondary)
         Toggle(
           "Notify when a result is waiting",
           isOn: Binding {
@@ -54,9 +60,8 @@ struct SettingsView: View {
       }
       Section("Context") {
         Toggle(
-          "Load a session's context automatically when it becomes the target",
-          isOn: setting(\.autoContext))
-        Text("Otherwise only Load context in the menu sends it.")
+          "Load context automatically when a line opens", isOn: setting(\.autoContext))
+        Text("Otherwise only Load context in the menu or /live context sends it.")
           .font(.caption).foregroundStyle(.secondary)
       }
       Section("General") {

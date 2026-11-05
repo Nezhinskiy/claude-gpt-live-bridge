@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { spokenReply, voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
+import { BAND, fakeWorld, framed, ID, LIVE, step } from './fake-bridge.ts'
 
 const REQUEST: VoiceRequest = {
   id: '00000000-0000-0000-0000-00000000000a',
@@ -84,6 +84,57 @@ test('approvalIsReported', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
 
+/** What Claude wrote in the step that asks for a permission goes with the approval notice. */
+test('theTextBeforeAnApprovalGoesWithIt', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', "I'm going to delete build/ and re-run.")
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'approval', text: "I'm going to delete build/ and re-run." },
+  ])
+})
+
+/**
+ * The engine may run a tool while its step still streams: a prompt then gets the text the step
+ * has streamed so far, never the step before it.
+ */
+test('aPromptWhileItsStepStreamsGetsThatStepsText', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Reading the config.')
+  world.stepText = "I'm going to delete build/ and re-run."
+  const streaming = $.turn.step({ turnId: 't1', index: 1, model: 'example-model', messageCount: 1 })
+  await streaming.next()
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'approval', text: "I'm going to delete build/ and re-run." },
+  ])
+  for await (const chunk of streaming) void chunk
+})
+
+/** A subagent's permission request is not the main loop's step: it neither carries nor takes that text. */
+test('aSubagentsApprovalGoesWithoutTheMainLoopsText', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Two folders hold build output.')
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval' }])
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r out' } })
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'approval', text: 'Two folders hold build output.' },
+  ])
+})
+
+/** A step longer than an answer may be is cut, so the notice still fits the app's body limit. */
+test('aLongStepIsCutForTheApproval', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'a'.repeat(40_000))
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', text: 'a'.repeat(32_000) }])
+})
+
 /** A voice request waiting for the next turn does not make the typed turn's approval the voice's. */
 test('aTypedTurnsApprovalIsNotReportedWhileAVoiceRequestWaits', async ($, on) => {
   const world = fakeWorld(on)
@@ -133,6 +184,88 @@ test('claudesQuestionIsAnsweredByVoice', async ($, on) => {
   await world.clock.advance(1000)
   expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+})
+
+const PLAIN = 'Which name should the folder get? Options: build: the default; out: shorter.'
+
+/** What Claude wrote in the step that asks the question goes with the question. */
+test('theTextBeforeClaudesQuestionGoesWithIt', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  world.take('answer')
+  await step($, world, 't1', 'Here is what I found: the folder has two outputs.')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{
+    sessionId: ID, state: 'approval',
+    question: PLAIN, text: 'Here is what I found: the folder has two outputs.',
+  }])
+  expect(world.take('answer')).toEqual([])
+  world.answerDialog('build')
+  await asked
+})
+
+/** A step with no text after one with text: the question goes alone. */
+test('aQuestionAfterAStepWithNoTextGoesAlone', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Let me look at the folder.')
+  await step($, world, 't1', '')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN }])
+  world.answerDialog('build')
+  await asked
+})
+
+/** The text goes with one question only. */
+test('aSecondQuestionDoesNotRepeatTheText', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Two folders hold build output.')
+  const first = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.answerDialog('out')
+  await first
+  world.take('activity')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN }])
+  world.answerDialog('build')
+  await asked
+})
+
+/** The text goes with one pause only: a question after a prompt in the same step goes alone. */
+test('aQuestionAfterAnApprovalInTheSameStepGoesAlone', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  world.stepText = 'Two folders hold build output.'
+  const streaming = $.turn.step({ turnId: 't1', index: 0, model: 'example-model', messageCount: 1 })
+  await streaming.next()
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  for await (const chunk of streaming) void chunk
+  world.take('activity')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN }])
+  world.answerDialog('build')
+  await asked
+})
+
+/** A subagent's step does not replace what the main loop wrote. */
+test('aSubagentsStepLeavesTheMainLoopsText', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  await step($, world, 't1', 'Two folders hold build output.')
+  await step($, world, 't1', 'A subagent report.', 'a1')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{
+    sessionId: ID, state: 'approval',
+    question: PLAIN, text: 'Two folders hold build output.',
+  }])
+  world.answerDialog('build')
+  await asked
 })
 
 /** Answered at the keyboard, the question is settled for the voice too; a reply after it is not lost silently. */

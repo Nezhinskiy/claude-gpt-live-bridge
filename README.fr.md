@@ -234,7 +234,7 @@ Dans la session Claude Code à laquelle vous voulez parler :
 | `/live context` | Envoie à la voix un nouveau résumé de cette session, rédigé par le modèle de la session. |
 
 La commande est `/live`, et non `/voice`, car `/voice` est le mode vocal propre à Claude Code.
-Envoyer ou non le résumé d'une session chaque fois qu'elle devient la cible n'est pas une
+Charger ou non le résumé d'une session chaque fois qu'une ligne s'ouvre n'est pas une
 commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 [Settings](#réglages) de LiveBridge.
 
@@ -243,17 +243,20 @@ commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 Appuyez sur **Start**, dans la bande au-dessus du prompt ou dans le menu de la barre des menus, et
 parlez.
 
-- **Le Start de la bande** fait de sa session la cible, démarre l'appel et envoie à la voix le
-  résumé de la session ([détails](docs/architecture/overview.md#components)). Tant que l'appel
-  parle à une autre session, la bande affiche **Talk here**. Si la bande
-  n'apparaît pas dans une session rejointe, `/live on` la fait revenir.
+- **Le Start de la bande** fait de sa session la cible et démarre l'appel ; avec
+  **Load context automatically when a line opens** activé, la ligne qu'il ouvre charge le résumé de la session
+  ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à une autre
+  session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session rejointe,
+  `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
   la conserve, les minutes, **Settings…** et **Quit LiveBridge**.
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
-  repart de zéro à la prochaine ouverture de la ligne, et `/live on` dans une session retirée la
-  rejoint de nouveau.
+  repart de zéro à la prochaine ouverture de la ligne, sauf si **Load context automatically when
+  a line opens** est activé : cette ligne recharge un résumé de la même transcription de la
+  session, donc désactivez le réglage ou faites `/clear` dans la session avant. `/live on` dans
+  une session retirée la rejoint de nouveau.
 
 ### Réglages
 
@@ -265,8 +268,12 @@ parlez.
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
   ouverture de la ligne.
-- **Load a session's context automatically when it becomes the target** (désactivé par défaut) :
-  un réglage unique pour toutes les sessions, conservé par l'application.
+- **Load context automatically when a line opens** (activé par défaut) : chaque
+  ligne que l'application ouvre (un Start, une ligne rouverte après un silence, la ligne après un
+  changement de cible) demande son résumé à la cible sans l'attendre ; un réglage unique pour
+  toutes les sessions, conservé par l'application.
+- **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
+  chaque demande que la voix transmet à Claude ([pourquoi](#limitations-connues)).
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
   attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
   new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
@@ -293,8 +300,9 @@ parlez.
 ## Facturation maîtrisée par conception
 
 Une session vocale en temps réel coûte tant qu'elle est ouverte, donc LiveBridge ne l'ouvre que
-pendant que quelqu'un parle, ou pendant que la réponse de Claude à une demande que vous venez de
-faire peut encore arriver :
+pendant que quelqu'un parle, pendant que la réponse de Claude à une demande que vous venez de
+faire peut encore arriver, ou pour dire cette réponse, une question de Claude ou que Claude
+attend votre autorisation :
 
 - Tant qu'un appel est en cours et que personne ne parle, le microphone alimente uniquement un
   détecteur de voix sur votre Mac. Rien n'est envoyé nulle part.
@@ -307,9 +315,12 @@ faire peut encore arriver :
   la réponse de Claude dès que plus personne ne parle. Un transfert ultérieur relance les
   2 minutes ; un échange qui n'envoie rien à Claude se ferme après les 20 secondes de silence
   habituelles.
-- Un résultat qui arrive plus tard, alors que la ligne est fermée, joue un carillon et attend : la
-  bande et le menu l'affichent comme non entendu, et la voix vous le dit la prochaine fois que
-  vous parlez
+- La réponse de Claude à une demande confiée à la session à laquelle vous parlez, une question
+  que Claude vous y pose ou une demande d'autorisation qu'il attend rouvre la ligne si elle arrive
+  alors que la ligne est fermée, et la voix la dit, facturée comme toute ligne ouverte. Tout le
+  reste de ce qui arrive ligne fermée (tout ce qui vient d'une session que vous avez quittée, une
+  mise à jour ultérieure) joue un carillon et attend : la bande et le menu l'affichent comme non
+  entendu, et la voix vous le dit la prochaine fois que vous parlez
   ([quand il compte comme entendu](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Chaque session Claude Code a sa propre conversation avec la voix. Elle est reportée sur la
   session temps réel suivante, et d'un Stop à un Start, de sorte que la voix se souvient de ce que
@@ -325,16 +336,20 @@ par un socket Unix situé dans un dossier que seul votre utilisateur peut ouvrir
 OpenAI, via la session temps réel de codex :
 
 - l'audio du microphone tant que la ligne est ouverte, de 2 secondes avant que vous ne commenciez
-  à parler jusqu'à sa fermeture ;
+  à parler (ou, pour une ligne qu'une réponse, une question ou une demande d'autorisation de
+  Claude a ouverte, dès son ouverture) jusqu'à sa fermeture ;
 - les instructions de la voix : les règles propres de LiveBridge, puis le **Prompt** de vos
   Settings si vous en avez écrit un ;
 - la conversation récente de la session cible (jusqu'aux 24 dernières lignes) pour la poursuivre
   dans une nouvelle session temps réel ;
 - les demandes encore ouvertes de la session cible, sous forme de résumés d'une ligne ;
 - chaque résultat, question, mise à jour et avis d'approbation, en une ligne d'au plus
-  2 000 caractères, blocs de code et tableaux retirés. Une mise à jour est la réponse de Claude
-  dans un tour ultérieur déclenché par la notification d'une tâche d'arrière-plan, pendant au plus
-  10 minutes après une demande vocale et jusqu'à ce qu'un autre tour démarre dans la session ;
+  2 000 caractères, blocs de code et tableaux retirés. Une question que Claude pose en cours de
+  tour, et l'avis d'approbation d'une permission que demande la boucle principale de Claude (pas
+  un sous-agent), portent aussi ce que Claude a écrit juste avant de demander. Une mise à jour
+  est la réponse de Claude dans un tour ultérieur déclenché par la notification d'une tâche
+  d'arrière-plan, pendant au plus 10 minutes après une demande vocale et jusqu'à ce qu'un autre
+  tour démarre dans la session ;
 - le résumé de contexte de la session cible, en une ligne d'au plus 1 500 caractères. Il est
   enregistré quand il est chargé et envoyé à chaque ouverture de la ligne tant que cette session
   est la cible, d'un Stop à un Start et d'un redémarrage de l'application à l'autre. Le
@@ -379,11 +394,20 @@ session.
 
 ## Limitations connues
 
+- La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande,
+  si bien que rien n'arrive à Claude : environ une demande sur cinq lors des
+  [tests](docs/bugs/BR-001.md), alors que la règle de la voix l'interdit. L'application joue un
+  son bref quand elle met une demande en file pour Claude ; si la voix dit qu'elle regarde et
+  qu'aucun son ne suit, répétez la demande. L'application ne peut pas distinguer une telle
+  promesse d'une réponse par ses mots, car la voix parle votre langue.
 - Un résultat qui arrive pendant que la ligne l'attend est transmis à la voix sous forme de texte
   à dire ; codex n'a aucun appel qui fasse parler la voix immédiatement, c'est donc le modèle qui
   décide du moment. Lors des tests, elle a parlé en quelques secondes. Si ce n'est pas le cas, le
   résultat reste non entendu : la voix le dit après vos prochains mots, ou un carillon retentit
   à la fermeture de la ligne.
+- Quand la réponse de Claude rouvre la ligne, la voix reste parfois muette
+  ([mesuré](docs/adr/0001-platform-findings.md)). La ligne se ferme alors au bout de 20 secondes,
+  et la réponse joue un carillon et attend, comme ci-dessous.
 - Quand vos prochains mots rouvrent la ligne, la voix répond parfois uniquement à ceux-ci sans
   dire le résultat en attente. Le résultat n'est pas perdu : il reste en attente, déclenche un
   carillon et publie une notification à la fermeture de la ligne, et il est de nouveau transmis à

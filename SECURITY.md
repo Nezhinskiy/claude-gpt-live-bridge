@@ -26,7 +26,8 @@ target session, and Claude runs it **under that session's own permission mode, a
 included**. Whatever that mode would ask before a tool runs, it still asks, and only you can
 answer, at your keyboard in Claude Code. LiveBridge has no code that answers a permission
 prompt: the mod declares no `tool.check` hook, and its `classic.PermissionRequest` hook only
-tells the voice that a prompt is waiting.
+tells the voice that a prompt is waiting, with what Claude's main loop wrote in the step that
+asks for it.
 
 A question Claude asks you while it works (the AskUserQuestion dialog) is not a permission
 prompt: Claude asks for your input, not for leave to run a tool. During a voice turn the mod
@@ -119,8 +120,8 @@ act" is a model instruction.
 
 ### What session text can do
 
-Results, questions, updates, open tasks and context summaries go to the voice as one tagged line
-each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
+Results, questions, updates, approval notices, open tasks and context summaries go to the voice
+as one tagged line each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
 space. That keeps the format unambiguous, but it is not a control: each line goes in with the
 rank of the owner's own words (`user`), so a session's text needs no fake tag to give the voice
 orders. The voice is told to treat such text as data to relay, which is again an instruction.
@@ -133,25 +134,31 @@ secret.
 ### Residual risk, by design
 
 - **Anything that steers the voice can start work.** Text a joined session read (a README, an
-  issue, a web page, a tool's output) can reach the voice in a result, an update or a summary,
-  and talk it into a handoff, including the "confirmed by voice" sentence above.
+  issue, a web page, a tool's output) can reach the voice in a result, a question, an update, an
+  approval notice or a summary, and talk it into a handoff, including the "confirmed by voice" sentence above.
 - **A handoff can hop between sessions.** The voice hands work to the target session, or to the
   session that asked the last question. So text that session A read can become a prompt in
   session B, which may run in a more permissive mode.
 - **A loaded context persists.** Each session's `[CONTEXT]` line is saved in the data folder
   with that session's conversation and given to every later realtime session while that session
   is the target, across Stop and Start and app restarts, until you press **New conversation**
-  with it as the target, load a new summary from it, or remove it from LiveBridge. The band's
-  Start sends one, and with **Load a session's context automatically when it becomes the
-  target** on in LiveBridge's Settings, a session sends a new one whenever it becomes the
-  target. One injected summary can therefore steer every later call with that session. Its recent conversation is carried over
-  the same way, including the lines the session sent the voice. A result from another session is
-  still spoken in whatever line is open, and the voice's reply to it stays in that line's
-  conversation, so one session's text can still reach the conversation about another.
+  with it as the target, load a new summary from it, or remove it from LiveBridge. With **Load
+  context automatically when a line opens** on (the default) in LiveBridge's Settings, the
+  target session sends a new one whenever the app opens a line: a Start, a line reopened after
+  silence, the line after a target switch. The menu's Load context and `/live context` send one
+  too. One injected summary can therefore steer every later call with that session, and **New
+  conversation** alone does not end that while the setting is on: the next line the app opens
+  loads a summary of the same transcript again, the text the session read included. Its recent
+  conversation is carried over the same way, including the lines the session sent the voice. A
+  result from another session is still spoken in whatever line is open, and the voice's reply to
+  it stays in that line's conversation, so one session's text can still reach the conversation
+  about another.
 
-Join only sessions whose input you trust, press **New conversation** with a session as the
-target after it has read text you do not trust, and keep voice off for a session whose permission mode acts without
-asking.
+Join only sessions whose input you trust. After a session has read text you do not trust, turn
+**Load context automatically when a line opens** off or `/clear` that session, then press **New
+conversation** with it as the target; with the setting on and the transcript unchanged, the next
+line loads a summary of the same text again. Keep voice off for a session whose permission mode
+acts without asking.
 
 ### What an update installs
 

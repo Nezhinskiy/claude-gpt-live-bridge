@@ -8,9 +8,7 @@ public enum AnswerShaper {
   public static func forVoice(
     _ text: String, status: AnswerStatus, label: String, session: SessionID? = nil
   ) -> VoiceLine {
-    let prose = text.replacing(/```[\s\S]*?(```|\z)/, with: "\n")
-      .split(whereSeparator: \.isNewline).filter { !$0.trimmingPrefix(/\s*/).hasPrefix("|") }
-      .joined(separator: " ")
+    let prose = prose(text)
     let kind: VoiceLine.Kind =
       switch status {
       case .ok: .result
@@ -23,6 +21,22 @@ public enum AnswerShaper {
       body: prose.allSatisfy(\.isWhitespace)
         ? "the answer is code or a table only; it is in the session." : prose,
       session: session)
+  }
+
+  /// `text` without its fenced code blocks and table rows, its lines joined by spaces.
+  public static func prose(_ text: String) -> String {
+    text.replacing(/```[\s\S]*?(```|\z)/, with: "\n")
+      .split(whereSeparator: \.isNewline).filter { !$0.trimmingPrefix(/\s*/).hasPrefix("|") }
+      .joined(separator: " ")
+  }
+
+  /// `head`, a question or a notice, then what Claude wrote in the step that paused on it, its
+  /// code and tables removed. After `head`, so the cut of a long line takes the text, never it.
+  public static func paused(_ head: String, wrote text: String?) -> String {
+    let said = prose(text ?? "")
+    if said.allSatisfy(\.isWhitespace) { return head }
+    let end = head.last.map { ".!?".contains($0) } == true ? "" : "."
+    return "\(head)\(end) Claude wrote just before asking: \(said)"
   }
 
   /// `[TAG] label: body` as exactly one line of at most `limit` characters, the label cut to

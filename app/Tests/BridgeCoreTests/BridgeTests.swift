@@ -73,7 +73,12 @@ actor FakeAudio: AudioSide {
   func failAnswers() { answerFails = true }
   func startListening() { calls.append("startListening") }
   func stopListening() { calls.append("stopListening") }
-  func makeOffer() -> String { "offer" }
+  /// Whether each offer carried the pre-roll.
+  var offers: [Bool] = []
+  func makeOffer(preroll: Bool) -> String {
+    offers.append(preroll)
+    return "offer"
+  }
   func applyAnswer(_ sdp: String) throws {
     if answerFails { throw CodexProblem.protocolMismatch("no session.started") }
     calls.append("applyAnswer")
@@ -82,6 +87,7 @@ actor FakeAudio: AudioSide {
   func flushPreroll() { calls.append("flushPreroll") }
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
+  func confirmHandoff() { calls.append("confirmHandoff") }
 }
 
 /// Records the notices the bridge posts.
@@ -105,7 +111,8 @@ struct BridgeTests {
   /// `dir` and `time` are given to restart the app on another test's data.
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
-    time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true }
+    time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
+    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, autoContext: Bool = false
   ) throws {
     self.time = time
     self.dir = try dir ?? temporaryDirectory()
@@ -115,7 +122,8 @@ struct BridgeTests {
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
-      notifier: notifier, notifies: notifies)
+      notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs,
+      autoContext: { autoContext })
   }
 
   @discardableResult
@@ -325,6 +333,53 @@ struct BridgeTests {
 
   /// A question Claude asks mid-turn reaches the voice whole, and the owner's next handoff goes
   /// to that session as its reply, though another session is the target.
+  /// What Claude wrote before asking rides in the question's line, its code and tables removed
+  /// as from a result.
+  @Test func aQuestionsLineHasNoCodeOrTables() async throws {
+    try await join(a, "Alpha")
+    try await registry.enqueue(request(1), for: a)
+    #expect(try await registry.poll(a) == .request(request(1)))
+    await live()
+    let question = "Which name? Options: out."
+    let text = "Two folders.\n```\nrm -rf build\n```\n| a | b |\nPick one."
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question, text: text))
+    let said = "Which name? Options: out. Claude wrote just before asking: Two folders. Pick one."
+    #expect(await voice.added == ["[ASKING] Alpha: \(said)"])
+  }
+
+  /// What Claude wrote in the step that asked for a permission follows the approval notice,
+  /// its code and tables removed as from a result.
+  @Test func anApprovalsLineCarriesTheStepsProse() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let text = "Deleting build.\n```\nrm -rf build\n```\n| a | b |\nThen test."
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
+    let notice = "Claude is waiting for your approval"
+    let said = "\(notice). Claude wrote just before asking: Deleting build. Then test."
+    #expect(await voice.added == ["[APPROVAL] Alpha: \(said)"])
+  }
+
+  /// A step that wrote only code or a table adds nothing to the notice.
+  @Test func anApprovalAfterACodeOnlyStepIsTheNoticeAlone() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let text = "```\nrm -rf build\n```\n| a | b |"
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
+    #expect(await voice.added == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
+  }
+
+  /// A step's text longer than a line is cut, and the notice before it stays whole.
+  @Test func aLongStepTextNeverCutsTheNotice() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let text = String(repeating: "Deleting build. ", count: 200)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
+    let line = try #require(await voice.added.first)
+    #expect(line.hasPrefix("[APPROVAL] Alpha: Claude is waiting for your approval. Claude wrote"))
+    #expect(line.count <= AnswerShaper.maxCharacters)
+  }
+
   @Test func replyToClaudesQuestionGoesToTheAskingSession() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
@@ -337,6 +392,16 @@ struct BridgeTests {
     #expect(await voice.added == ["[ASKING] Alpha: \(question)"])
     voice.emit(.handoff(request(2)))
     #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
+  }
+
+  /// A handoff queued for a session is confirmed by a sound, so the owner can tell a request
+  /// that went to Claude from a voice that only said it would look (BR-001).
+  @Test func handoffToASessionIsConfirmedBySound() async throws {
+    try await join(a, "Alpha")
+    await live()
+    voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
+    #expect(await eventually { await audio.calls.filter { $0 == "confirmHandoff" }.count == 1 })
   }
 
   /// What the voice handed off shows in the conversation of the session it went to: here the
@@ -456,6 +521,18 @@ struct BridgeTests {
     #expect(await test.notifier.posted.isEmpty)
   }
 
+  /// Settings' handoff sound is read at each handoff; off, the request still goes.
+  @Test func handoffSoundCanBeTurnedOff() async throws {
+    let settings = SettingsStore(file: nil)
+    let test = try BridgeTests(confirmsHandoffs: { settings.current.confirmHandoffs })
+    settings.update { $0.confirmHandoffs = false }
+    try await test.join(a, "Alpha")
+    await test.live()
+    test.voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await test.registry.poll(a) == .request(request(1)) })
+    #expect(await !test.audio.calls.contains("confirmHandoff"))
+  }
+
   /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.
   func handOff() async throws {
     voice.emit(.handoff(request(1)))
@@ -525,13 +602,17 @@ struct BridgeTests {
     #expect(await voice.spoken.isEmpty)
   }
 
-  /// Silence does not close a line that waits for a result; the window does, and a result after
-  /// it chimes as before.
+  /// Silence does not close a line that waits for a result; the window does, and the result
+  /// after it opens the line again, without the pre-roll, to be said.
   @Test func anUnansweredHandoffClosesTheLineAfterTheWindow() async throws {
     await live()
     await bridge.audioEvent(.speechEnded)
+    voice.emit(.userUtterance("Example request 1"))
     try await handOff()
-    #expect(await eventually { time.sleepers >= 4 })  // sweep, 2 silence timers, window
+    // the window's own timer, armed before the clock moves: a count of sleepers can be made up
+    // of silence timers while the handoff still waits to be handled
+    let window = time.now + Double(CallMachine.resultWindowSeconds)
+    #expect(await eventually { time.deadlines.contains(window) })
     for second in 1..<CallMachine.resultWindowSeconds {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined
@@ -541,8 +622,86 @@ struct BridgeTests {
     time.advance(by: .seconds(1))
     #expect(await eventually { await bridge.status.call == .listening })
     try await answerFirstRequest()
-    #expect(await audio.calls.contains("chime"))
-    #expect(await voice.spoken.isEmpty)
+    #expect(await eventually { await voice.opens.count == 2 })
+    #expect(await audio.offers == [true, false])
+    #expect(await !audio.calls.contains("chime"))
+  }
+
+  /// The owner asked Alpha, the target, for something, and the line has since closed.
+  func closedAfterARequest() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    voice.emit(.userUtterance("Example request 1"))
+    try await handOff()
+    voice.emit(.closed(.other("closed")))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
+  /// The answer opens the line without holding the mod's request while it connects.
+  @Test func anOpeningAnswerDoesNotWaitForTheConnect() async throws {
+    try await closedAfterARequest()
+    await voice.holdOpen()
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.openWaiting == 1 })
+    await voice.releaseOpen()
+    #expect(await eventually { await bridge.status.call == .live })
+  }
+
+  /// An answer for a session that is not the target only chimes: the owner switches to it.
+  @Test func anAnswerForASessionNotTheTargetOnlyChimes() async throws {
+    try await closedAfterARequest()
+    try await join(b, "Beta")
+    try await post("/v1/target", TargetBody(sessionId: b))
+    try await answerFirstRequest()
+    #expect(await eventually { await audio.calls.contains("chime") })
+    #expect(await voice.opens.count == 1)
+  }
+
+  /// Once its session is the target again, an answer opens the line.
+  @Test func anAnswerOpensTheLineWhenItsSessionIsTheTargetAgain() async throws {
+    try await closedAfterARequest()
+    try await join(b, "Beta")
+    try await post("/v1/target", TargetBody(sessionId: b))
+    try await post("/v1/target", TargetBody(sessionId: a))
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.opens.count == 2 })
+    #expect(await !audio.calls.contains("chime"))
+  }
+
+  /// With the target's conversation erased, a new line would hold no request of the owner's and
+  /// stay silent (ADR 0001 (b)), so the answer only chimes.
+  @Test func anAnswerAfterNewConversationOnlyChimes() async throws {
+    try await closedAfterARequest()
+    await bridge.newConversation()
+    try await answerFirstRequest()
+    #expect(await eventually { await audio.calls.contains("chime") })
+    #expect(await voice.opens.count == 1)
+  }
+
+  /// After the answer, an update only chimes; an approval notice and a question Claude asks open
+  /// the line.
+  @Test func anApprovalAndAQuestionOpenTheLineAnUpdateChimes() async throws {
+    try await closedAfterARequest()
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.opens.count == 2 })
+    voice.emit(.closed(.other("closed")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    let chimes = { await audio.calls.filter { $0 == "chime" }.count }
+    let before = await chimes()
+    try await post(
+      "/v1/answer",
+      AnswerBody(sessionId: a, id: request(1).id, status: .update, text: "Tests pass.", reason: nil)
+    )
+    #expect(await chimes() == before + 1)
+    #expect(await voice.opens.count == 2)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval))
+    #expect(await eventually { await voice.opens.count == 3 })
+    voice.emit(.closed(.other("closed")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .approval, question: "Which branch?"))
+    #expect(await eventually { await voice.opens.count == 4 })
   }
 
   /// The last session leaving stops the call, as Start with none refuses: nobody is left to
@@ -643,6 +802,129 @@ struct BridgeTests {
 
   /// The same app data after the app restarted: a fresh bridge and registry.
   func restart() throws -> BridgeTests { try BridgeTests(dir: dir, time: time) }
+
+  // MARK: Context when a line opens
+
+  let summary = "[CONTEXT] Alpha: Alpha's work."
+  func context(_ summary: String = "Alpha's work.") -> ContextBody {
+    ContextBody(sessionId: a, summary: summary)
+  }
+
+  /// An empty summary keeps the stored context and reaches no line. The mod never sends one; the
+  /// guard is against another socket peer, not a control.
+  @Test func anEmptySummaryKeepsTheStoredContext() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", context())
+    await live()
+    try await post("/v1/context", context(" "))
+    #expect(await bridge.current.context == summary)
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// The first line a Start opens asks the target for its context; Claude gets no request.
+  @Test func openingALineAsksForContext() async throws {
+    let test = try BridgeTests(autoContext: true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// A line reopened after the voice closed it asks again.
+  @Test func reopeningALineAsksForContext() async throws {
+    let test = try BridgeTests(autoContext: true)
+    await test.live()
+    _ = try await test.registry.poll(test.a)
+    test.voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  /// The line after a target switch asks the new target, and the old target is not asked.
+  @Test func theLineAfterATargetSwitchAsksTheNewTarget() async throws {
+    let test = try BridgeTests(autoContext: true)
+    try await test.join(test.a, "Alpha")
+    try await test.join(test.b, "Beta")
+    await test.live()
+    _ = try await test.registry.poll(test.a)
+    await test.bridge.setTarget(test.b)
+    #expect(try await test.registry.poll(test.b) == nil)  // switching asks for nothing
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(try await test.registry.poll(test.b) == .context)
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// With Load context automatically off, a line opens without asking.
+  @Test func openingALineWithTheSettingOffAsksForNothing() async throws {
+    await live()
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  /// A summary that comes while the line connects is added once the line is connected.
+  @Test func contextThatArrivesWhileConnectingReachesTheLine() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    await voice.holdOpen()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.openWaiting == 1 })
+    try await post("/v1/context", context())
+    #expect(await voice.added.isEmpty)
+    await voice.releaseOpen()
+    await opening.value
+    #expect(await voice.added == [summary])
+  }
+
+  /// A summary that came before the line's items were built is in them already: once connected,
+  /// the line is not given it again. Here the line waits for a fresh codex to launch, so the
+  /// summary lands before the items are built.
+  @Test func aSeededContextIsNotAddedAgainOnceTheLineConnects() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    await test.live()
+    let first = try #require(await voices.made.first)
+    first.emit(.closed(.codex(.exited(-1))))
+    first.end()
+    #expect(await eventually { await first.shutdowns == 1 })
+    await voices.setSlow()
+    let opening = Task { await test.bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voices.waiting == 1 })
+    try await test.post("/v1/context", test.context())
+    await voices.finishLaunch()
+    await opening.value
+    let second = try #require(await voices.made.last)
+    #expect(await second.opens.last?.map(\.text).contains(test.summary) == true)
+    #expect(await second.added.isEmpty)
+  }
+
+  /// A summary for another session than the one the line is connecting to is not added to it.
+  @Test func contextForAnotherSessionDoesNotReachAConnectingLine() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    await voice.holdOpen()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.openWaiting == 1 })
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    await voice.releaseOpen()
+    await opening.value
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// The same summary again is not added to the line a second time.
+  @Test func anUnchangedContextIsNotAddedAgain() async throws {
+    await live()
+    try await post("/v1/context", context())
+    try await post("/v1/context", context())
+    #expect(await voice.added == [summary])
+  }
+
+  /// A summary that differs from the stored one is added.
+  @Test func aChangedContextIsAdded() async throws {
+    await live()
+    try await post("/v1/context", context())
+    try await post("/v1/context", context("Alpha's other work."))
+    #expect(await voice.added == [summary, "[CONTEXT] Alpha: Alpha's other work."])
+  }
 
   // MARK: One conversation per session
 
