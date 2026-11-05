@@ -61,7 +61,7 @@ struct SettingsView: View {
       Section("Context") {
         Toggle(
           "Load context automatically when a line opens", isOn: setting(\.autoContext))
-        Text("Otherwise only Load context in the menu, /live context or asking the voice sends it.")
+        Text("Otherwise only Load context in the menu or /live context sends it.")
           .font(.caption).foregroundStyle(.secondary)
       }
       Section("General") {

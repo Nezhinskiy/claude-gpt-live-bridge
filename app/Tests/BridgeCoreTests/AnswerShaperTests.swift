@@ -24,8 +24,6 @@ struct AnswerShaperTests {
     let voice = AnswerShaper.forVoice(text, status: .ok, label: "Example session").text
     #expect(voice.count <= AnswerShaper.maxCharacters, "\(voice.count)")
     #expect(voice.hasPrefix("[RESULT] Example session: "))
-    let last = AnswerShaper.lastReply(text, label: "Example session").text
-    #expect(last.count <= AnswerShaper.maxCharacters, "\(last.count)")
   }
 
   /// A session title of any length cannot crowd out the body or break the line.
@@ -36,22 +34,6 @@ struct AnswerShaperTests {
       #expect(line.count <= limit && line.hasSuffix(": Done."), "\(line.count)")
     }
     #expect(AnswerShaper.cap("Done.", to: 0).isEmpty && AnswerShaper.cap("Done.", to: -3).isEmpty)
-  }
-
-  /// Claude's last reply loses its code and keeps its end, the conclusion, from a sentence
-  /// start; what is left is redacted.
-  @Test func lastDropsCodeAndKeepsTheEnd() {
-    let sentence = "This sentence is exactly fifty characters long ok. "
-    let token = "ghp_" + String(repeating: "a", count: 36)
-    let reply =
-      String(repeating: sentence, count: 60) + "\n```env\nGITHUB_TOKEN=\(token)\n```\n"
-      + "The key sk-abcdefghijklmnopqrstuvwx is set. So the build is fixed."
-    let line = AnswerShaper.lastReply(reply, label: "Example session").text
-    #expect(line.count <= AnswerShaper.maxCharacters, "\(line.count)")
-    #expect(!line.contains("GITHUB_TOKEN") && !line.contains("ghp_"))
-    #expect(!line.contains("abcdefghij"))
-    #expect(line.hasPrefix("[LAST] Example session: This sentence"))
-    #expect(line.hasSuffix("So the build is fixed."))
   }
 
   @Test func redactsSecretsInAnswers() {

@@ -4,9 +4,6 @@ import Foundation
 public enum RealtimeEvent: Sendable, Equatable {
   /// The voice handed a request off (a codex `handoff_request` item), once per handoff id.
   case handoff(VoiceRequest)
-  /// The voice fetched the session's context: a handoff whose brief is `fetchBrief`. It never
-  /// reaches Claude.
-  case contextFetch
   case userUtterance(String)
   /// The voice finished a reply.
   case assistantUtterance(String)
@@ -51,8 +48,6 @@ public actor RealtimeSession: RealtimeControlling {
   private let timeout = Duration.seconds(20)
   /// More `mcpServerStatus/list` pages than this is a reply this version does not understand.
   static let maxStatusPages = 50
-  /// The brief of the handoff that fetches the session's context, in any case and punctuation.
-  public static let fetchBrief = "refresh context"
 
   /// Which `open` a line belongs to.
   private final class Ticket: Sendable {}
@@ -329,16 +324,10 @@ public actor RealtimeSession: RealtimeControlling {
 
   /// A `handoff_request` item: `input_transcript` is the brief, `active_transcript` the speech.
   /// The request gets a fresh UUID (the id the mod accepts); `handoff_id` only de-duplicates.
-  /// A brief of the words of `fetchBrief` alone is the voice's fetch, not a request.
   private func handoff(_ item: JSONValue) {
     guard item["type"] == "handoff_request", let id = item["handoff_id"]?.string,
       handoffs.insert(id).inserted
     else { return }
-    let brief = item["input_transcript"]?.string ?? ""
-    if CallMachine.words(brief) == CallMachine.words(Self.fetchBrief) {
-      emit.yield(.contextFetch)
-      return
-    }
     let transcript = (item["active_transcript"]?.array ?? []).compactMap { line in
       line["text"]?.string.map {
         Utterance(role: line["role"] == "assistant" ? .assistant : .user, text: $0)
@@ -348,7 +337,7 @@ public actor RealtimeSession: RealtimeControlling {
       .handoff(
         VoiceRequest(
           id: RequestID(rawValue: UUID().uuidString.lowercased()),
-          brief: brief,
+          brief: item["input_transcript"]?.string ?? "",
           transcript: transcript)))
   }
 }

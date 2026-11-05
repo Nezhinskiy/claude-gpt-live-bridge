@@ -13,8 +13,6 @@ public struct VoiceLine: Equatable, Sendable {
     case asking = "ASKING"
     case context = "CONTEXT"
     case task = "TASK"
-    /// Claude's last reply, said only in answer to the voice's fetch of the session's context.
-    case last = "LAST"
 
     /// It ends a request, so the line stops waiting for that session: a result, a failure or a
     /// question. An update, an approval notice, a question Claude waits on or context leaves the
@@ -52,10 +50,6 @@ public enum CallEvent: Equatable, Sendable {
   /// The open line carries a conversation that is not the target's any more: another session
   /// became the target, or the target's conversation was erased.
   case conversationChanged
-  /// The voice fetched this session's context; the line waits for it.
-  case fetchAsked(SessionID)
-  /// The fetch's answer: the context, Claude's last reply, or the fetch's failure.
-  case fetchAnswered([VoiceLine])
 }
 
 /// What the bridge does in reply, in order.
@@ -71,21 +65,18 @@ public enum CallEffect: Equatable, Sendable {
   /// Asks the open line to say a result now.
   case speak(VoiceLine)
   case chime
-  /// A handoff, or the voice's fetch that the open line waits for, was queued for a session;
-  /// without this sound the owner cannot tell it from a voice that only said it would look
-  /// (BR-001).
+  /// A handoff was queued for a session; without this sound the owner cannot tell it from a
+  /// voice that only said it would look (BR-001).
   case confirmHandoff
   case problem(Problem?)
 }
 
-/// The billing-aware call. The realtime session is open only while someone speaks, a handed-off
-/// request may still be answered or the voice waits for the context it fetched: speech opens
-/// it, silence or a new target closes it, and the microphone stays with local voice detection in
-/// between. After a handoff the line waits up to `resultWindowSeconds` from the latest one for
-/// that session's result, and says it as soon as nobody is speaking. A result that arrives while
-/// the line is closed is announced by a chime and waits until the owner next speaks. A fetch's
-/// answer is said like an awaited result, but only on the line that fetched it, and never waits
-/// as unheard. Pure: the bridge runs the effects.
+/// The billing-aware call. The realtime session is open only while someone speaks or a handed-off
+/// request may still be answered: speech opens it, silence or a new target closes it, and the
+/// microphone stays with local voice detection in between. After a handoff the line waits up to
+/// `resultWindowSeconds` from the latest one for that session's result, and says it as soon as
+/// nobody is speaking. A result that arrives while the line is closed is announced by a chime and
+/// waits until the owner next speaks. Pure: the bridge runs the effects.
 public struct CallMachine: Sendable {
   public static let noise = Problem.other(
     "The voice hung up: the microphone heard sound but no words for 90 seconds.")
@@ -106,11 +97,6 @@ public struct CallMachine: Sendable {
   /// The sessions handed a request whose result the open line waits for; while any is, silence
   /// does not close it, until `resultWindowSeconds` after the latest handoff.
   public private(set) var awaited: Set<SessionID> = []
-  /// The session whose context the voice fetched and the open line waits for; while it is set,
-  /// silence does not close the line. Its answer is said on its own path: never unheard.
-  public private(set) var fetching: SessionID?
-  /// The fetch's answer, which came while someone spoke; said once everyone is silent.
-  private var heldFetch: [VoiceLine] = []
   /// The silence timer elapsed while the line waited for a result.
   private var isSilenceDue = false
   /// The voice is saying a reply: a transcript delta came and its reply has not finished.
@@ -137,7 +123,7 @@ public struct CallMachine: Sendable {
 
   /// The grace before a held result is said, once neither the owner nor the voice is speaking.
   private var graceIfQuiet: [CallEffect] {
-    (!unheard.contains(where: \.isHeld) && heldFetch.isEmpty) || isSoundOn || isVoiceSpeaking
+    !unheard.contains(where: \.isHeld) || isSoundOn || isVoiceSpeaking
       ? [] : [.armGrace(milliseconds: Self.graceMilliseconds)]
   }
 
@@ -196,18 +182,6 @@ public struct CallMachine: Sendable {
       guard let session else { return [] }
       awaited.insert(session)
       return [.confirmHandoff, .armResultWindow(seconds: Self.resultWindowSeconds)]
-    case (.live, .fetchAsked(let session)):
-      isAckUnfinished = true  // the fetch is a handoff to codex, which acknowledges it
-      fetching = session
-      return [.confirmHandoff]
-    case (.live, .fetchAnswered(let lines)):
-      guard fetching != nil else { return [] }
-      fetching = nil
-      if isSoundOn || isVoiceSpeaking {
-        heldFetch += lines
-        return [armSilence()]
-      }
-      return lines.map { .speak($0) } + [armSilence()]
     case (.live, .assistantFinishedSpeaking(let text)):
       let canSay = replyCanSay ?? []
       replyCanSay = nil
@@ -218,19 +192,18 @@ public struct CallMachine: Sendable {
       isAckUnfinished = false
       return [armSilence()] + graceIfQuiet
     case (.live, .graceElapsed):
-      let held = unheard.filter(\.isHeld).map(\.line) + heldFetch
+      let held = unheard.filter(\.isHeld).map(\.line)
       guard !held.isEmpty, !isSoundOn, !isVoiceSpeaking else { return [] }
       unheard = unheard.map { Unheard(line: $0.line) }
-      heldFetch = []
       return held.map { .speak($0) } + [armSilence()]
     case (.live, .resultWindowElapsed):
       guard !awaited.isEmpty else { return [] }
       awaited = []
-      return isSilenceDue && fetching == nil ? [.closeRealtime] + hangUp() : []
+      return isSilenceDue ? [.closeRealtime] + hangUp() : []
     case (.connecting, .conversationChanged), (.live, .conversationChanged):
       return [.closeRealtime] + hangUp()
     case (.live, .silenceElapsed):
-      if !awaited.isEmpty || fetching != nil, !isSoundOn {
+      if !awaited.isEmpty, !isSoundOn {
         isSilenceDue = true
         return []
       }
@@ -246,11 +219,10 @@ public struct CallMachine: Sendable {
     unheard.removeAll { isSuperseded($0.line) }
   }
 
-  /// A session got a new id (`/clear`): the line waits for it and its context, and its results
-  /// stay its own, under the new id.
+  /// A session got a new id (`/clear`): the line waits for it, and its results stay its own,
+  /// under the new id.
   public mutating func rename(_ old: SessionID, to new: SessionID) {
     if awaited.remove(old) != nil { awaited.insert(new) }
-    if fetching == old { fetching = new }
     let moved = { (line: VoiceLine) in
       var line = line
       if line.session == old { line.session = new }
@@ -261,13 +233,10 @@ public struct CallMachine: Sendable {
   }
 
   /// Back to local listening; `pending` is kept, and a chime says so when the line was open.
-  /// A fetch is dropped: its answer would come to another line.
   private mutating func hangUp() -> [CallEffect] {
     defer {
       phase = .listening
       awaited = []
-      fetching = nil
-      heldFetch = []
       unheard = unheard.map { Unheard(line: $0.line) }
       isSilenceDue = false
       isVoiceSpeaking = false
@@ -307,8 +276,7 @@ public struct CallMachine: Sendable {
     "would", "your", "если", "есть", "когда", "можно", "сейчас", "тоже", "только", "чтобы",
   ]
 
-  /// The text's words, folded: what is left without case, diacritics, punctuation or digits.
-  static func words(_ text: String) -> [String] {
+  private static func words(_ text: String) -> [String] {
     text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
       .split(whereSeparator: { !$0.isLetter }).map(String.init)
   }

@@ -155,7 +155,7 @@ public actor Bridge: Router {
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
   public func loadContext() async {
     guard let target = await registry.target else { return }
-    await registry.requestContext(for: target, fetch: nil)
+    await registry.requestContext(for: target)
   }
 
   /// The menu's choice of target, which also ends a question's route; a session that left is
@@ -310,7 +310,7 @@ public actor Bridge: Router {
     let session = await registry.target
     lineSession = session
     lineKnowsSession = true
-    if let session, autoContext() { await registry.requestContext(for: session, fetch: nil) }
+    if let session, autoContext() { await registry.requestContext(for: session) }
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer()
@@ -377,14 +377,12 @@ public actor Bridge: Router {
     case .handoff(let request):
       let session = await route(request)
       await send(.handedOff(session))
-      if session == nil { await send(.deliver(Self.noSession)) }
-    case .contextFetch:
-      guard let target = await registry.target else {
-        await send(.deliver(Self.noSession))
-        break
+      if session == nil {
+        await send(
+          .deliver(
+            AnswerShaper.line(
+              .failed, label: "LiveBridge", body: "no Claude Code session is joined.")))
       }
-      await send(.fetchAsked(target))
-      await registry.requestContext(for: target, fetch: time.now + ContextLoads.timeout)
     case .userUtterance(let text):
       record(.owner, text, in: lineSession)
       await send(.userTranscribed)
@@ -400,10 +398,6 @@ public actor Bridge: Router {
     }
     await changed()
   }
-
-  /// What the voice is told when no session is joined to take its handoff or fetch.
-  private static let noSession = AnswerShaper.line(
-    .failed, label: "LiveBridge", body: "no Claude Code session is joined.")
 
   private func record(_ speaker: Conversation.Line.Speaker, _ text: String, in id: SessionID?) {
     guard let id, !text.isEmpty else { return }
@@ -496,56 +490,35 @@ public actor Bridge: Router {
   }
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
-  /// it is and kept in the session's conversation; an empty one (none, or it failed) keeps the
-  /// stored line. When the line waits for it as its fetch's answer, it is said, with Claude's
-  /// last reply as a `[LAST]` line that is never kept; with neither, the fetch failed.
-  /// Otherwise a live line about that session gets the summary at once, and one still
-  /// connecting gets it when connected; Claude's last reply goes nowhere. A summary equal to the
-  /// stored one is neither saved nor added again.
+  /// it is and kept in the session's conversation; an empty one keeps the stored line. A live
+  /// line about that session gets it at once, and one still connecting gets it when connected;
+  /// it does not hold the line open. A summary equal to the stored one is neither saved nor
+  /// added again.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
-    let summary =
+    let line =
       body.summary.allSatisfy(\.isWhitespace)
       ? nil
       : AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
-    let changed = summary != nil && summary?.text != continuity[id].context
-    if let summary, changed {
-      continuity.setContext(summary.text, for: id)
-      save()
+    guard let line, line.text != continuity[id].context else {
+      announceContext.yield(id)
+      return
     }
+    continuity.setContext(line.text, for: id)
+    save()
     announceContext.yield(id)
-    if await registry.endFetch(of: id), machine.fetching == id {
-      let last = body.last.flatMap {
-        $0.allSatisfy(\.isWhitespace)
-          ? nil : AnswerShaper.lastReply($0, label: row.label, session: id)
-      }
-      let lines = [summary, last].compactMap { $0 }
-      await send(.fetchAnswered(lines.isEmpty ? [fetchFailed(row.label, id)] : lines))
-    } else if let summary, changed, lineSession == id {
-      switch machine.phase {
-      case .live: try? await realtime?.addContext(summary.text)
-      case .connecting: heldContext = summary
-      default: break
-      }
+    guard lineSession == id else { return }
+    switch machine.phase {
+    case .live: try? await realtime?.addContext(line.text)
+    case .connecting: heldContext = line
+    default: break
     }
   }
 
-  private func fetchFailed(_ label: String, _ id: SessionID) -> VoiceLine {
-    AnswerShaper.line(.failed, label: label, body: SessionRegistry.fetchFailure, session: id)
-  }
-
-  /// Fails what timed out; a fetch's failure is its answer, said only while the line waits for
-  /// it.
   private func sweep() async {
-    for delivery in await registry.sweep() {
-      if !delivery.isFetch {
-        await deliver(delivery)
-      } else if machine.fetching == delivery.session {
-        await send(.fetchAnswered([fetchFailed(delivery.label, delivery.session)]))
-      }
-    }
+    for delivery in await registry.sweep() { await deliver(delivery) }
     await changed()
   }
 
