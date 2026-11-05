@@ -58,7 +58,7 @@ export type ActivityBody =
   { sessionId: SessionId; state: SessionActivity; question?: string; text?: string };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
-export type CallAction = 'start' | 'stop';
+export type CallAction = 'start' | 'stop' | 'mute' | 'unmute';
 export type CallBody = { action: CallAction };
 
 export type CallPhase = 'off' | 'listening' | 'connecting' | 'live';
@@ -73,6 +73,8 @@ export type StatusReply = {
   problem?: string;
   /** Results the voice has not said yet. */
   unheard: number;
+  /** The microphone is released while the call goes on. */
+  isMuted?: boolean;
 };
 
 /** The reply to GET /v1/next; each poll also refreshes the session's liveness. */

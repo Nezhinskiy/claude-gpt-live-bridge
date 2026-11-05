@@ -1,6 +1,7 @@
 {
   "status": {
     "call": "off",
+    "isMuted": false,
     "minutesToday": 0,
     "sessions": [],
     "unheard": 0

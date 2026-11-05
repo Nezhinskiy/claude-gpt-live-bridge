@@ -29,6 +29,7 @@ const STATUS = fields<Wire.StatusReply>({
   minutesToday: 'number',
   problem: optional(S),
   unheard: 'number',
+  isMuted: optional('boolean'),
 })
 const WORK: Shape = {
   anyOf: [
@@ -51,7 +52,7 @@ const SHAPES: Record<string, Shape> = {
     sessionId: S, id: S, status: { oneOf: ['ok', 'failed', 'question', 'update'] }, text: S,
     reason: optional(S),
   }),
-  'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop'] } }),
+  'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop', 'mute', 'unmute'] } }),
   'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
   'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S) }),

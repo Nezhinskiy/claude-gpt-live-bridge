@@ -130,6 +130,8 @@ public actor Bridge: Router {
       questionRoute = nil
       await send(.stop)
       await endCodex()
+    case .mute, .unmute:
+      break
     }
   }
 

@@ -123,9 +123,9 @@ public struct ContextBody: Codable, Sendable, Equatable {
   public var summary: String
 }
 
-public enum CallAction: String, Codable, Sendable { case start, stop }
+public enum CallAction: String, Codable, Sendable { case start, stop, mute, unmute }
 
-/// `POST /v1/call`: Start or Stop from the Claude Code band.
+/// `POST /v1/call`: Start, Stop, Mute or Unmute from the Claude Code band.
 public struct CallBody: Codable, Sendable, Equatable { public var action: CallAction }
 
 /// `off`: no microphone. `listening`: microphone and local voice detection only, no realtime
@@ -150,6 +150,8 @@ public struct StatusReply: Codable, Sendable, Equatable {
   /// Results the voice has not said yet: waiting for the owner to speak, or given to the open
   /// session.
   public var unheard: Int
+  /// The microphone is released while the call goes on.
+  public var isMuted = false
 }
 
 /// The reply to `GET /v1/next`. Each poll also refreshes the session's liveness.

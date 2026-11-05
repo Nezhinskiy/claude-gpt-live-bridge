@@ -990,7 +990,7 @@ struct BridgeTests {
       HTTPRequest(method: "GET", path: "/v1/next", query: ["sessionId": b.rawValue], body: Data()))
     let polled = try JSONSerialization.jsonObject(with: reply.body) as? [String: Any]
     let status = try #require(polled?["status"] as? [String: Any])
-    #expect(Set(status.keys) == ["call", "sessions", "minutesToday", "unheard"])
+    #expect(Set(status.keys) == ["call", "sessions", "minutesToday", "unheard", "isMuted"])
     await bridge.setTarget(b)
     #expect(await lines().isEmpty)
   }
