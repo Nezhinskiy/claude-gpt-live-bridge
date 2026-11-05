@@ -9,7 +9,7 @@ import { summarize } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
 import { askedText, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
-import { clip, clipToEnd, originOf, TurnTracker } from './turns.ts'
+import { clip, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
 import type { VoiceRequest } from './wire.ts'
@@ -29,8 +29,6 @@ const CONTEXT_TIMEOUT_MS = 60_000
 const SENT_NOTE_MS = 3_000
 /** How long the polled band may go undrawn before every surface is asked for it again. */
 const UNDRAWN_MS = 3_000
-/** In characters, as `ANSWER_LIMIT`: what the context's `last` may hold; the app shortens it for speech. */
-const LAST_LIMIT = 8_000
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
@@ -49,10 +47,6 @@ let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
 /** When a surface last asked for the band while this session was joined. */
 let drawnAt = 0
-/** Claude's last reply in the main loop (the last non-empty answer of a turn), until /clear. */
-let lastReply = ''
-/** What Claude wrote when it asked, and the question, while an `AskUserQuestion` is open. */
-let asking: { step: string; question: string } | null = null
 let approval: { tool: string; agent: string | undefined } | null = null
 /** Answers the question Claude asked in a voice turn with the owner's spoken reply, while it is open. */
 let answerQuestion: ((text: string) => void) | null = null
@@ -186,8 +180,6 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
   if (!isNewId && title === joined.title) return
   if (isNewId) {
     staleSummary()  // /clear: a new transcript
-    lastReply = ''
-    asking = null
     await $.store.delete(joinedKey(joined.sessionId))
   }
   await link.rejoin({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
@@ -267,13 +259,6 @@ function staleSummary(): void {
   summary = null
 }
 
-/** What Claude last said, its end kept; an open question comes with the text that asked it. */
-function lastText(): string {
-  if (asking === null) return clipToEnd(lastReply, LAST_LIMIT)
-  const said = asking.step || lastReply
-  return clipToEnd(said === '' ? asking.question : `${said}\n\n${asking.question}`, LAST_LIMIT)
-}
-
 /** The band's note on the summary; undefined takes it down. */
 function showContext($: EngineInterface, context: Band['context']) {
   return update($, band, now => {
@@ -293,9 +278,9 @@ async function hasTurns($: EngineInterface): Promise<boolean> {
 }
 
 /**
- * Sends the session's summary and Claude's last reply to the app; says what happened and never
- * rejects. `isFresh` asks the model again even when no turn has completed since its last summary.
- * While one is on its way a second ask joins it.
+ * Sends the session's summary to the app; says what happened and never rejects. `isFresh` asks
+ * the model again even when no turn has completed since its last summary. While one is on its
+ * way a second ask joins it.
  */
 function sendContext($: EngineInterface, isFresh: boolean): Promise<ContextOutcome> {
   sending ??= deliverContext($, isFresh).finally(() => { sending = null })
@@ -321,19 +306,11 @@ async function deliverContext($: EngineInterface, isFresh: boolean): Promise<Con
 async function writeAndPost($: EngineInterface, isFresh: boolean, send: number): Promise<ContextOutcome> {
   try {
     const turns = turnsDone
-    let text = ''
-    let isWritten = true
-    try {
-      text = !isFresh && summary !== null ? summary : await summarize($)
-    } catch {
-      isWritten = false  // the voice still gets Claude's last reply
-    }
+    const text = !isFresh && summary !== null ? summary : await summarize($)
     if (send !== sendCount) return 'failed'
-    if (isWritten && text !== '' && turns === turnsDone) summary = text
-    const last = lastText()
-    if (text === '' && last === '') return isWritten ? 'empty' : 'failed'
-    const isTaken = (await link?.context(text, last)) === true
-    return isTaken && isWritten ? 'sent' : 'failed'
+    if (text === '') return 'empty'
+    if (turns === turnsDone) summary = text
+    return (await link?.context(text)) === true ? 'sent' : 'failed'
   } catch {
     return 'failed'
   }
@@ -464,8 +441,7 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      // A turn with no origin seen is treated as typed: its answer reaches the voice only as the
-      // context's `last`, when the owner's fetch asks for it.
+      // A turn with no origin seen is treated as typed: its answer never reaches the voice.
       tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'typed', await $.clock.now())
       lastOrigin = null
       await serial(() => follow($, false))
@@ -486,7 +462,6 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       const post = tracker.turnCompleted(e.turnId, e.answer, e.reason)
-      if (e.answer.trim() !== '') lastReply = e.answer
       if (!post) staleSummary()  // a voice turn's answer went to the voice: the summary still holds
       approval = null
       await save($)
@@ -506,26 +481,16 @@ export const register: Register = on => {
   // free text, so the owner may ask back instead of choosing; returning before the dialog's
   // own answer closes it.
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
-    if (e.agentId !== undefined) return next(e)
-    // Taken once for both: the voice's question line, and the context's copy while it is open.
-    const said = tracker.takeStepText().trim()
-    // A context asked meanwhile carries the step's text, then the question, a typed turn's
-    // included: each once, the question last, as the context keeps the end.
-    asking = { step: said, question: askedText(e.questions) }
+    if (e.agentId !== undefined || tracker.running === null || !link?.session) return next(e)
+    const answered = next(e)
+    const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
     try {
-      if (tracker.running === null || !link?.session) return await next(e)
-      const answered = next(e)
-      const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
-      try {
-        await link.activity('approval', askedText(e.questions, said))
-        const first = await Promise.race([answered, spoken])
-        return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
-      } finally {
-        answerQuestion = null
-        await link?.activity('working')
-      }
+      await link.activity('approval', askedText(e.questions, tracker.takeStepText()))
+      const first = await Promise.race([answered, spoken])
+      return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
     } finally {
-      asking = null
+      answerQuestion = null
+      await link?.activity('working')
     }
   }).catch(($, e, next) => next(e))
 

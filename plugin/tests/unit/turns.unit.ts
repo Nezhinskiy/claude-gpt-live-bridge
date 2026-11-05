@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { FRAMING, voicePrompt } from '../../hooks/prompt.ts'
-import { clip, clipToEnd, FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
+import { clip, FOLLOW_UP_MS, originOf, TurnTracker } from '../../hooks/turns.ts'
 
 const ID = '00000000-0000-0000-0000-00000000000a'
 const framed = (id: string) =>
@@ -109,24 +109,6 @@ test('clipCutsWholeCharactersOnly', () => {
   assert.equal(clip('short', 10), 'short')
   // In a `u` pattern a pair is one character, so only a lone surrogate matches.
   for (let limit = 0; limit < 8; limit++) assert.ok(!/[\uD800-\uDFFF]/u.test(clip('a😀'.repeat(4), limit)))
-})
-
-test('clipToEndLeavesShortTextAlone', () => {
-  assert.equal(clipToEnd('one\ntwo', 20), 'one\ntwo')
-  assert.equal(clipToEnd('one\ntwo', 7), 'one\ntwo')
-})
-
-test('clipToEndKeepsTheEndFromALineStart', () => {
-  // The last 12 characters are "ee\nfour\nfive"; what is left of the cut line, "ee", is dropped.
-  assert.equal(clipToEnd('one\ntwo\nthree\nfour\nfive', 12), 'four\nfive')
-})
-
-test('clipToEndKeepsTheWindowWhenItHoldsNoLineBreak', () => {
-  assert.equal(clipToEnd('abcdefghij', 4), 'ghij')
-})
-
-test('clipToEndNeverSplitsASurrogatePair', () => {
-  assert.equal(clipToEnd('a😀😀😀', 2), '😀😀')
 })
 
 test('aStepsTextIsTakenOnce', () => {

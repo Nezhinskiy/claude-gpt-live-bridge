@@ -204,12 +204,6 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
 export const framed = (text: string) =>
   `${FRAMING}${text}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns — it starts this turn in the user's place. Address the message above.`
 
-/** A question Claude asks the owner with `AskUserQuestion`. */
-export const ASKED = [{
-  question: 'Which name should the folder get?', header: 'Name', multiSelect: false,
-  options: [{ label: 'build', description: 'the default' }, { label: 'out', description: 'shorter' }],
-}]
-
 /** One model step of turn `turnId` (a subagent's, with `agentId`) whose visible text is `text`. */
 export async function step($: Engine, world: ReturnType<typeof fakeWorld>, turnId: string, text: string, agentId?: string) {
   world.stepText = text

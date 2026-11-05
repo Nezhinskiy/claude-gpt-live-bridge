@@ -108,12 +108,9 @@ export class BridgeLink {
     await this.#forSession('activity', { state, ...(question !== undefined && { question }) })
   }
 
-  /**
-   * Posts the session's summary (`''` when there is none) and Claude's last reply; false when the
-   * app did not take it.
-   */
-  async context(summary: string, last?: string): Promise<boolean> {
-    return (await this.#forSession('context', { summary, ...(last && { last }) }))?.ok === true
+  /** Posts the session's summary; false when the app did not take it. */
+  async context(summary: string): Promise<boolean> {
+    return (await this.#forSession('context', { summary }))?.ok === true
   }
 
   async target(): Promise<void> {

@@ -1,12 +1,11 @@
-// The app asks for this session's context (the line it opens does, and so does the voice's
-// fetch): the summary and Claude's last reply, once per change, never for a new session, and
-// with a short note in the band while it goes.
+// The app asks for this session's context (the line it opens does): the summary, once per change,
+// never for a new session, and with a short note in the band while it goes.
 import { expect, test } from 'claude-code/testing'
 import type { Engine, TestBody } from 'claude-code/testing'
 
-import { askedText, voicePrompt } from '../hooks/prompt.ts'
+import { voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { ASKED, BAND, fakeWorld, framed, ID, LIVE, step } from './fake-bridge.ts'
+import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
 
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
 const SUMMARY = { sessionId: ID, summary: 'Goal: tidy the example project.' }
@@ -102,7 +101,7 @@ test('askingAgainWithNoNewTurnAsksTheModelForNothing', async ($, on) => {
   await typedTurn($, 't1', 'Renamed.')
   world.summary = 'Goal: tidy the example project. The helper is renamed.'
   await appAsks(world)
-  expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary, last: 'Renamed.' }])
+  expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary }])
   expect(world.forks).toBe(2)
 })
 
@@ -117,7 +116,7 @@ test('theBandSaysLoadingThenSent', async ($, on) => {
     expect(await note(band)).toBe('Loading context…')
     expect(world.take('context')).toEqual([])
     await world.clock.advance(5000)
-    expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary, last: 'Done.' }])
+    expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary }])
     expect(await note(band)).toBe('Context sent')
     await world.clock.advance(3000)
     expect(await note(band)).toBeUndefined()
@@ -173,56 +172,6 @@ test('twoAsksAtOnceShareOneSummary', async ($, on) => {
   expect(world.forks).toBe(1)
 })
 
-test('aContextCarriesClaudesLastReply', async ($, on) => {
-  const world = await joined($, on)
-  await typedTurn($, 't1', 'Three files.')
-  await appAsks(world)
-  expect(world.take('context')).toEqual([{ ...SUMMARY, last: 'Three files.' }])
-})
-
-test('anOpenQuestionComesWithTheTextThatAskedIt', async ($, on) => {
-  const world = await joined($, on)
-  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
-  await step($, world, 't1', 'Two folders.')
-  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
-  await appAsks(world)
-  expect(world.take('context')).toEqual([{ ...SUMMARY, last: `Two folders.\n\n${askedText(ASKED)}` }])
-  world.answerDialog('build')
-  await asked
-  await appAsks(world)
-  expect(world.take('context')).toEqual([SUMMARY])
-})
-
-test('aVoiceTurnsOpenQuestionGivesTheTextThatAskedItOnce', async ($, on) => {
-  // The voice turn's question line takes the step's text too; the context keeps its own copy,
-  // said once, before the question.
-  const world = await joined($, on)
-  world.work.push({ kind: 'request', ...REQUEST })
-  await world.clock.advance(1000)
-  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
-  await step($, world, 't1', 'Two folders.')
-  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
-  await appAsks(world)
-  expect(world.take('context')).toEqual([{ ...SUMMARY, last: `Two folders.\n\n${askedText(ASKED)}` }])
-  world.answerDialog('build')
-  await asked
-})
-
-test('aLongLastReplyIsClipped', async ($, on) => {
-  const world = await joined($, on)
-  const lines = Array.from({ length: 205 }, (_, i) => `line ${i} `.padEnd(97, 'x'))
-  const answer = lines.join('\n')
-  await typedTurn($, 't1', answer)
-  await appAsks(world)
-  const [{ last }] = world.take('context') as [{ last: string }]
-  expect(last.length).toBeLessThanOrEqual(8000)
-  expect(last.length).toBeGreaterThan(7000)
-  // The end is kept, from the start of a line, and the conclusion is in it.
-  expect(answer.endsWith(last)).toBe(true)
-  expect(answer[answer.length - last.length - 1]).toBe('\n')
-  expect(last.endsWith(lines.at(-1)!)).toBe(true)
-})
-
 test('aVoiceTurnKeepsTheSummaryCached', async ($, on) => {
   const world = await joined($, on)
   await appAsks(world)
@@ -237,27 +186,6 @@ test('aVoiceTurnKeepsTheSummaryCached', async ($, on) => {
   await typedTurn($, 't2', 'Renamed.')
   await appAsks(world)
   expect(world.forks).toBe(2)
-})
-
-test('aFailedSummaryStillSendsTheLastReply', async ($, on) => {
-  const world = await joined($, on)
-  await typedTurn($, 't1', 'Three files.')
-  world.forkFails = 'api-error'
-  await appAsks(world)
-  expect(world.take('context')).toEqual([{ sessionId: ID, summary: '', last: 'Three files.' }])
-})
-
-test('clearForgetsTheLastReply', async ($, on) => {
-  const world = await joined($, on)
-  await typedTurn($, 't1', 'Three files.')
-  await appAsks(world)
-  expect(world.take('context')).toEqual([{ ...SUMMARY, last: 'Three files.' }])
-  // /clear gives the session a new id, which the next poll joins under.
-  const cleared = '00000000-0000-0000-0000-000000000002'
-  world.sessionId = cleared
-  await world.clock.advance(1000)
-  await appAsks(world)
-  expect(world.take('context')).toEqual([{ sessionId: cleared, summary: SUMMARY.summary }])
 })
 
 test('liveContextAsksTheModelEachTime', async ($, on) => {
