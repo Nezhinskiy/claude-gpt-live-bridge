@@ -48,8 +48,9 @@ microphone or Claude:
   a result from Claude still opens the line. Mute closes no line. It ends the owner's speech only if
   they were speaking; then an open line's silence is counted from Mute (20 s), as if they had
   stopped speaking when they pressed it, and a line that was already quiet closes when it would have
-  without Mute. A held result can still keep a line open up to 120 s, as without Mute. Stop and an
-  audio failure reset it. It is pure; `Bridge` runs the effects in order.
+  without Mute. A handoff whose answer is still awaited can still keep a line open, up to 120 s
+  after the handoff, as without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs
+  the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped

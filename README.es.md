@@ -243,11 +243,12 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   está silenciado) libera tu micrófono mientras la llamada continúa: una respuesta de Claude sigue
   abriendo la línea y la voz la dice. La banda mantiene la fase y añade `· muted`; el menú dice
   "Muted — line closed" mientras no hay línea abierta. Mute no cierra la línea: una línea abierta se
-  cierra como si hubieras dejado de hablar al pulsar Mute, y se factura como cualquier silencio, así
-  que Mute no ahorra minutos de tiempo real. **Unmute** vuelve a tomar el micrófono y, si no puede
-  (denegado, ocupado, ausente), la llamada termina con el motivo. **Stop** termina la llamada y
-  **Mute**; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier proceso
-  que se ejecute como tú puede quitarlo ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+  cierra tras el silencio habitual, contado desde Mute si estabas hablando, y cuando lo habría hecho
+  sin Mute si la línea ya estaba en silencio; se factura como cualquier silencio, así que Mute no
+  ahorra minutos de tiempo real. **Unmute** vuelve a tomar el micrófono y, si no puede (denegado,
+  ocupado, ausente), la llamada termina con el motivo. **Stop** termina la llamada y **Mute**; el
+  siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier proceso que se ejecute
+  como tú puede quitarlo ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
   que se abre la línea, salvo con **Load context automatically when a line opens** activado: esa

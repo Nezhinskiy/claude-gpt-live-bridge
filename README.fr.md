@@ -257,12 +257,13 @@ parlez.
   micro est coupé) libère votre microphone pendant que l'appel continue : une réponse de Claude
   ouvre toujours la ligne et la voix la dit. La bande garde la phase et ajoute `· muted` ; le menu
   affiche « Muted — line closed » tant qu'aucune ligne n'est ouverte. Mute ne ferme pas la ligne :
-  une ligne ouverte se ferme comme si vous aviez cessé de parler au moment d'appuyer sur Mute, et
-  est facturée comme n'importe quel silence, donc Mute n'économise pas de minutes temps réel.
-  **Unmute** reprend le microphone et, s'il n'y parvient pas (refusé, occupé, absent), l'appel se
-  termine avec la raison. **Stop** termine l'appel et la coupure ; le **Start** suivant commence
-  micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
-  lever ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+  une ligne ouverte se ferme après le silence habituel, compté à partir de Mute si vous parliez, et
+  quand elle l'aurait fait sans Mute si la ligne était déjà silencieuse ; elle est facturée comme
+  n'importe quel silence, donc Mute n'économise pas de minutes temps réel. **Unmute** reprend le
+  microphone et, s'il n'y parvient pas (refusé, occupé, absent), l'appel se termine avec la raison.
+  **Stop** termine l'appel et la coupure ; le **Start** suivant commence micro actif. Mute n'est pas
+  un verrou : tout processus qui s'exécute sous votre compte peut le lever
+  ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne, sauf si **Load context automatically when

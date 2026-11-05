@@ -25,10 +25,10 @@ on, so an answer from Claude still opens the line and is said.
   too, and the line opens empty.
 - The call goes on: an answer, question or approval notice from the target still opens the closed
   line and the voice says it (as since 0.3.0). A result held while the owner was speaking is said
-  after the usual grace. An open line closes as if the owner had stopped speaking when
-  they pressed Mute: if they were speaking, its silence (20 s) is counted from Mute; if the line was
-  already quiet, Mute does not change when it closes. A held handoff result can still keep a line
-  open up to 120 s, as without Mute. Mute never saves realtime minutes.
+  after the usual grace. An open line closes as if the owner had stopped speaking when they pressed
+  Mute: if they were speaking, its silence (20 s) is counted from Mute; if the line was already
+  quiet, Mute does not change when it closes. A handoff whose answer is still awaited can still keep
+  a line open, up to 120 s after the handoff, as without Mute. Mute never saves realtime minutes.
 - **Unmute** takes the microphone again and waits for it, as Start does, up to the page's 10 s
   microphone deadline; until it is back, the menu, and the band that pressed it, may still show
   Muted. Speech then opens the line as before. A failed Unmute ends the call with its reason.
@@ -48,7 +48,7 @@ on, so an answer from Claude still opens the line and is said.
   was considered and not taken; the plan's review rulings say why). One native check covers only
   the window while macOS's first-run prompt is up: once macOS answers, `Bridge` looks at the call
   again before it asks the page to take the microphone, so a Start goes ahead only while the call
-  is on, and an Unmute only while the call is on and still muted (below).
+  is on, and an Unmute only while the call is on and not muted again (below).
 - **Not a control against local processes.** Mute protects against being heard by accident. Any
   process running as the owner can unmute through the socket, as it can start a call
   ([SECURITY.md](../../SECURITY.md)).
@@ -139,11 +139,15 @@ on, so an answer from Claude still opens the line and is said.
 ## Testing
 
 - BridgeCore: `CallMachine` rows for Mute and Unmute in each phase, a repeated Mute or Unmute,
-  speech ignored while muted (listening and live), a result opening the line while muted, Mute on
-  a live line re-arming 20 s and giving a held result its grace, Mute while connecting then
-  connected arming 20 s. `Bridge`: `/v1/call` mute and unmute reach the audio side and the
-  status; mute, stop, start listens unmuted. The presentation and the menu outline show
-  Mute/Unmute and the muted strings.
+  speech ignored while muted (listening and live), a result opening the line while muted, Mute on a
+  live line re-arming 20 s and giving a held result its grace, Mute while connecting then connected
+  arming 20 s, and Mute on a line that was already quiet changing nothing (it neither re-arms the
+  silence nor extends a result's first-word wait). `Bridge`: `/v1/call` mute and unmute reach the
+  audio side and the status; mute, stop, start listens unmuted. The window while macOS's prompt is
+  up: a Stop during Start's prompt opens no microphone; a Mute during Start's prompt still listens,
+  muted; a Mute or a Stop during Unmute's prompt takes no microphone; a refusal for a Start or an
+  Unmute that a Stop or a Mute made stale is not reported, and a refusal for a current one ends the
+  call with it. The presentation and the menu outline show Mute/Unmute and the muted strings.
 - `AudioJSTests`: `microphone.test.mjs` drives the module with a deferred acquisition: an
   acquisition pending at Mute leaves no live capture (from Start, from Unmute, from a device
   change); a device change while muted acquires nothing; a mute before the first attach is kept;
