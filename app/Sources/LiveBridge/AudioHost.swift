@@ -23,9 +23,11 @@ final class AudioHost: NSObject, AudioSide {
   private var navigation: WKNavigation?
   private var loaded = false
   private var waiting: [CheckedContinuation<Void, Never>] = []
-  /// Counts the releases (Mute, Stop) so a take that waited on macOS's prompt can tell one
-  /// arrived meanwhile: that release wins, and the take must not reach the page after it.
-  private var released = 0
+  /// Count the releases that arrive while a take waits on macOS's prompt, and that win over it:
+  /// a Stop cancels a Start or an Unmute, a Mute cancels an Unmute only (Start proceeds and the
+  /// page starts muted).
+  private var stops = 0
+  private var mutes = 0
   /// The bundled `audio/handoff.wav`, which `scripts/render-sound.mjs` renders.
   private let handoffSound = Bundle.module.url(
     forResource: "handoff", withExtension: "wav", subdirectory: "audio"
@@ -57,21 +59,21 @@ final class AudioHost: NSObject, AudioSide {
   // MARK: AudioSide
 
   func startListening() async {
-    guard await mayTakeMicrophone() else { return }
+    guard await mayTakeMicrophone(muteCancels: false) else { return }
     do { try await call("return await LB.listen(fake)", ["fake": fakeMic != nil]) } catch {
       onEvent(.failed(.other("The audio page did not start: \(Self.message(error))")))
     }
   }
 
   func stopListening() async {
-    released += 1
+    stops += 1
     _ = try? await call("LB.stop()")
   }
 
   /// Fails closed: a page that cannot confirm the release ends the call, whose `LB.stop`
   /// releases the microphone, rather than showing Muted over an open microphone.
   func muteMicrophone() async {
-    released += 1
+    mutes += 1
     do { try await call("LB.mute()") } catch {
       onEvent(.failed(.other("The audio page did not mute: \(Self.message(error))")))
     }
@@ -81,7 +83,7 @@ final class AudioHost: NSObject, AudioSide {
   /// be reached fails here. macOS is asked first, as at Start, so a revoked permission is
   /// reported as denied rather than as a timeout.
   func unmuteMicrophone() async {
-    guard await mayTakeMicrophone() else { return }
+    guard await mayTakeMicrophone(muteCancels: true) else { return }
     do { try await call("return await LB.unmute()") } catch {
       onEvent(.failed(.other("The audio page did not unmute: \(Self.message(error))")))
     }
@@ -110,14 +112,15 @@ final class AudioHost: NSObject, AudioSide {
   func confirmHandoff() async { handoffSound?.play() }
 
   /// Whether the page may take the microphone: macOS's refusal is reported as a failure, and a
-  /// Mute or Stop that arrived while its prompt was up wins over the Start or Unmute waiting.
-  private func mayTakeMicrophone() async -> Bool {
-    let before = released
+  /// Stop that arrived while its prompt was up wins over the Start or Unmute waiting (a Mute
+  /// too, for an Unmute).
+  private func mayTakeMicrophone(muteCancels: Bool) async -> Bool {
+    let (stopsBefore, mutesBefore) = (stops, mutes)
     if fakeMic == nil, let problem = await Self.askForMicrophone() {
       onEvent(.failed(problem))
       return false
     }
-    return released == before
+    return stops == stopsBefore && (!muteCancels || mutes == mutesBefore)
   }
 
   /// macOS's answer for the microphone, asking it first if it never was (its prompt then
