@@ -49,6 +49,8 @@ public actor SessionRegistry {
   private struct Session {
     let joinOrder: Int
     var title = ""
+    /// The mod's version as its last join named it; nil when it named none.
+    var modVersion: AppVersion?
     var lastPoll: Date
     var activity = SessionActivity.idle
     var queued: [VoiceRequest] = []
@@ -96,6 +98,7 @@ public actor SessionRegistry {
       sessions[body.sessionId] ?? replaced ?? Session(joinOrder: joins, lastPoll: time.now)
     joins += 1
     session.title = String(body.title.prefix(Self.maxTitle))
+    session.modVersion = body.modVersion.flatMap { AppVersion($0) }
     session.lastPoll = time.now
     sessions[body.sessionId] = session
     if target == nil { retarget(body.sessionId) }
@@ -241,6 +244,14 @@ public actor SessionRegistry {
         sessionId: id, label: labels[id] ?? session.title, activity: session.activity,
         isTarget: id == target)
     }
+  }
+
+  /// The labels of the sessions whose mod is older than `app`, or names no version, in the order
+  /// they joined: they run the mod Claude Code loaded before the update, until they restart.
+  public func labelsOnAnOlderMod(than app: AppVersion) -> [String] {
+    let labels = labels()
+    return ordered().filter { $0.value.modVersion.map { $0 < app } ?? true }
+      .map { labels[$0.key] ?? $0.value.title }
   }
 
   private func ordered() -> [(key: SessionID, value: Session)] {

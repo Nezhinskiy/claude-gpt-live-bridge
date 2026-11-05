@@ -226,6 +226,18 @@ struct SessionRegistryTests {
   }
 
   /// `/clear` gives the session a new id: it keeps its place, the target and its request.
+  /// A session whose mod is older than the app, or that names no version (a mod before 0.3.1),
+  /// is listed by its label until it joins with a mod as new as the app.
+  @Test func sessionsOnAnOlderModAreListed() async throws {
+    let app = try #require(AppVersion("0.3.1"))
+    try await registry.join(JoinBody(sessionId: a, title: "Alpha", modVersion: "0.3.0"))
+    try await registry.join(JoinBody(sessionId: b, title: "Beta", modVersion: "0.3.1"))
+    try await registry.join(JoinBody(sessionId: c, title: "Gamma"))
+    #expect(await registry.labelsOnAnOlderMod(than: app) == ["Alpha", "Gamma"])
+    try await registry.join(JoinBody(sessionId: a, title: "Alpha", modVersion: "0.3.1"))
+    #expect(await registry.labelsOnAnOlderMod(than: app) == ["Gamma"])
+  }
+
   @Test func joinReplacingAnIdMovesTheSession() async throws {
     await join(a, "Alpha")
     await join(b, "Beta")

@@ -262,3 +262,12 @@ test('aRemovalTheAnswerMeetsTurnsTheSessionOff', async ($, on) => {
   expect(world.take('next')).toEqual([])
   expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
 })
+
+/** The join names the mod's version, read from its own plugin.json, for the app's Settings. */
+test('theJoinNamesTheModsVersion', async ($, on) => {
+  const world = fakeWorld(on)
+  world.modVersion = '0.3.1'
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, modVersion: '0.3.1' }])
+})

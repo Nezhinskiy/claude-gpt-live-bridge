@@ -93,8 +93,11 @@ struct UpdateSection: View {
         Text("Updated from \(record.from.description).")
         switch record.mod {
         case .updated:
-          Text("Claude Code sessions already open keep the old mod until they restart.")
-            .font(.caption).foregroundStyle(.secondary)
+          let older = model.update?.labelsOnAnOlderMod ?? []
+          if !older.isEmpty {
+            Text("On the old mod until restarted: \(older.joined(separator: ", ")).")
+              .font(.caption).foregroundStyle(.secondary)
+          }
         case .byHand(let commands):
           Text("LiveBridge could not update its Claude Code mod. Run these in a terminal:")
             .font(.caption).foregroundStyle(.secondary)

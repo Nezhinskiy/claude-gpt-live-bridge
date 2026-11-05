@@ -36,7 +36,7 @@ export type Work =
  * removed, any other is answered 410 `removed`; absent means false. Whether a new target is asked
  * for its summary is the app's own setting, not the join's.
  */
-export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean };
+export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 

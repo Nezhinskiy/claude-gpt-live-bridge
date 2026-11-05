@@ -38,6 +38,8 @@ const band = atom({ plugin: 'livebridge', key: 'band' } as const, null)
 
 let link: BridgeLink | null = null
 let home = ''
+/** This mod's version, from its own plugin.json, for the app's Settings; undefined if unread. */
+let modVersion: string | undefined
 let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
 /** When a surface last asked for the band while this session was joined. */
@@ -127,6 +129,13 @@ function parseRecord(text: string): unknown {
   }
 }
 
+/** The version in this mod's plugin.json, or undefined when it cannot be read. */
+async function ownVersion($: EngineInterface): Promise<string | undefined> {
+  const manifest = await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`).catch(() => null)
+  const version = (parseRecord(String(manifest ?? '')) as { version?: unknown } | null)?.version
+  return typeof version === 'string' ? version : undefined
+}
+
 /** Joins; `byOwner` when the owner typed /live on (a reload's resume is not their decision). */
 async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   // What the last join learnt about the app is stale: the owner may have opened or installed it.
@@ -135,7 +144,8 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   const sessionId = await $.session.id()
   const title = (await readTitle($, sessionId)) ?? ''
   // Only the owner's own join brings back a session they removed.
-  const isJoined = (await link?.join({ sessionId, title, ...(byOwner && { owner: true }) })) === true
+  const isJoined =
+    (await link?.join({ sessionId, title, ...(byOwner && { owner: true }), ...(modVersion && { modVersion }) })) === true
   await save($)
   await setBand($, {})
   redrawBand($)
@@ -403,6 +413,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await declareCommand($)
     home = (await $.env.get('HOME')) ?? ''
+    modVersion = await ownVersion($)
     link = new BridgeLink({
       fetch: (url, init) => $.http.fetch(url, init),
       run: argv => $.process.run(argv),

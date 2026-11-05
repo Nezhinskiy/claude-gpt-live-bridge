@@ -6,6 +6,12 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- After an update, Settings lists the joined Claude Code sessions still on the old mod, by name,
+  instead of always saying that open sessions keep it until they restart. A mod reports its
+  version when it joins; one from before this release names none and counts as old.
+
 ## [0.3.0]
 
 ### Added

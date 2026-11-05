@@ -112,7 +112,8 @@ struct BridgeTests {
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
     time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, autoContext: Bool = false
+    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, autoContext: Bool = false,
+    appVersion: AppVersion? = nil
   ) throws {
     self.time = time
     self.dir = try dir ?? temporaryDirectory()
@@ -123,7 +124,7 @@ struct BridgeTests {
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs,
-      autoContext: { autoContext })
+      autoContext: { autoContext }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -367,6 +368,16 @@ struct BridgeTests {
     let text = "```\nrm -rf build\n```\n| a | b |"
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
     #expect(await voice.added == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
+  }
+
+  /// What the app shows lists the joined sessions whose mod is older than the app.
+  @Test func theAppListsSessionsOnAnOlderMod() async throws {
+    let test = try BridgeTests(appVersion: AppVersion("0.3.1"))
+    try await test.post(
+      "/v1/join", JoinBody(sessionId: a, title: "Alpha", modVersion: "0.3.0"))
+    try await test.post(
+      "/v1/join", JoinBody(sessionId: b, title: "Beta", modVersion: "0.3.1"))
+    #expect(await test.bridge.current.labelsOnAnOlderMod == ["Alpha"])
   }
 
   /// A step's text longer than a line is cut, and the notice before it stays whole.

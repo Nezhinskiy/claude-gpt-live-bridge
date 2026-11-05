@@ -78,6 +78,9 @@ public struct JoinBody: Codable, Sendable, Equatable {
   /// `true`: the owner asked for it (`/live on`). Only such a join brings back a session the
   /// owner removed; any other is answered `410 removed`.
   public var owner: Bool?
+  /// The mod's version, from its own plugin.json; absent from a mod before 0.3.1, or one that
+  /// could not read it.
+  public var modVersion: String?
 }
 
 /// `POST /v1/leave`.

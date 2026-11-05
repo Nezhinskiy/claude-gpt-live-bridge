@@ -11,6 +11,7 @@ struct WireTests {
   /// Fixture name → a check that it decodes to its type and re-encodes to the same JSON.
   static let roundTrips: [String: @Sendable (Data) throws -> Data] = [
     "join": roundTrip(JoinBody.self), "join-replaces": roundTrip(JoinBody.self),
+    "join-version": roundTrip(JoinBody.self),
     "leave": roundTrip(LeaveBody.self),
     "target": roundTrip(TargetBody.self), "call": roundTrip(CallBody.self),
     "activity": roundTrip(ActivityBody.self), "activity-question": roundTrip(ActivityBody.self),
