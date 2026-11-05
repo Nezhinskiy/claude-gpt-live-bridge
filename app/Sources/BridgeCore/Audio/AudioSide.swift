@@ -42,4 +42,8 @@ public protocol AudioSide: Sendable {
   func chime() async
   /// The short sound that confirms a handoff was queued for a session (BR-001).
   func confirmHandoff() async
+  /// Releases the microphone; the call goes on.
+  func muteMicrophone() async
+  /// Takes the microphone again, once it is back.
+  func unmuteMicrophone() async
 }

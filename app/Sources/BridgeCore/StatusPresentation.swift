@@ -33,6 +33,9 @@ public struct StatusPresentation: Sendable, Equatable {
   public let detail: String
   /// What the call button does.
   public let action: CallAction
+  /// Mute, or Unmute while muted; nil while the call is off.
+  public let muteAction: CallAction?
+  public let isMuted: Bool
   /// Start needs a joined session to talk to; Stop is always possible.
   public let canAct: Bool
   public let rows: [SessionRowPresentation]
@@ -61,9 +64,11 @@ public struct StatusPresentation: Sendable, Equatable {
       default: [.connecting, .live].contains(s.call) ? .active : .quiet
       }
     action = s.call == .off ? .start : .stop
+    isMuted = s.isMuted
+    muteAction = s.call == .off ? nil : (s.isMuted ? .unmute : .mute)
     canAct = action == .stop || !s.sessions.isEmpty
     let target = s.sessions.first(where: \.isTarget)?.label
-    (headline, detail) =
+    let (phaseHeadline, phaseDetail) =
       switch s.call {
       case .off:
         (
@@ -77,6 +82,14 @@ public struct StatusPresentation: Sendable, Equatable {
       case .connecting: ("Connecting…", "Opening the voice line.")
       case .live: ("Live", target.map { "Talking to \($0)" } ?? "No session has joined yet.")
       }
+    switch (s.call, s.isMuted) {
+    case (.listening, true):
+      (headline, detail) = ("Muted — line closed", "The line opens when Claude answers you.")
+    case (.connecting, true), (.live, true):
+      (headline, detail) = (phaseHeadline + " · muted", phaseDetail)
+    default:
+      (headline, detail) = (phaseHeadline, phaseDetail)
+    }
     rows = s.sessions.map {
       SessionRowPresentation(
         id: $0.sessionId, label: $0.label, detail: Self.text(of: $0.activity),

@@ -97,7 +97,7 @@ public actor Bridge: Router {
       StatusReply(
         call: machine.phase, sessions: await registry.rows(),
         minutesToday: await meter.minutesToday(), problem: problem?.sentence,
-        unheard: machine.pending.count)
+        unheard: machine.pending.count, isMuted: machine.isMuted)
     }
   }
 
@@ -130,8 +130,8 @@ public actor Bridge: Router {
       questionRoute = nil
       await send(.stop)
       await endCodex()
-    case .mute, .unmute:
-      break
+    case .mute: await send(.mute)
+    case .unmute: await send(.unmute)
     }
   }
 
@@ -274,6 +274,8 @@ public actor Bridge: Router {
     case .startLocalVAD: await audio.startListening()
     case .stopLocalVAD: await audio.stopListening()
     case .flushPreroll: await audio.flushPreroll()
+    case .muteMicrophone: await audio.muteMicrophone()
+    case .unmuteMicrophone: await audio.unmuteMicrophone()
     case .addContext(let line): try? await realtime?.addContext(line.text)
     case .speak(let line): try? await realtime?.speak(line.text)
     case .armSilenceTimer(let seconds): arm(.silence, after: .seconds(seconds))

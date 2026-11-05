@@ -64,6 +64,16 @@ final class AudioHost: NSObject, AudioSide {
 
   func stopListening() async { _ = try? await call("LB.stop()") }
 
+  func muteMicrophone() async { _ = try? await call("LB.mute()") }
+
+  /// Waits for the microphone; the page reports a refusal itself, so only a page that cannot
+  /// be reached fails here.
+  func unmuteMicrophone() async {
+    do { try await call("return await LB.unmute()") } catch {
+      onEvent(.failed(.other("The audio page did not unmute: \(Self.message(error))")))
+    }
+  }
+
   func makeOffer(preroll: Bool) async throws -> String {
     guard
       let sdp = try await call("return await LB.makeOffer(preroll)", ["preroll": preroll])

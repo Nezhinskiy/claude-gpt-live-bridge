@@ -88,6 +88,8 @@ actor FakeAudio: AudioSide {
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
   func confirmHandoff() { calls.append("confirmHandoff") }
+  func muteMicrophone() { calls.append("muteMicrophone") }
+  func unmuteMicrophone() { calls.append("unmuteMicrophone") }
 }
 
 /// Records the notices the bridge posts.
@@ -165,6 +167,36 @@ struct BridgeTests {
     if await registry.target == nil { try? await join(a, "Alpha") }
     await bridge.perform(.start)
     await bridge.audioEvent(.speechStarted)
+  }
+
+  @Test func muteReachesTheAudioSide() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.post("/v1/call", CallBody(action: .mute))
+    #expect(await test.audio.calls.last == "muteMicrophone")
+    #expect(await test.bridge.status.isMuted)
+  }
+
+  @Test func unmuteReachesTheAudioSide() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.post("/v1/call", CallBody(action: .mute))
+    try await test.post("/v1/call", CallBody(action: .unmute))
+    #expect(await test.audio.calls.last == "unmuteMicrophone")
+    #expect(await !test.bridge.status.isMuted)
+  }
+
+  @Test func stopWhileMutedThenStartListensUnmuted() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.post("/v1/call", CallBody(action: .mute))
+    await test.bridge.perform(.stop)
+    await test.bridge.perform(.start)
+    #expect(await test.audio.calls.last == "startListening")
+    #expect(await !test.bridge.status.isMuted)
   }
 
   /// A second Start while codex is still launching does not launch a second codex, and a
