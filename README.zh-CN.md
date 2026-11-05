@@ -128,7 +128,7 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
   如果 Claude 仍在处理语音请求，它会等待；然后用 `claude plugin marketplace update livebridge` 和
   `claude plugin update livebridge@livebridge` 更新模组，停止通话，一步将新应用放到原位并打开它。
 - 之后，Settings 会显示是从哪个版本更新而来。如果模组未能更新，那里会列出这两条命令，供你自己运行。
-  已经打开的 Claude Code 会话在重启之前仍使用旧模组。
+  已经打开的 Claude Code 会话在重启之前仍使用旧模组；Settings 会列出仍在使用旧模组的已加入会话。
 - 更新的下载不会设置隔离（quarantine）属性，因此 macOS 不应像拦截首次下载那样拦截更新后应用的首次启动；这是从代码推出的结论，尚未实际观察到。
   由上述检查承担这一把关作用（[SECURITY.md](SECURITY.md#what-an-update-installs)）。更新后第一次点击 **Start** 时，macOS 会再次请求麦克风权限，因为每个发布版本都使用 ad hoc 签名。
 

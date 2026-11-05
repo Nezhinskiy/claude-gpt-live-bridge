@@ -82,6 +82,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     submitted: [] as string[],
     launches: [] as (readonly string[])[],
     read: [] as string[],
+    /** The version the mod's own plugin.json names, or null when it cannot be read. */
+    modVersion: null as string | null,
     /** While set, the app's reply to a poll is held until it resolves (built before, as the app does). */
     holdNext: null as Promise<void> | null,
     /** Called once a poll is being held. */
@@ -121,6 +123,11 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
       .map(name => ({ name, kind: 'file', size: 1, mtimeMs: 0, isLink: false }) as const),
   }))
   on('fs.read', (_, e) => {
+    // The mod's own manifest, not one of the session registry's files `read` lists.
+    if (e.path.endsWith('/.claude-plugin/plugin.json')) {
+      if (world.modVersion === null) throw new Error('ENOENT')
+      return { value: JSON.stringify({ name: 'livebridge', version: world.modVersion }) }
+    }
     world.read.push(e.path)
     const other = world.otherRecords[e.path.split('/').at(-1) ?? '']
     return { value: other ?? JSON.stringify({ pid: 12345, sessionId: world.sessionId, name: world.title }) }

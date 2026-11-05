@@ -53,6 +53,8 @@ public actor Bridge: Router {
   /// context stops waiting for it.
   public nonisolated let contextArrivals: AsyncStream<SessionID>
   private let announceContext: AsyncStream<SessionID>.Continuation
+  /// The running app's version; sessions on an older mod are listed against it.
+  private let appVersion: AppVersion?
 
   /// `realtime` makes the codex side of a call; it is called at Start, and again after codex
   /// stopped. Sessions are swept every second.
@@ -62,8 +64,9 @@ public actor Bridge: Router {
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
-    autoContext: @escaping @Sendable () -> Bool = { false }
+    autoContext: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
+    self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
     self.confirmsHandoffs = confirmsHandoffs
@@ -104,9 +107,11 @@ public actor Bridge: Router {
       let status = await status
       let minutes = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
       let shown = await registry.target.map { continuity[$0] } ?? Conversation()
+      var olderMods: [String] = []
+      if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes, context: shown.context,
-        conversation: shown.lines)
+        conversation: shown.lines, labelsOnAnOlderMod: olderMods)
     }
   }
 
@@ -592,4 +597,6 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let context: String?
   /// The target's whole conversation, oldest first: every line the app keeps.
   public let conversation: [Conversation.Line]
+  /// The joined sessions whose mod is older than the app, or names no version, by label.
+  public let labelsOnAnOlderMod: [String]
 }

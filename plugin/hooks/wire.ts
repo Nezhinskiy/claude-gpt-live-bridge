@@ -33,10 +33,12 @@ export type Work =
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
  * session had before `/clear`: its place, target and requests move to the new id. `owner: true`
  * says the owner asked for it (`/live on`): only such a join brings back a session the owner
- * removed, any other is answered 410 `removed`; absent means false. Whether a new target is asked
+ * removed, any other is answered 410 `removed`; absent means false. `modVersion` is this mod's
+ * version, from its plugin.json; absent from a mod from before the field, or one that could not
+ * read it, and Settings then lists the session as on the old mod. Whether a new target is asked
  * for its summary is the app's own setting, not the join's.
  */
-export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean };
+export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 

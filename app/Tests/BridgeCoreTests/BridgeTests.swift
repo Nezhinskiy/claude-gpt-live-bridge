@@ -112,7 +112,8 @@ struct BridgeTests {
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
     time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, autoContext: Bool = false
+    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, autoContext: Bool = false,
+    appVersion: AppVersion? = nil
   ) throws {
     self.time = time
     self.dir = try dir ?? temporaryDirectory()
@@ -123,7 +124,7 @@ struct BridgeTests {
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs,
-      autoContext: { autoContext })
+      autoContext: { autoContext }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -133,8 +134,8 @@ struct BridgeTests {
       HTTPRequest(method: "POST", path: path, query: [:], body: body))
   }
 
-  func join(_ id: SessionID, _ title: String) async throws {
-    try await post("/v1/join", JoinBody(sessionId: id, title: title))
+  func join(_ id: SessionID, _ title: String, modVersion: String? = nil) async throws {
+    try await post("/v1/join", JoinBody(sessionId: id, title: title, modVersion: modVersion))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -367,6 +368,21 @@ struct BridgeTests {
     let text = "```\nrm -rf build\n```\n| a | b |"
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
     #expect(await voice.added == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
+  }
+
+  /// What the app shows lists the joined sessions whose mod is older than the app.
+  @Test func theAppListsSessionsOnAnOlderMod() async throws {
+    let test = try BridgeTests(appVersion: AppVersion("0.3.1"))
+    try await test.join(a, "Alpha", modVersion: "0.3.0")
+    try await test.join(b, "Beta", modVersion: "0.3.1")
+    #expect(await test.bridge.current.labelsOnAnOlderMod == ["Alpha"])
+  }
+
+  /// An app whose own version does not read lists nobody.
+  @Test func anAppWithNoVersionListsNoOldMods() async throws {
+    let test = try BridgeTests(appVersion: nil)
+    try await test.join(a, "Alpha", modVersion: "0.3.0")
+    #expect(await test.bridge.current.labelsOnAnOlderMod == [])
   }
 
   /// A step's text longer than a line is cut, and the notice before it stays whole.
