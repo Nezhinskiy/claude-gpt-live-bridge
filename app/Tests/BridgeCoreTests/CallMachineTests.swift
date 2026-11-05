@@ -20,6 +20,8 @@ struct CallMachineTests {
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
   static let r = Problem.other("r")
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
+  /// A line a result opened waits this long for the voice's first word.
+  static let firstWord = CallEffect.armSilenceTimer(seconds: CallMachine.firstWordSeconds)
   static let alpha = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   static let beta = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
   /// Lines of the bridge's own, which no session waits for.
@@ -86,8 +88,13 @@ struct CallMachineTests {
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
       [.openRealtimeForResult], pending: [result]),
     row(
-      "theOpenedLineGetsItAsContext", [.start, opening(result)], .connected, .live,
-      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
+      "theOpenedLineGetsItAsContextAndWaitsBrieflyForTheVoice", [.start, opening(result)],
+      .connected, .live, [.flushPreroll, .addContext(result), firstWord, .problem(nil)],
+      pending: [result]),
+    row(
+      "theVoiceSpeakingOnAnOpenedLineGetsTheUsualSilence",
+      [.start, opening(result), .connected], .assistantSpeaking, .live, [arm],
+      pending: [result]),
     row(
       "anOpenedLineLeftSilentChimes", [.start, opening(result), .connected], .silenceElapsed,
       .listening, [.closeRealtime, .chime], pending: [result]),

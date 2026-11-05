@@ -8,6 +8,11 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
+- A voice line that Claude's answer opens, when the voice has not started to speak 5 seconds after
+  it connects, now closes and chimes then, instead of after 20 seconds of silence: when the voice
+  speaks on such a line at all, it starts within about 2 seconds
+  ([measurement](docs/adr/0001-platform-findings.md)). It saves about 15 seconds of billed line each
+  time and tells you sooner that the answer waits.
 - After an update, Settings lists the joined Claude Code sessions still on the old mod, by name,
   instead of always saying that open sessions keep it until they restart. A mod reports its
   version when it joins; one from before this release names none and counts as old.

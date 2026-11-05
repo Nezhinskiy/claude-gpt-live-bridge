@@ -114,6 +114,10 @@ public struct CallMachine: Sendable {
   /// Local voice detection hears sound; the timer then allows `noiseCapSeconds`.
   private var isSoundOn = false
   public static let silenceSeconds = 20
+  /// How long a line a result opened waits for the voice's first word before it closes and the
+  /// result chimes. When the voice speaks there at all, it starts within about 2 s
+  /// (ADR 0001 (n)).
+  public static let firstWordSeconds = 5
   public static let noiseCapSeconds = 90
   /// How long after the latest handoff the line stays open for its result. Billed.
   public static let resultWindowSeconds = 120
@@ -166,8 +170,12 @@ public struct CallMachine: Sendable {
       return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
+      // a line nobody spoke on waits only briefly for the voice to start
+      let silence =
+        isOpeningForResult && !isSoundOn
+        ? CallEffect.armSilenceTimer(seconds: Self.firstWordSeconds) : armSilence()
       isOpeningForResult = false
-      return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
+      return [.flushPreroll] + pending.map { .addContext($0) } + [silence, .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return [.problem(reason)] + hangUp()

@@ -374,7 +374,7 @@ can become a request that Claude runs under the session's own permission mode.
   within a few seconds. If it does not, the result stays unheard: the voice says it after your
   next words, or it chimes when the line closes.
 - When Claude's answer opens the line again, the voice sometimes stays silent
-  ([measured](docs/adr/0001-platform-findings.md)). The line then closes after 20 seconds and
+  ([measured](docs/adr/0001-platform-findings.md)). The line then closes after 5 seconds and
   the answer chimes and waits, as below.
 - When your next words reopen the line, the voice sometimes answers only them and does not say
   the waiting result. The result is not lost: it stays waiting, chimes and posts a notification

@@ -407,7 +407,7 @@ session.
   résultat reste non entendu : la voix le dit après vos prochains mots, ou un carillon retentit
   à la fermeture de la ligne.
 - Quand la réponse de Claude rouvre la ligne, la voix reste parfois muette
-  ([mesuré](docs/adr/0001-platform-findings.md)). La ligne se ferme alors au bout de 20 secondes,
+  ([mesuré](docs/adr/0001-platform-findings.md)). La ligne se ferme alors au bout de 5 secondes,
   et la réponse joue un carillon et attend, comme ci-dessous.
 - Quand vos prochains mots rouvrent la ligne, la voix répond parfois uniquement à ceux-ci sans
   dire le résultat en attente. Le résultat n'est pas perdu : il reste en attente, déclenche un
