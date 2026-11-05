@@ -319,7 +319,9 @@ socket पर बात करता है, जो ऐसे folder में �
 session के ज़रिए OpenAI को यह जाता है:
 
 - line खुली रहने के दौरान microphone audio, आपके बोलना शुरू करने से 2 सेकंड पहले से (या, Claude के
-  जवाब, सवाल या permission prompt से खुली line के लिए, उसके खुलने से) लेकर line बंद होने तक (muted रहते LiveBridge कुछ capture नहीं करता, इसलिए कुछ नहीं जाता; Mute दबाने से पहले आपने जो बोला, पहले से खुल रही line पर, वह फिर भी जाता है);
+  जवाब, सवाल या permission prompt से खुली line के लिए, उसके खुलने से) लेकर line बंद होने तक (muted
+  रहते LiveBridge कुछ capture नहीं करता, इसलिए कुछ नहीं जाता; Mute दबाने से पहले आपने जो बोला, जो
+  line पहले से connect हो रही थी उस पर, वह फिर भी जा सकता है);
 - voice के निर्देश: LiveBridge के अपने नियम, फिर आपकी Settings का **Prompt**, अगर आपने लिखा हो;
 - target session की हाल की conversation (आख़िरी 24 पंक्तियों तक), ताकि उसे नए realtime session में
   जारी रखा जा सके;

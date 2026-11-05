@@ -320,10 +320,10 @@ LiveBridge has no telemetry and listens on no network port; the mod talks to the
 socket in a folder only your user can open. What goes to OpenAI, through codex's realtime
 session:
 
-- microphone audio while the line is open, from 2 seconds before you started speaking (or, for
-  a line Claude's answer, question or approval notice opened, from when it opened) until it
-  closes (while muted LiveBridge captures nothing, so none goes; speech you said before pressing
-  Mute, on a line already opening, still does);
+- microphone audio while the line is open, from 2 seconds before you started speaking (or, for a
+  line Claude's answer, question or approval notice opened, from when it opened) until it closes
+  (while muted LiveBridge captures nothing, so none goes; speech you said before pressing Mute, on a
+  line that was already connecting, may still go);
 - the voice's instructions: LiveBridge's own rules, then your Settings **Prompt** if you wrote
   one;
 - the target session's recent conversation (up to the last 24 lines) to continue it in a new

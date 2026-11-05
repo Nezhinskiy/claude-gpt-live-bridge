@@ -331,8 +331,10 @@ por un socket Unix en una carpeta que solo tu usuario puede abrir. Lo que va a O
 la sesión en tiempo real de codex:
 
 - el audio del micrófono mientras la línea está abierta, desde 2 segundos antes de que empezaras a
-  hablar (o, en una línea que abrió una respuesta, pregunta o solicitud de permiso de Claude,
-  desde que se abrió) hasta que se cierra (con Mute, LiveBridge no capta nada, así que no sale audio; lo que dijiste antes de pulsar Mute, en una línea que ya se estaba abriendo, sí);
+  hablar (o, en una línea que abrió una respuesta, pregunta o solicitud de permiso de Claude, desde
+  que se abrió) hasta que se cierra (con Mute, LiveBridge no capta nada, así que no sale audio; lo
+  que dijiste antes de pulsar Mute, en una línea que ya se estaba conectando, puede salir
+  igualmente);
 - las instrucciones de la voz: las reglas propias de LiveBridge y, después, el **Prompt** de tus
   Ajustes si escribiste uno;
 - la conversación reciente de la sesión de destino (hasta las últimas 24 líneas) para continuarla
