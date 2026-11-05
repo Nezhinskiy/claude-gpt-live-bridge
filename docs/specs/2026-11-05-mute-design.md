@@ -1,7 +1,7 @@
 # Mute
 
-Status: delivered, 2026-11-05; revised the same day after the review
-(`docs/reviews/2026-11-05-mute-review.md` on branch `review/mute`).
+Status: built, awaiting the by-hand microphone check, 2026-11-05; revised the same day after the
+review (`docs/reviews/2026-11-05-mute-review.md` on branch `review/mute`).
 
 ## Why
 
