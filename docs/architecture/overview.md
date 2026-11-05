@@ -143,14 +143,14 @@ The owner speaks; the line opens with the pre-roll and the voice hands the reque
 request is queued for a session, in any phase of the line, the app plays a short sound
 ([BR-001](../bugs/BR-001.md)). The line stays open for its result up to
 `CallMachine.resultWindowSeconds` (120 s) after the latest handoff, however silent it is (sound
-without words still closes it after 90 s). A result from a session handed a request in that
-window is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once
-neither the owner (local voice detection) nor the voice is speaking; when either was, the bridge
-waits until both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
-line. A window that passes with no result closes the line once it is silent; that result chimes
-later as below. A line with no handoff waiting keeps the plain silence rule, so an exchange that
-sends nothing to Claude costs no more than before. codex has no request that makes the v3 voice
-respond, so whether it says the speakable text at once is the model's choice
+without words still closes it after 90 s). A result from a session handed a request in that window
+is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the
+owner (local voice detection) nor the voice is speaking; when either was, the bridge waits until
+both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
+line. A window that passes with no result closes the line once it is silent; when the result comes,
+it opens the line again, as below. A line with no handoff waiting keeps the plain silence rule, so
+an exchange that sends nothing to Claude costs no more than before. codex has no request that makes
+the v3 voice respond, so whether it says the speakable text at once is the model's choice
 ([ADR 0001](../adr/0001-platform-findings.md) (b)).
 
 ```mermaid
@@ -211,10 +211,23 @@ sequenceDiagram
 
 ### A result while the line is closed
 
-A result that arrives while the line is closed (after the window, or after a hang-up) does not
-reopen it. It chimes and waits; the voice gets it when the owner next speaks and says it in a
-reply. A result for a session the open line is not waiting on is added as context and said in
-the voice's next reply.
+An answer, a question or an approval notice from the target (its result, failure or question, or a
+question Claude asks or a permission prompt it waits on while it works) opens the closed line when
+the target's conversation holds a turn of the owner's; a line seeded without one stays silent ([ADR
+0001](../adr/0001-platform-findings.md) (b)). The bridge decides this from the registry's target and
+the conversation, and passes it with the delivery. The new realtime session is seeded with the
+target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
+the voice usually says it unprompted, within about 8 s of connecting ([ADR
+0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence rule closes the line,
+and the line chimes and waits as below. The mod's request that brought the line does not wait for
+the connect, and a question or approval the owner settles at the keyboard while its line still
+connects closes that line.
+
+Any other line that arrives while the line is closed (one from a session that is not the target, a
+later update) does not open it. It chimes, the notification names the session, and the line waits;
+the voice gets it when the owner next speaks and says it in a reply. A connect that fails with lines
+unheard chimes too. A result for a session the open line is not waiting on is added as context and
+said in the voice's next reply.
 
 ```mermaid
 sequenceDiagram
@@ -320,7 +333,7 @@ sequenceDiagram
   Claude->>Mod: classic.PermissionRequest (during a voice turn)
   Mod->>Bridge: POST /v1/activity approval (and the step's text)
   Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before asking: …"
-  Codex-->>Owner: says so (or a chime if the line is closed)
+  Codex-->>Owner: says so (a closed line opens for it, as for a result)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
   Mod->>Bridge: POST /v1/activity working

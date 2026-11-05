@@ -29,6 +29,12 @@ All notable changes to this project are listed here. The format follows
   the voice ask you to confirm an action first. In 20 test runs it missed no handoff, against 3 of
   20 with the old wording: too few runs to call the failure fixed
   ([BR-001](docs/bugs/BR-001.md)).
+- Claude's answer to a request you handed the session you are talking to, a question Claude asks
+  you there, or a permission prompt it waits on now opens the closed voice line, and the voice
+  says it, instead of only chiming. It is billed like any open line; if the voice stays silent,
+  the line closes after 20 seconds and chimes as before. Anything from another session, and a
+  later update, still only chimes
+  ([billing](README.md#billing-aware-by-design), [privacy](README.md#privacy)).
 
 ### Fixed
 

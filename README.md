@@ -276,7 +276,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 ## Billing-aware by design
 
 A realtime voice session costs while it is open, so LiveBridge opens it only while someone is
-talking, or while Claude's answer to a request you just made may still come:
+talking, while Claude's answer to a request you just made may still come, or to say that answer,
+a question Claude asks you, or that Claude waits for your approval:
 
 - While a call is on and nobody is talking, the microphone feeds only a voice detector on your
   Mac. Nothing is sent anywhere.
@@ -288,8 +289,11 @@ talking, or while Claude's answer to a request you just made may still come:
   after that handoff, billed like any open line, and the voice says Claude's answer once nobody
   is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
   Claude closes after the usual 20 seconds of silence.
-- A result that arrives later, while the line is closed, plays a chime and waits: the band and
-  the menu show it as unheard, and the voice tells you when you next speak
+- Claude's answer to a request you handed the session you are talking to, a question Claude asks
+  you there, or a permission prompt it waits on opens the line again when it comes after the line
+  closed, and the voice says it, billed like any open line. Anything else that arrives while the
+  line is closed (anything from a session you switched away from, a later update) plays a chime
+  and waits: the band and the menu show it as unheard, and the voice tells you when you next speak
   ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
@@ -306,7 +310,8 @@ LiveBridge has no telemetry and listens on no network port; the mod talks to the
 socket in a folder only your user can open. What goes to OpenAI, through codex's realtime
 session:
 
-- microphone audio while the line is open, from 2 seconds before you started speaking until it
+- microphone audio while the line is open, from 2 seconds before you started speaking (or, for
+  a line Claude's answer, question or approval notice opened, from when it opened) until it
   closes;
 - the voice's instructions: LiveBridge's own rules, then your Settings **Prompt** if you wrote
   one;
@@ -368,6 +373,9 @@ can become a request that Claude runs under the session's own permission mode.
   no call that makes the voice speak at once, so the model decides when. In testing it spoke
   within a few seconds. If it does not, the result stays unheard: the voice says it after your
   next words, or it chimes when the line closes.
+- When Claude's answer opens the line again, the voice sometimes stays silent
+  ([measured](docs/adr/0001-platform-findings.md)). The line then closes after 20 seconds and
+  the answer chimes and waits, as below.
 - When your next words reopen the line, the voice sometimes answers only them and does not say
   the waiting result. The result is not lost: it stays waiting, chimes and posts a notification
   when the line closes, and goes to the voice again the next time the line opens.

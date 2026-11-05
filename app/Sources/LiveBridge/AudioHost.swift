@@ -64,8 +64,11 @@ final class AudioHost: NSObject, AudioSide {
 
   func stopListening() async { _ = try? await call("LB.stop()") }
 
-  func makeOffer() async throws -> String {
-    guard let sdp = try await call("return await LB.makeOffer()") as? String else {
+  func makeOffer(preroll: Bool) async throws -> String {
+    guard
+      let sdp = try await call("return await LB.makeOffer(preroll)", ["preroll": preroll])
+        as? String
+    else {
       throw PageError(message: "The audio page returned no offer.")
     }
     return sdp
