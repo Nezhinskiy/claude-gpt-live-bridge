@@ -231,7 +231,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   वापस ले आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), मिनट,
-  **Settings…** और **Quit LiveBridge** होते हैं।
+  **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
   line खुलने से नए सिरे से शुरू होता है, सिवाय तब जब **Load context automatically when a line opens**

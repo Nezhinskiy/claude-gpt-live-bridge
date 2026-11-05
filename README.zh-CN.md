@@ -189,7 +189,7 @@ claude plugin uninstall livebridge@livebridge
   状态条，`/live on` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
   **Load context**、LiveBridge 保存的目标会话 **Conversation**、分钟数、
-  **Settings…** 和 **Quit LiveBridge**。
+  **Star LiveBridge on GitHub**（打开仓库页面）、**Settings…** 和 **Quit LiveBridge**。
 - **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。
   语音从线路下次打开时重新开始，除非 **Load context automatically when a line opens** 已开启：那条线路会再次加载同一会话记录的摘要，
   因此请先关闭该设置，或在该会话中执行 `/clear`。在被移除的会话中执行 `/live on` 可让它重新加入。

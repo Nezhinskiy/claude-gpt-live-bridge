@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
+  want to support the project.
+
 ### Changed
 
 - After an update, Settings lists the joined Claude Code sessions still on the old mod, by name,

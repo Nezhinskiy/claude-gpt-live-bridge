@@ -68,4 +68,8 @@ struct ReleaseTests {
       return true
     }
   }
+
+  @Test func theRepositoryPageIsTheRepositorysGitHubURL() {
+    #expect(Release.repositoryPage.absoluteString == "https://github.com/getLiveBridge/LiveBridge")
+  }
 }

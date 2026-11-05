@@ -251,7 +251,8 @@ parlez.
   `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
-  la conserve, les minutes, **Settings…** et **Quit LiveBridge**.
+  la conserve, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt), **Settings…** et
+  **Quit LiveBridge**.
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne, sauf si **Load context automatically when

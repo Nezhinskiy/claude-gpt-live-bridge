@@ -1,6 +1,6 @@
 /// What the menu bar menu holds for one status, top to bottom, as a plain value: the call card,
-/// the sessions, the target's whole conversation, the minutes, an update to install, Settings and
-/// Quit. The app renders it
+/// the sessions, the target's whole conversation, the minutes, an update to install, a star on
+/// GitHub, Settings and Quit. The app renders it
 /// into an `NSMenu`, the custom rows as hosted SwiftUI views and the rest as native items, so
 /// the menu has the system's own corners, material and shadow. Pure.
 public struct MenuContent: Sendable, Equatable {
@@ -12,7 +12,7 @@ public struct MenuContent: Sendable, Equatable {
 
   /// What a native item does.
   public enum Command: Sendable, Equatable {
-    case copyJoinCommand, loadContext, newConversation, settings, quit
+    case copyJoinCommand, loadContext, newConversation, starOnGitHub, settings, quit
     /// Installs the release announced, this version.
     case installUpdate(AppVersion)
 
@@ -21,7 +21,7 @@ public struct MenuContent: Sendable, Equatable {
       switch self {
       case .settings: ","
       case .quit: "q"
-      case .copyJoinCommand, .loadContext, .newConversation, .installUpdate: ""
+      case .copyJoinCommand, .loadContext, .newConversation, .starOnGitHub, .installUpdate: ""
       }
     }
   }
@@ -78,6 +78,7 @@ public struct MenuContent: Sendable, Equatable {
       } ?? []
     let footer: [Item] =
       install + [
+        .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
         .command(.settings, title: "Settings…", isEnabled: true),
         .command(.quit, title: "Quit LiveBridge", isEnabled: true),
       ]
