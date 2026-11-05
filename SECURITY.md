@@ -69,9 +69,7 @@ voices.
     microphone indicator in the menu bar);
   - read the status, which names every joined session and its id;
   - post a `[CONTEXT]` line for any joined session. It is saved and seeds every later call with
-    that session, long after the process has exited (see "A loaded context persists" below).
-    While the voice waits for that session's context, the same post also gives it a `[LAST]`
-    line, which the voice then says;
+    that session, long after the process has exited (see "A loaded context persists" below);
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation.
 
@@ -121,8 +119,8 @@ act" is a model instruction.
 
 ### What session text can do
 
-Results, questions, updates, open tasks, context summaries and Claude's last reply go to the
-voice as one tagged line each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
+Results, questions, updates, open tasks and context summaries go to the voice as one tagged line
+each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
 space. That keeps the format unambiguous, but it is not a control: each line goes in with the
 rank of the owner's own words (`user`), so a session's text needs no fake tag to give the voice
 orders. The voice is told to treat such text as data to relay, which is again an instruction.
@@ -135,18 +133,8 @@ secret.
 ### Residual risk, by design
 
 - **Anything that steers the voice can start work.** Text a joined session read (a README, an
-  issue, a web page, a tool's output) can reach the voice in a result, an update, a summary or
-  Claude's last reply, and talk it into a handoff, including the "confirmed by voice" sentence
-  above.
-- **The voice decides when Claude's last reply is sent.** The app sends the target's last reply
-  as a `[LAST]` line ([what is sent](README.md#privacy)) only in answer to the voice's fetch: a
-  handoff whose brief is the words `refresh context` (in any case, with any punctuation, digits
-  ignored), which the app answers itself and never passes to Claude. The voice is told to fetch
-  when you ask about the session and what it has does not cover it. That is an instruction, not
-  a control: text that steers the voice can make it fetch, the reply may be from a turn you
-  typed, and a question the voice hands off instead goes to Claude as any request. The app does
-  not save the `[LAST]` line or seed a later line with it, but what the voice says about it stays
-  in the conversation like any reply.
+  issue, a web page, a tool's output) can reach the voice in a result, an update or a summary,
+  and talk it into a handoff, including the "confirmed by voice" sentence above.
 - **A handoff can hop between sessions.** The voice hands work to the target session, or to the
   session that asked the last question. So text that session A read can become a prompt in
   session B, which may run in a more permissive mode.
@@ -156,12 +144,12 @@ secret.
   with it as the target, load a new summary from it, or remove it from LiveBridge. With **Load
   context automatically when a line opens** on (the default) in LiveBridge's Settings, the
   target session sends a new one whenever the app opens a line: a Start, a line reopened after
-  silence, the line after a target switch. The menu's Load context, `/live context` and the
-  voice's fetch send one too. One injected summary can therefore steer every later call with
-  that session. Its recent conversation is carried over the same way, including the lines the
-  session sent the voice. A result from another session is still spoken in whatever line is
-  open, and the voice's reply to it stays in that line's conversation, so one session's text can
-  still reach the conversation about another.
+  silence, the line after a target switch. The menu's Load context and `/live context` send one
+  too. One injected summary can therefore steer every later call with that session. Its recent
+  conversation is carried over the same way, including the lines the session sent the voice. A
+  result from another session is still spoken in whatever line is open, and the voice's reply to
+  it stays in that line's conversation, so one session's text can still reach the conversation
+  about another.
 
 Join only sessions whose input you trust, press **New conversation** with a session as the
 target after it has read text you do not trust, and keep voice off for a session whose permission mode acts without

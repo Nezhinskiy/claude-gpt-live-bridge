@@ -8,12 +8,6 @@ All notable changes to this project are listed here. The format follows
 
 ### Added
 
-- The voice can look at the Claude Code session. Ask it about "the chat" or what is in the
-  session and, when what it has does not cover that, it is instructed to fetch the session's
-  context itself and answer from it: the summary, and Claude's last reply (a turn you typed
-  included) with its open question and options. Claude runs no turn for a fetch; a question the
-  voice hands off instead goes to Claude as before, as a Claude turn. The reply is sent only for
-  that fetch and is not saved. If no context arrives within 60 seconds, the voice says so.
 - A short sound when the app queues a request the voice handed off. The voice sometimes says it
   is looking without handing the request off; with no sound, nothing was queued
   ([BR-001](docs/bugs/BR-001.md)). **Settings > Notifications > Play a sound when a request is
@@ -27,7 +21,7 @@ All notable changes to this project are listed here. The format follows
   it separately. The mod reuses its summary until a turn you typed completes, so a line
   reopened after a voice request costs no new summary.
 - The voice's instructions say that "the chat" is the Claude Code session, and that a question
-  from a turn you typed waits at the keyboard.
+  about it that the voice's lines do not cover is handed off to Claude.
 - The in-app update attaches and ejects the release image with `diskutil image attach` and
   `diskutil eject` instead of `hdiutil`, which macOS 27 deprecates. Each run mounts the image at
   a new folder of its own.

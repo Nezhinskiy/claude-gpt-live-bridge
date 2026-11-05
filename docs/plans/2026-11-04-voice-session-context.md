@@ -1,5 +1,11 @@
 # The voice knows the Claude session: implementation plan
 
+> **Delivered in part (2026-11-05).** Line-open context and the "the chat" rule shipped. The
+> fetch (`refresh context`), `[LAST]` and the wire field `last` were taken out after six real
+> smoke runs showed the voice's handoff brief is the owner's words verbatim, so the voice never
+> sent the fetch; they are kept on branch `feat/voice-context-fetch`. See the
+> [spec's status](../specs/2026-11-04-voice-session-context-design.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Dispatch by wave: a wave's tasks share no file and may run in parallel; a wave starts when the one before it is reviewed.
 
 **Goal:** every line the app opens gives the voice the target's context; the voice fetches it

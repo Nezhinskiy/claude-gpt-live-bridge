@@ -1,6 +1,12 @@
 # The voice knows the Claude session
 
-Status: delivered, 2026-11-04. Revised the same day after a design, simplify and security review
+Status: delivered in part, 2026-11-05. Line-open context and the rule that "the chat" is the
+Claude Code session shipped. The fetch (`refresh context`), the `[LAST]` line and the wire field
+`last` were taken out after six real smoke runs: the voice never sent `refresh context`, because
+on GPT-Live the handoff brief codex reports (`input_transcript`, from the server's
+`delegation.created` item) was the owner's own words verbatim every time, so a prompt rule cannot
+make the voice send a fixed brief. That part is kept on branch `feat/voice-context-fetch`. Revised
+on 2026-11-04 after a design, simplify and security review
 (`docs/reviews/2026-11-04-voice-context-review.md` on `review/voice-context`).
 
 ## Why

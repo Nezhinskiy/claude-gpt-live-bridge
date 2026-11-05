@@ -48,9 +48,7 @@ microphone or Claude:
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
-  session was the last one, which stops the call ([failure behaviour](#failure-behaviour)). The
-  voice's [fetch of a session's context](#fetching-the-context) has its own deadline here,
-  `ContextLoads.timeout` (60 s).
+  session was the last one, which stops the call ([failure behaviour](#failure-behaviour)).
 - `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
   (the owner's, the voice's, the lines the session sent the voice and the brief of each request
   its queue took) and the context loaded from it. Each new realtime session is seeded with the
@@ -61,13 +59,10 @@ microphone or Claude:
   its own, and only the 20 conversations used last are kept.
 - `RealtimeSession`: one ephemeral, read-only codex thread per realtime session; it refuses to go
   on unless codex reports every MCP server disabled, interrupts every codex turn and declines
-  every request codex sends. A handoff whose brief is `refresh context` (any case or punctuation)
-  it reports as its own event, `contextFetch`, so that it never reaches Claude.
+  every request codex sends.
 - `AnswerShaper` and `Redaction`: each delivery to the voice becomes one line, `[TAG] label:
   text`, of at most 2,000 characters, with the label cut to 120 characters, without code blocks
-  or tables, and with credentials redacted. A `[LAST]` line, Claude's last reply, keeps the end
-  of the text where the others keep the start, since a reply ends with its conclusion and any
-  question Claude waits on.
+  or tables, and with credentials redacted.
 - `UnixHTTPServer` and `Wire`: the mod's routes (below).
 - `Update/`: the in-app update ([below](#update)). `AppVersion` and `Release` parse a version
   and GitHub's `releases/latest` reply strictly; `UpdatePolicy` says when a check is due and
@@ -104,13 +99,8 @@ that has drawn no band for 3 s while the session is joined is asked for it again
 in a joined session asks every surface for it. Start
 makes the session the target and starts the call; the line the app opens then asks the target
 for its summary (with Load context automatically on), which the mod writes (none for a session
-with no prompt yet; the last one again, with no model call, while no turn has completed since it
-was written), with a short note in the band while it goes. The mod also keeps, in memory, Claude's
-last reply in the main loop (a turn the owner typed included) and the question Claude waits on
-while one is open, and posts them with the summary as `last`, clipped to its last 8,000
-characters at a line start; `/clear` forgets them. While a question is open, what Claude wrote in
-the step that asked it stands in for the last reply: the mod takes that text from its turn
-tracker once, for both the `[ASKING]` line and `last`, which carries it once, before the question. Talk here shows only while
+with no prompt yet; the last one again, with no model call, until a turn the owner typed
+completes or `/clear`), with a short note in the band while it goes. Talk here shows only while
 the call talks to another session, and moves it here. When the socket does not answer, it opens
 `/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
 to `open -g -b <bundle id>`.
@@ -128,10 +118,10 @@ that both test suites parse.
 |---|---|
 | `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`; an upsert that also refreshes liveness |
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
-| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask (the line opening's and the voice's fetch look the same to the mod) |
+| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn |
-| `POST /v1/context` | `summary` (`''` when there is none or it failed) and an optional `last`, Claude's last reply and open question; the app redacts the summary and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. `last` becomes a `[LAST]` line only in answer to a fetch ([below](#fetching-the-context)) |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
 
 Every reply carries the status: the phase, the sessions with their labels (`Title · ab12` when
@@ -357,38 +347,6 @@ sequenceDiagram
   Mod->>Bridge: POST /v1/activity working
 ```
 
-### Fetching the context
-
-Asked about "the chat" or what is in the session, the voice answers from what it has. When that
-does not cover it, it is instructed to hand off the brief `refresh context`. The app takes that
-handoff itself, with the handoff's short sound: it records nothing in the conversation, sends
-nothing to Claude, and asks the target for its context with a 60 s deadline. The call machine holds
-the line open for the answer (`fetching`). The mod posts the summary with Claude's last reply and
-open question; the app speaks the `[CONTEXT]` line (also stored, as any context is) and the
-`[LAST]` line (never stored, never seeded into a later line) as the fetch's answer, once nobody is
-speaking. Claude runs no turn for the fetch. With no context within 60 s the voice gets `[FAILED]
-label: context not available`; with no target, the no-session sentence at once. A target change,
-the session leaving, Stop and a closed line drop the wait, and context that comes after is routine.
-That the voice writes the brief `refresh context` is a model instruction, not a control: the brief
-decides only where a request goes, and a brief that does not match, the owner's own question
-included, goes to Claude as any handoff and runs a Claude turn.
-
-```mermaid
-sequenceDiagram
-  actor Owner
-  participant Codex as voice
-  participant Bridge
-  participant Mod
-  Owner->>Codex: "look at the chat"
-  Codex-->>Bridge: handoff_request "refresh context"
-  Note over Bridge: not a request: nothing for Claude, the line waits (60 s)
-  Mod->>Bridge: GET /v1/next
-  Bridge-->>Mod: work: context
-  Mod->>Bridge: POST /v1/context (summary, last)
-  Bridge->>Codex: appendSpeech "[CONTEXT] label: …", "[LAST] label: …"
-  Codex-->>Owner: says what Claude last said
-```
-
 ### Update
 
 Only the copy at `/Applications/LiveBridge.app` (the bundle, symlinks resolved, is that path, and
@@ -451,9 +409,6 @@ only if it is still the one it bound.
 
 ## Failure behaviour
 
-- **The voice's fetch gets no context:** the voice gets `[FAILED] label: context not available`
-  after 60 s. A summary that failed still posts Claude's last reply, so the voice gets the
-  `[LAST]` line alone; a session with neither posts nothing, and its fetch fails the same way.
 - **No session joined:** Start is disabled in the menu. From the band or the socket, Start
   does nothing but report "No Claude Code session has joined: run /live on in a session, then
   start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
