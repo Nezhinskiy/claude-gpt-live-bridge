@@ -245,7 +245,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   "Muted — line closed" mientras no hay línea abierta. Mute no cierra la línea: una línea abierta
   se cierra como lo haría sin Mute, y se factura como cualquier silencio, así que Mute no ahorra minutos de tiempo real. **Unmute** vuelve a tomar el micrófono y,
   si no puede (denegado, ocupado, ausente), la llamada termina con el motivo. **Stop** termina la
-  llamada y el silencio; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo:
+  llamada y **Mute**; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo:
   cualquier proceso que se ejecute como tú puede quitarlo
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una

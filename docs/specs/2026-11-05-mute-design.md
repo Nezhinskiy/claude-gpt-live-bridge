@@ -25,8 +25,8 @@ on, so an answer from Claude still opens the line and is said.
   too, and the line opens empty.
 - The call goes on: an answer, question or approval notice from the target still opens the closed
   line and the voice says it (as since 0.3.0). A result held while the owner was speaking is said
-  after the usual grace. A line that is open when the owner mutes stays open until the 20 s
-  silence rule closes it.
+  after the usual grace. A line that is open when the owner mutes closes as it would
+  without Mute.
 - **Unmute** takes the microphone again and waits for it, as Start does, up to the page's 10 s
   microphone deadline; until it is back, the menu, and the band that pressed it, may still show
   Muted. Speech then opens the line as before. A failed Unmute ends the call with its reason.
