@@ -188,6 +188,20 @@ test('aVoiceTurnKeepsTheSummaryCached', async ($, on) => {
   expect(world.forks).toBe(2)
 })
 
+test('clearMakesTheContextSummariseAgain', async ($, on) => {
+  // /clear starts a new transcript, so the summary of the old one is not sent for it.
+  const world = await joined($, on)
+  await appAsks(world)
+  expect(world.forks).toBe(1)
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  const cleared = '00000000-0000-0000-0000-000000000002'
+  world.sessionId = cleared
+  await world.clock.advance(1000)  // the poll rejoins under the new id
+  await appAsks(world)
+  expect(world.forks).toBe(2)
+  expect(world.take('context')).toEqual([SUMMARY, { ...SUMMARY, sessionId: cleared }])
+})
+
 test('liveContextAsksTheModelEachTime', async ($, on) => {
   // The manual path: the owner asked for a summary, so it is written again.
   const world = await joined($, on)
