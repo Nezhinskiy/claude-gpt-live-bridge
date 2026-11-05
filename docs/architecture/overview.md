@@ -80,14 +80,17 @@ microphone or Claude:
 
 **`LiveBridge`** (the app target) wires `BridgeCore` to the menu bar, to `SMAppService` for Open at
 login, and to `AudioHost`: one `WKWebView` in an invisible window (one point, fully transparent,
-click-through, ordered in on every Space, because WebKit holds back the microphone of a page it
-does not consider visible), serving the bundled audio page under its own URL scheme. Before the
-page opens the microphone, the app asks macOS for it itself (WebKit's request never shows the
-prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
-for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
-queued audio into the peer, dropping silence until it has caught up. Mute stops the capture's
-tracks in one rule where the page acquires the microphone (`microphone.js`), so nothing
-acquired after Mute survives it, and Unmute captures again with no permission prompt. For updates,
+click-through, ordered in on every Space, because WebKit holds back the microphone of a page it does
+not consider visible), serving the bundled audio page under its own URL scheme. Before the page
+opens the microphone, the app asks macOS for it itself (WebKit's request never shows the prompt for
+this app); the prompt can stay up a while, so once macOS answers, `Bridge` looks at the call again:
+a Start goes ahead only while the call is on, an Unmute only while it is on and not muted, and a
+take no longer wanted does nothing and reports no refusal. The page owns the microphone, a voice
+detector (−45 dBFS for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a
+connect it plays the queued audio into the peer, dropping silence until it has caught up. Mute stops
+the capture's tracks in one rule where the page acquires the microphone (`microphone.js`), so
+nothing acquired after Mute survives it (no native check backs that release), and Unmute captures
+again with no permission prompt. For updates,
 `SystemUpdateEnvironment` is the real `UpdateEnvironment` (an ephemeral `URLSession`, `gh`,
 `diskutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
 `UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced

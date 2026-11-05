@@ -43,9 +43,12 @@ on, so an answer from Claude still opens the line and is said.
   be lost.
 - **What enforces it.** One rule in the audio page, where the microphone is acquired (below). The
   macOS indicator is how the owner sees it: off means LiveBridge captures nothing. The Muted label
-  alone proves nothing. No native check backs the page: the media-capture delegate grants every
-  microphone request from the page's own main frame, muted or not (a deny there while muted was
-  considered and not taken; the plan's review rulings say why).
+  alone proves nothing. No native check backs the release itself: the media-capture delegate grants
+  every microphone request from the page's own main frame, muted or not (a deny there while muted
+  was considered and not taken; the plan's review rulings say why). One native check covers only
+  the window while macOS's first-run prompt is up: once macOS answers, `Bridge` looks at the call
+  again before it asks the page to take the microphone, so a Start goes ahead only while the call
+  is on, and an Unmute only while the call is on and still muted (below).
 - **Not a control against local processes.** Mute protects against being heard by accident. Any
   process running as the owner can unmute through the socket, as it can start a call
   ([SECURITY.md](../../SECURITY.md)).
@@ -77,8 +80,16 @@ on, so an answer from Claude still opens the line and is said.
   machine, the mute with it.
 - `Bridge` performs the two actions as call events, runs the two effects on `AudioSide`'s
   `muteMicrophone()` and `unmuteMicrophone()`, and its status carries `isMuted`.
-- `AudioHost`: `muteMicrophone()` calls `LB.mute()`; `unmuteMicrophone()` calls `LB.unmute()` and,
-  when the page cannot be reached, reports a failure as `startListening()` does.
+- `AudioSide.microphoneProblem()` asks macOS for the microphone, which shows its prompt the first
+  time, and returns its refusal or none. `Bridge` calls it before `startListening()` and
+  `unmuteMicrophone()`, then checks the call machine as it is once macOS has answered: Start goes
+  ahead only while the call is not off, Unmute only while it is not off and not muted. A take that
+  is no longer wanted does nothing and reports no refusal; a refusal for a wanted one ends the call
+  with its reason. A Mute during Start's prompt does not cancel the Start (the page records the
+  mute and listens muted).
+- `AudioHost`: `microphoneProblem()` as above; `muteMicrophone()` calls `LB.mute()`;
+  `unmuteMicrophone()` calls `LB.unmute()` and, when the page cannot be reached, reports a failure
+  as `startListening()` does.
 - `StatusPresentation` knows `isMuted`, and derives the second action (`mute`, or `unmute` while
   muted; none while off) where it derives Start/Stop. Muted and listening, the headline is
   "Muted — line closed" and the detail "The line opens when Claude answers you."; connecting and
