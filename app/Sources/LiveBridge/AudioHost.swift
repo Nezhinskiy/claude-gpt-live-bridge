@@ -54,9 +54,7 @@ final class AudioHost: NSObject, AudioSide {
   // MARK: AudioSide
 
   func startListening() async {
-    if fakeMic == nil, let problem = await Self.askForMicrophone() {
-      return onEvent(.failed(problem))
-    }
+    if await microphoneRefused() { return }
     do { try await call("return await LB.listen(fake)", ["fake": fakeMic != nil]) } catch {
       onEvent(.failed(.other("The audio page did not start: \(Self.message(error))")))
     }
@@ -64,11 +62,19 @@ final class AudioHost: NSObject, AudioSide {
 
   func stopListening() async { _ = try? await call("LB.stop()") }
 
-  func muteMicrophone() async { _ = try? await call("LB.mute()") }
+  /// Fails closed: a page that cannot confirm the release ends the call, whose `LB.stop`
+  /// releases the microphone, rather than showing Muted over an open microphone.
+  func muteMicrophone() async {
+    do { try await call("LB.mute()") } catch {
+      onEvent(.failed(.other("The audio page did not mute: \(Self.message(error))")))
+    }
+  }
 
   /// Waits for the microphone; the page reports a refusal itself, so only a page that cannot
-  /// be reached fails here.
+  /// be reached fails here. macOS is asked first, as at Start, so a revoked permission is
+  /// reported as denied rather than as a timeout.
   func unmuteMicrophone() async {
+    if await microphoneRefused() { return }
     do { try await call("return await LB.unmute()") } catch {
       onEvent(.failed(.other("The audio page did not unmute: \(Self.message(error))")))
     }
@@ -95,6 +101,13 @@ final class AudioHost: NSObject, AudioSide {
   func chime() async { NSSound(named: "Glass")?.play() }
 
   func confirmHandoff() async { handoffSound?.play() }
+
+  /// Reports macOS's refusal of the microphone as a failure; true when it refused.
+  private func microphoneRefused() async -> Bool {
+    guard fakeMic == nil, let problem = await Self.askForMicrophone() else { return false }
+    onEvent(.failed(problem))
+    return true
+  }
 
   /// macOS's answer for the microphone, asking it first if it never was (its prompt then
   /// shows); nil when the page may open the microphone.
