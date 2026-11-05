@@ -243,7 +243,9 @@ The list of what goes to OpenAI, and when, is in the README's
 closed: voice detection runs on the Mac. Codex itself keeps running between lines, and opening
 Settings starts another codex to list the voices; what codex sends on its own is codex's. Codex
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
-session sends its work to Anthropic as it always does. LiveBridge has no telemetry.
+session sends its work to Anthropic as it always does. LiveBridge has no telemetry. The menu's
+**Star LiveBridge on GitHub** only opens the repository's page in your browser; the app sends
+nothing.
 
 For updates, the app itself makes two kinds of request, and no others: the release check and the
 image download below. It also runs `gh` and `claude` for the requests listed below; what `gh`

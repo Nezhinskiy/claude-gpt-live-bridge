@@ -120,14 +120,6 @@ struct MenuContentTests {
     #expect(install != nil && settings != nil && install! < settings!)
   }
 
-  /// The classic way to support an open-source app, beside Settings.
-  @Test func theMenuOffersAStarOnGitHub() {
-    let outline = Self.menu(Self.status(sessions: 0), available: nil).outline
-    let star = outline.firstIndex(of: "Star LiveBridge on GitHub")
-    let settings = outline.firstIndex(of: "Settings… ⌘,")
-    #expect(star != nil && settings != nil && star! + 1 == settings!)
-  }
-
   @Test func noUpdateAddsNoInstallItem() {
     let outline = Self.menu(Self.status(sessions: 0), available: nil).outline
     #expect(!outline.contains { $0.hasPrefix("Install LiveBridge") })

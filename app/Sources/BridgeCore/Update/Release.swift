@@ -23,7 +23,7 @@ public struct Release: Equatable, Sendable {
     guard decoded.assets?.contains(where: { $0.name == imageName }) == true else {
       throw .noImage
     }
-    let base = "https://github.com/\(repository)/releases"
+    let base = "\(repositoryPage.absoluteString)/releases"
     guard let imageURL = URL(string: "\(base)/download/\(version.tag)/\(imageName)"),
       let pageURL = URL(string: "\(base)/tag/\(version.tag)")
     else { throw .badTag(decoded.tagName) }
@@ -34,7 +34,7 @@ public struct Release: Equatable, Sendable {
   static let imageName = "LiveBridge.dmg"
   /// The repository that publishes the releases.
   public static let repository = "getLiveBridge/LiveBridge"
-  /// Its page on GitHub, where the menu's star item goes.
+  /// The repository's page on GitHub.
   public static let repositoryPage = URL(string: "https://github.com/\(repository)")!
   /// GitHub's latest release of LiveBridge.
   public static let latestURL = URL(
