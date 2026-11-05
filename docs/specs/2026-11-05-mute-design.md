@@ -1,6 +1,6 @@
 # Mute
 
-Status: proposed, 2026-11-05; revised the same day after the review
+Status: delivered, 2026-11-05; revised the same day after the review
 (`docs/reviews/2026-11-05-mute-review.md` on branch `review/mute`).
 
 ## Why

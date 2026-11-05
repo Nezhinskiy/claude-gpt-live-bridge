@@ -232,6 +232,15 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), मिनट,
   **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
+- **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
+  चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice उसे
+  बोलती है। band phase वैसी ही रखता है और `· muted` जोड़ता है; जब कोई line खुली न हो, menu "Muted — line
+  closed" कहता है। Mute line बंद नहीं करता: खुली line तब तक खुली रहती है जब तक 20 सेकंड की चुप्पी
+  उसे बंद न कर दे, और किसी भी चुप्पी की तरह billed होती है, इसलिए Mute से realtime minutes नहीं
+  बचते। **Unmute** microphone फिर लेता है, और न ले पाए (मना किया गया, busy, मौजूद नहीं) तो call
+  कारण के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted
+  शुरू होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
+  ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
   line खुलने से नए सिरे से शुरू होता है, सिवाय तब जब **Load context automatically when a line opens**
@@ -281,6 +290,7 @@ Realtime voice session खुली रहने तक खर्च होत�
 
 - जब call चालू हो और कोई बोल नहीं रहा, तब microphone सिर्फ़ आपके Mac पर चल रहे voice detector को
   audio देता है। कहीं कुछ भेजा नहीं जाता।
+  Muted रहते हुए LiveBridge के पास कोई microphone नहीं होता, और macOS का microphone indicator यह दिखाता है।
 - जब आप बोलना शुरू करते हैं, line खुल जाती है। बोलना शुरू करने से पहले के 2 सेकंड रखे जाते हैं और
   सबसे पहले भेजे जाते हैं, ताकि आपके पहले शब्द न छूटें।
 - 20 सेकंड की चुप्पी के बाद line बंद हो जाती है। शब्दों के बिना आवाज़ (संगीत, TV) उसे 90 सेकंड बाद
@@ -309,7 +319,7 @@ socket पर बात करता है, जो ऐसे folder में �
 session के ज़रिए OpenAI को यह जाता है:
 
 - line खुली रहने के दौरान microphone audio, आपके बोलना शुरू करने से 2 सेकंड पहले से (या, Claude के
-  जवाब, सवाल या permission prompt से खुली line के लिए, उसके खुलने से) लेकर line बंद होने तक;
+  जवाब, सवाल या permission prompt से खुली line के लिए, उसके खुलने से) लेकर line बंद होने तक (muted रहते LiveBridge कुछ capture नहीं करता, इसलिए कुछ नहीं जाता; Mute दबाने से पहले आपने जो बोला, पहले से खुल रही line पर, वह फिर भी जाता है);
 - voice के निर्देश: LiveBridge के अपने नियम, फिर आपकी Settings का **Prompt**, अगर आपने लिखा हो;
 - target session की हाल की conversation (आख़िरी 24 पंक्तियों तक), ताकि उसे नए realtime session में
   जारी रखा जा सके;

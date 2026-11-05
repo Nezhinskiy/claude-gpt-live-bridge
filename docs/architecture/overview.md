@@ -44,7 +44,9 @@ microphone or Claude:
 
 - `CallMachine`: the call's phase — `off`, `listening` (microphone and local voice detection
   only), `connecting`, `live` (a realtime session is open) — and the effects of each event. It
-  is pure; `Bridge` runs the effects in order.
+  also keeps `isMuted`, orthogonal to the phase: while muted the microphone is released, speech
+  is ignored, and a result from Claude still opens the line. Mute closes no line; the 20 s silence
+  rule does, as without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
@@ -80,7 +82,9 @@ does not consider visible), serving the bundled audio page under its own URL sch
 page opens the microphone, the app asks macOS for it itself (WebKit's request never shows the
 prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
 for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
-queued audio into the peer, dropping silence until it has caught up. For updates,
+queued audio into the peer, dropping silence until it has caught up. Mute stops the capture's
+tracks in one rule where the page acquires the microphone (`microphone.js`), so nothing
+acquired after Mute survives it, and Unmute captures again with no permission prompt. For updates,
 `SystemUpdateEnvironment` is the real `UpdateEnvironment` (an ephemeral `URLSession`, `gh`,
 `diskutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
 `UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced
@@ -94,7 +98,8 @@ background ones by the request marker on the prompt's last line and by the `prom
 origin. A voice turn is one that has started: while a voice request waits for the running turn
 to end, that turn's questions, and the notice of its permission prompts, stay in Claude Code. It
 draws a band above the prompt with the call's phase, the target, the unheard count and the
-buttons Start/Stop and Talk here, with the problem sentence on a row of its own. A surface
+buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries `isMuted`, with a
+`· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own. A surface
 that has drawn no band for 3 s while the session is joined is asked for it again, and `/live on`
 in a joined session asks every surface for it. Start
 makes the session the target and starts the call; the line the app opens then asks the target
@@ -122,9 +127,9 @@ that both test suites parse.
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn (none: a permission prompt), `text` what Claude wrote in the step that pauses |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
-| `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
+| `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
-Every reply carries the status: the phase, the sessions with their labels (`Title · ab12` when
+Every reply carries the status: the phase, `isMuted`, the sessions with their labels (`Title · ab12` when
 two titles are the same) and which one is the target, the minutes today, the problem sentence
 and the count of unheard results. What only the app's menu shows (the minutes this call, the
 target's context line and its conversation) is not on the wire.
@@ -455,5 +460,7 @@ only if it is still the one it bound.
   could not be opened, perhaps because another app holds it; a request still pending after
   10 s fails with its own sentence instead of listening to nothing. When the
   default input changes mid-call, the page takes the new one and keeps the peer.
+- **Unmute cannot take the microphone** (denied, busy, missing) **or the audio page cannot be
+  reached:** the call goes to `off` with the reason, as at Start.
 - **Local Network access blocked:** with no ICE candidate within 2 s, the call goes to `off` with a
   sentence naming the setting.

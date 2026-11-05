@@ -239,6 +239,16 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
   conserva LiveBridge, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
   **Settings…** y **Quit LiveBridge**.
+- **Mute** (junto a **Stop**, en la banda y en la tarjeta de llamada del menú; **Unmute** mientras
+  está silenciado) libera tu micrófono mientras la llamada continúa: una respuesta de Claude sigue
+  abriendo la línea y la voz la dice. La banda mantiene la fase y añade `· muted`; el menú dice
+  "Muted — line closed" mientras no hay línea abierta. Mute no cierra la línea: una línea abierta
+  sigue abierta hasta que la cierran los 20 segundos de silencio, facturada como cualquier
+  silencio, así que Mute no ahorra minutos de tiempo real. **Unmute** vuelve a tomar el micrófono y,
+  si no puede (denegado, ocupado, ausente), la llamada termina con el motivo. **Stop** termina la
+  llamada y el silencio; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo:
+  cualquier proceso que se ejecute como tú puede quitarlo
+  ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
   que se abre la línea, salvo con **Load context automatically when a line opens** activado: esa
@@ -292,6 +302,7 @@ permiso:
 
 - Mientras hay una llamada en curso y nadie habla, el micrófono alimenta únicamente un detector de
   voz en tu Mac. No se envía nada a ninguna parte.
+  Mientras está silenciado, LiveBridge no tiene el micrófono, y el indicador de micrófono de macOS lo muestra.
 - Cuando empiezas a hablar, se abre la línea. Los 2 segundos anteriores a que empezaras se
   conservan y se envían primero, para que no se pierdan tus primeras palabras.
 - La línea se cierra tras 20 segundos de silencio. El sonido sin palabras (música, una tele) la
@@ -322,7 +333,7 @@ la sesión en tiempo real de codex:
 
 - el audio del micrófono mientras la línea está abierta, desde 2 segundos antes de que empezaras a
   hablar (o, en una línea que abrió una respuesta, pregunta o solicitud de permiso de Claude,
-  desde que se abrió) hasta que se cierra;
+  desde que se abrió) hasta que se cierra (con Mute, LiveBridge no capta nada, así que no sale audio; lo que dijiste antes de pulsar Mute, en una línea que ya se estaba abriendo, sí);
 - las instrucciones de la voz: las reglas propias de LiveBridge y, después, el **Prompt** de tus
   Ajustes si escribiste uno;
 - la conversación reciente de la sesión de destino (hasta las últimas 24 líneas) para continuarla
