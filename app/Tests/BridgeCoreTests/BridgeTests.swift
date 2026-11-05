@@ -575,7 +575,10 @@ struct BridgeTests {
     await bridge.audioEvent(.speechEnded)
     voice.emit(.userUtterance("Example request 1"))
     try await handOff()
-    #expect(await eventually { time.sleepers >= 4 })  // sweep, 2 silence timers, window
+    // the window's own timer, armed before the clock moves: a count of sleepers can be made up
+    // of silence timers while the handoff still waits to be handled
+    let window = time.now + Double(CallMachine.resultWindowSeconds)
+    #expect(await eventually { time.deadlines.contains(window) })
     for second in 1..<CallMachine.resultWindowSeconds {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined

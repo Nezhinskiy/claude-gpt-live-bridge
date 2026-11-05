@@ -19,4 +19,14 @@ struct TimeSourceTests {
     long.cancel()
     time.advance(by: .seconds(55))
   }
+
+  /// A deadline already passed, as when a timer's task starts late, wakes at once.
+  @Test func aPassedDeadlineWakesAtOnce() async throws {
+    let time = TestTime()
+    let deadline = time.now
+    time.advance(by: .seconds(5))
+    try await time.sleep(until: deadline)
+    try await SystemTime().sleep(until: Date().addingTimeInterval(-1))
+    #expect(time.sleepers == 0)
+  }
 }

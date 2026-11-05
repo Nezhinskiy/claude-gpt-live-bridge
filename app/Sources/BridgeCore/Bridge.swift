@@ -281,10 +281,12 @@ public actor Bridge: Router {
     }
   }
 
+  /// The deadline is taken now, not when the task starts, so a late start does not move it.
   private func arm(_ timer: CallTimer, after delay: Duration) {
     timers[timer]?.cancel()
+    let deadline = time.now + delay.timeInterval
     timers[timer] = Task { [time] in
-      try? await time.sleep(for: delay)
+      try? await time.sleep(until: deadline)
       await self.fire(timer)
     }
   }
