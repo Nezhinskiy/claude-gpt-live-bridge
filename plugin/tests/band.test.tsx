@@ -174,9 +174,9 @@ test('aMutedCallOffersUnmuteAndKeepsItsPhase', async ($, on) => {
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
     expect(await buttons(band)).toEqual(['Stop', 'Unmute'])
-    expect((await band.find({ type: 'Text', text: 'Live' }))).toBeDefined()
+    expect(await band.find({ type: 'Text', text: 'Live' })).toBeDefined()
     expect((await band.find({ type: 'Text', text: '●' }))?.props.color).toBe('error')
-    expect(await band.find({ type: 'Text', text: /muted/ })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: '· muted' })).toBeDefined()
     await band.press({ key: 'mute' })
     expect(world.take('call')).toEqual([{ action: 'unmute' }])
     await band.unmount()
@@ -202,6 +202,18 @@ test('anAppWithoutMuteDrawsNoMute', async ($, on) => {
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
     expect(await buttons(band)).toEqual(['Stop'])
+    await band.unmount()
+  }
+})
+
+test('anUnmutedLiveCallDrawsNoMutedMarker', async ($, on) => {
+  const world = await joined($, on)
+  world.status = { ...world.status, call: 'live', isMuted: false }
+  await world.clock.advance(1000)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await band.find({ type: 'Text', text: 'Live' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: /muted/i })).toBeUndefined()
     await band.unmount()
   }
 })
