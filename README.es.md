@@ -317,10 +317,12 @@ la sesión en tiempo real de codex:
   en una nueva sesión en tiempo real;
 - las peticiones de la sesión de destino aún abiertas, como sus resúmenes de una línea;
 - cada resultado, pregunta, actualización y aviso de aprobación, como una línea de como máximo 2000
-  caracteres, sin bloques de código ni tablas. Una pregunta que Claude hace a mitad de turno lleva
-  también lo que Claude escribió justo antes de hacerla. Una actualización es la respuesta de Claude en un
-  turno posterior iniciado por la notificación de una tarea en segundo plano, durante hasta 10
-  minutos después de una petición por voz y hasta que empiece cualquier otro turno en la sesión;
+  caracteres, sin bloques de código ni tablas. Una pregunta que Claude hace a mitad de turno, y el
+  aviso de aprobación de un permiso que pide el bucle principal de Claude (no un subagente),
+  llevan también lo que Claude escribió justo antes de pedirlo. Una actualización es la respuesta
+  de Claude en un turno posterior iniciado por la notificación de una tarea en segundo plano,
+  durante hasta 10 minutos después de una petición por voz y hasta que empiece cualquier otro
+  turno en la sesión;
 - el resumen de contexto de la sesión de destino, como una línea de como máximo 1500 caracteres. Se
   guarda cuando se carga y se envía cada vez que se abre la línea mientras esa sesión es el
   destino, a través de Stop y Start y de los reinicios de la aplicación. El submenú Conversation del

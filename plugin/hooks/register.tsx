@@ -9,7 +9,7 @@ import { summarize } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
 import { askedText, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
-import { clip, originOf, TurnTracker } from './turns.ts'
+import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
 import type { VoiceRequest } from './wire.ts'
@@ -18,11 +18,6 @@ const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
 const RESCAN_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
-/**
- * In characters: under the app's 131,072-byte body limit even at four UTF-8 bytes each; the app
- * shortens answers for speech itself.
- */
-const ANSWER_LIMIT = 32_000
 /** How long a summary may take before the band stops saying it is loading. */
 const CONTEXT_TIMEOUT_MS = 60_000
 /** How long the band says "Context sent". */
@@ -373,6 +368,9 @@ async function startHere($: EngineInterface): Promise<void> {
 }
 
 /** Whether a tool's run, failure or denial settles the permission request being reported. */
+/** What the step that pauses wrote, as the activity's `text`; none when it wrote nothing. */
+const wrote = (text: string) => (text === '' ? {} : { text })
+
 function settles(e: { tool_name: string; agent_id?: string }): boolean {
   if (approval?.tool !== e.tool_name || approval.agent !== e.agent_id) return false
   approval = null
@@ -449,12 +447,22 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // The engine's turn.complete carries only the turn's last text, and a question only its
-  // options: what Claude wrote in the step that asks would reach the voice in neither.
+  // The engine's turn.complete carries only the turn's last text, and a question or a permission
+  // prompt only itself: what Claude wrote in the step that asks would reach the voice in neither.
+  // Kept as it streams, since the engine may run the step's tools before the step ends.
   on('turn.step', async function* ($, e, next) {
-    const result = yield* next(e)
-    if (e.agentId === undefined) tracker.stepped(result.answer)
-    return result
+    if (e.agentId !== undefined) return yield* next(e)
+    tracker.stepStarted()
+    const stream = next(e)
+    let block: number | undefined
+    for await (const chunk of stream) {
+      if (chunk.kind === 'text') {
+        tracker.streamed(block === undefined || block === chunk.index ? chunk.text : `\n${chunk.text}`)
+        block = chunk.index
+      }
+      yield chunk
+    }
+    return stream.result
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -483,7 +491,7 @@ export const register: Register = on => {
     const answered = next(e)
     const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
     try {
-      await link.activity('approval', askedText(e.questions, tracker.takeStepText()))
+      await link.activity('approval', { question: askedText(e.questions), ...wrote(tracker.takeStepText()) })
       const first = await Promise.race([answered, spoken])
       return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
     } finally {
@@ -492,12 +500,12 @@ export const register: Register = on => {
     }
   }).catch(($, e, next) => next(e))
 
-  // ADR 0001 (i): a permission request that reaches the person during a voice turn. Claude's
-  // question has its own report above.
+  // ADR 0001 (i): a permission request that reaches the person during a voice turn, with what
+  // the main loop wrote in the step that asks for it. Claude's question has its own report above.
   on('classic.PermissionRequest', async ($, e, next) => {
     if (tracker.running !== null && e.tool_name !== 'AskUserQuestion') {
       approval = { tool: e.tool_name, agent: e.agent_id }
-      await link?.activity('approval')
+      await link?.activity('approval', e.agent_id === undefined ? wrote(tracker.takeStepText()) : {})
     }
     return next(e)
   }).catch(($, e, next) => next(e))

@@ -309,9 +309,10 @@ session:
   realtime session;
 - the target session's requests still open, as their one-line briefs;
 - each result, question, update and approval notice, as one line of at most 2,000 characters,
-  with code blocks and tables removed. A question Claude asks mid-turn also carries what Claude
-  wrote just before asking it. An update is Claude's answer in a later turn started by a
-  background task's notification, for up to 10 minutes after a voice request and until any other
+  with code blocks and tables removed. A question Claude asks mid-turn, and the approval notice
+  for a permission prompt of Claude's main loop (not a subagent's), also carry what Claude wrote
+  just before asking. An update is Claude's answer in a later turn started by a background
+  task's notification, for up to 10 minutes after a voice request and until any other
   turn starts in the session;
 - the target session's context summary, as one line of at most 1,500 characters. It is saved
   when it is loaded and sent every time the line opens while that session is the target, across

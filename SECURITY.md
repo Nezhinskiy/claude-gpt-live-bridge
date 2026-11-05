@@ -26,7 +26,8 @@ target session, and Claude runs it **under that session's own permission mode, a
 included**. Whatever that mode would ask before a tool runs, it still asks, and only you can
 answer, at your keyboard in Claude Code. LiveBridge has no code that answers a permission
 prompt: the mod declares no `tool.check` hook, and its `classic.PermissionRequest` hook only
-tells the voice that a prompt is waiting.
+tells the voice that a prompt is waiting, with what Claude's main loop wrote in the step that
+asks for it.
 
 A question Claude asks you while it works (the AskUserQuestion dialog) is not a permission
 prompt: Claude asks for your input, not for leave to run a tool. During a voice turn the mod
@@ -119,8 +120,8 @@ act" is a model instruction.
 
 ### What session text can do
 
-Results, questions, updates, open tasks and context summaries go to the voice as one tagged line
-each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
+Results, questions, updates, approval notices, open tasks and context summaries go to the voice
+as one tagged line each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
 space. That keeps the format unambiguous, but it is not a control: each line goes in with the
 rank of the owner's own words (`user`), so a session's text needs no fake tag to give the voice
 orders. The voice is told to treat such text as data to relay, which is again an instruction.
@@ -133,8 +134,8 @@ secret.
 ### Residual risk, by design
 
 - **Anything that steers the voice can start work.** Text a joined session read (a README, an
-  issue, a web page, a tool's output) can reach the voice in a result, an update or a summary,
-  and talk it into a handoff, including the "confirmed by voice" sentence above.
+  issue, a web page, a tool's output) can reach the voice in a result, a question, an update, an
+  approval notice or a summary, and talk it into a handoff, including the "confirmed by voice" sentence above.
 - **A handoff can hop between sessions.** The voice hands work to the target session, or to the
   session that asked the last question. So text that session A read can become a prompt in
   session B, which may run in a more permissive mode.

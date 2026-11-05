@@ -334,11 +334,44 @@ struct BridgeTests {
     try await registry.enqueue(request(1), for: a)
     #expect(try await registry.poll(a) == .request(request(1)))
     await live()
-    let question =
-      "Which name? Options: out. Claude wrote just before asking: Two folders.\n```\nrm -rf build\n```\n| a | b |\nPick one."
-    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question))
+    let question = "Which name? Options: out."
+    let text = "Two folders.\n```\nrm -rf build\n```\n| a | b |\nPick one."
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question, text: text))
     let said = "Which name? Options: out. Claude wrote just before asking: Two folders. Pick one."
     #expect(await voice.added == ["[ASKING] Alpha: \(said)"])
+  }
+
+  /// What Claude wrote in the step that asked for a permission follows the approval notice,
+  /// its code and tables removed as from a result.
+  @Test func anApprovalsLineCarriesTheStepsProse() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let text = "Deleting build.\n```\nrm -rf build\n```\n| a | b |\nThen test."
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
+    let notice = "Claude is waiting for your approval"
+    let said = "\(notice). Claude wrote just before asking: Deleting build. Then test."
+    #expect(await voice.added == ["[APPROVAL] Alpha: \(said)"])
+  }
+
+  /// A step that wrote only code or a table adds nothing to the notice.
+  @Test func anApprovalAfterACodeOnlyStepIsTheNoticeAlone() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let text = "```\nrm -rf build\n```\n| a | b |"
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
+    #expect(await voice.added == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
+  }
+
+  /// A step's text longer than a line is cut, and the notice before it stays whole.
+  @Test func aLongStepTextNeverCutsTheNotice() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let text = String(repeating: "Deleting build. ", count: 200)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
+    let line = try #require(await voice.added.first)
+    #expect(line.hasPrefix("[APPROVAL] Alpha: Claude is waiting for your approval. Claude wrote"))
+    #expect(line.count <= AnswerShaper.maxCharacters)
   }
 
   @Test func replyToClaudesQuestionGoesToTheAskingSession() async throws {

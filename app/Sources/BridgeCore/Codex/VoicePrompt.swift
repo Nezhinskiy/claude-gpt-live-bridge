@@ -67,5 +67,9 @@ public enum VoicePrompt {
     without choosing for them. Hand off only the owner's reply: the option they choose, or what \
     they want to ask or tell Claude about it. That handoff reaches Claude as the reply to its \
     question, so write it as the owner's words to Claude.
+
+    An [APPROVAL] line is a permission prompt Claude waits on in Claude Code, often with what \
+    Claude wrote just before asking. Only the owner can answer it, at the keyboard: tell them \
+    so and what Claude wants to do. No handoff answers it, so do not ask for a yes to it.
     """
 }

@@ -45,6 +45,7 @@ const WORK: Shape = {
 const SHAPES: Record<string, Shape> = {
   'activity': fields<Wire.ActivityBody>({
     sessionId: S, state: { oneOf: ['idle', 'working', 'approval'] }, question: optional(S),
+    text: optional(S),
   }),
   'answer': fields<Wire.AnswerBody>({
     sessionId: S, id: S, status: { oneOf: ['ok', 'failed', 'question', 'update'] }, text: S,
