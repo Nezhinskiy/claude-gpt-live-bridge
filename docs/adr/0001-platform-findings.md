@@ -239,8 +239,9 @@ answer prompt but needs wording that is no request ("Hmm." did not reach a resul
 untested) and a filter that keeps it out of the conversation and the menu.
 
 Measured again on 2026-11-05 with the line given as speakable text (`appendSpeech`, PR #34 at
-`58c729a`), the same probe otherwise: `resultWindowSeconds` set to 0 in the working tree only, no
-nudge. 6 runs, 5 of them reached a result; the connect is the mod's `/v1/answer` to `live`.
+`58c729a`, since reverted), the same probe otherwise: `resultWindowSeconds` set to 0 in the working
+tree only, no nudge. 6 runs, 5 of them reached a result; the connect is the mod's `/v1/answer` to
+`live`.
 
 | Run | Connect | `live` to the end of the first segment | Said |
 |---|---|---|---|
@@ -342,8 +343,7 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
   owner to speak (see "Decision: results while the voice is closed" below). A result for a
   request handed off on the open line, within the window after the handoff, goes with
   `appendSpeech` instead, so the voice says it without waiting for the owner (see "Decision: the
-  line waits for a handoff's result" below); so does the line that opens a closed line (see
-  "Decision: a result opens the closed line" below).
+  line waits for a handoff's result" below).
 - Realtime failures are read from `thread/realtime/error` (and `closed` with `reason: "error"`),
   not from the start call's response; a message we do not recognise is shown as is. Not logged in
   is `account/read` returning `account: null`.
@@ -441,13 +441,9 @@ speak. For an approval notice the voice only says that Claude waits; the owner a
 Claude Code, as before. The bridge decides this from the registry's target and the conversation and
 passes it with the delivery; the call machine keeps no copy of either. A line from a session that is
 not the target only chimes, and the owner switches to it; so does a later update. The new session is
-seeded as usual, starts without the pre-roll, as nobody spoke, and gets the line to say with
-`appendSpeech`, held until the owner is silent if they speak while it connects (amended 2026-11-05
-at the owner's request to shorten the 7 to 15 s the owner waited, after item (n) found the voice
-slow to take up the line as context; item (n) then measured it no faster); any other unheard line
-goes as context. No synthetic utterance is sent. The connect does not hold up the mod's request that
-brought the line, and a question or approval settled at the keyboard while its line still connects
-closes it. When the opened line closes with the line still unsaid (item (n)), it chimes and waits,
-as decided on 2026-11-01; so does a connect that fails. The result window is unchanged. Each opening
-is billed like any open line: the connect, the voice's words and the 20 s of silence before it
-closes.
+seeded as usual, starts without the pre-roll, as nobody spoke, and gets the line as context; no
+synthetic utterance is sent. The connect does not hold up the mod's request that brought the line,
+and a question or approval settled at the keyboard while its line still connects closes it. When the
+opened line closes with the line still unsaid (item (n)), it chimes and waits, as decided on
+2026-11-01; so does a connect that fails. The result window is unchanged. Each opening is billed
+like any open line: the connect, the voice's words and the 20 s of silence before it closes.

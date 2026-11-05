@@ -216,14 +216,12 @@ question Claude asks or a permission prompt it waits on while it works) opens th
 the target's conversation holds a turn of the owner's; a line seeded without one stays silent ([ADR
 0001](../adr/0001-platform-findings.md) (b)). The bridge decides this from the registry's target and
 the conversation, and passes it with the delivery. The new realtime session is seeded with the
-target's conversation, starts without the pre-roll, as nobody spoke, and gets the line to say
-(`appendSpeech`, the call codex's own client makes to have an answer said), held until the owner is
-silent if they speak while it connects; any other unheard line goes as context. Given as context,
-the voice took 5 to 8 s to take it up, or said nothing ([ADR 0001](../adr/0001-platform-findings.md)
-(n)); with `appendSpeech` it was no faster, 6 to 9 s, and stayed silent in 1 of 5 runs. If the voice
-does not say it, the 20 s silence rule closes the line, and the line chimes and waits as below. The
-mod's request that brought the line does not wait for the connect, and a question or approval the
-owner settles at the keyboard while its line still connects closes that line.
+target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
+the voice usually says it unprompted, within about 8 s of connecting ([ADR
+0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence rule closes the line,
+and the line chimes and waits as below. The mod's request that brought the line does not wait for
+the connect, and a question or approval the owner settles at the keyboard while its line still
+connects closes that line.
 
 Any other line that arrives while the line is closed (one from a session that is not the target, a
 later update) does not open it. It chimes, the notification names the session, and the line waits;

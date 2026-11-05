@@ -85,20 +85,11 @@ struct CallMachineTests {
     row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
       [.openRealtimeForResult], pending: [result]),
+    // To be said at once (appendSpeech), not left for the voice to take up (appendText):
+    // given as context, the voice took 5-8 s to start, or said nothing (ADR 0001 (n)).
     row(
       "theOpenedLineSaysWhatOpenedIt", [.start, opening(result)], .connected, .live,
       [.flushPreroll, .speak(result), arm, .problem(nil)], pending: [result]),
-    row(
-      "theOpenedLineHoldsItWhileTheOwnerSpeaks", [.start, opening(result), .speechStarted],
-      .connected, .live, [.flushPreroll, cap, .problem(nil)], pending: [result]),
-    row(
-      "aHeldOpenerIsSaidAfterTheGrace",
-      [.start, opening(result), .speechStarted, .connected, .speechEnded], .graceElapsed, .live,
-      [.speak(result), arm], pending: [result]),
-    row(
-      "aFailedOpeningThenSpeechGivesItAsContext",
-      [.start, opening(result), .connectFailed(r), .speechStarted], .connected, .live,
-      [.flushPreroll, .addContext(result), cap, .problem(nil)], pending: [result]),
     row(
       "theOpenedLineGetsOtherUnheardLinesAsContext", [.start, deliver(a), opening(result)],
       .connected, .live,
@@ -300,17 +291,6 @@ struct CallMachineTests {
     var answer = Self.result
     answer.session = cleared
     #expect(machine.handle(.deliver(answer)) == [.speak(answer), Self.arm])
-  }
-
-  /// A `/clear` while the line an answer opened still connects keeps that answer to be said.
-  @Test func aRenameWhileTheOpenedLineConnectsStillSaysIt() {
-    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
-    var machine = CallMachine()
-    for event in [CallEvent.start, Self.opening(Self.result)] { _ = machine.handle(event) }
-    machine.rename(Self.alpha, to: cleared)
-    var said = Self.result
-    said.session = cleared
-    #expect(machine.handle(.connected) == [.flushPreroll, .speak(said), Self.arm, .problem(nil)])
   }
 
   /// A question withdrawn while the line it opened still connects leaves nothing to say: the
