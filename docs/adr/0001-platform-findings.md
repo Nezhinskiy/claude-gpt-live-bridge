@@ -515,4 +515,9 @@ synthetic utterance is sent. The connect does not hold up the mod's request that
 and a question or approval settled at the keyboard while its line still connects closes it. When the
 opened line closes with the line still unsaid (item (n)), it chimes and waits, as decided on
 2026-11-01; so does a connect that fails. The result window is unchanged. Each opening is billed
-like any open line: the connect, the voice's words and the 20 s of silence before it closes.
+like any open line: the connect, the voice's words and the silence before it closes. Amended on
+2026-11-05, after item (n) timed when the voice starts on such a line: in the 10 timed runs where it
+spoke it started 0.7 to 2.0 s after the connect, and in the 3 of them without a cue, as in use, 0.7
+to 1.4 s. Until the owner or the voice speaks on the line, its silence is
+`CallMachine.firstWordSeconds` (5 s) instead of 20 s, also after another line arrives; then it
+closes and chimes, and a voice that would have started later is cut off.

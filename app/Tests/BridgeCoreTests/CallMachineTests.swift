@@ -20,6 +20,8 @@ struct CallMachineTests {
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
   static let r = Problem.other("r")
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
+  /// A line a result opened waits this long for the voice's first word.
+  static let firstWord = CallEffect.armSilenceTimer(seconds: 5)
   static let alpha = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   static let beta = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
   /// Lines of the bridge's own, which no session waits for.
@@ -86,8 +88,23 @@ struct CallMachineTests {
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
       [.openRealtimeForResult], pending: [result]),
     row(
-      "theOpenedLineGetsItAsContext", [.start, opening(result)], .connected, .live,
-      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
+      "theOpenedLineGetsItAsContextAndWaitsBrieflyForTheVoice", [.start, opening(result)],
+      .connected, .live, [.flushPreroll, .addContext(result), firstWord, .problem(nil)],
+      pending: [result]),
+    row(
+      "theOwnerSpeakingWhileAnOpenedLineConnectsGetsTheNoiseCap",
+      [.start, opening(result), .speechStarted], .connected, .live,
+      [.flushPreroll, .addContext(result), cap, .problem(nil)], pending: [result]),
+    row(
+      "anotherLineBeforeTheFirstWordKeepsTheShortWait", [.start, opening(result), .connected],
+      deliver(a), .live, [.addContext(a), firstWord], pending: [result, a]),
+    row(
+      "theOwnersWordsOnAnOpenedLineGetTheUsualSilence", [.start, opening(result), .connected],
+      .userTranscribed, .live, [arm], pending: [result]),
+    row(
+      "theVoiceSpeakingOnAnOpenedLineGetsTheUsualSilence",
+      [.start, opening(result), .connected], .assistantSpeaking, .live, [arm],
+      pending: [result]),
     row(
       "anOpenedLineLeftSilentChimes", [.start, opening(result), .connected], .silenceElapsed,
       .listening, [.closeRealtime, .chime], pending: [result]),
@@ -294,6 +311,16 @@ struct CallMachineTests {
     for event in [CallEvent.start, Self.opening(Self.asking)] { _ = machine.handle(event) }
     #expect(machine.withdraw { $0 == Self.asking } == [.closeRealtime])
     #expect(machine.phase == .listening)
+  }
+
+  /// A line a question opened stays once the owner speaks on it while it connects.
+  @Test func withdrawingKeepsAnOpeningLineTheOwnerSpeaksOn() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.opening(Self.asking), .speechStarted] {
+      _ = machine.handle(event)
+    }
+    #expect(machine.withdraw { $0 == Self.asking } == [])
+    #expect(machine.phase == .connecting)
   }
 
   /// A line the owner opened by speaking stays, whatever is withdrawn from it.
