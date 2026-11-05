@@ -12,8 +12,8 @@ struct SessionRegistryTests {
 
   init() { registry = SessionRegistry(time: time) }
 
-  func join(_ id: SessionID, _ title: String = "Example session") async {
-    try? await registry.join(JoinBody(sessionId: id, title: title))
+  func join(_ id: SessionID, _ title: String = "Example session", modVersion: String? = nil) async {
+    try? await registry.join(JoinBody(sessionId: id, title: title, modVersion: modVersion))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -225,19 +225,25 @@ struct SessionRegistryTests {
     #expect(await run(1) == [timedOut])  // ten minutes awake in all
   }
 
-  /// `/clear` gives the session a new id: it keeps its place, the target and its request.
-  /// A session whose mod is older than the app, or that names no version (a mod before 0.3.1),
-  /// is listed by its label until it joins with a mod as new as the app.
+  /// A session whose mod is older than the app, or that names no version (a mod from before the
+  /// field), is listed by its label, in the order the sessions joined.
   @Test func sessionsOnAnOlderModAreListed() async throws {
     let app = try #require(AppVersion("0.3.1"))
-    try await registry.join(JoinBody(sessionId: a, title: "Alpha", modVersion: "0.3.0"))
-    try await registry.join(JoinBody(sessionId: b, title: "Beta", modVersion: "0.3.1"))
-    try await registry.join(JoinBody(sessionId: c, title: "Gamma"))
+    await join(a, "Alpha", modVersion: "0.3.0")
+    await join(b, "Beta", modVersion: "0.3.1")
+    await join(c, "Gamma")
     #expect(await registry.labelsOnAnOlderMod(than: app) == ["Alpha", "Gamma"])
-    try await registry.join(JoinBody(sessionId: a, title: "Alpha", modVersion: "0.3.1"))
-    #expect(await registry.labelsOnAnOlderMod(than: app) == ["Gamma"])
   }
 
+  /// A session that joins again with a mod as new as the app leaves the list.
+  @Test func aJoinWithACurrentModLeavesTheList() async throws {
+    let app = try #require(AppVersion("0.3.1"))
+    await join(a, "Alpha", modVersion: "0.3.0")
+    await join(a, "Alpha", modVersion: "0.3.1")
+    #expect(await registry.labelsOnAnOlderMod(than: app) == [])
+  }
+
+  /// `/clear` gives the session a new id: it keeps its place, the target and its request.
   @Test func joinReplacingAnIdMovesTheSession() async throws {
     await join(a, "Alpha")
     await join(b, "Beta")

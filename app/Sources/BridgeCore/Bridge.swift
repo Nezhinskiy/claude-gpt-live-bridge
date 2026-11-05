@@ -64,7 +64,7 @@ public actor Bridge: Router {
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
-    autoContext: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion? = nil
+    autoContext: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
@@ -597,6 +597,6 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let context: String?
   /// The target's whole conversation, oldest first: every line the app keeps.
   public let conversation: [Conversation.Line]
-  /// The joined sessions still on a mod older than the app, by label.
-  public var labelsOnAnOlderMod: [String] = []
+  /// The joined sessions whose mod is older than the app, or names no version, by label.
+  public let labelsOnAnOlderMod: [String]
 }

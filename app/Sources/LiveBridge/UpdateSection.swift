@@ -91,14 +91,7 @@ struct UpdateSection: View {
     if let record = model.updateRecord {
       VStack(alignment: .leading, spacing: 6) {
         Text("Updated from \(record.from.description).")
-        switch record.mod {
-        case .updated:
-          let older = model.update?.labelsOnAnOlderMod ?? []
-          if !older.isEmpty {
-            Text("On the old mod until restarted: \(older.joined(separator: ", ")).")
-              .font(.caption).foregroundStyle(.secondary)
-          }
-        case .byHand(let commands):
+        if case .byHand(let commands) = record.mod {
           Text("LiveBridge could not update its Claude Code mod. Run these in a terminal:")
             .font(.caption).foregroundStyle(.secondary)
           Text(commands.joined(separator: "\n"))
@@ -108,6 +101,12 @@ struct UpdateSection: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(commands.joined(separator: "\n"), forType: .string)
           }
+        }
+        // True whether the mod updated itself or by hand: each session leaves once it restarts.
+        let older = model.update?.labelsOnAnOlderMod ?? []
+        if !older.isEmpty {
+          Text("Still on the old mod: \(older.joined(separator: ", ")).")
+            .font(.caption).foregroundStyle(.secondary)
         }
       }
     }

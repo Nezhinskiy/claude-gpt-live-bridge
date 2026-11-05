@@ -104,6 +104,8 @@ final class AppModel {
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
   /// The running app's `CFBundleShortVersionString`.
   let versionText: String
+  /// That version, when it reads as `X.Y.Z`.
+  let appVersion: AppVersion?
   /// This is the copy in `/Applications`, the only one that checks for and installs updates.
   let isInstalledCopy: Bool
   /// Built from source with `build-app.sh --release` (`LBSourceBuild`).
@@ -133,6 +135,7 @@ final class AppModel {
   init() {
     let info = Bundle.main
     versionText = info.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    appVersion = AppVersion(versionText)
     isSourceBuild = info.object(forInfoDictionaryKey: "LBSourceBuild") as? Bool == true
     let installedIsLink =
       (try? FileManager.default.attributesOfItem(atPath: UpdatePolicy.installedPath)[.type])
@@ -157,7 +160,7 @@ final class AppModel {
         continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier,
         notifies: { settings.current.notifyResults },
         confirmsHandoffs: { settings.current.confirmHandoffs },
-        autoContext: { settings.current.autoContext }, appVersion: AppVersion(versionText))
+        autoContext: { settings.current.autoContext }, appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge
       self.server = server
@@ -187,7 +190,7 @@ final class AppModel {
   /// update and posts its notice once, then checks when due on launch, every
   /// `UpdatePolicy.tick` and on wake. Other copies leave `updates/` to the installed one.
   private func startUpdates(dataDir: URL?) {
-    guard isInstalledCopy, let running = AppVersion(versionText), let dataDir else { return }
+    guard isInstalledCopy, let running = appVersion, let dataDir else { return }
     let paths = UpdatePaths(dataDir: dataDir)
     let bridge = bridge
     let updater = Updater(
@@ -231,7 +234,7 @@ final class AppModel {
       switch record.mod {
       case .updated:
         "Updated from \(record.from). Claude Code sessions already open keep the old mod until "
-          + "they restart."
+          + "they restart; Settings lists them."
       case .byHand:
         "Updated from \(record.from). Settings shows the commands that update the Claude Code mod."
       }

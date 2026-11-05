@@ -22,6 +22,7 @@ test('reloadResumesPolling', async ($, on) => {
 
 test('clearRejoinsWithNewId', async ($, on) => {
   const world = fakeWorld(on)
+  world.modVersion = '0.3.1'
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
   world.take('join')
@@ -30,7 +31,8 @@ test('clearRejoinsWithNewId', async ($, on) => {
   await world.clock.advance(1000)
   // One join that replaces the old id, so the app keeps the target and any open request.
   expect(world.take('leave')).toEqual([])
-  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', replaces: ID }])
+  // It names the mod's version again, or Settings would list the session as on the old mod.
+  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', modVersion: '0.3.1', replaces: ID }])
   expect(world.joined).toEqual(new Set([OTHER]))
   await world.clock.advance(1000)
   expect(world.take('join')).toEqual([])
@@ -38,12 +40,13 @@ test('clearRejoinsWithNewId', async ($, on) => {
 
 test('renameRejoins', async ($, on) => {
   const world = fakeWorld(on)
+  world.modVersion = '0.3.1'
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
   world.take('join')
   world.title = 'Renamed session'
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Renamed session' }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Renamed session', modVersion: '0.3.1' }])
 })
 
 test('offLeaves', async ($, on) => {
@@ -248,6 +251,7 @@ test('aRemovalTheAnswerMeetsTurnsTheSessionOff', async ($, on) => {
   // The owner removed the session while its voice turn ran: the 410 on the answer is the
   // removal, not a lost answer.
   const world = fakeWorld(on)
+  world.modVersion = '0.3.1'
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
   world.work.push(REQUEST)
@@ -270,4 +274,11 @@ test('theJoinNamesTheModsVersion', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...LIVE, args: 'on' })
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, modVersion: '0.3.1' }])
+})
+
+/** A mod that cannot read its own plugin.json says so: Settings will list it as on the old mod. */
+test('anUnreadManifestIsLogged', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  expect(world.logs.some(line => line.includes('could not read its version'))).toBe(true)
 })

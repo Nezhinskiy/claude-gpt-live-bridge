@@ -134,8 +134,8 @@ struct BridgeTests {
       HTTPRequest(method: "POST", path: path, query: [:], body: body))
   }
 
-  func join(_ id: SessionID, _ title: String) async throws {
-    try await post("/v1/join", JoinBody(sessionId: id, title: title))
+  func join(_ id: SessionID, _ title: String, modVersion: String? = nil) async throws {
+    try await post("/v1/join", JoinBody(sessionId: id, title: title, modVersion: modVersion))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -373,11 +373,16 @@ struct BridgeTests {
   /// What the app shows lists the joined sessions whose mod is older than the app.
   @Test func theAppListsSessionsOnAnOlderMod() async throws {
     let test = try BridgeTests(appVersion: AppVersion("0.3.1"))
-    try await test.post(
-      "/v1/join", JoinBody(sessionId: a, title: "Alpha", modVersion: "0.3.0"))
-    try await test.post(
-      "/v1/join", JoinBody(sessionId: b, title: "Beta", modVersion: "0.3.1"))
+    try await test.join(a, "Alpha", modVersion: "0.3.0")
+    try await test.join(b, "Beta", modVersion: "0.3.1")
     #expect(await test.bridge.current.labelsOnAnOlderMod == ["Alpha"])
+  }
+
+  /// An app whose own version does not read lists nobody.
+  @Test func anAppWithNoVersionListsNoOldMods() async throws {
+    let test = try BridgeTests(appVersion: nil)
+    try await test.join(a, "Alpha", modVersion: "0.3.0")
+    #expect(await test.bridge.current.labelsOnAnOlderMod == [])
   }
 
   /// A step's text longer than a line is cut, and the notice before it stays whole.

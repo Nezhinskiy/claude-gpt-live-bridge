@@ -49,7 +49,7 @@ public actor SessionRegistry {
   private struct Session {
     let joinOrder: Int
     var title = ""
-    /// The mod's version as its last join named it; nil when it named none.
+    /// The mod's version as its last join named it; nil when it named none, or none that reads.
     var modVersion: AppVersion?
     var lastPoll: Date
     var activity = SessionActivity.idle
@@ -238,20 +238,21 @@ public actor SessionRegistry {
 
   /// The sessions in the order they joined.
   public func rows() -> [SessionRow] {
-    let labels = labels()
-    return ordered().map { id, session in
-      SessionRow(
-        sessionId: id, label: labels[id] ?? session.title, activity: session.activity,
-        isTarget: id == target)
+    labeled().map { id, label, session in
+      SessionRow(sessionId: id, label: label, activity: session.activity, isTarget: id == target)
     }
   }
 
   /// The labels of the sessions whose mod is older than `app`, or names no version, in the order
   /// they joined: they run the mod Claude Code loaded before the update, until they restart.
   public func labelsOnAnOlderMod(than app: AppVersion) -> [String] {
+    labeled().filter { $0.session.modVersion.map { $0 < app } ?? true }.map(\.label)
+  }
+
+  /// The sessions in the order they joined, each with its label.
+  private func labeled() -> [(id: SessionID, label: String, session: Session)] {
     let labels = labels()
-    return ordered().filter { $0.value.modVersion.map { $0 < app } ?? true }
-      .map { labels[$0.key] ?? $0.value.title }
+    return ordered().map { ($0.key, labels[$0.key] ?? $0.value.title, $0.value) }
   }
 
   private func ordered() -> [(key: SessionID, value: Session)] {
