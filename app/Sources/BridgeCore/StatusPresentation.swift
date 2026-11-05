@@ -35,6 +35,7 @@ public struct StatusPresentation: Sendable, Equatable {
   public let action: CallAction
   /// Mute, or Unmute while muted; nil while the call is off.
   public let muteAction: CallAction?
+  /// The microphone is released while the call goes on.
   public let isMuted: Bool
   /// Start needs a joined session to talk to; Stop is always possible.
   public let canAct: Bool

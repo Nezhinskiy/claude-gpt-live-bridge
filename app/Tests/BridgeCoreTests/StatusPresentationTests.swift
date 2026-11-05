@@ -54,6 +54,11 @@ struct StatusPresentationTests {
     #expect(shown.accessibilityLabel.contains("Muted"))
   }
 
+  @Test func aMutedConnectingCallKeepsItsHeadline() {
+    let shown = StatusPresentation(Self.status(.connecting, muted: true))
+    #expect(shown.headline == "Connecting… · muted")
+  }
+
   @Test func aMutedLineKeepsItsPhase() {
     let shown = StatusPresentation(Self.status(.live, muted: true))
     #expect(shown.headline == "Live · muted")

@@ -36,7 +36,8 @@ public struct MenuContent: Sendable, Equatable {
     public let canAct: Bool
     /// Mute, or Unmute while muted; nil while the call is off or there is no bridge.
     public let muteAction: CallAction?
-    /// "N unheard — speak to hear", when results wait.
+    /// "N unheard — speak to hear", when results wait; "N unheard — unmute and speak to hear"
+    /// while muted.
     public let unheard: String?
     public let problem: String?
     /// The problem is the microphone's refusal: the card offers to open that setting.
