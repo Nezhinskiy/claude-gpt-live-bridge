@@ -154,7 +154,8 @@ public struct CallMachine: Sendable {
       return end(with: [.closeRealtime, .stopLocalVAD, .problem(reason)])
     case (.off, .start):
       phase = .listening
-      return [.startLocalVAD, .problem(nil)]
+      // the problem first: listening waits on macOS's prompt, whose refusal is a new problem
+      return [.problem(nil), .startLocalVAD]
     case (.off, _):
       return []
     case (_, .speechStarted) where isMuted:

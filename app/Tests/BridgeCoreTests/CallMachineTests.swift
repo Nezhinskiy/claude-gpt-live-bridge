@@ -60,7 +60,9 @@ struct CallMachineTests {
   }
 
   static let table = [
-    row("startOpensOnlyTheMic", [], .start, .listening, [.startLocalVAD, .problem(nil)]),
+    row(
+      "startClearsTheProblemThenOpensOnlyTheMic", [], .start, .listening,
+      [.problem(nil), .startLocalVAD]),
     row("speechOpensTheVoice", [.start], .speechStarted, .connecting, [.openRealtime]),
     row(
       "muteWhileListeningReleasesTheMicrophone", [.start], .mute, .listening,

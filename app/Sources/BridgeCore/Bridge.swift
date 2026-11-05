@@ -271,11 +271,16 @@ public actor Bridge: Router {
       connecting = nil
       await audio.closePeer()
       await realtime?.close()
-    case .startLocalVAD: await audio.startListening()
+    case .startLocalVAD:
+      // a Mute meanwhile does not cancel a Start: the page records it, and listens muted
+      if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
     case .stopLocalVAD: await audio.stopListening()
     case .flushPreroll: await audio.flushPreroll()
     case .muteMicrophone: await audio.muteMicrophone()
-    case .unmuteMicrophone: await audio.unmuteMicrophone()
+    case .unmuteMicrophone:
+      if await mayTakeMicrophone(while: { $0.phase != .off && !$0.isMuted }) {
+        await audio.unmuteMicrophone()
+      }
     case .addContext(let line): try? await realtime?.addContext(line.text)
     case .speak(let line): try? await realtime?.speak(line.text)
     case .armSilenceTimer(let seconds): arm(.silence, after: .seconds(seconds))
@@ -287,6 +292,20 @@ public actor Bridge: Router {
     case .confirmHandoff: if confirmsHandoffs() { await audio.confirmHandoff() }
     case .problem(let shown): problem = shown
     }
+  }
+
+  /// Asks macOS for the microphone, whose first-run prompt stays up until the owner answers it;
+  /// meanwhile a Stop or a Mute can change the call. So the take is still wanted only while
+  /// `isCurrent` holds for the call as it is once macOS answered. A refusal for a wanted take
+  /// ends the call, as a failed microphone does; for one no longer wanted it says nothing.
+  private func mayTakeMicrophone(while isCurrent: (CallMachine) -> Bool) async -> Bool {
+    let refusal = await audio.microphoneProblem()
+    guard isCurrent(machine) else { return false }
+    if let refusal {
+      await audioEvent(.failed(refusal))
+      return false
+    }
+    return true
   }
 
   /// A chime's notification, naming the sessions whose results wait.
