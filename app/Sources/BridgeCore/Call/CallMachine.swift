@@ -109,14 +109,14 @@ public struct CallMachine: Sendable {
   private var isVoiceSpeaking = false
   /// The next finished reply is the handoff's acknowledgement, which says no result.
   private var isAckUnfinished = false
-  /// The line connecting was opened by a line that arrived, not by speech.
-  private var isOpeningForResult = false
+  /// A line that arrived opened this line, and neither the owner nor the voice has spoken on it
+  /// yet: its silence is `firstWordSeconds`.
+  private var isAwaitingFirstWord = false
   /// Local voice detection hears sound; the timer then allows `noiseCapSeconds`.
   private var isSoundOn = false
   public static let silenceSeconds = 20
-  /// How long a line a result opened waits for the voice's first word before it closes and the
-  /// result chimes. When the voice speaks there at all, it starts within about 2 s
-  /// (ADR 0001 (n)).
+  /// How long a line a result opened waits for the first word before it closes and the result
+  /// chimes (ADR 0001 (n)).
   public static let firstWordSeconds = 5
   public static let noiseCapSeconds = 90
   /// How long after the latest handoff the line stays open for its result. Billed.
@@ -130,7 +130,8 @@ public struct CallMachine: Sendable {
   /// without words, the line still closes after `noiseCapSeconds`.
   private mutating func armSilence() -> CallEffect {
     isSilenceDue = false
-    return .armSilenceTimer(seconds: isSoundOn ? Self.noiseCapSeconds : Self.silenceSeconds)
+    let quiet = isAwaitingFirstWord ? Self.firstWordSeconds : Self.silenceSeconds
+    return .armSilenceTimer(seconds: isSoundOn ? Self.noiseCapSeconds : quiet)
   }
 
   /// The grace before a held result is said, once neither the owner nor the voice is speaking.
@@ -161,7 +162,7 @@ public struct CallMachine: Sendable {
       unheard.append(Unheard(line: result))
       guard opensLine else { return [.chime] }
       phase = .connecting
-      isOpeningForResult = true
+      isAwaitingFirstWord = true
       return [.openRealtimeForResult]
     case (.connecting, .deliver(let result, _)):
       unheard.append(Unheard(line: result))
@@ -170,12 +171,7 @@ public struct CallMachine: Sendable {
       return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
-      // a line nobody spoke on waits only briefly for the voice to start
-      let silence =
-        isOpeningForResult && !isSoundOn
-        ? CallEffect.armSilenceTimer(seconds: Self.firstWordSeconds) : armSilence()
-      isOpeningForResult = false
-      return [.flushPreroll] + pending.map { .addContext($0) } + [silence, .problem(nil)]
+      return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return [.problem(reason)] + hangUp()
@@ -188,14 +184,21 @@ public struct CallMachine: Sendable {
       let isHeld = isSoundOn || isVoiceSpeaking
       unheard.append(Unheard(line: result, isHeld: isHeld))
       return isHeld ? [armSilence()] : [.speak(result), armSilence()]
+    case (.connecting, .speechStarted):
+      isSoundOn = true
+      isAwaitingFirstWord = false
+      return []
     case (.live, .speechStarted):
       isSoundOn = true
+      isAwaitingFirstWord = false
       return [armSilence()]
     case (.live, .assistantSpeaking):
       replyCanSay = replyCanSay ?? pending
       isVoiceSpeaking = true
+      isAwaitingFirstWord = false
       return [armSilence()]
     case (.live, .userTranscribed):
+      isAwaitingFirstWord = false
       return [armSilence()]
     case (.live, .handedOff(let session)):
       isAckUnfinished = true
@@ -239,7 +242,7 @@ public struct CallMachine: Sendable {
   @discardableResult
   public mutating func withdraw(where isSuperseded: (VoiceLine) -> Bool) -> [CallEffect] {
     unheard.removeAll { isSuperseded($0.line) }
-    guard phase == .connecting, isOpeningForResult, unheard.isEmpty else { return [] }
+    guard phase == .connecting, isAwaitingFirstWord, unheard.isEmpty else { return [] }
     return [.closeRealtime] + hangUp()
   }
 
@@ -260,7 +263,7 @@ public struct CallMachine: Sendable {
   private mutating func hangUp() -> [CallEffect] {
     defer {
       phase = .listening
-      isOpeningForResult = false
+      isAwaitingFirstWord = false
       awaited = []
       unheard = unheard.map { Unheard(line: $0.line) }
       isSilenceDue = false

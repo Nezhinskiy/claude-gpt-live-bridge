@@ -217,12 +217,12 @@ the target's conversation holds a turn of the owner's; a line seeded without one
 0001](../adr/0001-platform-findings.md) (b)). The bridge decides this from the registry's target and
 the conversation, and passes it with the delivery. The new realtime session is seeded with the
 target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
-the voice usually says it unprompted, starting within about 2 s of connecting ([ADR
-0001](../adr/0001-platform-findings.md) (n)). A voice that has not started after
-`CallMachine.firstWordSeconds` (5 s) will not: the line closes, and the line chimes and waits as
-below. Once the voice speaks, the 20 s silence rule applies. The mod's request that brought the line
-does not wait for the connect, and a question or approval the owner settles at the keyboard while
-its line still connects closes that line.
+the voice often says it unprompted, and sometimes says nothing ([ADR
+0001](../adr/0001-platform-findings.md) (n)). Until the owner or the voice speaks on such a line,
+its silence is `CallMachine.firstWordSeconds` (5 s) instead of 20 s, also after another line
+arrives; then the line closes, and the line chimes and waits as below. A voice that starts later is
+cut off. The mod's request that brought the line does not wait for the connect, and a question or
+approval the owner settles at the keyboard while its line still connects closes that line.
 
 Any other line that arrives while the line is closed (one from a session that is not the target, a
 later update) does not open it. It chimes, the notification names the session, and the line waits;
