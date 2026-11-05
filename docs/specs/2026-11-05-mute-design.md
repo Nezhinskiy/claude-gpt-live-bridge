@@ -118,6 +118,8 @@ on, so an answer from Claude still opens the line and is said.
   with its sentence. The call then ends with that reason, as `.audioFailed` ends it; Start again.
 - **The audio page cannot be reached at Unmute:** `AudioHost` reports it as at Start; the call
   ends.
+- **The audio page cannot confirm a Mute:** the call ends, which releases the microphone, rather
+  than showing Muted over an open one.
 - **An older mod with a newer app:** it shows only Start/Stop; the menu still mutes.
 - **A newer mod with an older app:** the status has no `isMuted`, so the band draws no Mute. The
   older app would refuse `mute` with a 400, which `link.call` does not show.

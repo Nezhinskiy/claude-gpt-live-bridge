@@ -464,5 +464,7 @@ only if it is still the one it bound.
   default input changes mid-call, the page takes the new one and keeps the peer.
 - **Unmute cannot take the microphone** (denied, busy, missing) **or the audio page cannot be
   reached:** the call goes to `off` with the reason, as at Start.
+- **The audio page cannot confirm a Mute:** the call ends, which releases the microphone, rather
+  than showing Muted over an open one.
 - **Local Network access blocked:** with no ICE candidate within 2 s, the call goes to `off` with a
   sentence naming the setting.
