@@ -256,6 +256,26 @@ tree only, no nudge. 6 runs, 5 of them reached a result; the connect is the mod'
 reliable (silent in 1 of 5 against 1 of 4); from the answer to the end of the first segment the
 owner waited 7.1 to 10.6 s. These runs kept the line open 287 s, about $0.24.
 
+A neutral synthetic utterance, probed the same day on `dev` at `12f142e` (the opener as context
+again): once a line a result opened was connected, the audio page queued a short `say` phrase into
+the peer's track, as in the speech runs above; `resultWindowSeconds` 0 in the working tree only,
+otherwise the same probe. Each run reached a result.
+
+| Run | Phrase | Connect | `live` to the end of the first segment | Said | The phrase |
+|---|---|---|---|---|---|
+| A1 | "Mm-hm." | 2.6 s | 10.5 s | yes | no transcript, no turn |
+| A2 | "Mm-hm." | 1.5 s | 6.1 s | yes | no transcript, no turn |
+| B1 | "Okay." | 1.7 s | 2.5 s (the segment broke at the phrase; one answer) | yes | heard as the owner's "Okay" |
+| B2 | "Okay." | 1.5 s | 7.3 s | yes | heard as the owner's "Okay" |
+| B3 | "Okay." | 1.7 s | 8.1 s | yes | heard as the owner's "Okay" |
+
+Neither phrase made the voice reliably faster. "Mm-hm." was not heard as a turn at all; "Okay." was,
+and went into the conversation as the owner's line, but the voice still took 7 to 8 s in 2 of 3
+runs. Neither was handed off or caused a repeat, and every run said the result, a sample too small
+to call a change against 1 silent run in 4 or 5. Only a question ("Any news?") made the voice answer
+within about 2 s, and a question is what the voice may hand off. These runs kept the line open 275
+s, about $0.23.
+
 ### Claude Code mod API
 
 **(e) Session title.** Observed against the desktop app's own session list: for each of 5
