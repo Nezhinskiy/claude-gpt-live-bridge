@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createCatchUp, createPreroll } from '../../Sources/LiveBridge/Resources/audio/preroll.js';
+import { createCatchUp, createLineAudio, createPreroll } from '../../Sources/LiveBridge/Resources/audio/preroll.js';
 
 const frame = (value, length = 1024) => new Float32Array(length).fill(value);
 
@@ -40,4 +40,22 @@ test('catchUpKeepsEverySpokenFrameAndLiveAudio', () => {
     catchUp.push(frame(0)); // caught up: live silence passes as it is
     assert.ok(catchUp.pull());
   }
+});
+
+test('nothingRecordedBeforeAResetReachesTheLine', () => {
+  const line = createLineAudio({ sampleRate: 48000 });
+  line.write(frame(0.5));
+  line.reset();
+  line.hold(true);
+  assert.equal(line.pull(), null, 'the pre-roll was emptied');
+
+  const held = createLineAudio({ sampleRate: 48000 });
+  held.hold(true);
+  held.write(frame(0.5));
+  held.reset();
+  held.write(frame(0.25));
+  assert.equal(held.pull(), null, 'the queue was cleared and the hold ended');
+  held.hold(true);
+  assert.equal(held.pull()[0], 0.25, 'only what came after the reset reaches the line');
+  assert.equal(held.pull(), null);
 });

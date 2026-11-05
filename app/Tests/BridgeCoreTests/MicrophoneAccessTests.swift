@@ -21,7 +21,7 @@ struct MicrophoneAccessTests {
   @Test func thePagesRefusalIsTheSameProblem() throws {
     #expect(AudioEvent(body: ["type": "microphoneDenied"]) == .failed(.microphoneDenied))
     let page = URL(filePath: #filePath).deletingLastPathComponent()
-      .appending(path: "../../Sources/LiveBridge/Resources/audio/audio.js").standardized
+      .appending(path: "../../Sources/LiveBridge/Resources/audio/microphone.js").standardized
     #expect(try String(contentsOf: page, encoding: .utf8).contains("type: 'microphoneDenied'"))
   }
 }
