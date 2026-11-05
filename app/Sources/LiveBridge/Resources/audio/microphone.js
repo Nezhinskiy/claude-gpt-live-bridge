@@ -85,10 +85,12 @@ export function createMicrophone({ acquire, connect, disconnect, watchDevices, o
   };
 }
 
+/** A microphone request still pending after this fails, so the call never listens to nothing. */
+export const MIC_DEADLINE_MS = 10000;
+
 const sentence = {
   NotFoundError: 'No microphone is connected.',
-  MicTimeoutError:
-    'The microphone did not start within 10 seconds. Check System Settings > Privacy & Security > Microphone, then start again.',
+  MicTimeoutError: `The microphone did not start within ${MIC_DEADLINE_MS / 1000} seconds. Check System Settings > Privacy & Security > Microphone, then start again.`,
 };
 const busy = 'The microphone could not be opened; another app may be using it.';
 

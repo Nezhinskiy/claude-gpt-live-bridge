@@ -14,11 +14,9 @@
 import { createVad, dbfs, rms } from './vad.js';
 import { createLineAudio } from './preroll.js';
 import { within } from './deadline.js';
-import { createMicrophone, microphoneFailure } from './microphone.js';
+import { MIC_DEADLINE_MS, createMicrophone, microphoneFailure } from './microphone.js';
 
 const FRAME = 1024;
-/** A microphone request still pending after this fails, so the call never listens to nothing. */
-const MIC_DEADLINE_MS = 10000;
 const say = {
   lost: 'The microphone stopped and no other input was found.',
   localNetwork:
@@ -91,12 +89,15 @@ async function acquire(isCurrent) {
     stopTracks(stream);
     return null;
   }
+  let node;
+  try {
+    node = context.createMediaStreamSource(stream);
+  } catch (error) {
+    stopTracks(stream); // not yet a capture, so nothing else would stop it
+    throw error;
+  }
   const track = stream.getAudioTracks()[0];
-  return {
-    node: context.createMediaStreamSource(stream),
-    stop: () => stopTracks(stream),
-    onEnded: (handler) => (track.onended = handler),
-  };
+  return { node, stop: () => stopTracks(stream), onEnded: (handler) => (track.onended = handler) };
 }
 
 function micLate() {
@@ -144,6 +145,7 @@ async function listen(wav) {
 
 /** Releases the microphone; the call, and an open line, go on. */
 function mute() {
+  if (mic.muted) return; // a second Mute changes nothing, and posts nothing
   mic.mute();
   if (!ctx) return;
   vad = createVad();
@@ -151,9 +153,9 @@ function mute() {
   post({ type: 'level', value: 0 });
 }
 
-/** Resolves once the microphone is back, or its failure was posted. */
-function unmute() {
-  return mic.unmute().catch(failMicrophone);
+/** Resolves, to nothing on every path, once the microphone is back or its failure was posted. */
+async function unmute() {
+  await mic.unmute().catch(failMicrophone);
 }
 
 function stop() {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createMicrophone, microphoneFailure } from '../../Sources/LiveBridge/Resources/audio/microphone.js';
+import { MIC_DEADLINE_MS, createMicrophone, microphoneFailure } from '../../Sources/LiveBridge/Resources/audio/microphone.js';
 
 /** A capture that records whether it was stopped, connected and what its ended handler is. */
 function capture() {
@@ -211,4 +211,9 @@ test('microphoneFailureNamesTheCause', () => {
   });
   assert.equal(new Set(reasons).size, 3, 'each cause has its own sentence');
   assert.equal(microphoneFailure(undefined).reason, reasons[2], 'anything else reads as busy');
+});
+
+test('theTimeoutSentenceNamesTheDeadline', () => {
+  const { reason } = microphoneFailure(namedError('MicTimeoutError'));
+  assert.ok(reason.includes(` ${MIC_DEADLINE_MS / 1000} seconds`), reason);
 });
