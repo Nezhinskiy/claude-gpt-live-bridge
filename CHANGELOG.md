@@ -30,6 +30,11 @@ All notable changes to this project are listed here. The format follows
   instead of always saying that open sessions keep it until they restart. A mod reports its
   version when it joins; one from before this release names none and counts as old.
 
+### Fixed
+
+- A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
+  after the call has ended: the Start that was waiting on the prompt is cancelled.
+
 ## [0.3.0]
 
 ### Added
