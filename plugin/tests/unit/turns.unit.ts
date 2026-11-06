@@ -276,6 +276,15 @@ test('text typed into a running turn goes under that turn', () => {
   assert.deepEqual(tracker.typedInto('t1', 'second'), { turnId: 't1', from: 'owner', text: 'second' })
 })
 
+/** A hook may rewrite a prompt on its way in: `turn.start` holds what entered, the line what was typed. */
+test('a queued prompt is claimed by what entered', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'first', 'owner', 0)
+  assert.deepEqual(tracker.typedInto('t1', 'second', 'second, rewritten'), { turnId: 't1', from: 'owner', text: 'second' })
+  tracker.turnCompleted('t1', 'One.', 'answer')
+  assert.equal(tracker.turnStarted('t2', 'second, rewritten', null, 1000), null)
+})
+
 /** Terminal, ADR 0001 (m): at Enter the prompt carries the running turn's id; its own turn starts after that turn. */
 test('a queued prompt\'s own turn is the owner\'s and posts no prompt again', () => {
   const tracker = new TurnTracker()

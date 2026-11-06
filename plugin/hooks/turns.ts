@@ -158,11 +158,12 @@ export class TurnTracker {
   /**
    * The owner typed `text` into running turn `turnId`, and it goes under that turn. The engine
    * does not say whether it folds in or gets a turn of its own later (ADR 0001, item m), so it is
-   * remembered until a turn claims it.
+   * remembered as `entered`, what a hook left of it and what that turn's start will hold, until a
+   * turn claims it.
    */
-  typedInto(turnId: string, text: string): SyncLine {
+  typedInto(turnId: string, text: string, entered = text): SyncLine {
     const lines = this.#turns.get(turnId)?.linesUnder ?? turnId
-    this.#typed.push({ text, turnId: lines })
+    this.#typed.push({ text: entered, turnId: lines })
     return { turnId: lines, from: 'owner', text }
   }
 

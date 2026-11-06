@@ -775,6 +775,20 @@ test('aRefusedTurnStaysRefusedThroughItsQueuedPrompt', async ($, on) => {
   expect(world.kept).toEqual(['first'])
 })
 
+test('aRewrittenQueuedPromptFindsItsOwnTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  world.enteredText = 'second, rewritten'
+  await $.prompt.submit(composer('second', 't1'))
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'One.' })
+  await $.turn.start({ text: 'second, rewritten', turnId: 't2' })
+  await $.turn.complete({ ...DONE, turnId: 't2', answer: 'Two.' })
+  expect(world.take('sync')).toEqual([
+    owner('t1', 'first'), owner('t1', 'second'), claude('t1', 'One.'), claude('t1', 'Two.'),
+  ])
+})
+
 test('aSlashCommandsOwnerLineIsWhatWasTyped', async ($, on) => {
   const world = fakeWorld(on)
   await joined($, world)

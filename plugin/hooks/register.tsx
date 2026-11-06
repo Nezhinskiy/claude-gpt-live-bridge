@@ -539,7 +539,7 @@ export const register: Register = on => {
     }
     // Whether it folds in or gets a turn of its own, it goes to the app now, under the running turn.
     if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
-      await postSync($, tracker.typedInto(e.turnId, e.text))
+      await postSync($, tracker.typedInto(e.turnId, e.text, entered.text))
       await trySave($)
     }
     return entered

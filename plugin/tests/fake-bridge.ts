@@ -70,6 +70,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isSubmitRefused: false,
     /** A hook beneath the mod refuses the owner's prompt (`{ drop }`). */
     isPromptDropped: false,
+    /** What a hook beneath the mod rewrites a prompt to, or null. */
+    enteredText: null as string | null,
     /** The engine refuses the command's name (as it does a built-in's). */
     isCommandRefused: false,
     /** Every slash command the mod declared, in order. */
@@ -204,7 +206,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (world.isPromptDropped) return { drop: 'a hook refused the prompt' }
     world.submitted.push(e.text)
     world.timeline.push('submit')
-    return { text: e.text, origin: e.origin }
+    return { text: world.enteredText ?? e.text, origin: e.origin }
   })
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
