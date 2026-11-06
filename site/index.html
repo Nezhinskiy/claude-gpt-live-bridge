@@ -36,7 +36,7 @@
     <img class="hero-icon" src="assets/icon.png" width="112" height="112" alt="LiveBridge app icon: white bars standing on a bridge deck, on a teal tile">
     <h1>LiveBridge</h1>
     <p class="tagline">Talk to an open Claude Code session by voice.</p>
-    <p class="lede">A macOS menu bar app that keeps a GPT-Live voice line ready through codex on your ChatGPT login, with no API key. The voice chats, asks what you mean, and hands real work to your Claude Code session. Claude does the work with its own model, tools and permission mode, and the voice tells you the result. You do not have to hold the line open while Claude works: its answer opens the closed line again and the voice says it.</p>
+    <p class="lede">A macOS menu bar app that keeps a GPT-Live voice line ready through codex on your ChatGPT login, with no API key. The voice chats, asks what you mean, and hands real work to your Claude Code session. Claude does the work with its own model, tools and permission mode, and the voice tells you the result. You do not have to hold the line open while Claude works: its answer opens the closed line again and goes to the voice to say.</p>
     <div class="actions">
       <a class="button primary" href="https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg">
         <svg class="button-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -194,7 +194,7 @@ claude plugin install livebridge@livebridge</code></pre>
       </div>
       <div>
         <dt>Your Claude keeps its permissions</dt>
-        <dd>Requests run under the session’s own permission mode. When Claude waits for a permission prompt, the voice tells you, except <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">where an organization manages Claude Code</a>, and you answer it in Claude Code; LiveBridge never answers it for you. Anything the microphone hears can become a request, so read <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/SECURITY.md">SECURITY.md</a> before using voice with a mode that acts without asking.</dd>
+        <dd>Requests run under the session’s own permission mode. When Claude waits for a permission prompt, the voice is given a notice and may tell you, except <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">where an organization manages Claude Code</a>, so do not rely on that when away from your Mac. You answer the prompt in Claude Code; LiveBridge never answers it for you. Anything the microphone hears can become a request, so read <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/SECURITY.md">SECURITY.md</a> before using voice with a mode that acts without asking.</dd>
       </div>
     </dl>
   </section>
