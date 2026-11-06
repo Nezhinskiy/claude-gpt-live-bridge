@@ -105,8 +105,7 @@ final class AppModel {
   @ObservationIgnored private var server: UnixHTTPServer?
   @ObservationIgnored private var loads = ContextLoads()
   @ObservationIgnored private var loadsTimer: Task<Void, Never>?
-  @ObservationIgnored private let audio = AudioHost(
-    fakeMic: AppModel.fakeMic, tapeFile: AppModel.tapeFile)
+  @ObservationIgnored private let audio = AudioHost()
   /// The running app's `CFBundleShortVersionString`.
   let versionText: String
   /// That version, when it reads as `X.Y.Z`.
@@ -488,7 +487,7 @@ final class AppModel {
   {
     let client = try await launchCodex(cwd: cwd)
     #if DEBUG
-      if let instructions = voiceInstructions {
+      if let instructions = DebugFlags.current.voiceInstructions {
         return RealtimeSession(
           client: client, cwd: cwd, voice: { settings.current.voice }, instructions: instructions)
       }
@@ -522,39 +521,5 @@ final class AppModel {
       }
     #endif
     return Release.latestURL
-  }
-
-  /// `--fake-mic <wav>`, once per line: debug builds play the files as the microphone, each next
-  /// one when the voice has finished speaking.
-  private static var fakeMic: [URL] {
-    #if DEBUG
-      let arguments = CommandLine.arguments
-      return arguments.indices.dropLast().filter { arguments[$0] == "--fake-mic" }.map {
-        URL(filePath: arguments[$0 + 1])
-      }
-    #else
-      return []
-    #endif
-  }
-
-  #if DEBUG
-    /// `--voice-instructions <file>`: debug builds tell the voice the file's text, not its rules.
-    nonisolated private static var voiceInstructions: String? {
-      let arguments = CommandLine.arguments
-      guard let flag = arguments.firstIndex(of: "--voice-instructions"), flag + 1 < arguments.count
-      else { return nil }
-      return try? String(contentsOfFile: arguments[flag + 1], encoding: .utf8)
-    }
-  #endif
-
-  /// `--record-call <wav>`: debug builds record both sides of each call there.
-  private static var tapeFile: URL? {
-    #if DEBUG
-      let arguments = CommandLine.arguments
-      if let flag = arguments.firstIndex(of: "--record-call"), flag + 1 < arguments.count {
-        return URL(filePath: arguments[flag + 1])
-      }
-    #endif
-    return nil
   }
 }

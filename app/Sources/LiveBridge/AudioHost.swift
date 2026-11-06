@@ -31,12 +31,13 @@ final class AudioHost: NSObject, AudioSide {
     forResource: "handoff", withExtension: "wav", subdirectory: "audio"
   ).flatMap { NSSound(contentsOf: $0, byReference: true) }
 
-  /// `fakeMic` (debug builds only) replaces the microphone with WAV files, played in order, and
-  /// `tapeFile` (debug builds only) records both sides of each call there.
-  init(fakeMic: [URL], tapeFile: URL?) {
-    self.fakeMic = fakeMic
+  /// A debug build's `DebugFlags` replace the microphone with WAV files and record the call.
+  override init() {
     #if DEBUG
-      tape = tapeFile.map { CallTape(file: $0) }
+      fakeMic = DebugFlags.current.fakeMic
+      tape = DebugFlags.current.tape.map { CallTape(file: $0) }
+    #else
+      fakeMic = []
     #endif
     let config = WKWebViewConfiguration()
     config.preferences.inactiveSchedulingPolicy = .none  // a hidden page is not suspended
