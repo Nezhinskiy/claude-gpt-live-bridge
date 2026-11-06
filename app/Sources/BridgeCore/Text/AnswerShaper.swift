@@ -23,21 +23,23 @@ public enum AnswerShaper {
 
   /// What a line says in place of an answer that is code or tables only.
   static let codeOnly = "the answer is code or a table only; it is in the session."
+  /// The owner's counterpart: what stands in for typed text that is code or tables only.
+  static let typedCodeOnly = "the owner typed code or a table only; it is in the session."
 
   /// A line of a turn that is not a voice request, as context: the owner's typed text
   /// (`[TYPED]`) or Claude's final answer (`[CLAUDE]`), shaped like any answer. Nil for text with
-  /// nothing to say: an empty one, or the owner's own if it is code or tables only.
+  /// nothing to say: an empty one. Code or tables only is a short sentence saying so.
   public static func synced(
     _ text: String, from source: SyncSource, label: String, session: SessionID
   ) -> VoiceLine? {
+    guard !text.allSatisfy(\.isWhitespace) else { return nil }
     let prose = prose(text)
     let isCodeOnly = prose.allSatisfy(\.isWhitespace)
-    switch source {
+    return switch source {
     case .owner:
-      return isCodeOnly ? nil : line(.typed, label: label, body: prose, session: session)
+      line(.typed, label: label, body: isCodeOnly ? typedCodeOnly : prose, session: session)
     case .claude:
-      guard !text.allSatisfy(\.isWhitespace) else { return nil }
-      return line(.claude, label: label, body: isCodeOnly ? codeOnly : prose, session: session)
+      line(.claude, label: label, body: isCodeOnly ? codeOnly : prose, session: session)
     }
   }
 

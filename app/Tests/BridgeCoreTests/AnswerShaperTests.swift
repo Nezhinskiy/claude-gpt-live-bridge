@@ -104,14 +104,17 @@ struct AnswerShaperTests {
     }
   }
 
-  /// Claude's code-only answer says so, as a result does; the owner's has nothing to say.
-  @Test func aCodeOnlySyncedLineSaysSoForClaudeAndIsNilForTheOwner() throws {
+  /// A code-only line says so, for Claude as a result does and for the owner in its own words.
+  @Test func aCodeOnlySyncedLineSaysSoForClaudeAndForTheOwner() throws {
     let id = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
     let code = "```swift\nlet x = 1\n```"
     let claude = try #require(
       AnswerShaper.synced(code, from: .claude, label: "Example session", session: id))
     let result = AnswerShaper.forVoice(code, status: .ok, label: "Example session")
     #expect(claude.body == result.body)
-    #expect(AnswerShaper.synced(code, from: .owner, label: "Example session", session: id) == nil)
+    let typed = try #require(
+      AnswerShaper.synced(code, from: .owner, label: "Example session", session: id))
+    #expect(typed.kind == .typed && typed.body.contains("code or a table only"))
+    #expect(!typed.text.contains("let x"))
   }
 }
