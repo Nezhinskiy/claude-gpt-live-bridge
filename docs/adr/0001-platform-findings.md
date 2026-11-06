@@ -530,8 +530,11 @@ mid-turn, were not observed.
 The engine checks a hooks module's source when it loads it. 2.1.296 follows `$` only into a
 function declared in the same file, so it refuses `register.tsx`, which passes `$` to `summarize`
 from `context.ts`; 2.1.301 follows it across the import. 2.1.297 to 2.1.300 were not installed, so
-the floor may be lower: 2.1.301 is the lowest version verified. On 2.1.301 and 2.1.312 a real
-session against a stand-in for the app joined, polled, took a voice request into a turn and left,
+the floor may be lower: 2.1.301 is the lowest version verified. A mod cannot declare a minimum:
+`plugin validate` on 2.1.301 and 2.1.312 calls `engines` in `plugin.json` an unknown field that
+Claude Code ignores, and on an older engine the mod that would say so is what failed to load.
+
+On 2.1.301 and 2.1.312 a real session against a stand-in for the app joined, polled, took a voice request into a turn and left,
 with the same routes in the same order. That turn ended in an error at the account's usage limit,
 which the mod answered as `failed`. Not observed on a real engine: a successful model turn, and the
 band in the terminal.

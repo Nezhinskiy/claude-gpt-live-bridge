@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every check CI runs.
+# Every check CI runs but one: scripts/check-floor.sh, which downloads a second Claude Code.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -9,6 +9,8 @@ swift format lint --strict -r app
 sh scripts/tests/uninstall.test.sh
 # The marketplace pins the mod to the app's release tag; a release binary has no test-only switch.
 sh scripts/tests/release-guards.test.sh
+# Every copy of the lowest Claude Code the README promises agrees with its Requirements line.
+sh scripts/tests/claude-code-floor.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
 node --test 'app/Tests/AudioJSTests/*.test.mjs'
 
@@ -35,15 +37,4 @@ if ! command -v claude >/dev/null 2>&1; then
   echo "check.sh: claude is not on PATH, so the mod's engine-facing half was NOT type-checked or tested; install Claude Code and run this again" >&2
   exit 0
 fi
-types=plugin/.claude-plugin/types/claude-code/index.d.ts
-if [ ! -f "$types" ]; then
-  # A headless session lays the types while it watches the mod's folder. The mod's own command
-  # answers without the model, so this needs no login, and no settings or other plugins load.
-  CLAUDE_CODE_PLUGIN_DIR_WATCH=1 claude -p --setting-sources "" --no-session-persistence \
-    --plugin-dir plugin "/live status" >/dev/null
-  [ -f "$types" ] || { echo "check.sh: Claude Code laid no API types in plugin/.claude-plugin/types" >&2; exit 1; }
-fi
-npm --prefix plugin run typecheck
-claude plugin validate .
-claude plugin validate plugin
-claude plugin test plugin
+sh scripts/check-mod.sh
