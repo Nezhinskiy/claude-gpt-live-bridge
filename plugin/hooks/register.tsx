@@ -12,7 +12,7 @@ import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
-import type { AnswerStatus, LimitWindowBody, TurnRef, VoiceRequest, Work } from './wire.ts'
+import type { ActivityBody, AnswerStatus, LimitWindowBody, TurnRef, VoiceRequest, Work } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
@@ -461,6 +461,13 @@ const wrote = (text: string) => (text === '' ? {} : { text })
 /** Names the main-loop turn an activity belongs to, for the app; none between turns. */
 const under = (turn: TurnRef | null) => (turn === null ? {} : { turn })
 
+/** Tells the app what waits; one it did not take is a gap, as the voice never hears of it. */
+async function awaiting($: EngineInterface, said: Omit<ActivityBody, 'sessionId' | 'state'>): Promise<void> {
+  if ((await link?.activity('approval', said)) === true) return
+  noteGap()
+  await save($)
+}
+
 /**
  * A settled prompt: a line for the running turn, and the session works on. It is the mod's report,
  * not the owner's typing, so it refuses nothing.
@@ -630,9 +637,7 @@ export const register: Register = on => {
     try {
       // The app says what waits only on a change to `approval`.
       if (tracker.isPrompting) await link.activity('working', { turn })
-      await link.activity('approval', {
-        question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn,
-      })
+      await awaiting($, { question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn })
       // Over at once: a reply from here on has no question, whatever posting the answer takes.
       const first = await Promise.race([answered, spoken]).finally(() => { answerQuestion = null })
       if ('kind' in first) {
@@ -645,7 +650,7 @@ export const register: Register = on => {
       return first
     } finally {
       await link?.activity('working', under(tracker.current))
-      if (tracker.isPrompting) await link?.activity('approval', under(tracker.current))
+      if (tracker.isPrompting) await awaiting($, under(tracker.current))
     }
   }).catch(($, e, next) => next(e))
 
@@ -659,7 +664,7 @@ export const register: Register = on => {
       await save($)
       // A bare approval would take back the open question, and the app would say nothing for it.
       if (answerQuestion === null) {
-        await link.activity('approval', { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })
+        await awaiting($, { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })
       }
     }
     return next(e)

@@ -2,6 +2,10 @@ import { expect, test } from 'claude-code/testing'
 
 import { BAND, fakeWorld, ID, LIVE } from './fake-bridge.ts'
 
+declare const setTimeout: (fn: () => void, ms: number) => unknown
+/** Lets whatever is not held run as far as it can. */
+const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
+
 test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   const world = fakeWorld(on)
   world.isAppUp = false
@@ -62,6 +66,36 @@ test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
   await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
   await world.clock.advance(1000)
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+})
+
+/** The voice never hears of the question or the prompt, so its picture of the turn has a hole. */
+test('aPromptTheAppDidNotGetMeansAMissedJoin', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  world.take('join')
+  world.isAppUp = false
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  world.isAppUp = true
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
+test('aQuestionTheAppDidNotGetMeansAMissedJoin', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('join')
+  world.isAppUp = false
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: [{ question: 'Which name?', options: [{ label: 'out' }] }] } as never)
+  await aMoment()
+  world.isAppUp = true
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+  world.answerDialog('out')
+  await asked
 })
 
 test('aFailedJoinKeepsTheGapForTheNextOne', async ($, on) => {
