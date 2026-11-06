@@ -106,10 +106,10 @@ while the menu says it is current, is a failure even if every line technically a
   context: the owner is at the Mac.
 - **Text typed into a running turn** (a `prompt.submit` with a `turnId`, voice turns included) is
   the owner's words and is synced as a typed owner line (my call).
-- **The kept window.** When synced lines push a conversation's oldest line out of the kept window
-  while the session's summary predates that line, the session is marked *missed*, so the next line
-  loads a fresh summary itself (my call): the voice never silently forgets turns while the menu
-  says it is current.
+- **The kept window.** When the lines since the session's summary no longer all reach the voice,
+  rolled off the kept window or past what codex's seed limits carry, the next line loads a fresh
+  summary itself and the menu says the session is out of sync (my call): the voice never silently
+  forgets turns while the menu says it is current.
 - **The mod sends, the app decides.** The mod posts every main-loop turn that is not already a
   voice request's answer, whatever the call state; the app applies the pause setting and records
   out-of-sync. The mod needs no setting of the app's.
@@ -125,8 +125,8 @@ while the menu says it is current, is a failure even if every line technically a
   tune it against codex's `initialItems` limits in `Continuity`, 128 items and about 8,192
   tokens). A typed line is marked as typed, so the voice can tell it from speech.
 - **Older peers.** A newer mod against an older app gets an unknown route and carries on as today.
-  An older mod against a newer app (no sync support, known from `modVersion` on join, #32) leaves
-  its session permanently *missed*, so its lines load a summary as they do now.
+  An older mod against a newer app (its join does not say it syncs) leaves its session permanently
+  *missed*, so its lines load a summary as they do now.
 - **No change to the permission boundary.** The approval notice from a typed turn is a notice; the
   mod still declares no `tool.check` hook.
 
@@ -166,8 +166,8 @@ for the band.
   lines as the owner's (marked typed), Claude's as Claude's. It is not an unheard result
   (`initialItems` must include it, unlike an unheard `.claude` line).
 - If its session is the open line's, it is kept and added with `addContext` when the owner next
-  starts speaking (see Decisions), whether the line is `connecting` or `live`; `heldContext`
-  becomes a list, not one slot. A line opened later is seeded with it.
+  starts speaking (see Decisions), whether the line is `connecting` or `live`; `CallMachine` keeps
+  them, and `heldContext` stays the summary's one slot. A line opened later is seeded with it.
 - With the pause setting on and the call `off`, a synced line is dropped and its session marked
   *paused*.
 - `openLine` requests a summary only when the session has no context or is *missed* (and not
