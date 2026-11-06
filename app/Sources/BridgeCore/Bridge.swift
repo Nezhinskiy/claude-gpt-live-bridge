@@ -177,6 +177,7 @@ public actor Bridge: Router {
 
   private func askForContext(of id: SessionID) async {
     continuity.noteSummaryAsk(of: id, at: time.now)
+    save()
     await registry.requestContext(for: id)
   }
 

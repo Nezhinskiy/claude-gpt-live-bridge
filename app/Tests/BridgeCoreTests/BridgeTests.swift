@@ -1161,6 +1161,19 @@ struct BridgeTests {
       await eventually { await notifier.posted.last?.body.contains("start the call") == true })
   }
 
+  /// The ask dates the summary, so it outlives a restart, or the summary clears a gap it missed.
+  @Test func aSummaryAskedForBeforeARestartClearsNoLaterPause() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.bridge.loadContext()
+    let restarted = try test.restart()
+    restarted.setPause(true)
+    try await restarted.join(test.a, "Alpha")
+    try await restarted.sync(test.a, kind: .start)  // refused, so the session is paused
+    try await restarted.post("/v1/context", ContextBody(sessionId: test.a, summary: "Old."))
+    #expect(await restarted.bridge.current.needsContext)
+  }
+
   /// A summary asked for before a refused turn does not hold that turn, so the session stays out
   /// of sync and the voice keeps what it had.
   @Test func aSummaryAskedForBeforeAPausedTurnClearsNothing() async throws {
