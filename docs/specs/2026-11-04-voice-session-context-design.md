@@ -27,8 +27,9 @@ request, without making Claude do anything in the chat.
 
 ## What the owner sees
 
-- Superseded: the setting is removed. A line gives the voice the target's context only when its
-  session has none or missed a turn, and never after a pause or while the pause setting is on
+- Superseded: the setting is removed. A line gives the voice the target's context only when the
+  voice lacks part of the session (no summary, a missed turn, lines past the seed, a mod that
+  does not sync), and never after a pause or while the pause setting is on
   (conversation sync, "What the owner sees"). The line does not wait for it.
 - Asked about "the chat", "the context", "what is there" or "have a look", the voice answers from
   what it has; if that does not cover it, it fetches the session's context itself and answers

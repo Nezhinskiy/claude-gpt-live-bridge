@@ -30,9 +30,11 @@ tells the voice that a prompt is waiting, with what Claude's main loop wrote in 
 asks for it.
 
 A question Claude asks you while it works (the AskUserQuestion dialog) is not a permission
-prompt: Claude asks for your input, not for leave to run a tool. In any turn of a joined
-session, one you typed included, the mod sends it to the voice, and a spoken reply, given before
-you answer at the keyboard, answers the dialog as free text. So a steered voice can answer the
+prompt: Claude asks for your input, not for leave to run a tool. In any main-loop turn of a
+joined session, one you typed included, the mod reports it to the app. For the target the app has
+the voice say it, and a spoken reply, given before you answer at the keyboard, answers the dialog
+as free text; the app sends the next handoff to the session that asked last, which after a
+target switch is not the target. So a steered voice can answer the
 dialog of a turn you typed, not only of a voice turn. That gives speech no reach it did not
 have, since it already reaches Claude as a request, and whatever Claude then does still passes
 the permission prompt. The mod does not tell a reply you spoke from one an injected line talked
@@ -149,11 +151,13 @@ What the app does enforce is smaller. A line is cut to one line of at most 2,000
 (`AnswerShaper.line`); its fenced code blocks and table rows are removed from the prose, and what
 you typed that was only code or a table becomes a sentence saying so (`AnswerShaper.synced`); and
 the redactor runs on it. The label `[TYPED]` is put on by the app when a mod says the line is
-yours, and it records as yours only a prompt the engine marks as typed in the composer, which is
-how the Claude desktop app's typed prompts reach the engine (checked on the engine, not on the
-real desktop app). A prompt from Remote Control, another agent, a plugin or a schedule is not
-recorded as yours, though Claude's answer to it is. The mod's own notes (that you allowed a
-tool, settled a prompt, or closed a question at the keyboard) go as Claude's.
+yours. The mod says so for a prompt the engine marks as typed in the composer, which is how the
+Claude desktop app's typed prompts reach the engine (checked on the engine, not on the real
+desktop app), text typed into a running turn included, and for your answer to Claude's question
+at the keyboard. A prompt from Remote Control, another agent, a plugin or a schedule is not
+recorded as yours, though Claude's answer to it is. The mod's own notes (that you allowed a tool,
+that a prompt was settled, that a question was closed with no answer) go as Claude's, so they
+never refuse a turn under the pause; your keyboard answer does.
 
 The redactor that removes credential shapes from these lines (private keys, JWTs, common API
 tokens, URL passwords, `password=`-style fields) is a convenience against an accidental leak. It
@@ -165,34 +169,44 @@ those shapes goes to OpenAI as typed, personal text included.
 
 - **Anything that steers the voice can start work.** Text a joined session read (a README, an
   issue, a web page, a tool's output) can reach the voice in a result, a question, an update, an
-  approval notice, a summary or, now, Claude's answer to a turn you typed, and talk it into a
+  approval notice, a summary, a synced line or Claude's answer to a turn you typed, and talk it into a
   handoff, including the "confirmed by voice" sentence above. A page Claude reads while you type
   to it can steer the voice through Claude's answer, as it could in a voice turn.
 - **A handoff can hop between sessions.** The voice hands work to the target session, or to the
   session that asked the last question. So text that session A read can become a prompt in
   session B, which may run in a more permissive mode.
 - **What the voice keeps.** Each session's conversation with the voice is saved in the data
-  folder as plain JSON: your typed text and Claude's final answers to typed turns, the voice's
-  and your spoken lines, the lines the session sent the voice, and the session's `[CONTEXT]`
-  line. It holds at most 64 lines for each of the 20 sessions used last (`Conversation.keptLines`,
-  `Continuity.keptConversations`), longer for none of them: a session that has left keeps its
-  lines until 20 others have been used since, or until you press **New conversation** or remove
-  it. The folder is `0700`; whether Time Machine or another backup copies it has not been tested.
-  The sync fills it **with no call running**: while a session is joined, what you type in it and
-  Claude's answers are recorded, and the next line opened with that session gives them to
-  OpenAI. Claude already repeats much of the same text in its answers to voice requests; what is
-  new is that your own typing goes too.
+  folder as plain JSON: your typed text and Claude's final answers to turns that were not voice
+  requests, an answer a newer voice request superseded (kept unsaid and added to the open line as
+  context), the voice's and your spoken lines, the briefs of the requests the voice handed off,
+  the lines the session sent the voice (results, questions, updates, approval notices), and the
+  session's `[CONTEXT]` line. It holds at most 64 lines for each of the 20 sessions used last
+  (`Conversation.keptLines`, `Continuity.keptConversations`), longer for none of them. A session
+  that has left keeps its lines until 20 others have been used since; to erase them sooner,
+  [join it again and press **New conversation**](README.md#privacy). The folder is `0700`;
+  whether Time Machine or another backup copies it has not been tested. The sync fills it **with
+  no call running**: while a session is joined, what you type in it and Claude's answers are
+  recorded, and the next line opened with that session gives them to OpenAI. Claude already
+  repeats much of the same text in its answers to voice requests; what is new is that your own
+  typing, and Claude's answers to turns you typed, go too.
 - **The pause keeps new text out and removes nothing.** With **Pause sync while the call is
   stopped** on and the call stopped, what you type is not recorded, a prompt typed into a running
-  turn included, and the session is marked *paused* (`Continuity.admits`, `Bridge.sync`). While
+  turn included, and the session is marked *paused* (`Continuity.admits`, `Bridge.sync`). Typing
+  also refuses the rest of a turn that began synced: Claude's later lines of it stay out too.
+  While
   the setting is on, no line loads a summary by itself (`Bridge.openLine`), and none does for a
   session marked paused after the setting is off again: only **Load context** or `/live context`
   does, because a summary is written from the whole transcript and carries the paused text.
   What the pause does not do:
   - It removes nothing already recorded, in the data folder or in a line that is open.
-  - It cannot stop Claude's later answers from repeating paused text: a turn that began synced
-    keeps being synced to its end, apart from what you type after Stop, and a later turn's answer
-    can quote the paused text. The next turn's answer then goes to the voice as any does.
+  - It cannot stop Claude's later answers from repeating paused text: a Claude line of a turn
+    admitted before Stop goes in until you type into it, and a later turn's answer can quote the
+    paused text. That answer then goes to the voice as any does.
+  - Typing under the pause withholds a voice request in flight in that session, since its answer
+    may repeat what you typed: the answer closes as failed with a plain reason, nothing of it is
+    recorded or said, and that turn's later questions and approval notices stay out too
+    (`SessionRegistry.withholdAnswer`, `Bridge.activity`). A request waiting behind a typed turn
+    is withheld as well, since the app cannot tell the two apart.
   - A prompt typed while Claude streams its final text starts a turn of its own, which keeps the
     decision of the turn it was typed into; a slash command queued behind a turn takes a
     decision of its own, so the pause reaches less far there.
@@ -202,11 +216,14 @@ those shapes goes to OpenAI as typed, personal text included.
     receive marks the session *missed*, and a missed session, unlike a paused one, loads a
     summary by itself once the setting is off.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
-  conversation** with the session as the target, or remove it with ×, and not otherwise: a load
-  of a new summary replaces the old one but keeps the lines. `/clear` gives the session a new id
+  conversation** with the session as the target, or remove it with ×, or when 20 sessions used
+  since push them out (which also loses a paused mark); a load of a new summary replaces the old
+  one but keeps the lines. Neither **New conversation** nor × withdraws a result the voice has
+  not said yet: a hang-up keeps it and the next connect adds it again, and only **Stop** clears
+  those. `/clear` gives the session a new id
   and carries its lines and context to it, so `/clear` ends nothing until **New conversation**
   follows. Removing a session holds until you join it again, since the mod's own joins are
-  refused (`410`). **New conversation** keeps the *paused* mark, so the next line asks for no
+  refused (`410`). **New conversation** and × keep the *paused* mark, so the next line asks for no
   summary of that transcript. A session with no summary and no pause mark does get one from the
   next line, written from the whole transcript, the text the session read included.
 - **A result from another session** is still spoken in whatever line is open, and the voice's
@@ -214,8 +231,8 @@ those shapes goes to OpenAI as typed, personal text included.
   conversation about another.
 
 Join only sessions whose input you trust. After a session has read text you do not trust,
-`/clear` it, then press **New conversation** with it as the target, and do not press **Load
-context** for it until you want the transcript's summary. To keep what you type out of the
+`/clear` it, press **Stop**, then press **New conversation** with it as the target, and do not
+press **Load context** for it until you want the transcript's summary. To keep what you type out of the
 voice, press Stop first and turn on **Pause sync while the call is stopped**; what you typed
 before that stays recorded. Keep voice off for a session whose permission mode acts without
 asking.

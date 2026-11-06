@@ -13,14 +13,19 @@ All notable changes to this project are listed here. The format follows
   a line opened later is seeded with them, and neither chimes nor opens a closed line. This
   happens while the call is on, and also while it is stopped, so the voice has them at the next
   Start; nothing leaves the Mac until a line opens. A question Claude asks or a permission
-  prompt it waits on is said by the voice in the target whoever started the turn, and a question
-  you answer at the keyboard, or a prompt you settle there, is told to the voice. **Load context**
-  is enabled only when the voice has missed something. A mod and an app from before this keep
+  prompt it waits on is said by the voice in the target whoever started the turn (in another
+  session, one from a turn you typed is only recorded), and a question you answer at the
+  keyboard, or a prompt you settle there, is told to the voice. A voice answer a newer request
+  superseded is no longer dropped: it is kept in the conversation, unsaid, and added to the open
+  line as context. **Load context** is enabled only when the voice lacks part of the session. A mod and an app from before this keep
   working together: an older mod's sessions are treated as missing turns, so their lines load a
   summary as before. The data is described in [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Pause sync while the call is stopped** in Settings (off by default): with it on, what you type
   while the call is stopped is not recorded, and no line loads a summary by itself; only **Load
-  context** or `/live context` does. It removes nothing already recorded.
+  context** or `/live context` does. It removes nothing already recorded. Typing under the pause
+  into a turn that has a voice request in flight (or waiting behind it) makes that request's
+  answer fail with a plain reason, with nothing of it recorded or said, and that turn's later
+  questions and approval notices stay out.
 - **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
   want to support the project.
 - **Mute** beside Stop, in the band above the prompt and in the menu's call card (**Unmute**
@@ -35,8 +40,9 @@ All notable changes to this project are listed here. The format follows
 
 - The conversation kept for each session holds its last 64 lines instead of 24.
 - **Load context automatically when a line opens** is gone from Settings. A line now loads a
-  summary by itself only for a session that has never had one or missed a turn, and never after a
-  pause. An owner who had turned it off gets **Pause sync while the call is stopped** turned on at
+  summary by itself when the voice lacks part of the session (it has none, a turn did not
+  arrive, the lines since the summary outgrew what the voice can carry, or the mod does not
+  sync), and never after a pause or while the pause setting is on. An owner who had turned it off gets **Pause sync while the call is stopped** turned on at
   the update, so summaries stay by hand; turns typed while the call is on now sync all the same.
 - **Load context** in the menu is disabled, reading **Context up to date**, while the voice has
   the whole conversation.

@@ -231,8 +231,10 @@ que escribes en una sesión quede fuera de la voz mientras la llamada está dete
 Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra de menús, y habla.
 
 - **El Start de la banda** convierte su sesión en el destino e inicia la llamada; la línea que abre
-  recibe la conversación de la sesión, y carga además un resumen solo si la sesión nunca tuvo uno o
-  se perdió un turno
+  recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
+  de ella (aún no hay resumen, un turno no llegó, hay más líneas desde el resumen de las que la voz
+  puede llevar, o el mod es anterior a la sincronización), pero nunca con **Pause sync** activado
+  ni tras una pausa
   ([detalles](docs/architecture/overview.md#components)). Mientras la llamada habla con otra
   sesión, la banda muestra **Talk here**. Si la banda no aparece en una sesión unida,
   `/live on` la recupera.
@@ -250,16 +252,18 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   ocupado, ausente), la llamada termina con el motivo. **Stop** termina la llamada y **Mute**; el
   siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier proceso que se ejecute
   como tú puede quitarlo ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
-- **Load context** solo está habilitado cuando al destino le falta el resumen o la voz se ha
-  perdido algo: un turno que la aplicación no recibió, o líneas que superan lo que la voz puede
-  llevar. En otro caso el elemento dice **Context up to date** y está deshabilitado, porque la voz
-  ya tiene la conversación. `/live context` funciona siempre.
+- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen,
+  un turno no llegó, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
+  conversación larga lo supera), la sesión estuvo en pausa o su mod no sincroniza. En otro caso el
+  elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la
+  conversación. `/live context` funciona siempre.
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
-  que se abre la línea. Esa línea carga por sí sola un resumen de la misma transcripción de la
-  sesión, que incluye lo que la sesión leyó, salvo que la sesión esté marcada como en pausa (véase
-  **Pause sync**); para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
-  conversation**. `/live on` en una sesión eliminada la une de nuevo.
+  que se abre la línea. Los resultados que aún no ha dicho se quedan y se añaden de nuevo; solo
+  **Stop** los borra. Con **Pause sync** desactivado y la sesión sin pausa, la siguiente línea carga
+  por sí sola un resumen de la misma transcripción de la sesión, que incluye lo que la sesión leyó;
+  para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New conversation**. `/live on` en
+  una sesión eliminada la une de nuevo.
 
 ### Ajustes
 
@@ -275,12 +279,13 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
   sale del Mac hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI,
   activa el ajuste, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida
-  se registra, tampoco un prompt escrito en un turno en curso, y la sesión queda marcada como en
-  pausa. Mientras está activado, ninguna línea carga un resumen por sí sola, ni tampoco después de
-  una pausa: solo lo hacen **Load context** o `/live context`, y ese resumen se escribe a partir de
-  toda la transcripción, así que lleva lo que pausaste. No elimina nada ya registrado, y las
-  respuestas posteriores de Claude pueden repetir el texto en pausa
-  ([SECURITY.md](SECURITY.md#residual-risk-by-design)).
+  se registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga
+  un resumen por sí sola, ni tampoco después de una pausa: solo lo hacen **Load context** o
+  `/live context`, y ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
+  pausaste. Si hay una petición por voz en curso en esa sesión, escribir hace fallar su respuesta,
+  sin que nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas
+  posteriores de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
+  [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Play a sound when a request is queued for Claude** (activado por defecto): un sonido breve por
   cada petición que la voz pasa a Claude ([por qué](#limitaciones-conocidas)).
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
@@ -306,13 +311,17 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - Cuando Claude está esperando una solicitud de permiso, la voz lo dice. Tú respondes a la
   solicitud en Claude Code; LiveBridge nunca la responde por ti.
 - Sabe lo que escribes. Mientras una sesión está unida, lo que escribes en ella y la respuesta final
-  de Claude a cada turno escrito pasan a la conversación de esa sesión con la voz como contexto: la
-  voz puede mencionarlos, pero no suena ningún aviso por ellos ni abre por ellos una línea cerrada.
-  Una línea abierta los recibe de inmediato; una línea que se abre después empieza con ellos. El
-  texto de Claude a mitad de turno, los subagentes y la salida de las herramientas no se sincronizan.
-  Una pregunta o una solicitud de permiso en el destino la dice la voz, sea cual sea el turno que la
-  originó; en otra sesión solo se registra. Cuando respondes en el teclado a una pregunta de Claude o
-  a una solicitud de permiso, la voz se entera.
+  de Claude a cada turno que no fue una petición por voz pasan a la conversación de esa sesión con
+  la voz como contexto: la voz puede mencionarlos, pero no suena ningún aviso por ellos ni abre por
+  ellos una línea cerrada. Una línea abierta los recibe de inmediato; una línea que se abre después
+  empieza con ellos. Una respuesta por voz que una petición más nueva desplazó no se dice, pero se
+  guarda y se añade igual. El texto de Claude a mitad de turno no se sincroniza, salvo lo que
+  escribió justo antes de una pregunta o una solicitud de permiso, que va con ella; los subagentes
+  y la salida de las herramientas tampoco. Una pregunta o una solicitud de permiso en el destino la
+  dice la voz, sea cual sea el turno que la causó; en otra sesión se dice o suena un aviso, como un
+  resultado de ella, salvo que si el turno lo escribiste tú solo se registra. Un turno que la pausa
+  deja fuera no tiene nada de esto. Cuando respondes en el teclado a una pregunta de Claude o a una
+  solicitud de permiso, la voz se entera.
 
 ## Facturación bajo control por diseño
 
@@ -364,8 +373,8 @@ la sesión en tiempo real de codex:
   continuarla en una nueva sesión en tiempo real. Incluye lo que escribiste en esa sesión y la
   respuesta final de Claude a cada turno escrito, además de tu voz y la de la voz, así que escribir
   en una sesión lo envía a OpenAI cuando se abre una línea con ella. Mientras una línea está abierta,
-  cada línea nueva del destino entra de inmediato. Las líneas de otra sesión solo salen cuando se
-  abre una línea con ella como destino;
+  cada línea nueva del destino entra de inmediato. Las líneas sincronizadas de otra sesión solo salen cuando se abre una línea con ella como destino;
+  sus resultados, preguntas y avisos de aprobación entran en la línea abierta sea cual sea la sesión;
 - las peticiones de la sesión de destino aún abiertas, como sus resúmenes de una línea;
 - cada resultado, pregunta, actualización, aviso de aprobación, texto escrito y respuesta a un
   turno escrito, como una línea de como máximo 2000 caracteres, sin bloques de código ni tablas (un
@@ -406,9 +415,8 @@ conectan a GitHub, y a Sigstore para la raíz de confianza de `gh`, con tus prop
 En tu Mac, la aplicación guarda sus ajustes, el contador de uso, cuándo buscó actualizaciones por
 última vez y qué versiones anunció, lo que hizo la última actualización y, para cada una de las
 últimas 20 sesiones usadas, su conversación reciente (hasta 64 líneas, con lo que escribiste en ella; se registra sin llamada
-salvo que actives **Pause sync**) y la última línea de contexto cargada desde ella, como JSON
-plano en `~/Library/Application Support/LiveBridge`, una carpeta que solo tu usuario puede abrir.
-No se ha probado si Time Machine la copia. Las líneas de una sesión desaparecen cuando
+salvo que actives **Pause sync**) y la última línea de contexto cargada desde ella, en `~/Library/Application Support/LiveBridge`, una carpeta que solo tu usuario puede abrir
+([cómo se guarda](SECURITY.md#residual-risk-by-design)). Las líneas de una sesión desaparecen cuando
 pulsas **New conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido
 las conserva hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta
 `/live on` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas.
@@ -419,10 +427,7 @@ sesión.
 
 ## Limitaciones conocidas
 
-- Un prompt enviado a una sesión por Remote Control no se registra en la conversación de la voz
-  como palabras tuyas, aunque sí la respuesta de Claude. Solo cuenta como tuyo el texto escrito en
-  el campo de entrada de Claude Code; lo escrito en la aplicación de escritorio de Claude llega al
-  motor como texto de ese campo en las pruebas sobre su motor, y la aplicación en sí no se observó.
+- Un prompt enviado a una sesión por Remote Control no se registra en la conversación de la voz como palabras tuyas, aunque sí la respuesta de Claude ([SECURITY.md](SECURITY.md#what-session-text-can-do) dice qué prompts cuentan como tuyos).
 - A veces la voz dice que está mirando ("On it", "Looking now") sin pasar la petición, así que a
   Claude no le llega nada: más o menos una petición de cada cinco en las
   [pruebas](docs/bugs/BR-001.md), aunque la regla de la voz lo prohíbe. La aplicación emite un
