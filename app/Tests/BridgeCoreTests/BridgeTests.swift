@@ -1489,22 +1489,55 @@ struct BridgeTests {
       LimitWindowBody(kind: "seven_day", percentUsed: 7, resetsAt: nil),
     ])
     let reading = try #require(await bridge.current.claudeLimits)
-    #expect(reading.fiveHour == LimitWindow(usedPercent: 23.5, resetsAt: Self.resetDate))
-    #expect(reading.week == LimitWindow(usedPercent: 7, resetsAt: nil))
+    #expect(
+      reading.windows == [
+        LimitWindow(span: .minutes(300), usedPercent: 23.5, resetsAt: Self.resetDate),
+        LimitWindow(span: .minutes(10080), usedPercent: 7, resetsAt: nil),
+      ])
     #expect(reading.readAt == time.now)
   }
 
-  @Test func anUnknownKindIsIgnored() async throws {
+  @Test func anUnknownKindShowsByName() async throws {
+    try await join(a, "Alpha")
+    try await limits([LimitWindowBody(kind: "thirty_day", percentUsed: 90, resetsAt: nil)])
+    let reading = try #require(await bridge.current.claudeLimits)
+    #expect(reading.windows.map(\.span) == [.kind("thirty_day")])
+    #expect(reading.windows.first?.span.label == "thirty day")
+  }
+
+  @Test func spendLimitStaysOut() async throws {
     try await join(a, "Alpha")
     try await limits([LimitWindowBody(kind: "spend_limit", percentUsed: 90, resetsAt: nil)])
     #expect(await bridge.current.claudeLimits == nil)
+  }
+
+  @Test func aKindOutsideTheAlphabetIsIgnored() async throws {
+    try await join(a, "Alpha")
+    for kind in ["Five", "a-b", String(repeating: "a", count: 33), ""] {
+      try await limits([LimitWindowBody(kind: kind, percentUsed: 90, resetsAt: nil)])
+    }
+    #expect(await bridge.current.claudeLimits == nil)
+    try await limits([
+      LimitWindowBody(kind: String(repeating: "a", count: 32), percentUsed: 1, resetsAt: nil)
+    ])
+    #expect(await bridge.current.claudeLimits?.windows.count == 1)
+  }
+
+  @Test func aReadingHoldsAtMostThreeWindows() async throws {
+    try await join(a, "Alpha")
+    try await limits(
+      ["a", "b", "c", "five_hour", "seven_day"].map {
+        LimitWindowBody(kind: $0, percentUsed: 5, resetsAt: nil)
+      })
+    let spans = try #require(await bridge.current.claudeLimits).windows.map(\.span)
+    #expect(spans == [.minutes(300), .minutes(10080), .kind("a")])
   }
 
   @Test func anIdleSessionDoesNotLowerTheFigures() async throws {
     try await join(a, "Alpha")
     try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: Self.reset)])
     try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 12, resetsAt: Self.reset)])
-    #expect(await bridge.current.claudeLimits?.fiveHour?.usedPercent == 40)
+    #expect(await bridge.current.claudeLimits?.windows.first?.usedPercent == 40)
   }
 
   @Test func anUnjoinedSessionIsIgnored() async throws {
@@ -1519,7 +1552,7 @@ struct BridgeTests {
     try await join(a, "Alpha")
     try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: Self.reset)])
     try await post("/v1/leave", LeaveBody(sessionId: a))
-    #expect(await bridge.current.claudeLimits?.fiveHour?.usedPercent == 40)
+    #expect(await bridge.current.claudeLimits?.windows.first?.usedPercent == 40)
   }
 
   @Test func aResetThatDoesNotParseIsNoReset() async throws {
@@ -1529,8 +1562,8 @@ struct BridgeTests {
       LimitWindowBody(kind: "seven_day", percentUsed: 5, resetsAt: "2026-01-01T06:00:00.250Z"),
     ])
     let reading = try #require(await bridge.current.claudeLimits)
-    #expect(reading.fiveHour == LimitWindow(usedPercent: 40, resetsAt: nil))
-    #expect(reading.week?.resetsAt == Self.resetDate.addingTimeInterval(0.25))
+    #expect(reading.windows.first?.resetsAt == nil)
+    #expect(reading.windows.last?.resetsAt == Self.resetDate.addingTimeInterval(0.25))
   }
 
   @Test func theStatusDoesNotChange() async throws {
@@ -1554,7 +1587,7 @@ struct BridgeTests {
         name: "Claude", limits: update.claudeLimits, now: time.now, calendar: utc,
         locale: Locale(identifier: "en_GB")))
     #expect(row.figures.map(\.text) == ["22% of week"])
-    #expect(update.claudeLimits?.fiveHour == nil)
+    #expect(update.claudeLimits?.windows.map(\.span) == [.minutes(10080)])
     let lines = row.tooltip.split(separator: "\n").map(String.init)
     #expect(lines.count == 2)
     #expect(lines.first?.hasPrefix("Weekly window resets ") == true)

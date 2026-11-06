@@ -7,7 +7,8 @@ struct LimitsPollTests {
   let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 
   func reading(_ percent: Double = 7) -> UsageLimits {
-    UsageLimits(fiveHour: LimitWindow(usedPercent: percent, resetsAt: nil), readAt: t0)
+    UsageLimits(
+      windows: [LimitWindow(span: .minutes(300), usedPercent: percent, resetsAt: nil)], readAt: t0)
   }
 
   @Test func theFirstOpenReads() {

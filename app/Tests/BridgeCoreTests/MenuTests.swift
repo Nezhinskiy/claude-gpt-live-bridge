@@ -283,8 +283,10 @@ struct LimitRowTests {
     five: Double? = 7, week: Double? = 19, blocked: Bool = false, readAt: Date = now
   ) -> UsageLimits {
     UsageLimits(
-      fiveHour: five.map { LimitWindow(usedPercent: $0, resetsAt: reset) },
-      week: week.map { LimitWindow(usedPercent: $0, resetsAt: weekReset) },
+      windows: [
+        five.map { LimitWindow(span: .minutes(300), usedPercent: $0, resetsAt: reset) },
+        week.map { LimitWindow(span: .minutes(10080), usedPercent: $0, resetsAt: weekReset) },
+      ].compactMap { $0 },
       isBlocked: blocked, readAt: readAt)
   }
 
@@ -318,8 +320,10 @@ struct LimitRowTests {
 
   @Test func aWindowPastItsResetIsLeftOut() {
     let stale = UsageLimits(
-      fiveHour: LimitWindow(usedPercent: 50, resetsAt: Self.now - 60),
-      week: LimitWindow(usedPercent: 19, resetsAt: Self.weekReset), readAt: Self.now - 3600)
+      windows: [
+        LimitWindow(span: .minutes(300), usedPercent: 50, resetsAt: Self.now - 60),
+        LimitWindow(span: .minutes(10080), usedPercent: 19, resetsAt: Self.weekReset),
+      ], readAt: Self.now - 3600)
     #expect(Self.row(stale)?.figures.map(\.text) == ["19% of week"])
   }
 
@@ -368,8 +372,27 @@ struct LimitRowTests {
 
   @Test func aWindowWithNoResetHasNoResetLine() {
     let limits = UsageLimits(
-      fiveHour: LimitWindow(usedPercent: 7, resetsAt: nil), readAt: Self.now)
+      windows: [LimitWindow(span: .minutes(300), usedPercent: 7, resetsAt: nil)],
+      readAt: Self.now)
     #expect(Self.row(limits)?.tooltip == "Read at 05:08")
+  }
+
+  @Test func aWindowOfAnotherLengthShowsByItsLength() {
+    let limits = UsageLimits(
+      windows: [LimitWindow(span: .minutes(240), usedPercent: 22, resetsAt: Self.reset)],
+      readAt: Self.now)
+    let row = Self.row(limits)
+    #expect(row?.figures.map(\.text) == ["22% of 4 h"])
+    #expect(row?.tooltip.hasPrefix("4-hour window resets at 06:04") == true)
+  }
+
+  @Test func aWindowWithNoLengthIsTheLimit() {
+    let limits = UsageLimits(
+      windows: [LimitWindow(span: .unknown, usedPercent: 22, resetsAt: Self.reset)],
+      readAt: Self.now)
+    let row = Self.row(limits)
+    #expect(row?.figures.map(\.text) == ["22% of limit"])
+    #expect(row?.tooltip.hasPrefix("Limit resets at 06:04") == true)
   }
 
   @Test func theMenuHoldsTheRowsAboveTheMinutes() {

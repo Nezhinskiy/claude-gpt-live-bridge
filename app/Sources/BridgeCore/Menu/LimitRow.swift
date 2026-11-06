@@ -25,17 +25,15 @@ public struct LimitRow: Sendable, Equatable {
   /// nil when `limits` has no window still current and no block: there is nothing to show.
   public init?(name: String, limits: UsageLimits?, now: Date, calendar: Calendar, locale: Locale) {
     guard let current = limits?.current(at: now) else { return nil }
-    guard current.fiveHour != nil || current.week != nil || current.isBlocked else { return nil }
+    guard !current.windows.isEmpty || current.isBlocked else { return nil }
 
     // The value comes from the socket, and `Int(_:)` traps on a huge double: clamp first.
-    func figure(_ window: LimitWindow, of span: String) -> Figure {
+    func figure(_ window: LimitWindow) -> Figure {
       let percent = Int(min(max(window.usedPercent, 0), 100).rounded())
-      return Figure(text: "\(percent)% of \(span)", isNear: percent >= Self.nearPercent)
+      return Figure(
+        text: "\(percent)% of \(window.span.label)", isNear: percent >= Self.nearPercent)
     }
-    let windows: [(window: LimitWindow, span: String, label: String)] = [
-      current.fiveHour.map { ($0, "5 h", "5-hour window") },
-      current.week.map { ($0, "week", "Weekly window") },
-    ].compactMap { $0 }
+    let windows = current.windows
 
     func formatted(_ template: String) -> DateFormatter {
       let formatter = DateFormatter()
@@ -57,14 +55,14 @@ public struct LimitRow: Sendable, Equatable {
     var lines: [String] = []
     if current.isBlocked { lines.append("\(name) reports usage is blocked right now.") }
     for item in windows {
-      guard let resetsAt = item.window.resetsAt else { continue }
+      guard let resetsAt = item.resetsAt else { continue }
       let shown = when(resetsAt)
-      lines.append("\(item.label) resets " + (shown.isToday ? "at " : "") + shown.text)
+      lines.append("\(item.span.windowName) resets " + (shown.isToday ? "at " : "") + shown.text)
     }
     lines.append("Read at " + when(current.readAt).text)
 
     self.name = name
-    figures = windows.map { figure($0.window, of: $0.span) }
+    figures = windows.map(figure)
     isBlocked = current.isBlocked
     tooltip = lines.joined(separator: "\n")
   }

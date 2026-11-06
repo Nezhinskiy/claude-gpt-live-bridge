@@ -42,8 +42,11 @@ struct CodexLimitsTests {
       codex(primary: slot(7, 300, 1_800_003_600), secondary: slot(19, 10080, 1_800_500_000)))
     let five = Date(timeIntervalSince1970: 1_800_003_600)
     let week = Date(timeIntervalSince1970: 1_800_500_000)
-    #expect(got.fiveHour == LimitWindow(usedPercent: 7, resetsAt: five))
-    #expect(got.week == LimitWindow(usedPercent: 19, resetsAt: week))
+    #expect(
+      got.windows == [
+        LimitWindow(span: .minutes(300), usedPercent: 7, resetsAt: five),
+        LimitWindow(span: .minutes(10080), usedPercent: 19, resetsAt: week),
+      ])
     #expect(got.readAt == now && !got.isBlocked)
   }
 
@@ -56,37 +59,61 @@ struct CodexLimitsTests {
 
   @Test func aWeekInThePrimarySlotIsTheWeek() async throws {
     let got = try await read(codex(primary: slot(19, 10080)))
-    #expect(got.week?.usedPercent == 19)
-    #expect(got.fiveHour == nil)
+    #expect(got.windows.map(\.span) == [.minutes(10080)])
   }
 
-  @Test func aWindowOfAnotherLengthIsIgnored() async throws {
-    let other = try await read(codex(primary: slot(5, 43200), secondary: slot(6, 43200)))
-    #expect(other.fiveHour == nil && other.week == nil)
-    for (minutes, counts) in [(285.0, true), (315, true), (284, false), (316, false)] {
+  @Test func aWindowOfAnotherLengthShows() async throws {
+    let got = try await read(codex(primary: slot(22, 240), secondary: slot(6, 43200)))
+    #expect(got.windows.map(\.span) == [.minutes(240), .minutes(43200)])
+    #expect(got.windows.first?.span.label == "4 h")
+  }
+
+  @Test func aLengthNearAKnownOneIsThatLength() async throws {
+    for (minutes, want) in [(285.0, 300), (315, 300), (9576, 10080), (10584, 10080)] {
       let got = try await read(codex(primary: slot(5, minutes)))
-      #expect((got.fiveHour != nil) == counts, "\(minutes) minutes")
-      #expect(got.week == nil)
-    }
-    for (minutes, counts) in [(9576.0, true), (10584, true), (9575, false), (10585, false)] {
-      let got = try await read(codex(primary: slot(5, minutes)))
-      #expect((got.week != nil) == counts, "\(minutes) minutes")
-      #expect(got.fiveHour == nil)
+      #expect(got.windows.map(\.span) == [.minutes(want)], "\(minutes) minutes")
     }
   }
 
-  @Test func bothSlotsOfOneLengthLeaveThePrimary() async throws {
+  @Test func aWindowWithNoDurationShowsAsLimit() async throws {
+    let got = try await read(codex(primary: slot(9, nil)))
+    #expect(got.windows.map(\.span) == [.unknown])
+  }
+
+  @Test func aWindowWithNoPercentIsLeftOut() async throws {
+    let noPercent: JSONValue = [
+      "windowDurationMins": .number(300), "resetsAt": .number(1_800_003_600),
+    ]
+    let got = try await read(codex(primary: noPercent, secondary: slot(19, 10080)))
+    #expect(got.windows.map(\.span) == [.minutes(10080)])
+  }
+
+  @Test func twoOfOneLengthKeepThePrimary() async throws {
     let got = try await read(codex(primary: slot(1, 300), secondary: slot(2, 300)))
-    #expect(got.fiveHour?.usedPercent == 1)
+    #expect(got.windows.map(\.usedPercent) == [1])
+  }
+
+  @Test func anUnknownExtraFieldChangesNothing() async throws {
+    var bucket = try #require(bucket("codex", primary: slot(7, 300)).object)
+    bucket["tertiary"] = slot(50, 60)
+    bucket["somethingNew"] = ["a": .number(1)]
+    let got = try await read(reply(byId: ["codex": .object(bucket)]))
+    #expect(got.windows.map(\.usedPercent) == [7])
   }
 
   @Test func fallsBackToTheSingleBucket() async throws {
     for id: JSONValue in ["codex", .null] {
       let got = try await read(reply(single: bucket(id, primary: slot(7, 300))))
-      #expect(got.fiveHour?.usedPercent == 7)
+      #expect(got.windows.map(\.usedPercent) == [7])
     }
     let absent = try await read(reply(single: ["primary": slot(7, 300)]))
-    #expect(absent.fiveHour?.usedPercent == 7)
+    #expect(absent.windows.map(\.usedPercent) == [7])
+  }
+
+  @Test func noBucketMapIsTheSingleBucket() async throws {
+    let value: JSONValue = ["rateLimits": bucket("codex", primary: slot(7, 300))]
+    #expect(value["rateLimitsByLimitId"] == nil)
+    #expect(try await read(value).windows.map(\.usedPercent) == [7])
   }
 
   @Test func anotherBucketIsNotRead() async throws {
@@ -94,7 +121,7 @@ struct CodexLimitsTests {
     let single = reply(single: bucket("other", primary: slot(7, 300)))
     for value in [byId, single] {
       let got = try await read(value)
-      #expect(got.fiveHour == nil && got.week == nil)
+      #expect(got.windows.isEmpty)
     }
   }
 

@@ -529,18 +529,35 @@ public actor Bridge: Router {
   }
 
   /// A joined session's reading of Claude's usage windows, merged into what is held: a session
-  /// that sat idle may report figures older than another's. Windows of other kinds are ignored,
-  /// and a reset that is not an ISO 8601 time is no reset.
+  /// that sat idle may report figures older than another's. A reset that is not an ISO 8601 time
+  /// is no reset.
   private func limits(_ body: LimitsBody) async {
     guard (try? await label(of: body.sessionId)) != nil else { return }
-    func window(_ kind: String) -> LimitWindow? {
-      guard let one = body.windows.first(where: { $0.kind == kind }) else { return nil }
-      return LimitWindow(usedPercent: one.percentUsed, resetsAt: one.resetsAt.flatMap(Self.isoDate))
+    let windows = body.windows.compactMap { one -> LimitWindow? in
+      Self.span(ofKind: one.kind).map {
+        LimitWindow(
+          span: $0, usedPercent: one.percentUsed, resetsAt: one.resetsAt.flatMap(Self.isoDate))
+      }
     }
-    let reading = UsageLimits(
-      fiveHour: window("five_hour"), week: window("seven_day"), readAt: time.now)
-    guard reading.fiveHour != nil || reading.week != nil else { return }
+    let reading = UsageLimits(windows: windows, readAt: time.now)
+    guard !reading.windows.isEmpty else { return }
     claudeLimits = claudeLimits?.merging(reading) ?? reading
+  }
+
+  /// The span of a Claude window kind: `five_hour` and `seven_day` are the two lengths the app
+  /// names, `spend_limit` is not a usage window, and any other kind shows by name. A kind comes
+  /// from the socket and reaches the menu, so only `[a-z0-9_]{1,32}` is accepted.
+  static func span(ofKind kind: String) -> LimitSpan? {
+    switch kind {
+    case "five_hour": return .minutes(LimitSpan.shortMinutes)
+    case "seven_day": return .minutes(LimitSpan.aWeek)
+    case "spend_limit": return nil
+    default:
+      let allowed = kind.utf8.allSatisfy {
+        ($0 >= 97 && $0 <= 122) || ($0 >= 48 && $0 <= 57) || $0 == 95
+      }
+      return allowed && (1...32).contains(kind.utf8.count) ? .kind(kind) : nil
+    }
   }
 
   /// An ISO 8601 time, with or without fractional seconds.
