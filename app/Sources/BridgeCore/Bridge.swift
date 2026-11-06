@@ -694,9 +694,10 @@ public actor Bridge: Router {
     }
   }
 
-  /// A line of a turn that is not a voice request. It is kept in its session's conversation if
-  /// `Continuity.admits` takes it (the pause setting with the call off refuses it, and marks the
-  /// session paused); the open line about that session is given it at once, as context.
+  /// A line of a turn. It is kept in its session's conversation if `Continuity.admits` takes it
+  /// (the pause setting with the call off refuses it, and marks the session paused); the open line
+  /// about that session is given it at once, as context. A `typed` line refused in a turn with a
+  /// voice request behind it withholds exactly that request.
   private func sync(_ body: SyncBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)

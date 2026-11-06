@@ -5,6 +5,8 @@
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
 // `removed`; also the reply to its join unless `owner` is true), 413 body over 131072 bytes.
+// `sync` and `context` look a session up among the joined, so a removed one gets their 404, and
+// `activity` and `limits` ignore it, 200.
 
 /** The socket path relative to the home folder Foundation reports. */
 const SOCKET_REL = 'Library/Application Support/LiveBridge/run/bridge.sock';

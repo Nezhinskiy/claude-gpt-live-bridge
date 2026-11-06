@@ -126,7 +126,7 @@ export class BridgeLink {
     return reply?.status === 410 ? REMOVED : reply?.ok === true
   }
 
-  /** `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only). */
+  /** `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only), and the turn. */
   async activity(state: SessionActivity, said: Omit<ActivityBody, 'sessionId' | 'state'> = {}): Promise<void> {
     await this.#forSession('activity', { state, ...said })
   }
