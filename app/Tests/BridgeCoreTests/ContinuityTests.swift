@@ -9,8 +9,10 @@ struct ContinuityTests {
     var conversation = Conversation()
     let line = String(repeating: "Это строка ответа. ", count: 100)
     for _ in 0..<Conversation.keptLines { conversation.record(.claude, line) }
-    let bytes = conversation.initialItems(tasks: []).reduce(0) { $0 + ($1.text.utf8.count + 3) / 4 }
-    #expect(bytes <= Conversation.maxTokens)
+    let tokens = conversation.initialItems(tasks: []).reduce(0) {
+      $0 + ($1.text.utf8.count + 3) / 4
+    }
+    #expect(tokens <= Conversation.maxTokens)
   }
 
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")

@@ -970,23 +970,83 @@ struct BridgeTests {
     #expect(await audio.calls.contains("stopListening"))
   }
 
-  @Test func aUsageLimitOnTheDataChannelEndsTheCall() async throws {
+  @Test func aUsageLimitInCodexsClosedEndsTheCall() async throws {
     try await join(a, "Alpha")
     await live()
-    let limit = "Unable to verify usage availability. (usage_check_failed)"
-    await bridge.audioEvent(.lineError(limit))
+    voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit. Try again later."))))
+    #expect(await eventually { await bridge.status.call == .off })
+    #expect(await eventually { await voice.shutdowns == 1 })
+  }
+
+  @Test func theServiceRefusingEndsTheCall() async throws {
+    try await join(a, "Alpha")
+    await live()
+    await bridge.audioEvent(
+      .lineError(code: "usage_check_failed", message: "Unable to verify usage availability."))
     #expect(await bridge.status.call == .off)
-    #expect(await bridge.status.problem?.contains(limit) == true)
+    let problem = try #require(await bridge.status.problem)
+    #expect(problem.contains("Unable to verify usage availability."))
     #expect(await audio.calls.contains("closePeer"))
     #expect(await voice.shutdowns == 1)
+  }
+
+  /// An error before `session.started` comes while the line is still connecting.
+  @Test func theServiceRefusingEndsAConnectingLine() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    await voice.holdOpen()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.openWaiting == 1 })
+    await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
+    await voice.releaseOpen()
+    await opening.value
+    #expect(await bridge.status.call == .off)
+    #expect(await bridge.status.problem?.contains("No.") == true)
+  }
+
+  /// The voice may have closed first: the line that said so is gone, and the limit still holds.
+  @Test func theServiceRefusingAfterTheLineClosedEndsTheCall() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    await bridge.audioEvent(.lineError(code: "usage_limit_reached", message: "No."))
+    #expect(await bridge.status.call == .off)
   }
 
   @Test func anotherDataChannelErrorLeavesTheLineOpen() async throws {
     try await join(a, "Alpha")
     await live()
-    await bridge.audioEvent(.lineError("Unknown event type. (invalid_request)"))
+    await bridge.audioEvent(.lineError(code: "invalid_request", message: "Unknown event."))
     #expect(await bridge.status.call == .live)
     #expect(await bridge.status.problem == nil)
+  }
+
+  /// A kept question still answers to its session, and the reply must not go to the target.
+  @Test func aKeptQuestionKeepsItsRoute() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
+    #expect(await eventually { await bridge.status.call == .off })
+    await bridge.perform(.start)
+    await live()
+    voice.emit(.handoff(request(2)))
+    #expect(await eventually { (try? await registry.poll(b)) != nil })
+  }
+
+  @Test func aLimitWithNoQuestionLeavesNoRoute() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .working))
+    voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
+    #expect(await eventually { await bridge.status.call == .off })
+    await bridge.perform(.start)
+    await live()
+    voice.emit(.handoff(request(2)))
+    #expect(await eventually { (try? await registry.poll(a)) != nil })
+    #expect(try await registry.poll(b) == nil)
   }
 
   /// The context line is shown exactly as the voice gets it, also after the app restarts.

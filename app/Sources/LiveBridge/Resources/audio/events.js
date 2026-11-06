@@ -1,6 +1,6 @@
 // What the line's data channel says. Pure: tested with node --test.
 
-/** An `error` event's message and code as one sentence for the app; null for anything else. */
+/** An `error` event's code and message for the app; null for anything else. */
 export function lineError(text) {
   let event;
   try {
@@ -9,6 +9,7 @@ export function lineError(text) {
     return null;
   }
   if (event?.type !== 'error') return null;
-  const { message, code } = event.error ?? {};
-  return message && code ? `${message} (${code})` : (message ?? code ?? null);
+  const { message, code, type } = event.error ?? {};
+  const name = code || type || '';
+  return { code: name, message: message || name };
 }

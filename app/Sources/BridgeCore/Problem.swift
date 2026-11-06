@@ -6,6 +6,8 @@ public enum Problem: Sendable, Equatable {
   /// macOS refuses LiveBridge the microphone.
   case microphoneDenied
   case codex(CodexProblem)
+  /// The service refused the voice on the line's data channel, which codex does not report.
+  case lineRefused(String)
   /// Any other, in its own words: the audio page, a voice session that closed, the noise cap.
   case other(String)
 
@@ -14,8 +16,21 @@ public enum Problem: Sendable, Equatable {
     self = (error as? CodexProblem).map(Problem.codex) ?? .other(error.localizedDescription)
   }
 
-  /// One sentence for the menu and the band.
+  /// An `error` on the line's data channel, when it is about usage. The code decides: the
+  /// service's prose is not codex's, and only a refusal of this kind ends a call.
+  static func refusal(code: String, message: String) -> Problem? {
+    code.contains("usage") || code.contains("quota") ? .lineRefused(message) : nil
+  }
+
+  /// One sentence for the menu and the band, with no control characters: the engine refuses a
+  /// band that holds one, and the text can be the service's.
   public var sentence: String {
+    String(
+      String.UnicodeScalarView(
+        wording.unicodeScalars.filter { $0.properties.generalCategory != .control }))
+  }
+
+  private var wording: String {
     switch self {
     case .noSession:
       "No Claude Code session has joined: run \(StatusPresentation.joinCommand) in a session, "
@@ -24,13 +39,20 @@ public enum Problem: Sendable, Equatable {
       "LiveBridge cannot use the microphone. Allow LiveBridge in System Settings > Privacy & "
         + "Security > Microphone, then start again."
     case .codex(let problem): problem.sentence
+    case .lineRefused(let message):
+      "ChatGPT did not allow the voice just now, so it is paused. Claude Code keeps working. "
+        + "\(message)"
     case .other(let sentence): sentence
     }
   }
 
-  /// The plan's limit stopped the voice: a new line would fail the same way until it resets.
-  public var isUsageLimit: Bool {
-    if case .codex(let problem) = self { problem.isUsageLimit } else { false }
+  /// A new line would fail the same way, so speech must not keep opening them.
+  public var pausesCall: Bool {
+    switch self {
+    case .codex(let problem): problem.isUsageLimit || problem.isRefusal
+    case .lineRefused: true
+    default: false
+    }
   }
 
   /// The menu offers to open the Microphone pane of System Settings.

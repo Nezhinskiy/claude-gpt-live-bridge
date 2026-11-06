@@ -150,38 +150,56 @@ struct CodexLaunchTests {
     #expect(ContinuousClock.now - start < .seconds(5))
   }
 
-  /// codex's own words at `rust-v0.166.0`: this path carries no error code, so its wording is the
-  /// only signal (`docs/research/2026-11-05-gpt-live-limits.md`).
-  @Test func usageLimitsAreRecognisedInCodexsWords() {
-    for message in [
-      "You’ve hit your usage limit. Visit https://chatgpt.com/settings/usage to purchase more "
-        + "credits or try again at 11:33 PM.",
-      "You've hit your usage limit. Try again later.",
-      "You’ve hit your usage limit for example-model. Switch to another model now, or try again.",
-      "You hit your spend cap. Ask your admin.",
-      "Your workspace is out of credits. Ask your admin.",
-      "Quota exceeded. Check your plan and billing details.",
-      "exceeded retry limit, last status: 429 Too Many Requests",
-      "Unable to verify usage availability. (usage_check_failed)",
-    ] {
-      let problem = CodexProblem.realtimeError(message)
-      #expect(problem.isUsageLimit, "\(message)")
-      #expect(problem.sentence.contains(message), "\(message)")
-      #expect(problem.sentence.contains("usage limit is reached"), "\(message)")
-      #expect(!problem.sentence.hasPrefix("Realtime voice failed"), "\(message)")
-      #expect(!problem.sentence.contains("plan may"), "\(message)")
-    }
+  /// codex's own sentences at `rust-v0.166.0` (`codex-rs/protocol/src/error.rs`): this path carries
+  /// no error code, so its wording is the only signal.
+  static let spent = [
+    "You’ve hit your usage limit. Visit https://chatgpt.com/settings/usage to purchase more "
+      + "credits or try again at 11:33 PM.",
+    "You've hit your usage limit. Try again later.",
+    "You’ve hit your usage limit for example-model. Switch to another model now, or try again.",
+    "You hit your spend cap. Raise it to keep going.",
+    "Your workspace is out of credits. Ask your admin.",
+    "Quota exceeded. Check your plan and billing details.",
+  ]
+  static let refused = [
+    "exceeded retry limit, last status: 429 Too Many Requests",
+    "To use Codex with your ChatGPT plan, upgrade to Plus: https://chatgpt.com/explore/plus",
+  ]
+
+  @Test(arguments: spent) func aSpentBudgetIsSaidAsAUsageLimit(_ message: String) {
+    let problem = Problem.codex(.realtimeError(message))
+    #expect(problem.pausesCall)
+    #expect(problem.sentence.hasPrefix("Your ChatGPT plan's usage limit is reached"))
+    #expect(problem.sentence.contains(message))
   }
 
-  @Test func otherErrorsAreNoUsageLimit() {
-    for message in [
-      "To use Codex with your ChatGPT plan, upgrade to Plus.", "503 Service Unavailable",
-      "AVAS realtime calls require realtime v1 or v3",
-    ] {
-      #expect(!CodexProblem.realtimeError(message).isUsageLimit, "\(message)")
+  /// Nothing shows these spent a budget: the sentence does not say they did.
+  @Test(arguments: refused) func aRefusalIsNotSaidAsAUsageLimit(_ message: String) {
+    let problem = Problem.codex(.realtimeError(message))
+    #expect(problem.pausesCall)
+    #expect(problem.sentence.hasPrefix("ChatGPT did not allow the voice"))
+    #expect(problem.sentence.contains(message))
+  }
+
+  @Test func thePageSaysItIsNoUsageLimit() {
+    let problem = Problem.lineRefused("Unable to verify usage availability.")
+    #expect(problem.pausesCall)
+    #expect(problem.sentence.hasPrefix("ChatGPT did not allow the voice"))
+    #expect(problem.sentence.contains("Unable to verify usage availability."))
+  }
+
+  @Test func otherErrorsLeaveTheCallOn() {
+    for message in ["503 Service Unavailable", "AVAS realtime calls require realtime v1 or v3"] {
+      #expect(!Problem.codex(.realtimeError(message)).pausesCall, "\(message)")
     }
-    #expect(!CodexProblem.notLoggedIn.isUsageLimit)
-    #expect(!Problem.other("You’ve hit your usage limit.").isUsageLimit)
+    #expect(!Problem.codex(.notLoggedIn).pausesCall)
+    #expect(!Problem.other("You’ve hit your usage limit.").pausesCall)
+  }
+
+  /// The engine refuses a band holding one, which takes Start and Stop with it.
+  @Test func aSentenceHoldsNoControlCharacters() {
+    #expect(Problem.other("one\u{0007}two\u{009B}three").sentence == "onetwothree")
+    #expect(Problem.lineRefused("one\u{0000}two").sentence.contains("onetwo"))
   }
 
   /// No real "plan without realtime" error has been observed (ADR 0001 (k)); these messages are

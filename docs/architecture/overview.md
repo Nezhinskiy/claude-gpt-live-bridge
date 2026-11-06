@@ -449,13 +449,14 @@ only if it is still the one it bound.
 - **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
   gives no answer within 10 s.
-- **A plan without realtime voice, or any realtime error:** the first connect reports codex's
-  own words in one sentence, with a hint when they name sign-in or the plan, and the call goes
-  back to `listening`.
-- **The plan's usage limit:** recognised in codex's wording, as this path carries no code, or from
-  an `error` on the line's data channel, which codex does not report. The app says the limit is
-  reached, with codex's sentence, and the call ends, keeping what waits to be said: speech would
-  only open lines that fail. Start tries once more.
+- **A realtime error:** the first connect reports codex's own words in one sentence, with a hint
+  when they name sign-in or the plan, and the call goes back to `listening`.
+- **A refusal a new line would get too:** the plan's usage limit, a plan without voice or a 429
+  with no known body, recognised in codex's wording, as this path carries no code; or an `error`
+  about usage on the line's data channel, which codex does not report, recognised by its code.
+  The call ends, so speech does not open lines that fail, and until Start or Stop it keeps what
+  waits to be said, lines that arrive meanwhile too, with a question's route. Only a spent budget
+  is called a limit: the others are said as ChatGPT not allowing the voice.
 - **Codex installed with npm, or found only through a shell's start-up files:** the app reads
   `PATH` from the user's own shell (at most 3 s) and starts codex with it; a codex whose runtime
   is still missing gets its own sentence.

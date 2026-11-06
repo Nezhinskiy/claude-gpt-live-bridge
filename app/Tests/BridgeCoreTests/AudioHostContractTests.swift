@@ -9,7 +9,10 @@ struct AudioHostContractTests {
     #expect(AudioEvent(body: ["type": "speechEnded"]) == .speechEnded)
     #expect(AudioEvent(body: ["type": "level", "value": 0.25]) == .level(0.25))
     #expect(AudioEvent(body: ["type": "audioFailed", "reason": "r"]) == .failed(.other("r")))
-    #expect(AudioEvent(body: ["type": "lineError", "message": "m"]) == .lineError("m"))
+    #expect(
+      AudioEvent(body: ["type": "lineError", "code": "c", "message": "m"])
+        == .lineError(code: "c", message: "m"))
+    #expect(AudioEvent(body: ["type": "lineError"]) == .lineError(code: "", message: ""))
     #expect(AudioEvent(body: ["type": "audioFailed"]) != nil)  // a failure without a reason
     #expect(AudioEvent(body: ["type": "unknown"]) == nil)
     #expect(AudioEvent(body: "speechStarted") == nil)

@@ -20,6 +20,9 @@ public struct VoiceLine: Equatable, Sendable {
     public var answers: Bool { [.result, .failed, .question].contains(self) }
   }
 
+  /// A question the owner's next handoff answers.
+  var asks: Bool { [.question, .asking].contains(kind) }
+
   public var kind: Kind
   public var label: String
   public var body: String
@@ -37,6 +40,8 @@ public enum CallEvent: Equatable, Sendable {
   case silenceElapsed
   /// The owner releases the microphone while the call goes on, or takes it again.
   case mute, unmute
+  /// The service refused the voice while a line or the call was on (`Problem.pausesCall`).
+  case refused(Problem)
   /// The voice handed a request to this session; nil when none is joined, and the failure
   /// follows as a delivery.
   case handedOff(SessionID?)
@@ -59,6 +64,8 @@ public enum CallEvent: Equatable, Sendable {
 /// What the bridge does in reply, in order.
 public enum CallEffect: Equatable, Sendable {
   case openRealtime, closeRealtime, startLocalVAD, stopLocalVAD, flushPreroll
+  /// The call ended by itself: nothing keeps codex running.
+  case endCodex
   /// The audio page releases the microphone, or takes it again.
   case muteMicrophone, unmuteMicrophone
   /// Opens the line for a line that arrived: without the pre-roll, as nobody spoke, and without
@@ -93,6 +100,9 @@ public struct CallMachine: Sendable {
   public private(set) var phase: CallPhase = .off
   /// The owner released the microphone: no speech opens the line, but a line that arrived does.
   public private(set) var isMuted = false
+  /// The service refused the voice (`pause`): the call is off, and what the voice has not said
+  /// still waits, also lines that arrive now, until Start or Stop. Otherwise `off` keeps nothing.
+  public private(set) var isPaused = false
 
   private struct Unheard: Sendable {
     let line: VoiceLine
@@ -104,6 +114,8 @@ public struct CallMachine: Sendable {
   /// given to the open session. A hang-up keeps them, so none is lost; one may be spoken twice.
   private var unheard: [Unheard] = []
   public var pending: [VoiceLine] { unheard.map(\.line) }
+  /// A line that arrives now waits to be said; a stopped call drops it.
+  public var keepsLines: Bool { phase != .off || isPaused }
   /// The results given before the voice's current reply began; only that reply can say them.
   private var replyCanSay: [VoiceLine]?
   /// The sessions handed a request whose result the open line waits for; while any is, silence
@@ -154,10 +166,16 @@ public struct CallMachine: Sendable {
       return end(with: [.closeRealtime, .stopLocalVAD, .problem(reason)])
     case (.off, .start):
       phase = .listening
+      isPaused = false
       // the problem first: listening waits on macOS's prompt, whose refusal is a new problem
       return [.problem(nil), .startLocalVAD]
+    case (.off, .deliver(let line, _)) where isPaused:
+      unheard.append(Unheard(line: line))
+      return [.chime]
     case (.off, _):
       return []
+    case (_, .refused(let reason)):
+      return [.closeRealtime] + pause(for: reason)
     case (_, .speechStarted) where isMuted:
       return []
     case (_, .mute):
@@ -189,10 +207,11 @@ public struct CallMachine: Sendable {
       return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
-      return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
+      // the problem first: a refusal while these run must not be erased by them
+      return [.problem(nil), .flushPreroll] + pending.map { .addContext($0) } + [armSilence()]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
-      return reason.isUsageLimit ? pause(for: reason) : [.problem(reason)] + hangUp()
+      return reason.pausesCall ? pause(for: reason) : [.problem(reason)] + hangUp()
     case (.live, .deliver(let result, _)):  // a result the voice never speaks still hangs up
       guard let session = result.session, awaited.contains(session) else {
         unheard.append(Unheard(line: result))
@@ -235,7 +254,7 @@ public struct CallMachine: Sendable {
     case (.live, .graceElapsed):
       let held = unheard.filter(\.isHeld).map(\.line)
       guard !held.isEmpty, !isSoundOn, !isVoiceSpeaking else { return [] }
-      unheard = unheard.map { Unheard(line: $0.line) }
+      unheard = withoutHolds
       return held.map { .speak($0) } + [armSilence()]
     case (.live, .resultWindowElapsed):
       guard !awaited.isEmpty else { return [] }
@@ -283,7 +302,7 @@ public struct CallMachine: Sendable {
       phase = .listening
       isAwaitingFirstWord = false
       awaited = []
-      unheard = unheard.map { Unheard(line: $0.line) }
+      unheard = withoutHolds
       isSilenceDue = false
       isVoiceSpeaking = false
       isAckUnfinished = false
@@ -292,14 +311,17 @@ public struct CallMachine: Sendable {
     return pending.isEmpty ? [] : [.chime]
   }
 
-  /// The plan's limit: speech must not open lines that fail, so the call ends, as Stop does, and
-  /// keeps what waits to be said. Start tries once more.
+  /// A new line would fail the same way, so the call ends, as Stop does, and keeps what waits to
+  /// be said. Start tries once more.
   private mutating func pause(for reason: Problem) -> [CallEffect] {
-    let kept = unheard.map { Unheard(line: $0.line) }
-    self = CallMachine()
+    let kept = withoutHolds
+    _ = end(with: [])
     unheard = kept
-    return [.stopLocalVAD, .problem(reason)] + (kept.isEmpty ? [] : [.chime])
+    isPaused = true
+    return [.stopLocalVAD, .endCodex, .problem(reason)] + (kept.isEmpty ? [] : [.chime])
   }
+
+  private var withoutHolds: [Unheard] { unheard.map { Unheard(line: $0.line) } }
 
   private mutating func end(with effects: [CallEffect]) -> [CallEffect] {
     self = CallMachine()

@@ -140,7 +140,7 @@ exhausted budget during a call arrives the same way is **not documented**.
    nothing (**inferred**); one refused after `session.started` may be billed for its seconds, or
    the 15 s floor (§3). Either way the words spoken into it are lost and the same failure repeats
    until the reset.
-5. The audio page reads the data channel only until `session.started`
+5. The audio page acts on the data channel only until `session.started`
    (`app/Sources/LiveBridge/Resources/audio/audio.js:196-199`) and has no handler for the peer's
    connection state. A data-channel `error` such as `usage_check_failed` is therefore lost; the
    owner sees "The voice session closed (transport_closed).", or nothing until the silence timer
@@ -152,7 +152,11 @@ retries. For an unrecognised 429 body the owner sees "exceeded retry limit, last
 and for a gate after `session.started` only "transport_closed": neither says anything about a
 limit.
 
-### Recommendation (implemented, except for the peer's connection state and the rate-limit read)
+### Recommendation (implemented, with changes)
+
+PR #37 implemented this, except for the peer's connection state and the rate-limit read. It matches
+with `contains`, not "starts"; says only a spent budget is a limit; ends the call on a plan without
+voice too; and recognises the data channel's errors by their code.
 
 - Recognise a limit: a `realtimeError` whose text starts "You’ve hit your usage limit", "You hit
   your spend cap", "Your workspace is out of credits" or "Quota exceeded", or contains

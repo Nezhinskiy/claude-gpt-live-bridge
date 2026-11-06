@@ -4,11 +4,15 @@ import { lineError } from '../../Sources/LiveBridge/Resources/audio/events.js';
 
 test('anErrorEventGivesItsMessageAndCode', () => {
   const event = { type: 'error', error: { code: 'usage_check_failed', message: 'Unable to verify usage availability.' } };
-  assert.equal(lineError(JSON.stringify(event)), 'Unable to verify usage availability. (usage_check_failed)');
+  assert.deepEqual(lineError(JSON.stringify(event)), { code: 'usage_check_failed', message: 'Unable to verify usage availability.' });
 });
 
-test('anErrorWithOnlyACodeGivesTheCode', () => {
-  assert.equal(lineError('{"type":"error","error":{"code":"usage_check_failed"}}'), 'usage_check_failed');
+test('anEmptyMessageFallsBackToTheCode', () => {
+  assert.deepEqual(lineError('{"type":"error","error":{"code":"usage_check_failed","message":""}}'), { code: 'usage_check_failed', message: 'usage_check_failed' });
+});
+
+test('anErrorTypeStandsInForAMissingCode', () => {
+  assert.deepEqual(lineError('{"type":"error","error":{"type":"usage_limit_reached","message":"No."}}'), { code: 'usage_limit_reached', message: 'No.' });
 });
 
 test('anyOtherEventGivesNothing', () => {

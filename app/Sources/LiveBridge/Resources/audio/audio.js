@@ -210,11 +210,11 @@ async function applyAnswer(sdp) {
   if (!peer) throw closed();
   let timer;
   const ready = new Promise((resolve, reject) => {
-    // kept for the line's whole life: the service's usage gate speaks only on this channel
+    // the service's usage gate speaks only on this channel, also after `session.started`
     channel.onmessage = (event) => {
       if (event.data.includes('"session.started"')) resolve();
-      const message = peer === pc ? lineError(event.data) : null;
-      if (message) post({ type: 'lineError', message });
+      const error = peer === pc ? lineError(event.data) : null;
+      if (error) post({ type: 'lineError', ...error });
     };
     timer = setTimeout(() => reject(peer === pc ? new Error(say.timeout) : closed()), 10000);
   });

@@ -32,10 +32,11 @@ All notable changes to this project are listed here. The format follows
 
 ### Fixed
 
-- At the ChatGPT plan's usage limit the app now says so, with codex's sentence and its reset time,
-  and ends the call, instead of "Realtime voice failed" or a wrong hint that the plan lacks voice,
-  and a new failing line for every word spoken. Start tries once more. This also covers the
-  service's usage check on the line's data channel, which codex does not report.
+- At the ChatGPT plan's usage limit the app now says so, in codex's sentence with its reset time
+  where codex gives one, and ends the call, instead of "Realtime voice failed" or a wrong hint that
+  the plan lacks voice, and a new failing line for every word spoken. Answers keep waiting, and
+  Start tries once more. So does a plan without voice, and the service's usage check on the line's
+  data channel, which codex does not report; those are not called a limit, as nothing shows one.
 - A long conversation in a language other than English could stop a line from opening: the app
   measured its seed in characters while codex counts bytes and refuses a start past its limit.
 - A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
