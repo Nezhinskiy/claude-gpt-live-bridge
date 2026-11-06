@@ -49,7 +49,7 @@ says what this does and does not protect against.
 
 ## Quick start
 
-You need macOS 14+ on Apple Silicon, Claude Code 2.1.289+, and
+You need macOS 14+ on Apple Silicon, Claude Code 2.1.301+, and
 [codex](https://github.com/openai/codex) signed in (`codex login`) to a ChatGPT plan with
 realtime voice; to build the app yourself, also Xcode with Swift 6.0+. The details are under
 [Requirements](#requirements).
@@ -80,7 +80,7 @@ rebuilds and uninstalling are under [Install](#install).
 ## Requirements
 
 - macOS 14 or later on Apple Silicon.
-- Claude Code 2.1.289 or later (mods).
+- Claude Code 2.1.301 or later.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, tested with 0.166.0), installed with
   Homebrew (`brew install --cask codex`) or npm (`npm install -g @openai/codex`), on the `PATH`
   your shell sets in a Terminal window, and signed in with `codex login` to a ChatGPT plan that

@@ -56,7 +56,7 @@ et ce que cela ne protège pas.
 
 ## Démarrage rapide
 
-Il vous faut macOS 14+ sur Apple Silicon, Claude Code 2.1.289+, et
+Il vous faut macOS 14+ sur Apple Silicon, Claude Code 2.1.301+, et
 [codex](https://github.com/openai/codex) connecté (`codex login`) à une offre ChatGPT incluant la
 voix en temps réel ; pour compiler l'application vous-même, il faut aussi Xcode avec Swift 6.0+.
 Le détail se trouve sous [Prérequis](#prérequis).
@@ -88,7 +88,7 @@ sous [Installation](#installation).
 ## Prérequis
 
 - macOS 14 ou ultérieur sur Apple Silicon.
-- Claude Code 2.1.289 ou ultérieur (mods).
+- Claude Code 2.1.301 ou ultérieur.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, testé avec 0.166.0), installé avec
   Homebrew (`brew install --cask codex`) ou npm (`npm install -g @openai/codex`), présent dans le
   `PATH` que votre shell définit dans une fenêtre Terminal, et connecté avec `codex login` à une

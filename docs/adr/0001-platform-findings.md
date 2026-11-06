@@ -7,7 +7,7 @@ app runs `codex app-server` on the user's ChatGPT login, opens an OpenAI realtim
 through it, and relays the voice model's handoffs to a Claude Code session through the mod.
 Before any of that is built, a throwaway spike checked the platform facts the design rests on.
 This record keeps what was measured, how, and what we decided from it. Items are lettered (a)
-to (o) so later work can cite them.
+to (p) so later work can cite them.
 
 Tested on: macOS 27.0.1 (Apple Silicon), Swift 6.4.2, `codex-cli 0.166.0` (realtime `v3`,
 `outputModality: "audio"`, ChatGPT plan with realtime), Claude Code 2.1.309. The codex realtime
@@ -468,6 +468,25 @@ The two cannot be told apart at Enter. A host's message mid-turn comes late: dur
 `prompt.submit` with no `turnId` after `turn.complete`, then its turn; during a tool, with a
 `turnId` after `classic.PostToolUse`, folded in. Other origin kinds, and a voice prompt delivered
 mid-turn, were not observed.
+
+**(p) The lowest Claude Code the mod loads on.** Observed, 2026-11-06, on the mod at `3f0115d`; the
+2.1.309 row is CI's run on the same tree. "Real session" is a headless `/live status`.
+
+| Version | `plugin validate` | Real session | `typecheck` | `plugin test` |
+| --- | --- | --- | --- | --- |
+| 2.1.296 | fails | hooks module did not load | fails | 0 of 74 |
+| 2.1.301 | passes | answers | passes | 74 of 74 |
+| 2.1.309 | passes | answers | passes | 74 of 74 |
+| 2.1.312 | passes | answers | passes | 74 of 74 |
+
+The engine checks a hooks module's source when it loads it. 2.1.296 follows `$` only into a
+function declared in the same file, so it refuses `register.tsx`, which passes `$` to `summarize`
+from `context.ts`; 2.1.301 follows it across the import. 2.1.297 to 2.1.300 were not installed, so
+the floor may be lower: 2.1.301 is the lowest version verified. On 2.1.301 and 2.1.312 a real
+session against a stand-in for the app joined, polled, took a voice request into a turn and left,
+with the same routes in the same order. That turn ended in an error at the account's usage limit,
+which the mod answered as `failed`. Not observed on a real engine: a successful model turn, and the
+band in the terminal.
 
 ## Decision
 
