@@ -87,6 +87,8 @@ public actor SessionRegistry {
   private var sessions: [SessionID: Session] = [:]
   /// Sessions the owner removed that the owner has not joined again since.
   private var removed: Set<SessionID> = []
+  /// Sessions gone since the last `takeDropped()`.
+  private var dropped: [SessionID] = []
   private var joins = 0
   private var lastSweep: Date?
   /// A longer gap between sweeps means the Mac slept, not that every mod went quiet.
@@ -180,6 +182,12 @@ public actor SessionRegistry {
       session.wantsContext = false
       return .context
     }
+  }
+
+  /// The sessions that left, were removed or stopped polling since the last call.
+  public func takeDropped() -> [SessionID] {
+    defer { dropped = [] }
+    return dropped
   }
 
   /// Whether the session's mod posts sync lines; false for one that has not joined, or that
@@ -326,6 +334,7 @@ public actor SessionRegistry {
 
   private func drop(_ id: SessionID, labels: [SessionID: String], reason: String) -> Delivery? {
     guard let session = sessions.removeValue(forKey: id) else { return nil }
+    dropped.append(id)
     if target == id { retarget(ordered().last?.key) }
     guard session.hasOpenRequest, let label = labels[id] else { return nil }
     return Delivery(session: id, label: label, status: .failed, text: reason)

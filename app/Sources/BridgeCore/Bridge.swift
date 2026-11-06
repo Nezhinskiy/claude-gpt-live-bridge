@@ -195,7 +195,6 @@ public actor Bridge: Router {
   /// The menu's ×: forgets the session and its conversation. Its open request fails as
   /// "session left", and its next poll is told it was removed.
   public func remove(_ id: SessionID) async {
-    machine.endQuestionRoute(of: id)
     if let delivery = await registry.remove(id) { await deliver(delivery) }
     await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
   }
@@ -507,6 +506,15 @@ public actor Bridge: Router {
     return session == target && continuity[session].lines.contains { $0.speaker == .owner }
   }
 
+  /// A session that left can take no reply: its route ends, and neither its question nor its
+  /// approval notice is said. Both stay recorded.
+  private func withdrawQuestionsOfDroppedSessions() async {
+    for id in await registry.takeDropped() {
+      machine.endQuestionRoute(of: id)
+      await withdraw { $0.session == id && ($0.asks || $0.kind == .approval) }
+    }
+  }
+
   /// Drops unheard lines; a line opened only for them closes.
   private func withdraw(where isSuperseded: (VoiceLine) -> Bool) async {
     let effects = machine.withdraw(where: isSuperseded)
@@ -730,6 +738,7 @@ public actor Bridge: Router {
   /// Two changes can interleave across the awaits, so only the latest one publishes: an older
   /// one finishing last would show the status from before the newer change.
   @discardableResult private func changed() async -> StatusReply {
+    await withdrawQuestionsOfDroppedSessions()
     await followTarget()
     changes += 1
     let mine = changes

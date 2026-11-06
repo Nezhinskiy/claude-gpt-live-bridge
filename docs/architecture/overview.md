@@ -493,7 +493,9 @@ only if it is still the one it bound.
   does nothing but report "No Claude Code session has joined: run /live on in a session, then
   start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
   session closing, the menu's ×, or no poll for 5 s) stops a call that is on, a Start still
-  launching codex included, as Stop does, and reports the same sentence.
+  launching codex included, as Stop does, and reports the same sentence. Any session that leaves
+  takes its waiting question, its approval notice and its question's route with it; both stay
+  recorded.
 - **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
   gives no answer within 10 s.

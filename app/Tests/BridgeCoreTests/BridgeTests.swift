@@ -2535,6 +2535,35 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(b) == reply })
   }
 
+  /// A session that left can take no reply: its waiting question goes, and is not said on the
+  /// next line, where the reply would land in the target as a request.
+  @Test func aSessionThatLeftTakesItsQuestionOffTheQueue() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    #expect(await bridge.status.unheard == 1)
+    try await post("/v1/leave", LeaveBody(sessionId: a))
+    #expect(await bridge.status.unheard == 0)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// A session that left and came back asks nothing any more, so the next handoff is the target's.
+  @Test func aSessionThatLeftEndsItsRoute() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await answer(request(1), from: b, .question, "Which branch?")
+    try await post("/v1/leave", LeaveBody(sessionId: b))
+    try await join(b, "Beta")
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
+  }
+
   /// In another session a typed turn's question is only recorded, whatever the call is doing.
   @Test func aTypedQuestionInAnotherSessionDuringAPausedCallIsOnlyRecorded() async throws {
     try await join(a, "Alpha")
