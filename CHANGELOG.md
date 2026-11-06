@@ -17,9 +17,8 @@ All notable changes to this project are listed here. The format follows
   session, one from a turn you typed is only recorded), and a question you answer at the
   keyboard, or a prompt you settle there, is told to the voice. A voice answer a newer request
   superseded is no longer dropped: it is kept in the conversation, unsaid, and added to the open
-  line as context. **Load context** is enabled only when the voice lacks part of the session. A mod and an app from before this keep
-  working together: an older mod's sessions are treated as missing turns, so their lines load a
-  summary as before. The data is described in [SECURITY.md](SECURITY.md#residual-risk-by-design).
+  line as context. A mod and an app from before this keep working together: an older mod's
+  sessions are treated as missing turns, so their lines load a summary as before. The data is described in [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Pause sync while the call is stopped** in Settings (off by default): with it on, what you type
   while the call is stopped is not recorded, and no line loads a summary by itself; only **Load
   context** or `/live context` does. It removes nothing already recorded. Typing under the pause
@@ -71,6 +70,9 @@ All notable changes to this project are listed here. The format follows
   the plan lacks voice, and a new failing line for every word spoken. Answers keep waiting, and
   Start tries once more. So does a plan without voice, and the service's usage check on the line's
   data channel, which codex does not report; those are not called a limit, as nothing shows one.
+- The requirements, the site and the app's sign-in help now ask for a ChatGPT plan whose Codex
+  includes voice, and the README names the plans OpenAI's pricing page lists, instead of "realtime
+  voice", which no OpenAI page says.
 - A long conversation in a language other than English could stop a line from opening: the app
   measured its seed in characters while codex counts bytes and refuses a start past its limit.
 - An answer, a question or a permission prompt from the target now opens the closed line every
