@@ -1034,12 +1034,17 @@ struct BridgeTests {
     #expect(await eventually { (try? await registry.poll(b)) != nil })
   }
 
-  @Test func aLimitWithNoQuestionLeavesNoRoute() async throws {
+  /// A question the voice has said is no longer kept, and an unrelated handoff must not follow it.
+  @Test func aQuestionAlreadySaidLeavesNoRoute() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
     await live()
-    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
-    try await post("/v1/activity", ActivityBody(sessionId: b, state: .working))
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Deploy which branch?")
+    )
+    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantUtterance("Beta asks: deploy which branch?"))
+    #expect(await eventually { await bridge.status.unheard == 0 })
     voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
     #expect(await eventually { await bridge.status.call == .off })
     await bridge.perform(.start)
@@ -1047,6 +1052,31 @@ struct BridgeTests {
     voice.emit(.handoff(request(2)))
     #expect(await eventually { (try? await registry.poll(a)) != nil })
     #expect(try await registry.poll(b) == nil)
+  }
+
+  /// The pause keeps lines, so a question that arrives during it routes as on a live call.
+  @Test func aQuestionDuringThePauseKeepsItsRoute() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
+    #expect(await eventually { await bridge.status.call == .off })
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    #expect(await bridge.status.unheard == 1)
+    await bridge.perform(.start)
+    await live()
+    voice.emit(.handoff(request(2)))
+    #expect(await eventually { (try? await registry.poll(b)) != nil })
+  }
+
+  @Test func aLinePausedAtALimitNotifiesToStartFirst() async throws {
+    try await join(a, "Alpha")
+    await live()
+    voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
+    #expect(await eventually { await bridge.status.call == .off })
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    #expect(
+      await eventually { await notifier.posted.last?.body.contains("start the call") == true })
   }
 
   /// The context line is shown exactly as the voice gets it, also after the app restarts.

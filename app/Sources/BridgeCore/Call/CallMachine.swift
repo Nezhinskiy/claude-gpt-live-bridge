@@ -102,7 +102,7 @@ public struct CallMachine: Sendable {
   public private(set) var isMuted = false
   /// The service refused the voice (`pause`): the call is off, and what the voice has not said
   /// still waits, also lines that arrive now, until Start or Stop. Otherwise `off` keeps nothing.
-  public private(set) var isPaused = false
+  private var isPaused = false
 
   private struct Unheard: Sendable {
     let line: VoiceLine
@@ -175,7 +175,7 @@ public struct CallMachine: Sendable {
     case (.off, _):
       return []
     case (_, .refused(let reason)):
-      return [.closeRealtime] + pause(for: reason)
+      return pause(for: reason, closing: [.closeRealtime])
     case (_, .speechStarted) where isMuted:
       return []
     case (_, .mute):
@@ -313,12 +313,14 @@ public struct CallMachine: Sendable {
 
   /// A new line would fail the same way, so the call ends, as Stop does, and keeps what waits to
   /// be said. Start tries once more.
-  private mutating func pause(for reason: Problem) -> [CallEffect] {
+  private mutating func pause(for reason: Problem, closing: [CallEffect] = []) -> [CallEffect] {
     let kept = withoutHolds
-    _ = end(with: [])
+    let effects = end(
+      with: [.problem(reason)] + closing + [.stopLocalVAD, .endCodex]
+        + (kept.isEmpty ? [] : [.chime]))
     unheard = kept
     isPaused = true
-    return [.stopLocalVAD, .endCodex, .problem(reason)] + (kept.isEmpty ? [] : [.chime])
+    return effects
   }
 
   private var withoutHolds: [Unheard] { unheard.map { Unheard(line: $0.line) } }

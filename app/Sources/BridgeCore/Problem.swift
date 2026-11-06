@@ -19,7 +19,7 @@ public enum Problem: Sendable, Equatable {
   /// An `error` on the line's data channel, when it is about usage. The code decides: the
   /// service's prose is not codex's, and only a refusal of this kind ends a call.
   static func refusal(code: String, message: String) -> Problem? {
-    code.contains("usage") || code.contains("quota") ? .lineRefused(message) : nil
+    code.contains(/usage|quota|credit|spend/) ? .lineRefused(message) : nil
   }
 
   /// One sentence for the menu and the band, with no control characters: the engine refuses a
@@ -40,19 +40,16 @@ public enum Problem: Sendable, Equatable {
         + "Security > Microphone, then start again."
     case .codex(let problem): problem.sentence
     case .lineRefused(let message):
-      "ChatGPT did not allow the voice just now, so it is paused. Claude Code keeps working. "
+      "ChatGPT did not allow the voice, so it is paused. Claude Code keeps working. "
         + "\(message)"
     case .other(let sentence): sentence
     }
   }
 
-  /// A new line would fail the same way, so speech must not keep opening them.
+  /// codex's answer, which a new line would get too, so speech must not keep opening them.
   public var pausesCall: Bool {
-    switch self {
-    case .codex(let problem): problem.isUsageLimit || problem.isRefusal
-    case .lineRefused: true
-    default: false
-    }
+    guard case .codex(let problem) = self else { return false }
+    return problem.isUsageLimit || problem.isRefusal
   }
 
   /// The menu offers to open the Microphone pane of System Settings.

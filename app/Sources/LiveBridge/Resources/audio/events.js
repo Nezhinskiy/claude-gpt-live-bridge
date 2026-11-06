@@ -10,6 +10,6 @@ export function lineError(text) {
   }
   if (event?.type !== 'error') return null;
   const { message, code, type } = event.error ?? {};
-  const name = code || type || '';
+  const name = [code, type].filter(Boolean).join(' ');
   return { code: name, message: message || name };
 }

@@ -156,9 +156,13 @@ struct CodexLaunchTests {
     "You’ve hit your usage limit. Visit https://chatgpt.com/settings/usage to purchase more "
       + "credits or try again at 11:33 PM.",
     "You've hit your usage limit. Try again later.",
-    "You’ve hit your usage limit for example-model. Switch to another model now, or try again.",
-    "You hit your spend cap. Raise it to keep going.",
-    "Your workspace is out of credits. Ask your admin.",
+    "You’ve hit your usage limit for example-model. Switch to another model now, or try again "
+      + "later.",
+    "You hit your spend cap set in your workspace. Increase your spend cap to continue.",
+    "You hit your spend cap set by the owner of your workspace. Ask an owner to increase your "
+      + "spend cap to continue.",
+    "Your workspace is out of credits. Add credits to continue.",
+    "Your workspace is out of credits. Ask your workspace owner to refill in order to continue.",
     "Quota exceeded. Check your plan and billing details.",
   ]
   static let refused = [
@@ -183,9 +187,20 @@ struct CodexLaunchTests {
 
   @Test func thePageSaysItIsNoUsageLimit() {
     let problem = Problem.lineRefused("Unable to verify usage availability.")
-    #expect(problem.pausesCall)
     #expect(problem.sentence.hasPrefix("ChatGPT did not allow the voice"))
     #expect(problem.sentence.contains("Unable to verify usage availability."))
+  }
+
+  /// The service's own names for a spent budget, in codex's list and in the two reports.
+  @Test(arguments: [
+    "usage_check_failed", "usage_limit_reached", "insufficient_quota", "credit_balance_exhausted",
+    "workspace_spend_limit_exceeded",
+  ]) func aCodeAboutUsageIsARefusal(_ code: String) {
+    #expect(Problem.refusal(code: code, message: "No.") == .lineRefused("No."))
+  }
+
+  @Test func anotherCodeIsNoRefusal() {
+    #expect(Problem.refusal(code: "invalid_request", message: "No.") == nil)
   }
 
   @Test func otherErrorsLeaveTheCallOn() {

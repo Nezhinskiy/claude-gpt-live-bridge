@@ -121,13 +121,13 @@ struct CallMachineTests {
       [.problem(r), .chime], pending: [a]),
     row(
       "aUsageLimitAtOpenEndsTheCall", connecting, .connectFailed(limit), .off,
-      [.stopLocalVAD, .endCodex, .problem(limit)]),
+      [.problem(limit), .stopLocalVAD, .endCodex]),
     row(
       "aUsageLimitMidLineEndsTheCall", live, .remoteClosed(limit), .off,
-      [.stopLocalVAD, .endCodex, .problem(limit)]),
+      [.problem(limit), .stopLocalVAD, .endCodex]),
     row(
       "aUsageLimitKeepsWhatWaits", unheard, .connectFailed(limit), .off,
-      [.stopLocalVAD, .endCodex, .problem(limit), .chime], pending: [a]),
+      [.problem(limit), .stopLocalVAD, .endCodex, .chime], pending: [a]),
     row(
       "aHeldLineIsNoLongerHeldAfterALimit",
       live + [
@@ -151,13 +151,13 @@ struct CallMachineTests {
       connecting + [.connectFailed(limit), .start, .stop], deliver(a), .off, []),
     row(
       "theServiceRefusingEndsALiveLine", live, .refused(limit), .off,
-      [.closeRealtime, .stopLocalVAD, .endCodex, .problem(limit)]),
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
     row(
       "theServiceRefusingEndsAConnectingLine", connecting, .refused(limit), .off,
-      [.closeRealtime, .stopLocalVAD, .endCodex, .problem(limit)]),
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
     row(
       "theServiceRefusingEndsAListeningCall", [.start], .refused(limit), .off,
-      [.closeRealtime, .stopLocalVAD, .endCodex, .problem(limit)]),
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
     row("theServiceRefusingAStoppedCallDoesNothing", [], .refused(limit), .off, []),
     row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,

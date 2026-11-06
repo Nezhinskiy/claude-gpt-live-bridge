@@ -15,6 +15,10 @@ test('anErrorTypeStandsInForAMissingCode', () => {
   assert.deepEqual(lineError('{"type":"error","error":{"type":"usage_limit_reached","message":"No."}}'), { code: 'usage_limit_reached', message: 'No.' });
 });
 
+test('aTypeBesideACodeIsKept', () => {
+  assert.equal(lineError('{"type":"error","error":{"code":"limit","type":"usage_limit_reached","message":"No."}}').code, 'limit usage_limit_reached');
+});
+
 test('anyOtherEventGivesNothing', () => {
   assert.equal(lineError('{"type":"session.started"}'), null);
 });
