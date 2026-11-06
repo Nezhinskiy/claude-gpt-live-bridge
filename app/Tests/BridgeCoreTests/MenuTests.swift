@@ -117,7 +117,7 @@ struct MenuContentTests {
 
   @Test func withNoSessionsItOffersTheJoinCommand() {
     #expect(
-      Self.menu(Self.status(sessions: 0)).outline == [
+      Self.menu(Self.status(sessions: 0, needsContext: false)).outline == [
         "[call] Off · Start (disabled)",
         "---",
         "# Sessions",

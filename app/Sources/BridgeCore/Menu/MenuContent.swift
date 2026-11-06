@@ -131,7 +131,7 @@ public struct MenuContent: Sendable, Equatable {
     }
     // a summary just loaded, or on its way, is shown as that; otherwise a current voice has
     // nothing to load
-    let isCurrent = contextLoad == .ready && !update.needsContext
+    let isCurrent = target != nil && contextLoad == .ready && !update.needsContext
     let context: [Item] = [
       .command(
         .loadContext, title: isCurrent ? "Context up to date" : contextLoad.title,
