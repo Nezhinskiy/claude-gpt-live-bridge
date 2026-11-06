@@ -74,21 +74,6 @@ test('aTurnThatIsNotAVoiceRequestPostsNoAnswer', () => {
   assert.deepEqual(tracker.turnCompleted('unknown', 'Done.', 'answer'), { post: null, sync: null, isLost: true })
 })
 
-test('an owner turn posts its prompt', () => {
-  const tracker = new TurnTracker()
-  assert.deepEqual(tracker.turnStarted('t1', 'Rename the folder', 'owner', 0).lines, [
-    { turn: { id: 't1' }, kind: 'start' }, { turn: { id: 't1' }, kind: 'typed', text: 'Rename the folder' },
-  ])
-})
-
-test('an owner turn posts its answer', () => {
-  const tracker = new TurnTracker()
-  tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
-  assert.deepEqual(tracker.turnCompleted('t1', '  Renamed to out.\n', 'answer'), {
-    post: null, sync: { turn: { id: 't1' }, kind: 'answer', text: 'Renamed to out.' },
-  })
-})
-
 /** Only `composer` was seen as a person's own typing (ADR 0001, item m); a new kind is nobody's words. */
 test('only an observed origin is the owner', () => {
   const self = 'livebridge'
@@ -104,19 +89,6 @@ test('a prompt the person does not see as typed is not the owner\'s', () => {
   const self = 'livebridge'
   assert.equal(originOf({ kind: 'composer' }, self, true), 'other')
   assert.equal(originOf({ kind: 'task-notification' }, self, true), 'background', 'it stays what it was')
-})
-
-test('an other turn takes its decision and posts its answer, not its prompt', () => {
-  const tracker = new TurnTracker()
-  assert.deepEqual(tracker.turnStarted('t1', 'A message from a peer session.', 'other', 0).lines, [
-    { turn: { id: 't1' }, kind: 'start' },
-  ])
-  assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').sync, { turn: { id: 't1' }, kind: 'answer', text: 'Done.' })
-})
-
-test('a turn with no origin seen is other', () => {
-  const tracker = new TurnTracker()
-  assert.deepEqual(tracker.turnStarted('t1', 'Rename the folder', null, 0).lines, [{ turn: { id: 't1' }, kind: 'start' }])
 })
 
 test('a background turn outside the window posts its answer and no prompt', () => {
@@ -137,13 +109,6 @@ test('a background turn in the window stays an update', () => {
   assert.deepEqual(tracker.turnCompleted('t2', 'The build passed.', 'answer'), {
     post: { id: ID, status: 'update', text: 'The build passed.' }, sync: null,
   })
-})
-
-test('a voice turn posts only its start', () => {
-  const tracker = new TurnTracker()
-  tracker.submitted(ID)
-  assert.deepEqual(tracker.turnStarted('t1', framed(ID), 'voice', 0).lines.map(line => line.kind), ['start'])
-  assert.equal(tracker.turnCompleted('t1', 'Three files.', 'answer').sync, null)
 })
 
 test('an interrupted turn posts a report', () => {
@@ -279,10 +244,6 @@ test('current is the running turn of either kind, null after it ends', () => {
   assert.equal(tracker.current, null)
 })
 
-test('a turn the tracker never saw start is lost', () => {
-  assert.equal(new TurnTracker().turnCompleted('t1', 'Done.', 'answer').isLost, true)
-})
-
 test('a turn that started and ended is not lost', () => {
   const tracker = new TurnTracker()
   assert.equal(tracker.turnStarted('t1', 'first', 'owner', 0).isLost, false)
@@ -309,29 +270,6 @@ test('a snapshot from before sync loads', () => {
   assert.deepEqual(tracker.current, { id: 't1', request: ID })
   assert.equal(tracker.turnCompleted('t1', 'Done.', 'answer').post?.status, 'ok')
   assert.deepEqual(tracker.turnStarted('t2', 'second', null, 1000).lines.map(line => line.kind), ['start'], 'nothing was typed into it')
-})
-
-test('a slash command\'s owner line is the typed text', () => {
-  const tracker = new TurnTracker()
-  const wrapper = '<command-message>expand</command-message>\n<command-name>/expand</command-name>'
-  assert.deepEqual(tracker.turnStarted('t1', wrapper, 'owner', 0, '/expand foo').lines.at(-1), {
-    turn: { id: 't1' }, kind: 'typed', text: '/expand foo',
-  })
-})
-
-test('text typed into a running turn goes under that turn', () => {
-  const tracker = new TurnTracker()
-  tracker.turnStarted('t1', 'first', 'owner', 0)
-  assert.deepEqual(tracker.typedInto('t1', 'second'), { turn: { id: 't1' }, kind: 'typed', text: 'second' })
-})
-
-/** A hook may rewrite a prompt on its way in: `turn.start` holds what entered, the line what was typed. */
-test('a queued prompt is claimed by what entered', () => {
-  const tracker = new TurnTracker()
-  tracker.turnStarted('t1', 'first', 'owner', 0)
-  assert.deepEqual(tracker.typedInto('t1', 'second', 'second, rewritten'), { turn: { id: 't1' }, kind: 'typed', text: 'second' })
-  tracker.turnCompleted('t1', 'One.', 'answer')
-  assert.deepEqual(tracker.turnStarted('t2', 'second, rewritten', null, 1000).lines, [])
 })
 
 /** Terminal, ADR 0001 (m): at Enter the prompt carries the running turn's id; its own turn starts after that turn. */

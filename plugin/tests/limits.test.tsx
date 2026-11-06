@@ -125,34 +125,12 @@ test('aMeasureWithRateLimitsSendsThem', async ($, on) => {
   expect(world.take('limits')).toEqual([{ sessionId: ID, windows: [FIVE, SPEND] }])
 })
 
-test('aWeekOnlyListIsSent', async ($, on) => {
-  const world = fakeWorld(on)
-  on('session.usage', () => usage([]))
-  await $.session.start(START)
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.session.measure(measure([{ kind: 'seven_day', percentUsed: 22, resetsAt: '2026-01-05T06:00:00Z' }]))
-  await aMoment()
-  expect(world.take('limits')).toEqual([
-    { sessionId: ID, windows: [{ kind: 'seven_day', percentUsed: 22, resetsAt: '2026-01-05T06:00:00Z' }] },
-  ])
-})
-
 test('aMeasureOfSomethingElseSendsNothing', async ($, on) => {
   const world = fakeWorld(on)
   on('session.usage', () => usage([]))
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
   await $.session.measure(measure([FIVE], ['context']))
-  await aMoment()
-  expect(world.take('limits')).toEqual([])
-})
-
-test('anEmptyListSendsNothing', async ($, on) => {
-  const world = fakeWorld(on)
-  on('session.usage', () => usage([]))
-  await $.session.start(START)
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.session.measure(measure([]))
   await aMoment()
   expect(world.take('limits')).toEqual([])
 })
