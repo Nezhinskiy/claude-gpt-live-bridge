@@ -636,30 +636,20 @@ public actor Bridge: Router {
     let id = body.sessionId
     guard let row = try? await label(of: id) else { return }
     var body = body
+    var isAdmitted = true
     if body.state == .approval, let turn = body.turn {
-      let admitted = continuity.admits(turn: turn, kind: .report, in: id, pausing: pausing)
+      isAdmitted = continuity.admits(turn: turn, kind: .report, in: id, pausing: pausing)
       save()
-      guard admitted else {
-        body.question = nil
-        await registry.setActivity(body)
-        return
-      }
+      if !isAdmitted { body.question = nil }
     }
     await registry.setActivity(body)
+    guard isAdmitted else { return }
     switch (row.activity == .approval, body.state == .approval) {
     case (false, true):
-      let line =
-        if let question = body.question {
-          AnswerShaper.line(
-            .asking, label: row.label,
-            body: AnswerShaper.paused(AnswerShaper.prose(question), wrote: body.text),
-            session: id)
-        } else {
-          AnswerShaper.line(
-            .approval, label: row.label,
-            body: AnswerShaper.paused("Claude is waiting for your approval", wrote: body.text),
-            session: id)
-        }
+      let head = body.question.map(AnswerShaper.prose) ?? "Claude is waiting for your approval"
+      let line = AnswerShaper.line(
+        body.question == nil ? .approval : .asking, label: row.label,
+        body: AnswerShaper.paused(head, wrote: body.text), session: id)
       if let turn = body.turn, turn.request == nil, await registry.target != id {
         record(.claude, line.text, in: id)
         break
