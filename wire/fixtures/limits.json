@@ -1,0 +1,7 @@
+{
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "windows": [
+    { "kind": "five_hour", "percentUsed": 23.5, "resetsAt": "2026-01-01T06:00:00Z" },
+    { "kind": "seven_day", "percentUsed": 7 }
+  ]
+}

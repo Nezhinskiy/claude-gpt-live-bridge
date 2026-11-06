@@ -54,6 +54,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isAppInstalled: false,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
+    /** The status the app answers a usage reading with (404: it refuses it). */
+    limitsStatus: 200,
     isSubmitRefused: false,
     /** The engine refuses the command's name (as it does a built-in's). */
     isCommandRefused: false,
@@ -108,6 +110,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     },
   }
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.measure', (_, e) => ({ changed: e.changed }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('session.id', () => ({ value: world.sessionId }))
   on('session.turns', () => ({ value: world.turns }))
@@ -149,6 +152,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'leave') world.timeline.push('leave')
     if (route === 'answer' && world.answerStatus !== 200) {
       return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
+    }
+    if (route === 'limits' && world.limitsStatus !== 200) {
+      return { value: { status: world.limitsStatus, ok: false, headers: {}, text: '{"error":"refused"}' } }
     }
     // The app answers every call from a removed session so, its own joins included, until the owner joins it again.
     if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {

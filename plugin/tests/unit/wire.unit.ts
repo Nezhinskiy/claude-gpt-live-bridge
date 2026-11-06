@@ -57,6 +57,10 @@ const SHAPES: Record<string, Shape> = {
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
   'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S) }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
+  'limits': fields<Wire.LimitsBody>({
+    sessionId: S,
+    windows: { list: fields<Wire.LimitWindowBody>({ kind: S, percentUsed: 'number', resetsAt: optional(S) }) },
+  }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
   'target': fields<Wire.TargetBody>({ sessionId: S }),
 }

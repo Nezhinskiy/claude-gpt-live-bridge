@@ -8,6 +8,11 @@ All notable changes to this project are listed here. The format follows
 
 ### Added
 
+- The menu shows how much of your Codex and Claude usage is used, one row each, with the percent
+  used of every window the plan reports (up to three), orange from 90 %, and the reset times on
+  hover. Codex's figures are read when the menu opens, at most once a minute, by a short-lived
+  codex that asks OpenAI, also while the call is off; Claude's come from a joined session that has
+  answered ([Privacy](README.md#privacy)).
 - **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
   want to support the project.
 - **Mute** beside Stop, in the band above the prompt and in the menu's call card (**Unmute**
