@@ -1,6 +1,6 @@
 // The audio side of a LiveBridge call, run in an invisible WKWebView. The app calls `LB.*` and
 // awaits the returned promises; the page posts `speechStarted`, `speechEnded`, `level`,
-// `microphoneDenied` (the app has the sentence) and `audioFailed` to
+// `microphoneDenied` (the app has the sentence), `audioFailed` and `lineError` to
 // `window.webkit.messageHandlers.bridge`.
 //
 // The microphone runs through one 1024-sample processor. While the line is closed it feeds the
@@ -14,6 +14,7 @@
 import { createVad, dbfs, rms } from './vad.js';
 import { createLineAudio } from './preroll.js';
 import { within } from './deadline.js';
+import { lineError } from './events.js';
 import { MIC_DEADLINE_MS, createMicrophone, microphoneFailure } from './microphone.js';
 
 const FRAME = 1024;
@@ -209,8 +210,11 @@ async function applyAnswer(sdp) {
   if (!peer) throw closed();
   let timer;
   const ready = new Promise((resolve, reject) => {
+    // kept for the line's whole life: the service's usage gate speaks only on this channel
     channel.onmessage = (event) => {
       if (event.data.includes('"session.started"')) resolve();
+      const message = peer === pc ? lineError(event.data) : null;
+      if (message) post({ type: 'lineError', message });
     };
     timer = setTimeout(() => reject(peer === pc ? new Error(say.timeout) : closed()), 10000);
   });

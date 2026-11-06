@@ -192,7 +192,7 @@ public struct CallMachine: Sendable {
       return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
-      return [.problem(reason)] + hangUp()
+      return reason.isUsageLimit ? pause(for: reason) : [.problem(reason)] + hangUp()
     case (.live, .deliver(let result, _)):  // a result the voice never speaks still hangs up
       guard let session = result.session, awaited.contains(session) else {
         unheard.append(Unheard(line: result))
@@ -290,6 +290,15 @@ public struct CallMachine: Sendable {
       replyCanSay = nil
     }
     return pending.isEmpty ? [] : [.chime]
+  }
+
+  /// The plan's limit: speech must not open lines that fail, so the call ends, as Stop does, and
+  /// keeps what waits to be said. Start tries once more.
+  private mutating func pause(for reason: Problem) -> [CallEffect] {
+    let kept = unheard.map { Unheard(line: $0.line) }
+    self = CallMachine()
+    unheard = kept
+    return [.stopLocalVAD, .problem(reason)] + (kept.isEmpty ? [] : [.chime])
   }
 
   private mutating func end(with effects: [CallEffect]) -> [CallEffect] {

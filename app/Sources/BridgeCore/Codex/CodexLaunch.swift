@@ -37,9 +37,22 @@ public enum CodexProblem: LocalizedError, Equatable, Sendable {
       status < 0
         ? "Codex stopped unexpectedly." : "Codex stopped unexpectedly (exit status \(status))."
     case .timedOut(let method): "Codex stopped answering (\(method)), so it is started again."
+    case .realtimeError(let message) where isUsageLimit:
+      "Your ChatGPT plan's usage limit is reached, so the voice is paused. Claude Code keeps "
+        + "working. \(message)"
     case .realtimeError(let message):
       "Realtime voice failed (codex said: \(message))." + Self.hint(for: message.lowercased())
     }
+  }
+
+  /// codex's words for a spent budget, or the service's for a usage check it could not do. This
+  /// path carries no error code, so the wording is the only signal; which limit stopped the voice
+  /// is not known, so nothing calls it a voice limit.
+  public var isUsageLimit: Bool {
+    guard case .realtimeError(let message) = self else { return false }
+    return message.lowercased().contains(
+      /you[’']ve hit your usage limit|you hit your spend cap|your workspace is out of credits|quota exceeded|last status: 429|usage_check_failed/
+    )
   }
 
   /// A guess at the cause from codex's wording; no plan-without-realtime error has been observed.

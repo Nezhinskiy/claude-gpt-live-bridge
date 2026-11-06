@@ -150,6 +150,40 @@ struct CodexLaunchTests {
     #expect(ContinuousClock.now - start < .seconds(5))
   }
 
+  /// codex's own words at `rust-v0.166.0`: this path carries no error code, so its wording is the
+  /// only signal (`docs/research/2026-11-05-gpt-live-limits.md`).
+  @Test func usageLimitsAreRecognisedInCodexsWords() {
+    for message in [
+      "You’ve hit your usage limit. Visit https://chatgpt.com/settings/usage to purchase more "
+        + "credits or try again at 11:33 PM.",
+      "You've hit your usage limit. Try again later.",
+      "You’ve hit your usage limit for example-model. Switch to another model now, or try again.",
+      "You hit your spend cap. Ask your admin.",
+      "Your workspace is out of credits. Ask your admin.",
+      "Quota exceeded. Check your plan and billing details.",
+      "exceeded retry limit, last status: 429 Too Many Requests",
+      "Unable to verify usage availability. (usage_check_failed)",
+    ] {
+      let problem = CodexProblem.realtimeError(message)
+      #expect(problem.isUsageLimit, "\(message)")
+      #expect(problem.sentence.contains(message), "\(message)")
+      #expect(problem.sentence.contains("usage limit is reached"), "\(message)")
+      #expect(!problem.sentence.hasPrefix("Realtime voice failed"), "\(message)")
+      #expect(!problem.sentence.contains("plan may"), "\(message)")
+    }
+  }
+
+  @Test func otherErrorsAreNoUsageLimit() {
+    for message in [
+      "To use Codex with your ChatGPT plan, upgrade to Plus.", "503 Service Unavailable",
+      "AVAS realtime calls require realtime v1 or v3",
+    ] {
+      #expect(!CodexProblem.realtimeError(message).isUsageLimit, "\(message)")
+    }
+    #expect(!CodexProblem.notLoggedIn.isUsageLimit)
+    #expect(!Problem.other("You’ve hit your usage limit.").isUsageLimit)
+  }
+
   /// No real "plan without realtime" error has been observed (ADR 0001 (k)); these messages are
   /// constructed. codex's own words stay in every sentence, so a wrong hint still shows the cause.
   @Test func realtimeErrorsKeepCodexWordsWithAHint() throws {

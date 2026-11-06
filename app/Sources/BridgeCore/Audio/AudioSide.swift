@@ -8,6 +8,8 @@ public enum AudioEvent: Sendable, Equatable {
   case level(Double)
   /// The microphone or the peer connection failed.
   case failed(Problem)
+  /// An `error` event on the line's data channel, in the service's words.
+  case lineError(String)
 
   public init?(body: Any) {
     guard let message = body as? [String: Any], let type = message["type"] as? String else {
@@ -22,6 +24,9 @@ public enum AudioEvent: Sendable, Equatable {
     case "microphoneDenied": self = .failed(.microphoneDenied)
     case "audioFailed":
       self = .failed(.other(message["reason"] as? String ?? "The audio stopped unexpectedly."))
+    case "lineError":
+      guard let text = message["message"] as? String else { return nil }
+      self = .lineError(text)
     default: return nil
     }
   }

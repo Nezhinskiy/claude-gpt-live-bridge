@@ -959,6 +959,36 @@ struct BridgeTests {
     #expect(await bridge.status.problem?.contains("ChatGPT plan") == true)
   }
 
+  /// The voice cannot open a line until the limit resets, so words must not open failing lines.
+  @Test func aUsageLimitAtOpenEndsTheCall() async throws {
+    try await join(a, "Alpha")
+    await voice.fail(with: .realtimeError("You’ve hit your usage limit. Try again later."))
+    await live()
+    #expect(await bridge.status.call == .off)
+    #expect(await bridge.status.problem?.contains("usage limit is reached") == true)
+    #expect(await voice.shutdowns == 1)
+    #expect(await audio.calls.contains("stopListening"))
+  }
+
+  @Test func aUsageLimitOnTheDataChannelEndsTheCall() async throws {
+    try await join(a, "Alpha")
+    await live()
+    let limit = "Unable to verify usage availability. (usage_check_failed)"
+    await bridge.audioEvent(.lineError(limit))
+    #expect(await bridge.status.call == .off)
+    #expect(await bridge.status.problem?.contains(limit) == true)
+    #expect(await audio.calls.contains("closePeer"))
+    #expect(await voice.shutdowns == 1)
+  }
+
+  @Test func anotherDataChannelErrorLeavesTheLineOpen() async throws {
+    try await join(a, "Alpha")
+    await live()
+    await bridge.audioEvent(.lineError("Unknown event type. (invalid_request)"))
+    #expect(await bridge.status.call == .live)
+    #expect(await bridge.status.problem == nil)
+  }
+
   /// The context line is shown exactly as the voice gets it, also after the app restarts.
   @Test func contextIsRedactedCappedAndShown() async throws {
     try await join(a, "Alpha")

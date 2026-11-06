@@ -207,7 +207,24 @@ public actor Bridge: Router {
     case .failed(let reason):
       await send(.audioFailed(reason))
       await endCodex()
+    case .lineError(let message):
+      // codex's sideband does not carry these: the service's usage gate reaches only the page.
+      let reason = Problem.codex(.realtimeError(message))
+      guard reason.isUsageLimit, isLineOpen else { return }
+      connecting?.cancel()
+      connecting = nil
+      await audio.closePeer()
+      await realtime?.close()
+      await send(.remoteClosed(reason))
+      await endIfStopped()
     }
+  }
+
+  /// The call ended by itself (the plan's limit): nothing keeps codex or a question's route.
+  private func endIfStopped() async {
+    guard machine.phase == .off else { return }
+    questionRoute = nil
+    await endCodex()
   }
 
   public func handle(_ req: HTTPRequest) async -> HTTPResponse {
@@ -372,6 +389,7 @@ public actor Bridge: Router {
       await audio.closePeer()
       await realtime?.close()  // codex may have opened its side before the page failed
       await send(.connectFailed(Problem(error)))
+      await endIfStopped()
     }
   }
 
@@ -430,6 +448,7 @@ public actor Bridge: Router {
       connecting = nil
       await audio.closePeer()
       await send(.remoteClosed(reason))
+      await endIfStopped()
     }
     await changed()
   }

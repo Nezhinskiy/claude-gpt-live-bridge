@@ -28,6 +28,11 @@ public enum Problem: Sendable, Equatable {
     }
   }
 
+  /// The plan's limit stopped the voice: a new line would fail the same way until it resets.
+  public var isUsageLimit: Bool {
+    if case .codex(let problem) = self { problem.isUsageLimit } else { false }
+  }
+
   /// The menu offers to open the Microphone pane of System Settings.
   public var opensMicrophoneSettings: Bool { self == .microphoneDenied }
 

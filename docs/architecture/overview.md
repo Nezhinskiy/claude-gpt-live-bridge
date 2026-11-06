@@ -452,6 +452,10 @@ only if it is still the one it bound.
 - **A plan without realtime voice, or any realtime error:** the first connect reports codex's
   own words in one sentence, with a hint when they name sign-in or the plan, and the call goes
   back to `listening`.
+- **The plan's usage limit:** recognised in codex's wording, as this path carries no code, or from
+  an `error` on the line's data channel, which codex does not report. The app says the limit is
+  reached, with codex's sentence, and the call ends, keeping what waits to be said: speech would
+  only open lines that fail. Start tries once more.
 - **Codex installed with npm, or found only through a shell's start-up files:** the app reads
   `PATH` from the user's own shell (at most 3 s) and starts codex with it; a codex whose runtime
   is still missing gets its own sentence.

@@ -19,6 +19,7 @@ struct CallMachineTests {
   static let unheard: [CallEvent] = [.start, deliver(a), .speechStarted]
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
   static let r = Problem.other("r")
+  static let limit = Problem.codex(.realtimeError("You’ve hit your usage limit."))
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
   /// A line a result opened waits this long for the voice's first word.
   static let firstWord = CallEffect.armSilenceTimer(seconds: 5)
@@ -118,6 +119,18 @@ struct CallMachineTests {
     row(
       "closeWhileConnectingChimesForUnheardResults", unheard, .remoteClosed(r), .listening,
       [.problem(r), .chime], pending: [a]),
+    row(
+      "aUsageLimitAtOpenEndsTheCall", connecting, .connectFailed(limit), .off,
+      [.stopLocalVAD, .problem(limit)]),
+    row(
+      "aUsageLimitMidLineEndsTheCall", live, .remoteClosed(limit), .off,
+      [.stopLocalVAD, .problem(limit)]),
+    row(
+      "aUsageLimitKeepsWhatWaits", unheard, .connectFailed(limit), .off,
+      [.stopLocalVAD, .problem(limit), .chime], pending: [a]),
+    row(
+      "startTriesAgainAfterAUsageLimit", connecting + [.connectFailed(limit)], .start, .listening,
+      [.problem(nil), .startLocalVAD]),
     row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
       [.openRealtimeForResult], pending: [result]),
