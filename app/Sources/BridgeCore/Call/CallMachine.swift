@@ -316,9 +316,8 @@ public struct CallMachine: Sendable {
     if questionRoute == id { questionRoute = nil }
   }
 
-  /// Ends the route, unless its question still waits to be said: every waiting line is given to
-  /// the next line, whichever session it is about, and the reply must reach the session that
-  /// asked.
+  /// Ends the route, unless its question still waits to be said: a waiting line is given to the
+  /// next line, whichever session it is about, and the reply must reach the session that asked.
   public mutating func endSaidQuestionRoute() {
     if !unheard.contains(where: { $0.line.session == questionRoute && $0.line.asks }) {
       questionRoute = nil

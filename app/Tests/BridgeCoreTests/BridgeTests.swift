@@ -2419,9 +2419,35 @@ struct BridgeTests {
     #expect(await bridge.status.unheard == 0)
   }
 
-  /// A question still waiting to be said is given to the next line, whichever session that is
-  /// about, so the owner's reply must reach the session that asked, not the new target.
-  @Test func aKeptQuestionKeepsItsRouteAcrossATargetChange() async throws {
+  /// A change of target, by the menu or by the band, takes Alpha's waiting question off the queue
+  /// and ends its route: it is not said on Beta's line, and the owner's next words are Beta's.
+  @Test(arguments: [true, false])
+  func aTargetChangeTakesAWaitingQuestionOffTheQueue(byTheMenu: Bool) async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    await test.pausedAtTheLimit()
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    if byTheMenu {
+      await test.bridge.setTarget(b)
+    } else {
+      try await test.post("/v1/target", TargetBody(sessionId: b))
+    }
+    #expect(await test.bridge.status.unheard == 0)
+    await test.live()
+    #expect(await test.voice.added.isEmpty)
+    _ = try await test.registry.poll(a)  // the first line's ask for a summary
+    test.voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
+    #expect(try await test.registry.poll(a) == nil)
+  }
+
+  /// A question a change of target took off the queue stays recorded: Alpha's next line has it.
+  @Test func aQuestionTakenOffTheQueueIsInItsSessionsSeed() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
     await live()
@@ -2431,13 +2457,82 @@ struct BridgeTests {
       ActivityBody(
         sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     await bridge.setTarget(b)
+    await bridge.setTarget(a)
     await live()
-    #expect(await voice.added == ["[ASKING] Alpha: Which name?"])
+    let seed = await voice.opens.last?.map(\.text) ?? []
+    #expect(seed.contains("[ASKING] Alpha: Which name?"))
+  }
+
+  /// The menu's choice of another target with the line live: the owner's next words are Beta's.
+  @Test func aTargetChangeOnALiveLineEndsTheRoute() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    try await test.sync(a, "Rename it.")
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    await test.bridge.setTarget(b)
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await voices.made.last?.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
+  }
+
+  /// `/live target`, and the band's Talk here: a question the voice has said routes nothing once
+  /// the owner chose another session.
+  @Test func aPostedTargetEndsTheRouteOfAQuestionAlreadySaid() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    try await test.answer(request(1), from: a, .question, "Deploy which branch?")
+    await voices.made.last?.emit(.assistantSpeaking)
+    await voices.made.last?.emit(.assistantUtterance("Alpha asks: deploy which branch?"))
+    #expect(await eventually { await test.bridge.status.unheard == 0 })
+    try await test.post("/v1/target", TargetBody(sessionId: b))
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await voices.made.last?.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
+  }
+
+  /// The band's Start posts a target: of the same session it changes nothing, so a pause at the
+  /// limit keeps its question and that question's route.
+  @Test func aPostOfTheSameTargetKeepsAWaitingQuestion() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    await pausedAtTheLimit()
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    try await post("/v1/target", TargetBody(sessionId: a))
+    await live()
+    #expect(await voice.added == ["[ASKING] Beta: Which?"])
     voice.emit(.handoff(request(2)))
     let reply = Work.reply(request(2), forRequest: request(2).id)
-    #expect(try await eventually { try await registry.poll(a) == reply })
-    #expect(await bridge.status.unheard == 0)
-    #expect(await registry.openTasks(of: b).isEmpty)
+    #expect(try await eventually { try await registry.poll(b) == reply })
+  }
+
+  /// A waiting question whose own session becomes the target is that session's to say: it stays on
+  /// the queue, and the reply reaches it.
+  @Test func aQuestionOfTheNewTargetStaysOnTheQueue() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    await pausedAtTheLimit()
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    await bridge.setTarget(b)
+    await live()
+    #expect(await voice.added == ["[ASKING] Beta: Which?"])
+    voice.emit(.handoff(request(2)))
+    let reply = Work.reply(request(2), forRequest: request(2).id)
+    #expect(try await eventually { try await registry.poll(b) == reply })
   }
 
   /// In another session a typed turn's question is only recorded, whatever the call is doing.

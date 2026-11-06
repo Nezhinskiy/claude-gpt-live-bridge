@@ -101,7 +101,11 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
 - **Questions and permission prompts outside the target** (my call, from "sync without opening a
   call"): from a typed turn they are recorded as context only, with no chime and no unheard count;
   from a voice turn they keep today's behaviour. A question still open when its session becomes the
-  target is in the seed, and the owner may answer it by voice, as a target's own question.
+  target is in the seed, and the owner may answer it by voice, as a target's own question. A change
+  of target, by the menu or by `POST /v1/target`, ends a question's route and takes another
+  session's waiting question off the line's queue, so it is not said on the new target's line and
+  the reply reaches no wrong session; it stays recorded for that session's seed. A pause at the
+  plan's limit keeps its route, as the target did not change.
 - **A turn's sync is decided when it starts** (my call). The call state and the pause setting at
   the turn's start decide for its prompt, its keyboard answers and its final answer alike, so a
   paused prompt never has its answer synced after Start, and a turn typed while the call was on

@@ -175,12 +175,21 @@ public actor Bridge: Router {
     await registry.requestContext(for: target)
   }
 
-  /// The menu's choice of target, which also ends a question's route, unless that question still
-  /// waits to be said; a session that left is ignored.
+  /// The menu's choice of target; a session that left is ignored.
   public func setTarget(_ id: SessionID) async {
-    machine.endSaidQuestionRoute()
-    try? await registry.setTarget(id)
+    try? await pickTarget(id)
     await changed()
+  }
+
+  /// The owner's choice of target, from the menu, the band or `/live target`. A change takes every
+  /// other session's question off the line's queue, so it is not said on the new target's line and
+  /// the reply does not reach the wrong session; it stays recorded, so it is in its own session's
+  /// seed. A route ends with its question.
+  private func pickTarget(_ id: SessionID) async throws {
+    let isChange = await registry.target != id
+    try await registry.setTarget(id)
+    if isChange { await withdraw { $0.asks && $0.session != id } }
+    machine.endSaidQuestionRoute()
   }
 
   /// The menu's ×: forgets the session and its conversation. Its open request fails as
@@ -256,7 +265,7 @@ public actor Bridge: Router {
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
       case ("POST", "/v1/sync"): try await sync(try req.decodeBody(SyncBody.self))
       case ("POST", "/v1/target"):
-        try await registry.setTarget(try req.decodeBody(TargetBody.self).sessionId)
+        try await pickTarget(try req.decodeBody(TargetBody.self).sessionId)
       case ("POST", "/v1/call"): await perform(try req.decodeBody(CallBody.self).action)
       default: return .error(404, "no route \(req.method) \(req.path)")
       }
