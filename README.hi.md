@@ -39,7 +39,8 @@ codex और आपके अपने Claude Code के बीच एक bridg
 हैं, जिसे केवल आपका user खोल सकता है, और app किसी network port पर listen नहीं करता। जो traffic ये
 दोनों tools पहले से भेजते हैं (voice line का traffic आपके codex के ज़रिए OpenAI को, सिर्फ़ तब जब
 line खुली हो, और Claude का काम आपके Claude Code session के ज़रिए Anthropic को), उसके अलावा app का
-अपना traffic सिर्फ़ [updates](#अपडेट-करना) के लिए है: GitHub से नए release की अपने-आप होने वाली जाँच
+अपना traffic सिर्फ़ ये है: menu खोलने पर थोड़ी देर चलने वाला एक codex OpenAI से आपके Codex usage के आँकड़े
+माँगता है, call बंद हो तब भी; और [updates](#अपडेट-करना) का traffic: GitHub से नए release की अपने-आप होने वाली जाँच
 (दिन में एक बार, और हर launch पर जब तक उसके बताए release को install न किया गया हो), जिसे आप बंद कर
 सकते हैं; **Check for update** दबाने पर वही जाँच; नए release की सूचना देने पर `gh auth status`; और
 **Install** click करने पर download, उसकी जाँच और mod का update। [गोपनीयता](#गोपनीयता) में ठीक-ठीक
@@ -230,7 +231,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे
   वापस ले आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
-  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), मिनट,
+  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), उपयोग की सीमाएँ, मिनट,
   **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
   चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice उसे
@@ -280,7 +281,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   ही रहते हैं, और जो credentials वह पहचान लेता है उन्हें छिपा (redact) दिया जाता है।
 - जब Claude कोई सवाल पूछता है, तो voice उसे आपके सामने रखता है और आपका जवाब उसी session को वापस
   भेजता है। Claude जो काम बाद में background में पूरा करता है, उसकी रिपोर्ट update के रूप में दी जाती है।
-- जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice यह बताता है। Prompt का जवाब आप
+- जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice यह बताता है, सिवाय
+  [वहाँ जहाँ कोई organization Claude Code को manage करता है](#ज्ञात-सीमाएँ)। Prompt का जवाब आप
   Claude Code में देते हैं; LiveBridge उसका जवाब कभी आपकी जगह नहीं देता।
 
 ## बिलिंग का ध्यान रखने वाला डिज़ाइन
@@ -290,7 +292,7 @@ Realtime voice session खुली रहने तक खर्च होत�
 सवाल या इस बात को सुनाने के लिए कि Claude आपकी अनुमति का इंतज़ार कर रहा है:
 
 - जब call चालू हो और कोई बोल नहीं रहा, तब microphone सिर्फ़ आपके Mac पर चल रहे voice detector को
-  audio देता है। कहीं कुछ भेजा नहीं जाता।
+  audio देता है। कहीं कोई audio भेजा नहीं जाता।
   Muted रहते हुए LiveBridge के पास कोई microphone नहीं होता, और macOS का microphone indicator यह दिखाता है।
 - जब आप बोलना शुरू करते हैं, line खुल जाती है। बोलना शुरू करने से पहले के 2 सेकंड रखे जाते हैं और
   सबसे पहले भेजे जाते हैं, ताकि आपके पहले शब्द न छूटें।
@@ -312,6 +314,17 @@ Realtime voice session खुली रहने तक खर्च होत�
   की conversation के साथ खोलते हैं।
 - Menu वे मिनट दिखाता है जितनी देर line खुली रही, जैसा app ने नापा; आपका plan realtime voice को कैसे
   मीटर करता है, यह प्रकाशित नहीं है।
+- Menu दिखाता है कि आपके Codex और Claude usage का कितना हिस्सा इस्तेमाल हो चुका है: हर एक की एक
+  पंक्ति, plan जितनी windows बताता है उनमें से हर एक का इस्तेमाल हुआ प्रतिशत (हर पंक्ति में अधिकतम
+  तीन, जैसे `7% of 5 h · 19% of week`), 90 % या उससे अधिक होने पर नारंगी; किसी पंक्ति पर hover करने
+  से हर window के reset होने का समय दिखता है। Codex के आँकड़े हर बार menu खुलने पर, अधिकतम मिनट में
+  एक बार, एक अल्पकालिक codex से पढ़े जाते हैं; Claude के आँकड़े किसी जुड़े हुए session से तब आते हैं जब
+  वह जवाब दे चुका हो। जिस पंक्ति में दिखाने को कुछ न हो वह छोड़ दी जाती है, और codex जब बताता है कि
+  सामान्य उपयोग की अनुमति नहीं है तब Codex की पंक्ति में `blocked` लिखा आता है। Codex की आख़िरी reading तुरंत दिखती है और कुछ सेकंड बाद नई reading उसकी जगह ले लेती है, इसलिए menu खुला
+  रहते आँकड़े बदल सकते हैं; launch के ठीक बाद पंक्ति पहली reading आने पर दिखती है, और पढ़ना विफल होने पर
+  reading 15 मिनट बाद हट जाती है।
+  कौन-सी limit voice को
+  सबसे पहले रोकती है, यह प्रकाशित नहीं है ([विवरण](docs/research/2026-11-05-gpt-live-limits.md))।
 
 ## गोपनीयता
 
@@ -349,6 +362,11 @@ voice को ले जाने वाला codex thread अस्थायी
 सिवाय उनके जहाँ वह आपका login रखता है और जहाँ वह आपके proxy का उपयोग करता है, और हर MCP server बंद
 है; वह सिर्फ़ बात करने के लिए है। Claude का काम Anthropic को वैसे ही जाता है जैसे आपका Claude Code
 session हमेशा भेजता है।
+
+Menu खोलने पर LiveBridge एक अल्पकालिक codex शुरू करता है, जो आपके ChatGPT login से OpenAI से पूछता है कि
+आपका Codex usage कितना इस्तेमाल हो चुका है (हर window का प्रतिशत और reset का समय)। यह अधिकतम मिनट में एक
+बार होता है, call बंद होने पर भी, और इसमें कोई audio या text नहीं भेजा जाता। Claude के आँकड़े mod से socket
+के ज़रिए app तक पहुँचते हैं और कहीं और नहीं जाते; app दोनों को सिर्फ़ memory में रखता है।
 
 Updates के लिए app GitHub से बात करता है। **Check for updates automatically** चालू होने पर, दिन में
 एक बार (और हर launch पर, जब तक उसके बताए release को install न किया गया हो) वह बिना credentials के
@@ -401,6 +419,23 @@ Uninstall करने से वे सब हट जाती हैं।
   अंग्रेज़ी और रूसी के आम शब्दों की सूची के साथ
   ([नियम](docs/architecture/overview.md#a-result-while-the-line-is-closed))। किसी दूसरी भाषा में, अगर
   voice ने नतीजे का सिर्फ़ ज़िक्र किया हो, तब भी वह सुना हुआ गिना जा सकता है।
+- जहाँ कोई organization Claude Code को manage करता है, वहाँ LiveBridge में कुछ भी आपको नहीं बताता
+  कि कोई permission prompt इंतज़ार कर रहा है। Claude Code का built-in guard managed settings वाली
+  machine पर और Team या Enterprise plan से sign in की गई session में load होता है, और वहाँ mod के
+  permission hooks नहीं चलते। Prompt फिर भी Claude Code में दिखता है और आपका इंतज़ार करता है,
+  लेकिन voice उसके बारे में कुछ नहीं कहता और menu bar दिखाता है कि Claude काम कर रहा है, इसलिए अगर
+  जवाब में देर लगे तो Claude Code देखें। `/plugin` उन hooks के नाम बताता है, और Claude Code के हाल
+  के versions एक line भी दिखाते हैं कि hook छोड़ दिया गया। Claude के सवाल फिर भी voice तक पहुँचते
+  हैं। Hooks को एक Linux container में [मापा गया](docs/adr/0001-platform-findings.md); voice और
+  menu bar क्या करते हैं, यह code से निकलता है, और कोई असली line नहीं चलाई गई। Team और Enterprise
+  का मामला Claude Code के documentation से लिया गया है।
+- Managed settings में `allowManagedHooksOnly`, `allowManagedModsOnly` या `disableAllHooks` होने
+  पर mod load नहीं होता और `/live` काम नहीं करता। Administrator [mod को organization के अपने mod
+  के रूप में install कर सकता
+  है](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods), हर
+  machine के एक folder से: तब permission hooks चलते हैं, पहली दो settings के साथ भी ([मापा
+  गया](docs/adr/0001-platform-findings.md))। Claude Code के documentation के अनुसार, managed
+  settings में marketplace की copy चालू करना काफ़ी नहीं है।
 
 ## यह कैसे काम करता है
 

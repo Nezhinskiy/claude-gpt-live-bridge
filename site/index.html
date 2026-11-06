@@ -182,7 +182,7 @@ claude plugin install livebridge@livebridge</code></pre>
     <dl class="highlights">
       <div>
         <dt>Local by design</dt>
-        <dd>No telemetry and no server of its own. The app listens on no network port. Besides what codex and Claude Code already send (the voice line to OpenAI while it is open, and Claude’s work to Anthropic), the app’s only traffic of its own is for updates: an automatic check with GitHub for a new release (daily, and at launch while one it announced is not installed), which you can turn off; the same check when you press Check for update; <code>gh auth status</code> when a new release is announced; and the download, its verification and the mod’s update when you click Install. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists exactly what reaches OpenAI and names the requests the app makes to GitHub.</dd>
+        <dd>No telemetry and no server of its own. The app listens on no network port. Besides what codex and Claude Code already send (the voice line to OpenAI while it is open, and Claude’s work to Anthropic), the app’s only traffic of its own is a short-lived codex that, when you open the menu, asks OpenAI for your Codex usage figures, also while the call is off, and the traffic for updates: an automatic check with GitHub for a new release (daily, and at launch while one it announced is not installed), which you can turn off; the same check when you press Check for update; <code>gh auth status</code> when a new release is announced; and the download, its verification and the mod’s update when you click Install. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists exactly what reaches OpenAI and names the requests the app makes to GitHub.</dd>
       </div>
       <div>
         <dt>Billing-aware</dt>
@@ -194,7 +194,7 @@ claude plugin install livebridge@livebridge</code></pre>
       </div>
       <div>
         <dt>Your Claude keeps its permissions</dt>
-        <dd>Requests run under the session’s own permission mode. When Claude waits for a permission prompt, the voice tells you, and you answer it in Claude Code; LiveBridge never answers it for you. Anything the microphone hears can become a request, so read <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/SECURITY.md">SECURITY.md</a> before using voice with a mode that acts without asking.</dd>
+        <dd>Requests run under the session’s own permission mode. When Claude waits for a permission prompt, the voice tells you, except <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">where an organization manages Claude Code</a>, and you answer it in Claude Code; LiveBridge never answers it for you. Anything the microphone hears can become a request, so read <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/SECURITY.md">SECURITY.md</a> before using voice with a mode that acts without asking.</dd>
       </div>
     </dl>
   </section>

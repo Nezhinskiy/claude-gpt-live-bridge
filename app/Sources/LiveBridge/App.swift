@@ -96,6 +96,10 @@ final class AppModel {
   @ObservationIgnored let settings: SettingsStore
   @ObservationIgnored private var settingsWindow: SettingsWindow?
   @ObservationIgnored private var codexCwd: URL?
+  /// When codex's usage is read, and the last reading.
+  private(set) var limitsPoll = LimitsPoll()
+  /// The search path of the first usage read; looked up again only if codex is not on it.
+  @ObservationIgnored private var limitsSearchPath: [String]?
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
@@ -441,6 +445,39 @@ final class AppModel {
         voices = .failed("Codex did not list its voices: \(error.localizedDescription)")
       }
     }
+  }
+
+  /// Reads codex's usage in the background when `limitsPoll` says it is time; the menu follows
+  /// the poll when the reading lands. A failed read keeps the last reading.
+  func refreshLimits() {
+    guard let codexCwd, limitsPoll.begin(at: Date()) else { return }
+    let known = limitsSearchPath
+    Task {
+      // The login shell's search path is asked for once, as soon as codex is found on it.
+      let located = await Self.locateCodex(searchPath: known)
+      if let located { limitsSearchPath = located.searchPath }
+      var limits: UsageLimits?
+      if let located {
+        limits = try? await CodexLimits.readOnce(
+          launch: {
+            try await CodexLaunch.launch(
+              codex: located.codex, cwd: codexCwd, searchPath: located.searchPath)
+          }, now: Date())
+      }
+      limitsPoll.finish(limits)
+    }
+  }
+
+  /// Codex's usage as last read, nil once it is stale.
+  func codexLimits(at now: Date) -> UsageLimits? { limitsPoll.reading(at: now) }
+
+  /// codex on the search path `known`, else on the login shell's, which costs a shell start-up.
+  nonisolated private static func locateCodex(searchPath known: [String]?) async
+    -> (codex: URL, searchPath: [String])?
+  {
+    if let known, let codex = CodexLaunch.locate(searchPath: known) { return (codex, known) }
+    let path = await CodexLaunch.defaultSearchPath()
+    return CodexLaunch.locate(searchPath: path).map { ($0, path) }
   }
 
   /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed`

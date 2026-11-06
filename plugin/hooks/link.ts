@@ -3,7 +3,9 @@
 // Each call answers what happened and never throws.
 import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-code'
 
-import type { ActivityBody, AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } from './wire.ts'
+import type {
+  ActivityBody, AnswerBody, CallAction, JoinBody, LimitWindowBody, PollReply, SessionActivity,
+} from './wire.ts'
 
 /** LiveBridge.app's bundle identifier. */
 export const BUNDLE_ID = 'com.getlivebridge.livebridge'
@@ -22,6 +24,8 @@ export type LinkPorts = {
   log(text: string): void
   /** The app answered 410: the owner removed the session, which the link has already forgotten. */
   removed(sessionId: string): void
+  /** The app took a join, the first or one after it restarted or appeared; it has no reading yet. */
+  joined(): void
 }
 
 export class BridgeLink {
@@ -63,6 +67,7 @@ export class BridgeLink {
     const { replaces: _, owner: __, ...kept } = body
     this.#joined = kept
     this.#isKnown = (await this.#send('join', body))?.ok === true
+    if (this.#isKnown) this.#ports.joined()
     return this.#isKnown
   }
 
@@ -111,6 +116,11 @@ export class BridgeLink {
   /** Posts the session's summary; false when the app did not take it. */
   async context(summary: string): Promise<boolean> {
     return (await this.#forSession('context', { summary }))?.ok === true
+  }
+
+  /** Posts Claude's usage windows; nothing for an empty list, and the app's reply changes nothing. */
+  async limits(windows: readonly LimitWindowBody[]): Promise<void> {
+    if (windows.length > 0) await this.#forSession('limits', { windows })
   }
 
   async target(): Promise<void> {

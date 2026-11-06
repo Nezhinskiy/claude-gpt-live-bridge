@@ -1,3 +1,5 @@
+import Foundation
+
 /// What the menu bar menu holds for one status, top to bottom, as a plain value: the call card,
 /// the sessions, the target's whole conversation, the minutes, an update to install, a star on
 /// GitHub, Settings and Quit. The app renders it
@@ -66,6 +68,8 @@ public struct MenuContent: Sendable, Equatable {
     case transcript([Conversation.Line])
     /// The target's context line as it was sent: a custom view, wrapped.
     case sent(String)
+    /// A source's usage: a row that only informs, its tooltip saying when the windows reset.
+    case limit(LimitRow)
   }
 
   public let items: [Item]
@@ -74,7 +78,8 @@ public struct MenuContent: Sendable, Equatable {
   /// `available` is a newer release found and not yet installed: the menu offers to install it.
   public init(
     update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
-    available: AppVersion?
+    available: AppVersion?, codexLimits: UsageLimits? = nil, claudeLimits: UsageLimits? = nil,
+    now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
   ) {
     let install: [Item] =
       available.map {
@@ -140,9 +145,13 @@ public struct MenuContent: Sendable, Equatable {
       .submenu("Conversation", isEnabled: !talk.isEmpty, items: talk),
     ]
 
+    let limits: [Item] = [("Codex", codexLimits), ("Claude", claudeLimits)].compactMap {
+      LimitRow(name: $0.0, limits: $0.1, now: now, calendar: calendar, locale: locale)
+        .map(Item.limit)
+    }
     items =
-      [.call(card), .separator] + sessions + [.separator] + context
-      + [.separator, .note(Self.minutes(update)), .separator] + footer
+      [.call(card), .separator] + sessions + [.separator] + context + [.separator] + limits
+      + (limits.isEmpty ? [] : [.separator]) + [.note(Self.minutes(update)), .separator] + footer
   }
 
   private static func minutes(_ update: BridgeUpdate) -> String {
@@ -181,6 +190,7 @@ public struct MenuContent: Sendable, Equatable {
         return [indent + "[transcript]"]
           + lines.map { indent + "| \($0.speaker.name): \($0.text)" }
       case .sent(let text): return [indent + "[sent] \(text)"]
+      case .limit(let row): return [indent + "[limit] \(row.name) — \(row.text)"]
       }
     }
   }

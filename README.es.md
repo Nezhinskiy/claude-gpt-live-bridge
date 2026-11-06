@@ -39,7 +39,9 @@ entre tu propio codex y tu propio Claude Code. La aplicación y el mod se comuni
 Unix que solo tu usuario puede abrir, y la aplicación no escucha en ningún puerto de red. Además
 de lo que esas dos herramientas ya envían (la línea de voz a OpenAI a través de tu codex, solo
 mientras está abierta, y el trabajo de Claude a Anthropic a través de tu sesión de Claude Code),
-el único tráfico propio de la aplicación es para las [actualizaciones](#actualización): una
+el único tráfico propio de la aplicación es un codex de vida corta que, al abrir el menú, pide a
+OpenAI las cifras de uso de Codex, también con la llamada apagada, y el de las
+[actualizaciones](#actualización): una
 consulta automática a GitHub por si hay una versión nueva (diaria, y en cada arranque mientras no
 se haya instalado una que anunció), que puedes desactivar; la misma consulta cuando pulsas **Check
 for update**; `gh auth status` cuando se anuncia una versión nueva; y, cuando pulsas **Install**,
@@ -237,7 +239,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   `/live on` la recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
-  conserva LiveBridge, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
+  conserva LiveBridge, los límites de uso, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
   **Settings…** y **Quit LiveBridge**.
 - **Mute** (junto a **Stop**, en la banda y en la tarjeta de llamada del menú; **Unmute** mientras
   está silenciado) libera tu micrófono mientras la llamada continúa: una respuesta de Claude sigue
@@ -290,7 +292,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   tablas se quedan en la sesión, y las credenciales que reconoce se ocultan.
 - Cuando Claude hace una pregunta, la voz te la plantea y devuelve tu respuesta a esa sesión. El
   trabajo que Claude termina más tarde en segundo plano se comunica como una actualización.
-- Cuando Claude está esperando una solicitud de permiso, la voz lo dice. Tú respondes a la
+- Cuando Claude está esperando una solicitud de permiso, la voz lo dice, salvo
+  [donde una organización administra Claude Code](#limitaciones-conocidas). Tú respondes a la
   solicitud en Claude Code; LiveBridge nunca la responde por ti.
 
 ## Facturación bajo control por diseño
@@ -301,7 +304,7 @@ acabas de hacer, o para decir esa respuesta, una pregunta de Claude o que Claude
 permiso:
 
 - Mientras hay una llamada en curso y nadie habla, el micrófono alimenta únicamente un detector de
-  voz en tu Mac. No se envía nada a ninguna parte.
+  voz en tu Mac. No se envía audio a ninguna parte.
   Mientras está silenciado, LiveBridge no tiene el micrófono, y el indicador de micrófono de macOS lo muestra.
 - Cuando empiezas a hablar, se abre la línea. Los 2 segundos anteriores a que empezaras se
   conservan y se envían primero, para que no se pierdan tus primeras palabras.
@@ -324,6 +327,17 @@ permiso:
   palabras la abren con la conversación del nuevo destino.
 - El menú muestra los minutos que la línea estuvo abierta, medidos por la aplicación; cómo mide tu
   plan la voz en tiempo real no es público.
+- El menú muestra cuánto de tu uso de Codex y de Claude se ha gastado, una fila cada uno, como
+  porcentaje usado de cada ventana que informa el plan (hasta tres por fila, por ejemplo
+  `7% of 5 h · 19% of week`), en naranja desde el 90 %; pasa el cursor sobre una fila para ver
+  cuándo se reinicia cada ventana. Las cifras de Codex se leen cada vez que se abre el menú, como
+  máximo una vez por minuto, con un codex de corta vida; las de Claude llegan de una sesión unida
+  cuando ya ha respondido. Una fila sin nada que mostrar se omite, y la de Codex dice `blocked`
+  cuando codex informa de que el uso ordinario no está permitido. La última lectura de Codex se
+  muestra enseguida y una nueva la sustituye unos segundos después, así que las cifras pueden cambiar
+  con el menú abierto; justo tras el arranque la fila aparece cuando llega la primera lectura, y si
+  las lecturas fallan, una lectura desaparece a los 15 minutos. Qué límite detiene primero la
+  voz no está documentado ([detalles](docs/research/2026-11-05-gpt-live-limits.md)).
 
 ## Privacidad
 
@@ -364,6 +378,12 @@ El hilo de codex que transporta la voz es efímero y de solo lectura, con todas 
 codex desactivadas salvo donde conserva tu inicio de sesión y cómo usa tu proxy, y con todos los
 servidores MCP desactivados; está ahí solo para conversar. El trabajo de Claude va a Anthropic como
 siempre lo hace tu sesión de Claude Code.
+
+Al abrir el menú, LiveBridge inicia un codex de corta vida que pregunta a OpenAI, con tu inicio
+de sesión de ChatGPT, cuánto de tu uso de Codex se ha gastado (el porcentaje y la hora de reinicio
+de cada ventana). Ocurre como máximo una vez por minuto, también con la llamada apagada, y no
+envía audio ni texto. Las cifras de Claude llegan a la aplicación desde el mod por el socket y no
+van a ningún otro sitio; la aplicación guarda ambas solo en memoria.
 
 Para las actualizaciones, la aplicación se comunica con GitHub. Con **Check for updates
 automatically** activado, una vez al día (y en cada arranque mientras no se haya instalado una
@@ -420,6 +440,24 @@ sesión.
   palabras comunes solo en inglés y ruso
   ([la regla](docs/architecture/overview.md#a-result-while-the-line-is-closed)). En otro idioma, un
   resultado puede contar como escuchado cuando la voz solo lo ha mencionado.
+- Donde una organización administra Claude Code, nada en LiveBridge te avisa de que hay una
+  solicitud de permiso esperando. El guardián integrado de Claude Code se carga en un equipo con
+  ajustes administrados y en una sesión iniciada con un plan Team o Enterprise, y ahí los hooks de
+  permisos del mod no se ejecutan. La solicitud sigue apareciendo en Claude Code y sigue
+  esperándote, pero la voz no dice nada de ella y la barra de menús muestra a Claude trabajando,
+  así que mira Claude Code si una respuesta parece tardar. `/plugin` nombra los hooks, y las
+  versiones recientes de Claude Code también imprimen una línea que dice que un hook se omitió.
+  Las preguntas de Claude siguen llegando a la voz. Los hooks se
+  [midieron](docs/adr/0001-platform-findings.md) en un contenedor Linux; lo que hacen la voz y la
+  barra de menús se deduce del código, y no se probó una línea real. El caso de Team y Enterprise
+  viene de la documentación de Claude Code.
+- Con `allowManagedHooksOnly`, `allowManagedModsOnly` o `disableAllHooks` en los ajustes
+  administrados, el mod no se carga y `/live` no funciona. Un administrador puede [instalar el mod
+  como propio de la
+  organización](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods),
+  desde una carpeta en cada equipo: entonces los hooks de permisos se ejecutan, también con los
+  dos primeros ajustes ([medido](docs/adr/0001-platform-findings.md)). Según la documentación de
+  Claude Code, activar la copia del marketplace en los ajustes administrados no basta.
 
 ## Cómo funciona
 

@@ -75,7 +75,14 @@ voices.
   - post a `[CONTEXT]` line for any joined session. It is saved and seeds every later call with
     that session, long after the process has exited (see "A loaded context persists" below);
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
-    take over that session's place, its requests and its saved conversation.
+    take over that session's place, its requests and its saved conversation;
+  - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as
+    far ahead as it likes, which stands until that time (or until the app quits) because the later
+    reset wins; a window with no `resetsAt` goes 15 minutes after the reading. The reading is one
+    value shared by every session, and it outlives the session that sent it. The percent is not
+    checked on the way in and is clamped to 0 to 100 only for display. Window names are only
+    accepted as `[a-z0-9_]{1,32}` with a character other than `_`, and a row shows at most three
+    windows, so this can mislead the owner but add no rows.
 
   It can also read the data folder itself, every kept conversation included. Such a process can
   already do worse without LiveBridge: for example, it can add hooks to
@@ -106,6 +113,9 @@ has **no tools**:
   long as `codex features list` reports it.
 - **Every MCP server is off.** The app turns off every server codex's configuration names when
   it starts the thread, then requires codex to report each one disabled before every session.
+  That check belongs to the voice's thread. The short-lived codex that reads your usage starts no
+  thread and is not covered by it: in the one run seen, with an empty home, it started no MCP
+  server, but LiveBridge does not enforce that.
 
 The rest only narrows what is left. The app interrupts every codex turn it sees start, declines
 every request codex sends (approvals, tool calls, input requests and the rest), and closes the
@@ -244,7 +254,9 @@ otherwise reset the permission, so a prompt at another time is worth a second lo
 The list of what goes to OpenAI, and when, is in the README's
 [Privacy](README.md#privacy) section. LiveBridge sends no audio or text while the line is
 closed: voice detection runs on the Mac. Codex itself keeps running between lines, and opening
-Settings starts another codex to list the voices; what codex sends on its own is codex's. Codex
+Settings starts another codex to list the voices, and opening the menu starts a short-lived one
+that reads your Codex usage from OpenAI, also while the call is off; what codex sends on its own
+is codex's. Codex
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
 session sends its work to Anthropic as it always does. LiveBridge has no telemetry. The menu's
 **Star LiveBridge on GitHub** only opens the repository's page in your browser; the app sends
