@@ -233,11 +233,14 @@ those shapes goes to OpenAI as typed, personal text included.
     answer may repeat what you typed: the answer closes as failed with a plain reason, nothing of it
     is recorded or said, and that turn's later questions and approval notices stay out too
     (`SessionRegistry.withholdAnswer`, `Bridge.sync`, `Bridge.activity`). A refused `typed` line
-    withholds exactly the request its turn names. A request that only waits behind that turn is not
-    its own and keeps its answer, which may quote the paused text, as Claude has it in the
-    transcript. A voice turn holds nothing of yours: its start refuses nothing and marks nothing
-    under the pause, and only a `typed` line into it is refused. An older mod posts no turn and no
-    sync of its own turns: its lines go to the voice as ever and no pause refuses them.
+    withholds exactly the request its turn names; one a spoken reply tied the turn to is named, so
+    it is withheld, and its own later answer fails. A request that only waits behind that turn is
+    not its own and keeps its answer, which may quote the paused text, as Claude has it in the
+    transcript. Unlike a later request, which you make after the pause, it was made before you
+    typed, so its answer arrives unasked and goes into the seed with the call off. A voice turn
+    holds nothing of yours: its start refuses nothing and marks nothing under the pause, and only a
+    `typed` line into it is refused. An older mod posts no turn and no sync of its own turns: its
+    lines go to the voice as ever and no pause refuses them.
   - A prompt typed while Claude streams its final text starts a turn of its own, which keeps the
     decision of the turn it was typed into; a slash command queued behind a turn takes a
     decision of its own, so the pause reaches less far there.
@@ -256,10 +259,11 @@ those shapes goes to OpenAI as typed, personal text included.
     turn admitted before Stop stays admitted, and its answer, which may repeat that prompt, is
     recorded. So may text typed as feedback at a permission dialog, which as far as the hooks show
     reaches none of them; that was not run.
-  - A `/live context` summary written across a turn the app refused (Stop, then typing, all inside
-    the 60 seconds a summary may take) can clear the *paused* mark, and the paused text may be in
-    it: the mod notes no gap for a refused line, and `/live context` has no ask to date it. This is
-    accepted.
+  - A `/live context` summary can reach past the pause and past a forget. It takes no more than the
+    pause on, the call off and typing during the command to clear the *paused* mark, and the paused
+    text may be in that summary; one written across **New conversation** brings back what was
+    forgotten ([BR-002](docs/bugs/BR-002.md)). This is accepted, as a 60 second window on an
+    explicit command.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
   conversation** with the session as the target, or remove it with ×, or when 20 sessions used since
   push them out (which also loses a paused mark); a load of a new summary replaces the old one but
