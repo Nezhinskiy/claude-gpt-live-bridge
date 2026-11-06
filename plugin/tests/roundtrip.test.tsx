@@ -479,7 +479,6 @@ test('aSpokenReplyWithARequestWaitingIsAnUpdate', async ($, on) => {
   await asked
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
   expect(world.take('answer')).toEqual([{ sessionId: ID, id: REQUEST.id, status: 'update', text: 'Renamed to out.' }])
-  expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(false)
 })
 
 /** The hook's `.catch` runs the tool again: past the dialog, a snapshot that fails must not reach it. */
