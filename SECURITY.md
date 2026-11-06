@@ -214,8 +214,15 @@ those shapes goes to OpenAI as typed, personal text included.
   running**: while a session is joined, what you type in it and Claude's answers are recorded, and
   the next line opened with that session gives them to OpenAI. Claude already repeats much of the
   same text in its answers to voice requests; what is new is that your own typing, and Claude's
-  answers to turns you typed, go too. Text typed into a running turn also sits in the mod's own
-  store until the next turn, under the pause too; that store is not in the data folder.
+  answers to turns you typed, go too. The mod also keeps a snapshot of each
+  joined session in Claude Code's plugin store, `~/.claude/plugins/store/livebridge_*.json`, outside
+  the data folder. In plain JSON it holds text typed into a running turn until the next turn, under
+  the pause too, and the whole tool input of every open permission prompt until the prompt settles:
+  a Write's content, or a command with a secret in it, which the session's transcript holds as well
+  (`TurnTracker.snapshot`, `register.tsx`). `/live off`, the session's end, `/clear` and removing the
+  session in the app delete its key. Whether `claude plugin uninstall` removes the file was not run:
+  Claude Code's documentation of what it deletes does not name it
+  ([Uninstall](README.md#uninstall)).
 - **The pause keeps new text out and removes nothing.** With **Pause sync while the call is
   stopped** on and the call stopped, what you type is not recorded, a prompt typed into a running
   turn included, and the session is marked *paused* (`Continuity.admits`, `Bridge.sync`). Typing
