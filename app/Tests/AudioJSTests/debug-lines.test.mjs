@@ -87,3 +87,24 @@ test('a stopped microphone plays no next line', () => {
   lines.voice(false, 9000);
   assert.deepEqual(played, [0]);
 });
+
+test('a reply before the microphone is taken does not skip the first line', () => {
+  const played = [];
+  const lines = createFakeLines({ count: 2, play: (index) => played.push(index), quietMs: 1000 });
+  lines.voiceFinished(0);
+  lines.voice(false, 5000);
+  assert.deepEqual(played, []);
+  lines.start();
+  assert.deepEqual(played, [0]);
+});
+
+test('a reply finished while muted owes no line after the replay', () => {
+  const { lines, played } = rig(2);
+  lines.ended();
+  lines.stop();
+  lines.voiceFinished(1000);
+  lines.start();
+  lines.ended();
+  lines.voice(false, 5000);
+  assert.deepEqual(played, [0, 0]);
+});

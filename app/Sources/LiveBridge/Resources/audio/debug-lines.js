@@ -6,7 +6,7 @@
 export function createFakeLines({ count, play, quietMs = 600 }) {
   let current = 0;
   let playing = false;
-  let stopped = false;
+  let stopped = true; // until the microphone is taken
   let due = false; // a finished reply is owed the next line
   let quietSince = 0;
 
@@ -25,12 +25,13 @@ export function createFakeLines({ count, play, quietMs = 600 }) {
     stop() {
       stopped = true;
       playing = false;
+      due = false;
     },
     ended() {
       playing = false;
     },
     voiceFinished(tMs) {
-      due = current + 1 < count;
+      due = !stopped && current + 1 < count;
       quietSince = tMs;
     },
     /** One frame of the voice: whether it was loud, and when. */
