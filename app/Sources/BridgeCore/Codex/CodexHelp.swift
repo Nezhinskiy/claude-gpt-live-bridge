@@ -16,15 +16,15 @@ public struct CodexHelp: Sendable, Equatable {
   public static let signIn = CodexHelp(
     button: "How to sign in",
     steps:
-      "Open Terminal, run \(loginCommand) and sign in with a ChatGPT plan that includes "
-      + "realtime voice. Then press Start again.",
+      "Open Terminal, run \(loginCommand) and sign in with a ChatGPT plan whose Codex includes "
+      + "voice. Then press Start again.",
     command: loginCommand)
 
   public static let install = CodexHelp(
     button: "How to install codex",
     steps:
       "Open Terminal and run \(installCommand) (or \(npmInstallCommand)), then run "
-      + "\(loginCommand) and sign in with a ChatGPT plan that includes realtime voice. Then "
+      + "\(loginCommand) and sign in with a ChatGPT plan whose Codex includes voice. Then "
       + "press Start again.",
     command: installCommand)
 }
