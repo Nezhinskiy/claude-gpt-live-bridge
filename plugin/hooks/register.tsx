@@ -45,9 +45,11 @@ let home = ''
 /** This mod's version, from its own plugin.json at load, for the app's Settings; undefined if unread. */
 let modVersion: string | undefined
 let tracker = new TurnTracker()
-let lastOrigin: TurnOrigin | null = null
-/** That `prompt.submit`'s text, what was typed: a slash command's `turn.start` holds its expansion. */
-let lastPrompt: string | undefined
+/**
+ * The `prompt.submit` that will start the next turn: its origin, and what was typed, as a slash
+ * command's `turn.start` holds its expansion.
+ */
+let lastSubmit: { origin: TurnOrigin; text: string } | null = null
 /** When a surface last asked for the band while this session was joined. */
 let drawnAt = 0
 /** Answers the question Claude asked in the running turn with the owner's spoken reply, while it is open. */
@@ -547,15 +549,9 @@ export const register: Register = on => {
   // The hooks at sites that can refuse only observe: one that fails lets the event go on.
   on('prompt.submit', async ($, e, next) => {
     const origin = originOf(e.origin, PLUGIN_NAME, e.isMeta)
-    if (e.turnId === undefined) {
-      lastOrigin = origin
-      lastPrompt = e.text
-    }
+    if (e.turnId === undefined) lastSubmit = { origin, text: e.text }
     const entered = await next(e)
-    if (e.turnId === undefined && entered.drop !== undefined) {
-      lastOrigin = null
-      lastPrompt = undefined
-    }
+    if (e.turnId === undefined && entered.drop !== undefined) lastSubmit = null
     // Whether it folds in or gets a turn of its own, it goes to the app now, under the running turn.
     if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
       await postSync($, tracker.typedInto(e.turnId, e.text, entered.text))
@@ -575,10 +571,9 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      const { lines, isLost } = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
+      const { lines, isLost } = tracker.turnStarted(e.turnId, e.text, lastSubmit?.origin ?? null, await $.clock.now(), lastSubmit?.text)
       if (isLost) noteGap()
-      lastOrigin = null
-      lastPrompt = undefined
+      lastSubmit = null
       await serial(() => follow($, false))  // /clear: the line goes under the session's new id
       await save($)
       for (const line of lines) await postSync($, line)
