@@ -3,6 +3,7 @@
 #
 #   scripts/build-app.sh                          debug build: app/.build/app/LiveBridge.app, ad hoc
 #   scripts/build-app.sh --run [--fake-mic WAV]... [--record-call WAV] [--voice-instructions FILE]
+#                              [--film-menu]
 #                                                 debug build, quit its running copy, open it
 #   scripts/build-app.sh --release                release build, signed, installed in
 #                                                 /Applications and opened; run it again to upgrade
@@ -18,7 +19,8 @@
 # plays when the voice has finished speaking. --record-call (debug builds only) records a call
 # to WAV, the microphone on the left and the voice on the right, with its marks beside it in
 # WAV's name with .marks.jsonl; each call starts the tape over. --voice-instructions (debug builds
-# only) tells the voice FILE's text instead of its rules. If CFFIXED_USER_HOME is set, the app
+# only) tells the voice FILE's text instead of its rules. --film-menu (debug builds only) opens
+# the app's menu on SIGUSR1 and its conversation on SIGUSR2. If CFFIXED_USER_HOME is set, the app
 # keeps its files under that directory instead of your home folder. The disk image is dragged to
 # /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS names another
 # folder for it (the uninstall test's scratch one).

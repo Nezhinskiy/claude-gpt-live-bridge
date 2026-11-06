@@ -21,6 +21,14 @@
       #expect(try DebugFlags(arguments: ["LiveBridge"]) == DebugFlags())
     }
 
+    @Test func theFilmMenuFlagTakesNoValue() throws {
+      let flags = try DebugFlags(arguments: [
+        "LiveBridge", "--film-menu", "--record-call", wav.path,
+      ])
+      #expect(flags.filmMenu)
+      #expect(flags.tape?.path == wav.path)
+    }
+
     @Test func aFakeMicFlagIsGivenOncePerLineAndKeepsItsOrder() throws {
       let other = directory.appending(path: "other.wav")
       try Data([1]).write(to: other)

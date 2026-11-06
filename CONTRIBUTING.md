@@ -150,6 +150,7 @@ scripts/build-app.sh --run --fake-mic say.wav   # the WAV plays as the microphon
 scripts/build-app.sh --run --fake-mic a.wav --fake-mic b.wav   # b plays when the voice has finished
 scripts/build-app.sh --run --record-call call.wav   # you left, the voice right; each call starts it over
 scripts/build-app.sh --run --voice-instructions f.txt   # the voice gets f.txt, not its rules
+scripts/build-app.sh --run --film-menu   # SIGUSR1 opens the menu, SIGUSR2 its conversation
 CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of your home
 /usr/bin/log stream --info --predicate 'subsystem == "com.getlivebridge.livebridge"'
 ```

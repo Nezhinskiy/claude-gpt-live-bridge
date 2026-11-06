@@ -48,6 +48,40 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   /// Opens the menu, as a click on a notification does.
   func open() { item.button?.performClick(nil) }
 
+  #if DEBUG
+    private var filmSignals: [any DispatchSourceSignal] = []
+
+    /// `--film-menu`: SIGUSR1 opens the menu; SIGUSR2 closes it and pops up its Conversation
+    /// submenu on its own, the same `NSMenu`, as nothing but a real pointer opens a submenu. A
+    /// menu's tracking runs nested, so it starts from the run loop and not from this queue,
+    /// whose next blocks would wait for it to end.
+    func answerFilmSignals() {
+      answer(SIGUSR1) { [weak self] in self?.open() }
+      answer(SIGUSR2) { [weak self] in self?.popUpConversation() }
+    }
+
+    private func answer(_ number: Int32, with action: @escaping @MainActor @Sendable () -> Void) {
+      signal(number, SIG_IGN)
+      let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+      source.setEventHandler {
+        RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { action() } }
+      }
+      source.resume()
+      filmSignals.append(source)
+    }
+
+    private func popUpConversation() {
+      menu.cancelTracking()
+      NSApp.activate(ignoringOtherApps: true)
+      RunLoop.main.perform(inModes: [.default]) { [weak self] in
+        MainActor.assumeIsolated {
+          let conversation = self?.menu.item(withTitle: "Conversation")?.submenu
+          _ = conversation?.popUp(positioning: nil, at: NSPoint(x: 200, y: 800), in: nil)
+        }
+      }
+    }
+  #endif
+
   // MARK: - Actions the rows ask for
 
   func perform(_ action: CallAction) { model.perform(action) }

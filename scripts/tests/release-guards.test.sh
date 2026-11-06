@@ -28,7 +28,7 @@ if [ ! -s "$binary" ]; then
   echo "the release binary $binary is missing or empty" >&2
   exit 1
 fi
-for name in LIVEBRIDGE_RELEASES_URL DebugFlags CallTape --voice-instructions; do
+for name in LIVEBRIDGE_RELEASES_URL DebugFlags CallTape --voice-instructions filmSignals; do
   if grep -a -q -- "$name" "$binary"; then
     echo "the release binary contains $name" >&2
     fail=1

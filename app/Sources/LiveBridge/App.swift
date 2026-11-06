@@ -51,6 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     self.statusMenu = statusMenu
     model.notifier.onOpen = { [weak statusMenu] in statusMenu?.open() }
     model.notifier.onInstall = { [weak model] in model?.installUpdate($0) }
+    #if DEBUG
+      if DebugFlags.current.filmMenu { statusMenu.answerFilmSignals() }
+    #endif
   }
 }
 

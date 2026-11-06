@@ -366,8 +366,8 @@ A build from source (`scripts/build-app.sh --release`, marked `LBSourceBuild` in
 replaces the build with the release image. No build has a switch that skips the attestation. A
 debug build reads `LIVEBRIDGE_RELEASES_URL`, when set, in place of the GitHub API address, for
 testing; `scripts/check.sh` fails if a release binary contains that name. Debug builds also take
-flags that replace the microphone with files, record a call and replace the voice's rules
-(`--voice-instructions`); `scripts/check.sh` fails if a release binary contains the types that
+flags that replace the microphone with files, record a call, replace the voice's rules
+(`--voice-instructions`) and open the menu on a signal; `scripts/check.sh` fails if a release binary contains the types that
 hold them or a release bundle the audio page's debug scripts.
 
 **The microphone prompt after an update.** Each release is signed ad hoc, so macOS asks for the

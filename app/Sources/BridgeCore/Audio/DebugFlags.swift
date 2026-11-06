@@ -16,12 +16,16 @@
     public var tape: URL?
     /// `--voice-instructions <file>`: the file's text, and not the voice's rules.
     public var voiceInstructions: String?
+    /// `--film-menu`: the app opens its own menu on SIGUSR1 and the target's conversation on
+    /// SIGUSR2, so a film can show them with no click and no Accessibility grant.
+    public var filmMenu = false
 
     public init() {}
 
     /// A tool that cannot work is refused here: a take must not run for a minute without it.
     public init(arguments: [String]) throws {
       for (index, flag) in arguments.enumerated() where flag.hasPrefix("--") {
+        if flag == "--film-menu" { filmMenu = true }
         guard Self.names.contains(flag) else { continue }
         guard index + 1 < arguments.count else {
           throw Refused(description: "\(flag) needs a value")
