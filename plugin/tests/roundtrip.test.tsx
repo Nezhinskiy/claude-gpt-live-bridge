@@ -533,6 +533,33 @@ test('aLateSpokenReplyClosesItsRequest', async ($, on) => {
   expect(world.logs.some(line => line.includes('came after the question was answered'))).toBe(true)
 })
 
+/** The poll held the reply to the first question while the keyboard answered it and a second one opened. */
+test('aReplyToAClosedQuestionDoesNotAnswerTheNextOne', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  const first = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  let release = () => {}
+  world.holdNext = new Promise<void>(resolve => { release = resolve })
+  const isHeld = new Promise<void>(resolve => { world.onNextHeld = resolve })
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  void world.clock.advance(1000)
+  await isHeld
+  world.holdNext = null
+  world.answerDialog('out')
+  await first
+  const second = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  release()
+  await aMoment()
+  expect(world.take('answer')).toMatchObject([{ id: SPOKEN.id, status: 'failed' }])
+  world.answerDialog('build')
+  expect((await second).result).toMatchObject({ answers: { [ASKED[0]!.question]: 'build' } })
+})
+
 /** The keyboard won, and the mod is still telling the app so: a reply then has no question either. */
 test('aSpokenReplyWhileTheKeyboardAnswerIsPostedClosesItsRequest', async ($, on) => {
   const world = fakeWorld(on)

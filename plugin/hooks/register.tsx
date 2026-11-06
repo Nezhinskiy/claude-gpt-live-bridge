@@ -239,6 +239,7 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
 async function tick($: EngineInterface): Promise<void> {
   if (!link?.session) return  // it left, or was removed, while this poll waited its turn
   const hadGap = link.hasGap
+  const asked = answerQuestion  // a reply this poll brings can only be to a question open now
   const reply = await link.next()
   if (reply === REMOVED || !link.session) return  // the link queued `removed`; a join may have met it
   if (hadGap && !link.hasGap) await save($)  // a join said it: a reload must not say it again
@@ -271,8 +272,8 @@ async function tick($: EngineInterface): Promise<void> {
     // Queued behind an off or a removal that came in while this poll ran: those fail it in the app.
     enqueue($, () => deliver($, work))
   } else if (work?.kind === 'reply') {
-    if (answerQuestion !== null) {
-      answerQuestion(work)
+    if (asked !== null && asked === answerQuestion) {
+      asked(work)
     } else {
       $.ui.log(LATE_REPLY)
       // The app opened a request for a reply to a typed turn; a voice turn's refuses this, harmlessly.
