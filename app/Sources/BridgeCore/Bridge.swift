@@ -46,8 +46,6 @@ public actor Bridge: Router {
   /// What Claude Code last said of Claude's usage windows, merged over the readings before it.
   /// Memory only; it outlives the sessions that sent it.
   private var claudeLimits: UsageLimits?
-  /// The session that asked the last `[QUESTION]`; the next handoff goes there.
-  private var questionRoute: SessionID?
   private var callStart: Date?
   /// What was last published, so an unchanged status and conversation are not published again.
   private var published: BridgeUpdate?
@@ -136,7 +134,6 @@ public actor Bridge: Router {
       guard machine.phase == .off, connecting == nil else { return }
       await attempt { await self.launch() }
     case .stop:
-      questionRoute = nil
       await send(.stop)
       await endCodex()
     case .mute: await send(.mute)
@@ -181,7 +178,7 @@ public actor Bridge: Router {
   /// The menu's choice of target, which also ends a question's route, unless that question still
   /// waits to be said; a session that left is ignored.
   public func setTarget(_ id: SessionID) async {
-    endRouteUnlessKept()
+    machine.endSaidQuestionRoute()
     try? await registry.setTarget(id)
     await changed()
   }
@@ -189,7 +186,7 @@ public actor Bridge: Router {
   /// The menu's ×: forgets the session and its conversation. Its open request fails as
   /// "session left", and its next poll is told it was removed.
   public func remove(_ id: SessionID) async {
-    if questionRoute == id { questionRoute = nil }
+    machine.endQuestionRoute(of: id)
     if let delivery = await registry.remove(id) { await deliver(delivery) }
     await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
   }
@@ -237,7 +234,6 @@ public actor Bridge: Router {
           continuity.move(old, to: body.sessionId)
           machine.rename(old, to: body.sessionId)
           if lineSession == old { lineSession = body.sessionId }
-          if questionRoute == old { questionRoute = body.sessionId }
           save()
         }
         if body.missed == true {
@@ -297,9 +293,7 @@ public actor Bridge: Router {
       // a Mute meanwhile does not cancel a Start: the page records it, and listens muted
       if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
     case .stopLocalVAD: await audio.stopListening()
-    case .endCodex:
-      endRouteUnlessKept()
-      await endCodex()
+    case .endCodex: await endCodex()
     case .flushPreroll: await audio.flushPreroll()
     case .muteMicrophone: await audio.muteMicrophone()
     case .unmuteMicrophone:
@@ -331,15 +325,6 @@ public actor Bridge: Router {
       return false
     }
     return true
-  }
-
-  /// Ends a question's route, unless the question still waits to be said: every waiting line is
-  /// given to the next line, whichever session it is about, and the reply must reach the session
-  /// that asked.
-  private func endRouteUnlessKept() {
-    if !machine.pending.contains(where: { $0.session == questionRoute && $0.asks }) {
-      questionRoute = nil
-    }
   }
 
   /// A chime's notification, naming the sessions whose results wait.
@@ -547,8 +532,7 @@ public actor Bridge: Router {
   /// that session's conversation, so the menu shows its queue took it. Returns the session it
   /// went to, or nil when none is joined.
   private func route(_ request: VoiceRequest) async -> SessionID? {
-    let route = questionRoute
-    questionRoute = nil
+    let route = machine.takeQuestionRoute()
     for id in [route, await registry.target].compactMap({ $0 }) {
       guard (try? await registry.enqueue(request, for: id)) != nil else { continue }
       await withdraw { $0.session == id }
@@ -559,8 +543,6 @@ public actor Bridge: Router {
   }
 
   private func deliver(_ delivery: Delivery) async {
-    // only a question the call keeps (not one dropped while off) routes the next handoff
-    if delivery.status == .question, machine.keepsLines { questionRoute = delivery.session }
     await say(
       AnswerShaper.forVoice(
         delivery.text, status: delivery.status, label: delivery.label, session: delivery.session))
@@ -655,10 +637,9 @@ public actor Bridge: Router {
         record(.claude, line.text, in: id)
         break
       }
-      if body.question != nil, machine.keepsLines { questionRoute = id }
       await say(line)
     case (true, false):
-      if questionRoute == body.sessionId { questionRoute = nil }
+      machine.endQuestionRoute(of: id)
       await withdraw { $0.session == body.sessionId && [.approval, .asking].contains($0.kind) }
     default: break
     }

@@ -666,6 +666,21 @@ struct BridgeTests {
     #expect(await eventually { await test.registry.openTasks().contains(task) })
   }
 
+  /// A failed microphone ends the call as Stop does, and the route with it.
+  @Test func aFailedMicrophoneEndsTheRoute() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    try await test.answer(request(1), from: b, .question, "Which branch?")
+    await test.bridge.audioEvent(.failed(.other("The microphone failed.")))
+    #expect(await test.bridge.status.call == .off)
+    await test.live()
+    await voices.made.last?.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(a) == .request(request(2)) })
+  }
+
   /// A question the owner never heard, because the call was off, routes nothing.
   @Test func questionWhileOffRoutesNothing() async throws {
     try await join(a, "Alpha")

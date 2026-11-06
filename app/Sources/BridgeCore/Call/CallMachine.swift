@@ -123,6 +123,10 @@ public struct CallMachine: Sendable {
   public var pending: [VoiceLine] { unheard.map(\.line) }
   /// A line that arrives now waits to be said; a stopped call drops it.
   public var keepsLines: Bool { phase != .off || isPaused }
+  /// The session that asked the last question the call kept; the next handoff goes there. It ends
+  /// with the call. A question dropped while off routes nothing, and a pause keeps a route only
+  /// while its question still waits to be said.
+  public private(set) var questionRoute: SessionID?
   /// The results given before the voice's current reply began; only that reply can say them.
   private var replyCanSay: [VoiceLine]?
   /// The sessions handed a request whose result the open line waits for; while any is, silence
@@ -168,6 +172,7 @@ public struct CallMachine: Sendable {
   }
 
   public mutating func handle(_ event: CallEvent) -> [CallEffect] {
+    if case .deliver(let line, _) = event, line.asks, keepsLines { questionRoute = line.session }
     switch (phase, event) {
     case (_, .stop):
       return end(with: [.closeRealtime, .stopLocalVAD])
@@ -300,6 +305,26 @@ public struct CallMachine: Sendable {
     return [.closeRealtime] + hangUp()
   }
 
+  /// The session the next handoff goes to, if a question routes it; a route is used once.
+  public mutating func takeQuestionRoute() -> SessionID? {
+    defer { questionRoute = nil }
+    return questionRoute
+  }
+
+  /// `id`'s question is settled or can get no reply: the next handoff is not about it.
+  public mutating func endQuestionRoute(of id: SessionID) {
+    if questionRoute == id { questionRoute = nil }
+  }
+
+  /// Ends the route, unless its question still waits to be said: every waiting line is given to
+  /// the next line, whichever session it is about, and the reply must reach the session that
+  /// asked.
+  public mutating func endSaidQuestionRoute() {
+    if !unheard.contains(where: { $0.line.session == questionRoute && $0.line.asks }) {
+      questionRoute = nil
+    }
+  }
+
   /// Forgets the synced lines a connecting line waits to give: the conversation they are in has
   /// just seeded the line with them.
   public mutating func dropSynced() { connectingSynced = [] }
@@ -308,6 +333,7 @@ public struct CallMachine: Sendable {
   /// under the new id.
   public mutating func rename(_ old: SessionID, to new: SessionID) {
     if awaited.remove(old) != nil { awaited.insert(new) }
+    if questionRoute == old { questionRoute = new }
     let moved = { (line: VoiceLine) in
       var line = line
       if line.session == old { line.session = new }
@@ -337,10 +363,13 @@ public struct CallMachine: Sendable {
   /// be said. Start tries once more.
   private mutating func pause(for reason: Problem, closing: [CallEffect] = []) -> [CallEffect] {
     let kept = withoutHolds
+    let route = questionRoute
     let effects = end(
       with: [.problem(reason)] + closing + [.stopLocalVAD, .endCodex]
         + (kept.isEmpty ? [] : [.chime]))
     unheard = kept
+    questionRoute = route
+    endSaidQuestionRoute()
     isPaused = true
     return effects
   }
