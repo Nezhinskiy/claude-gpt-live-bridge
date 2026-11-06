@@ -706,32 +706,32 @@ public actor Bridge: Router {
     if !admitted, body.kind == .typed, let request = body.turn.request {
       await registry.withholdAnswer(request, of: id)
     }
-    guard admitted,
-      let line = AnswerShaper.synced(
-        body.text ?? "", kind: body.kind, label: row.label, session: id)
-    else {
+    guard admitted, await addSynced(body.text ?? "", kind: body.kind, of: row) else {
       save()  // the turn's decision persists, a `start`'s included
       return
     }
-    await addSynced(line, as: body.kind == .typed ? .owner : .claude)
   }
 
   /// A newer request superseded this answer, so it is not said, and the mod, told 200, notes no
   /// gap. So it is kept as Claude's synced line, unless it is a failure, which holds no answer.
   /// `SessionRegistry.complete` has already dropped one whose request is withheld.
   private func keepSuperseded(_ body: AnswerBody) async {
-    let id = body.sessionId
-    guard body.status != .failed, let row = try? await label(of: id),
-      let line = AnswerShaper.synced(body.text, kind: .answer, label: row.label, session: id)
-    else { return }
-    await addSynced(line, as: .claude)
+    guard body.status != .failed, let row = try? await label(of: body.sessionId) else { return }
+    await addSynced(body.text, kind: .answer, of: row)
   }
 
-  /// Keeps a synced line in its session's conversation; the open line about that session is
-  /// given it at once, as context.
-  private func addSynced(_ line: VoiceLine, as speaker: Conversation.Line.Speaker) async {
-    record(speaker, line.text, in: line.session)  // saves
-    if lineKnowsSession, lineSession == line.session { await send(.synced(line)) }
+  /// Keeps a line of a turn in its session's conversation, as the owner's if it is typed; the open
+  /// line about that session is given it at once, as context. False, and nothing saved, when it
+  /// has nothing to say.
+  @discardableResult
+  private func addSynced(_ text: String, kind: SyncKind, of row: SessionRow) async -> Bool {
+    let id = row.sessionId
+    guard let line = AnswerShaper.synced(text, kind: kind, label: row.label, session: id) else {
+      return false
+    }
+    record(line.kind == .typed ? .owner : .claude, line.text, in: id)
+    if lineKnowsSession, lineSession == id { await send(.synced(line)) }
+    return true
   }
 
   private func sweep() async {
