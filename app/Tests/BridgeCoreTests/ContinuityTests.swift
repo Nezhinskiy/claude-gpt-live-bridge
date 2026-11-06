@@ -122,11 +122,14 @@ struct ContinuityTests {
 }
 
 extension ContinuityTests {
+  var voice: RequestID { RequestID(rawValue: "request-1") }
+
   func admit(
-    _ continuity: inout Continuity, _ turn: String, _ kind: SyncKind, _ id: SessionID,
-    pausing: Bool
+    _ continuity: inout Continuity, _ turn: String, request: RequestID? = nil, _ kind: SyncKind,
+    _ id: SessionID, pausing: Bool
   ) -> Bool {
-    continuity.admits(turn: turn, kind: kind, in: id, pausing: pausing)
+    continuity.admits(
+      turn: TurnRef(id: turn, request: request), kind: kind, in: id, pausing: pausing)
   }
 
   @Test func aFileFromBeforeSyncStillDecodes() throws {
@@ -160,6 +163,20 @@ extension ContinuityTests {
     #expect(admit(&continuity, "t1", .typed, a, pausing: false))
     #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
     #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
+    #expect(continuity[a].outOfSync == .paused)
+  }
+
+  /// A voice turn holds nothing of the owner's to keep out, until the owner types into it.
+  @Test func aVoiceTurnIsAdmittedWhilePausing() {
+    var continuity = Continuity()
+    #expect(admit(&continuity, "t1", request: voice, .start, a, pausing: true))
+    #expect(continuity[a].outOfSync == nil)
+  }
+
+  @Test func aVoiceTurnTypedIntoWhilePausingIsRefused() {
+    var continuity = Continuity()
+    #expect(admit(&continuity, "t1", request: voice, .start, a, pausing: true))
+    #expect(!admit(&continuity, "t1", request: voice, .typed, a, pausing: true))
     #expect(continuity[a].outOfSync == .paused)
   }
 

@@ -618,25 +618,23 @@ public actor Bridge: Router {
   /// A session that starts waiting for approval sends the voice a notice, which goes once the
   /// approval is settled. A question Claude asked goes to the voice whole, and the next handoff
   /// is routed to that session as its reply. Either carries what Claude wrote before it.
-  /// From a turn the owner typed (`typedTurn`) in a session that is not the target, either is
-  /// context only: kept in its conversation, with no chime and no route. From a turn the pause
-  /// refused, or a voice turn whose answer is withheld, neither is kept or said, and the registry
-  /// is told of no question.
+  /// From a turn with no voice request behind it (`turn.request`) in a session that is not the
+  /// target, either is context only: kept in its conversation, with no chime and no route. From a
+  /// turn refused under the pause, neither is kept or said, and the registry is told of no
+  /// question; `working` and `idle` settle what was said before, whatever became of the turn. A
+  /// released mod names no turn: it reports only its voice turns, which nothing here refuses.
   private func activity(_ body: ActivityBody) async {
     let id = body.sessionId
     guard let row = try? await label(of: id) else { return }
     var body = body
-    var isRefused = false
-    if let turn = body.typedTurn {
-      isRefused = !continuity.admits(turn: turn, kind: .report, in: id, pausing: pausing)
+    if body.state == .approval, let turn = body.turn {
+      let admitted = continuity.admits(turn: turn, kind: .report, in: id, pausing: pausing)
       save()
-    }
-    // A voice turn's activity names no turn; `working` still has to settle what was said before.
-    if body.state == .approval, await registry.isAnswerWithheld(of: id) { isRefused = true }
-    guard !isRefused else {
-      body.question = nil
-      await registry.setActivity(body)
-      return
+      guard admitted else {
+        body.question = nil
+        await registry.setActivity(body)
+        return
+      }
     }
     await registry.setActivity(body)
     switch (row.activity == .approval, body.state == .approval) {
@@ -653,7 +651,7 @@ public actor Bridge: Router {
             body: AnswerShaper.paused("Claude is waiting for your approval", wrote: body.text),
             session: id)
         }
-      if body.typedTurn != nil, await registry.target != id {
+      if let turn = body.turn, turn.request == nil, await registry.target != id {
         record(.claude, line.text, in: id)
         break
       }
@@ -702,7 +700,7 @@ public actor Bridge: Router {
   private func sync(_ body: SyncBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
-    let admitted = continuity.admits(turn: body.turnId, kind: body.kind, in: id, pausing: pausing)
+    let admitted = continuity.admits(turn: body.turn, kind: body.kind, in: id, pausing: pausing)
     save()  // the turn's decision persists, a `start`'s included
     if !admitted, body.kind == .typed { await registry.withholdAnswer(of: id) }
     guard admitted,

@@ -178,9 +178,13 @@ struct BridgeTests {
   /// A line of a turn, as the mod posts it.
   @discardableResult
   func sync(
-    _ id: SessionID, turn: String = "turn-1", kind: SyncKind = .typed, _ text: String? = nil
+    _ id: SessionID, turn: String = "turn-1", request: RequestID? = nil, kind: SyncKind = .typed,
+    _ text: String? = nil
   ) async throws -> HTTPResponse {
-    try await post("/v1/sync", SyncBody(sessionId: id, turnId: turn, kind: kind, text: text))
+    try await post(
+      "/v1/sync",
+      SyncBody(
+        sessionId: id, turn: TurnRef(id: turn, request: request), kind: kind, text: text))
   }
 
   /// The conversations as saved, which a restarted app reads.
@@ -1552,10 +1556,25 @@ struct BridgeTests {
 
   /// With the pause on and the call off: a voice turn runs, and the owner types into it.
   func typedIntoAVoiceTurn() async throws {
+    try await voiceTurn()
+    try await sync(a, request: request(1).id, "Private thing.")
+  }
+
+  /// Alpha's request 1 in flight, and its turn started.
+  func voiceTurn() async throws {
     try await join(a, "Alpha")
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    try await sync(a, "Private thing.")
+    try await sync(a, request: request(1).id, kind: .start)
+  }
+
+  /// An approval in the voice turn of request 1.
+  func voiceApproval(question: String? = nil, text: String? = nil) async throws {
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: question, text: text,
+        turn: TurnRef(id: "turn-1", request: request(1).id)))
   }
 
   /// The voice turn's answer, which may repeat what was typed.
@@ -1613,11 +1632,7 @@ struct BridgeTests {
   @Test func aQuestionInAWithheldTurnStaysOut() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.typedIntoAVoiceTurn()
-    try await test.post(
-      "/v1/activity",
-      ActivityBody(
-        sessionId: test.a, state: .approval, question: "Which private thing?",
-        text: "The private thing."))
+    try await test.voiceApproval(question: "Which private thing?", text: "The private thing.")
     #expect(await test.lines().isEmpty)
     try await test.registry.enqueue(test.request(2), for: test.a)
     #expect(try await test.registry.poll(test.a) == nil)  // no question: no reply goes out
@@ -1627,9 +1642,7 @@ struct BridgeTests {
     let test = try BridgeTests(pausesSync: true)
     try await test.typedIntoAVoiceTurn()
     await test.live()
-    try await test.post(
-      "/v1/activity",
-      ActivityBody(sessionId: test.a, state: .approval, text: "The private thing."))
+    try await test.voiceApproval(text: "The private thing.")
     #expect(await test.lines().isEmpty)
     #expect(await test.voice.added.isEmpty)
     #expect(await test.voice.spoken.isEmpty)
@@ -1684,9 +1697,44 @@ struct BridgeTests {
   /// Under the pause a voice turn nobody typed into keeps its answer.
   @Test func aVoiceTurnNobodyTypedIntoKeepsItsAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)
-    try await test.join(test.a, "Alpha")
-    try await test.answer(test.request(1), from: test.a)
-    #expect(await test.lines() == ["Claude: [RESULT] Alpha: Done."])
+    try await test.voiceTurn()
+    try await test.voiceAnswer()
+    #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
+    #expect(try test.saved()[test.a].outOfSync == nil)
+  }
+
+  /// A request handed over before Stop starts its turn with the call off: nothing was typed, so
+  /// the pause has nothing to mark.
+  @Test func aVoiceTurnsStartUnderThePauseMarksNothing() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.voiceTurn()
+    #expect(try test.saved()[test.a].outOfSync == nil)
+  }
+
+  @Test func aVoiceTurnsReportStaysUnderThePause() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.voiceTurn()
+    try await test.sync(test.a, request: test.request(1).id, kind: .report, "You allowed Bash.")
+    #expect(await test.lines() == ["Claude: [CLAUDE] Alpha: You allowed Bash."])
+  }
+
+  @Test func aVoiceTurnsQuestionStaysUnderThePause() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.voiceTurn()
+    try await test.voiceApproval(question: "Which name?")
+    #expect(await test.lines() == ["Claude: [ASKING] Alpha: Which name?"])
+  }
+
+  /// A released mod names no turn and reports only its voice turns: its question is said, as it
+  /// always was, whatever the pause, and marks nothing.
+  @Test func aReleasedModsQuestionIsSaidUnderThePause() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha", syncs: false)
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(sessionId: test.a, state: .approval, question: "Which name?"))
+    #expect(await test.lines() == ["Claude: [ASKING] Alpha: Which name?"])
+    #expect(try test.saved()[test.a].outOfSync == nil)
   }
 
   /// A `start` refused under the pause says nothing of the owner's: no answer is withheld.
@@ -2063,7 +2111,8 @@ struct BridgeTests {
     try await sync(a, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await eventually { await voice.opens.count == 1 })
     #expect(
       await voice.opens.last?.map(\.text).contains("[TYPED] Alpha: Rename the folder.") == true)
@@ -2086,7 +2135,8 @@ struct BridgeTests {
       try await test.post(
         "/v1/activity",
         ActivityBody(
-          sessionId: test.b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+          sessionId: test.b, state: .approval, question: "Which name?",
+          turn: TurnRef(id: "turn-1")))
       try #require(await eventually { await test.voice.opens.count == 2 })
       try #require(await eventually { await test.bridge.status.call == .live })
       #expect(
@@ -2100,7 +2150,8 @@ struct BridgeTests {
     await bridge.perform(.start)
     try await sync(a, "Delete the build folder.")
     try await post(
-      "/v1/activity", ActivityBody(sessionId: a, state: .approval, typedTurn: "turn-1"))
+      "/v1/activity",
+      ActivityBody(sessionId: a, state: .approval, turn: TurnRef(id: "turn-1")))
     #expect(await eventually { await voice.opens.count == 1 })
   }
 
@@ -2113,7 +2164,8 @@ struct BridgeTests {
     try await sync(b, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 0)
     #expect(await !audio.calls.contains("chime"))
     #expect(await bridge.status.call == .listening)
@@ -2138,7 +2190,8 @@ struct BridgeTests {
     try await sync(b, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     await bridge.setTarget(b)
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.opens.last?.map(\.text).contains("[ASKING] Beta: Which name?") == true)
@@ -2166,15 +2219,15 @@ struct BridgeTests {
     try await test.post(
       "/v1/activity",
       ActivityBody(
-        sessionId: test.a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+        sessionId: test.a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await test.lines().isEmpty)
     #expect(await test.bridge.status.unheard == 0)
     try await test.registry.enqueue(test.request(1), for: test.a)
     #expect(try await test.registry.poll(test.a) == .request(test.request(1)))
   }
 
-  /// A subagent's prompt already has the session waiting; a refused turn's question after it
-  /// must still not make the session ask.
+  /// Another prompt already has the session waiting; a refused turn's question after it must
+  /// still not make the session ask.
   @Test func aRefusedTurnIsCheckedWhilePausedOnAnotherPrompt() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
@@ -2183,7 +2236,7 @@ struct BridgeTests {
     try await test.post(
       "/v1/activity",
       ActivityBody(
-        sessionId: test.a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+        sessionId: test.a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     try await test.registry.enqueue(test.request(1), for: test.a)
     #expect(try await test.registry.poll(test.a) == .request(test.request(1)))
     // only the subagent's prompt is kept, not the refused turn's question
@@ -2199,7 +2252,8 @@ struct BridgeTests {
     try await sync(a, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     voice.emit(.handoff(request(1)))
     let reply = Work.reply(request(1), forRequest: request(1).id)
     #expect(try await eventually { try await registry.poll(a) == reply })
@@ -2282,7 +2336,8 @@ struct BridgeTests {
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 1)
     await live()
     #expect(await seeded("Which name?") == 0)
@@ -2294,7 +2349,8 @@ struct BridgeTests {
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 1)
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
     #expect(await bridge.status.unheard == 0)
@@ -2309,7 +2365,8 @@ struct BridgeTests {
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     await bridge.setTarget(b)
     await live()
     #expect(await voice.added == ["[ASKING] Alpha: Which name?"])
@@ -2328,7 +2385,8 @@ struct BridgeTests {
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 0)
     #expect(try saved()[b].lines.contains { $0.text.hasPrefix("[ASKING] Beta:") })
     await live()

@@ -76,16 +76,16 @@ test('aTurnThatIsNotAVoiceRequestPostsNoAnswer', () => {
 
 test('an owner turn posts its prompt', () => {
   const tracker = new TurnTracker()
-  assert.deepEqual(tracker.turnStarted('t1', 'Rename the folder', 'owner', 0), {
-    turnId: 't1', kind: 'typed', text: 'Rename the folder',
-  })
+  assert.deepEqual(tracker.turnStarted('t1', 'Rename the folder', 'owner', 0), [
+    { turn: { id: 't1' }, kind: 'start' }, { turn: { id: 't1' }, kind: 'typed', text: 'Rename the folder' },
+  ])
 })
 
 test('an owner turn posts its answer', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
   assert.deepEqual(tracker.turnCompleted('t1', '  Renamed to out.\n', 'answer'), {
-    post: null, sync: { turnId: 't1', kind: 'answer', text: 'Renamed to out.' },
+    post: null, sync: { turn: { id: 't1' }, kind: 'answer', text: 'Renamed to out.' },
   })
 })
 
@@ -108,39 +108,41 @@ test('a prompt the person does not see as typed is not the owner\'s', () => {
 
 test('an other turn takes its decision and posts its answer, not its prompt', () => {
   const tracker = new TurnTracker()
-  assert.deepEqual(tracker.turnStarted('t1', 'A message from a peer session.', 'other', 0), {
-    turnId: 't1', kind: 'start',
-  })
-  assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').sync, { turnId: 't1', kind: 'answer', text: 'Done.' })
+  assert.deepEqual(tracker.turnStarted('t1', 'A message from a peer session.', 'other', 0), [
+    { turn: { id: 't1' }, kind: 'start' },
+  ])
+  assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').sync, { turn: { id: 't1' }, kind: 'answer', text: 'Done.' })
 })
 
 test('a turn with no origin seen is other', () => {
   const tracker = new TurnTracker()
-  assert.deepEqual(tracker.turnStarted('t1', 'Rename the folder', null, 0), { turnId: 't1', kind: 'start' })
+  assert.deepEqual(tracker.turnStarted('t1', 'Rename the folder', null, 0), [{ turn: { id: 't1' }, kind: 'start' }])
 })
 
 test('a background turn outside the window posts its answer and no prompt', () => {
   const tracker = new TurnTracker()
-  assert.deepEqual(tracker.turnStarted('t1', 'A background task finished.', 'background', 0), {
-    turnId: 't1', kind: 'start',
-  })
+  assert.deepEqual(tracker.turnStarted('t1', 'A background task finished.', 'background', 0), [
+    { turn: { id: 't1' }, kind: 'start' },
+  ])
   assert.deepEqual(tracker.turnCompleted('t1', 'The build passed.', 'answer'), {
-    post: null, sync: { turnId: 't1', kind: 'answer', text: 'The build passed.' },
+    post: null, sync: { turn: { id: 't1' }, kind: 'answer', text: 'The build passed.' },
   })
 })
 
 test('a background turn in the window stays an update', () => {
   const { tracker } = voiceTurn('Started the build in the background.')
-  assert.equal(tracker.turnStarted('t2', 'A background task finished.', 'background', 1000), null)
+  assert.deepEqual(tracker.turnStarted('t2', 'A background task finished.', 'background', 1000), [
+    { turn: { id: 't2', request: ID }, kind: 'start' },
+  ])
   assert.deepEqual(tracker.turnCompleted('t2', 'The build passed.', 'answer'), {
     post: { id: ID, status: 'update', text: 'The build passed.' }, sync: null,
   })
 })
 
-test('a voice turn posts no line', () => {
+test('a voice turn posts only its start', () => {
   const tracker = new TurnTracker()
   tracker.submitted(ID)
-  assert.equal(tracker.turnStarted('t1', framed(ID), 'voice', 0), null)
+  assert.deepEqual(tracker.turnStarted('t1', framed(ID), 'voice', 0).map(line => line.kind), ['start'])
   assert.equal(tracker.turnCompleted('t1', 'Three files.', 'answer').sync, null)
 })
 
@@ -172,7 +174,7 @@ test('replied makes the rest of the turn a voice turn', () => {
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
   tracker.replied(REPLY, REPLY, 1000)
   assert.equal(tracker.running, REPLY)
-  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: true })
+  assert.deepEqual(tracker.current, { id: 't1', request: REPLY })
   assert.deepEqual(tracker.turnCompleted('t1', 'Renamed to out.', 'answer'), {
     post: { id: REPLY, status: 'ok', text: 'Renamed to out.' }, sync: null,
   })
@@ -184,10 +186,31 @@ test('replied with another request in flight makes the answer its update', () =>
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
   tracker.replied(REPLY, ID, 1000)
   assert.equal(tracker.running, null)
-  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: false })
+  assert.deepEqual(tracker.current, { id: 't1', request: ID })
   assert.deepEqual(tracker.turnCompleted('t1', 'Renamed to out.', 'answer'), {
     post: { id: ID, status: 'update', text: 'Renamed to out.' }, sync: null,
   })
+})
+
+test('a voice turn starts naming its request', () => {
+  const tracker = new TurnTracker()
+  tracker.submitted(ID)
+  assert.deepEqual(tracker.turnStarted('t1', framed(ID), 'voice', 0), [{ turn: { id: 't1', request: ID }, kind: 'start' }])
+})
+
+test('text typed into a voice turn names its request', () => {
+  const tracker = new TurnTracker()
+  tracker.submitted(ID)
+  tracker.turnStarted('t1', framed(ID), 'voice', 0)
+  assert.deepEqual(tracker.typedInto('t1', 'second'), { turn: { id: 't1', request: ID }, kind: 'typed', text: 'second' })
+})
+
+test('a spoken reply puts its request on the turn\'s later lines', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
+  assert.deepEqual(tracker.typedInto('t1', 'first').turn, { id: 't1' })
+  tracker.replied(REPLY, REPLY, 1000)
+  assert.deepEqual(tracker.typedInto('t1', 'second').turn, { id: 't1', request: REPLY })
 })
 
 test('replied changes nothing in a voice turn', () => {
@@ -205,7 +228,7 @@ test('replied changes nothing without forRequest', () => {
   tracker.replied(REPLY, undefined, 1000)
   assert.equal(tracker.running, null)
   assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer'), {
-    post: null, sync: { turnId: 't1', kind: 'answer', text: 'Done.' },
+    post: null, sync: { turn: { id: 't1' }, kind: 'answer', text: 'Done.' },
   })
 })
 
@@ -220,12 +243,12 @@ test('current is the running turn of either kind, null after it ends', () => {
   const tracker = new TurnTracker()
   assert.equal(tracker.current, null)
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
-  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: false })
+  assert.deepEqual(tracker.current, { id: 't1' })
   tracker.turnCompleted('t1', 'Renamed.', 'answer')
   assert.equal(tracker.current, null)
   tracker.submitted(ID)
   tracker.turnStarted('t2', framed(ID), 'voice', 1000)
-  assert.deepEqual(tracker.current, { turnId: 't2', isVoice: true })
+  assert.deepEqual(tracker.current, { id: 't2', request: ID })
   tracker.turnCompleted('t2', 'Three files.', 'answer')
   assert.equal(tracker.current, null)
 })
@@ -251,7 +274,7 @@ test('a turn still held when the next one starts ended unseen', () => {
   tracker.turnStarted('t1', 'first', 'owner', 0)
   assert.equal(tracker.takeLostTurn(), true)
   assert.deepEqual(tracker.snapshot().turns.map(([id]) => id), ['t1'])
-  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: false })
+  assert.deepEqual(tracker.current, { id: 't1' })
 })
 
 test('a held turn does not hide one the tracker never saw', () => {
@@ -265,32 +288,32 @@ test('a snapshot from before sync loads', () => {
     pending: null, followUp: { id: ID, until: 5000 }, turns: [['t1', { id: ID, isVoice: true }]],
   })
   assert.equal(tracker.running, ID)
-  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: true })
+  assert.deepEqual(tracker.current, { id: 't1', request: ID })
   assert.equal(tracker.turnCompleted('t1', 'Done.', 'answer').post?.status, 'ok')
-  assert.equal(tracker.turnStarted('t2', 'second', null, 1000)?.kind, 'start', 'nothing was typed into it')
+  assert.deepEqual(tracker.turnStarted('t2', 'second', null, 1000).map(line => line.kind), ['start'], 'nothing was typed into it')
 })
 
 test('a slash command\'s owner line is the typed text', () => {
   const tracker = new TurnTracker()
   const wrapper = '<command-message>expand</command-message>\n<command-name>/expand</command-name>'
-  assert.deepEqual(tracker.turnStarted('t1', wrapper, 'owner', 0, '/expand foo'), {
-    turnId: 't1', kind: 'typed', text: '/expand foo',
+  assert.deepEqual(tracker.turnStarted('t1', wrapper, 'owner', 0, '/expand foo').at(-1), {
+    turn: { id: 't1' }, kind: 'typed', text: '/expand foo',
   })
 })
 
 test('text typed into a running turn goes under that turn', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'first', 'owner', 0)
-  assert.deepEqual(tracker.typedInto('t1', 'second'), { turnId: 't1', kind: 'typed', text: 'second' })
+  assert.deepEqual(tracker.typedInto('t1', 'second'), { turn: { id: 't1' }, kind: 'typed', text: 'second' })
 })
 
 /** A hook may rewrite a prompt on its way in: `turn.start` holds what entered, the line what was typed. */
 test('a queued prompt is claimed by what entered', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'first', 'owner', 0)
-  assert.deepEqual(tracker.typedInto('t1', 'second', 'second, rewritten'), { turnId: 't1', kind: 'typed', text: 'second' })
+  assert.deepEqual(tracker.typedInto('t1', 'second', 'second, rewritten'), { turn: { id: 't1' }, kind: 'typed', text: 'second' })
   tracker.turnCompleted('t1', 'One.', 'answer')
-  assert.equal(tracker.turnStarted('t2', 'second, rewritten', null, 1000), null)
+  assert.deepEqual(tracker.turnStarted('t2', 'second, rewritten', null, 1000), [])
 })
 
 /** Terminal, ADR 0001 (m): at Enter the prompt carries the running turn's id; its own turn starts after that turn. */
@@ -299,8 +322,8 @@ test('a queued prompt\'s own turn is the owner\'s and posts no prompt again', ()
   tracker.turnStarted('t1', 'first', 'owner', 0)
   tracker.typedInto('t1', 'second')
   tracker.turnCompleted('t1', 'Done with the first.', 'answer')
-  assert.equal(tracker.turnStarted('t2', 'second', null, 1000), null)
-  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: false })
+  assert.deepEqual(tracker.turnStarted('t2', 'second', null, 1000), [])
+  assert.deepEqual(tracker.current, { id: 't1' })
 })
 
 test('a queued prompt\'s answer goes under the first turn\'s id', () => {
@@ -310,7 +333,7 @@ test('a queued prompt\'s answer goes under the first turn\'s id', () => {
   tracker.turnCompleted('t1', 'Done with the first.', 'answer')
   tracker.turnStarted('t2', 'second', null, 1000)
   assert.deepEqual(tracker.turnCompleted('t2', 'Done with the second.', 'answer'), {
-    post: null, sync: { turnId: 't1', kind: 'answer', text: 'Done with the second.' },
+    post: null, sync: { turn: { id: 't1' }, kind: 'answer', text: 'Done with the second.' },
   })
 })
 
@@ -320,10 +343,10 @@ test('a chain of queued prompts keeps the first id', () => {
   tracker.typedInto('t1', 'second')
   tracker.turnCompleted('t1', 'One.', 'answer')
   tracker.turnStarted('t2', 'second', null, 1000)
-  assert.deepEqual(tracker.typedInto('t2', 'third'), { turnId: 't1', kind: 'typed', text: 'third' })
+  assert.deepEqual(tracker.typedInto('t2', 'third'), { turn: { id: 't1' }, kind: 'typed', text: 'third' })
   tracker.turnCompleted('t2', 'Two.', 'answer')
   tracker.turnStarted('t3', 'third', null, 2000)
-  assert.equal(tracker.turnCompleted('t3', 'Three.', 'answer').sync?.turnId, 't1')
+  assert.deepEqual(tracker.turnCompleted('t3', 'Three.', 'answer').sync?.turn, { id: 't1' })
 })
 
 test('two prompts queued at once each find their own turn', () => {
@@ -332,9 +355,9 @@ test('two prompts queued at once each find their own turn', () => {
   tracker.typedInto('t1', 'second')
   tracker.typedInto('t1', 'third')
   tracker.turnCompleted('t1', 'One.', 'answer')
-  assert.equal(tracker.turnStarted('t2', 'second', null, 1000), null)
+  assert.deepEqual(tracker.turnStarted('t2', 'second', null, 1000), [])
   tracker.turnCompleted('t2', 'Two.', 'answer')
-  assert.equal(tracker.turnStarted('t3', 'third', null, 2000), null)
+  assert.deepEqual(tracker.turnStarted('t3', 'third', null, 2000), [])
 })
 
 /** A prompt typed while a tool runs folds in: no turn of its own will claim what was remembered. */
@@ -345,7 +368,7 @@ test('a folded prompt leaves nothing remembered', () => {
   tracker.turnCompleted('t1', 'Done.', 'answer')
   tracker.turnStarted('t2', 'A peer session wrote.', null, 1000)
   tracker.turnCompleted('t2', 'Noted.', 'answer')
-  assert.deepEqual(tracker.turnStarted('t3', 'yes', null, 2000), { turnId: 't3', kind: 'start' })
+  assert.deepEqual(tracker.turnStarted('t3', 'yes', null, 2000), [{ turn: { id: 't3' }, kind: 'start' }])
 })
 
 test('the owner typing a folded prompt again is a prompt of its own', () => {
@@ -353,7 +376,7 @@ test('the owner typing a folded prompt again is a prompt of its own', () => {
   tracker.turnStarted('t1', 'first', 'owner', 0)
   tracker.typedInto('t1', 'yes')
   tracker.turnCompleted('t1', 'Done.', 'answer')
-  assert.deepEqual(tracker.turnStarted('t2', 'yes', 'owner', 1000), { turnId: 't2', kind: 'typed', text: 'yes' })
+  assert.deepEqual(tracker.turnStarted('t2', 'yes', 'owner', 1000).at(-1), { turn: { id: 't2' }, kind: 'typed', text: 'yes' })
 })
 
 /** Its `turn.start` holds the expansion, not what was typed: the window the owner accepted. */
@@ -363,7 +386,7 @@ test('a queued slash command stays other', () => {
   tracker.typedInto('t1', '/expand foo')
   tracker.turnCompleted('t1', 'Done.', 'answer')
   const wrapper = '<command-message>expand</command-message>'
-  assert.deepEqual(tracker.turnStarted('t2', wrapper, null, 1000), { turnId: 't2', kind: 'start' })
+  assert.deepEqual(tracker.turnStarted('t2', wrapper, null, 1000), [{ turn: { id: 't2' }, kind: 'start' }])
 })
 
 test('a prompt typed into a voice turn takes the voice turn\'s id', () => {
@@ -373,7 +396,7 @@ test('a prompt typed into a voice turn takes the voice turn\'s id', () => {
   tracker.typedInto('t1', 'second')
   tracker.turnCompleted('t1', 'Three files.', 'answer')
   tracker.turnStarted('t2', 'second', null, 1000)
-  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: false })
+  assert.deepEqual(tracker.current, { id: 't1' })
 })
 
 /** A refused prompt must stay refused through its answer, across a reload too. */
@@ -383,9 +406,9 @@ test('a queued prompt survives a reload', () => {
   tracker.typedInto('t1', 'second')
   const restored = new TurnTracker(JSON.parse(JSON.stringify(tracker.snapshot())))
   restored.turnCompleted('t1', 'One.', 'answer')
-  assert.equal(restored.turnStarted('t2', 'second', null, 1000), null)
+  assert.deepEqual(restored.turnStarted('t2', 'second', null, 1000), [])
   const again = new TurnTracker(JSON.parse(JSON.stringify(restored.snapshot())))
-  assert.equal(again.turnCompleted('t2', 'Two.', 'answer').sync?.turnId, 't1')
+  assert.deepEqual(again.turnCompleted('t2', 'Two.', 'answer').sync?.turn, { id: 't1' })
 })
 
 test('aRefusedSubmissionIsNoLongerPending', () => {

@@ -199,9 +199,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
       }
     }
     if (route === 'sync') {
-      const held = world.decision?.turnId === body.turnId ? world.decision : null
-      const isAdmitted = held ? held.isAdmitted && !(body.kind === 'typed' && world.isPausing) : !world.isPausing
-      world.decision = { turnId: body.turnId, isAdmitted }
+      const held = world.decision?.turnId === body.turn.id ? world.decision : null
+      const isFirstAdmitted = body.turn.request !== undefined || !world.isPausing
+      const isAdmitted = (held?.isAdmitted ?? isFirstAdmitted) && !(body.kind === 'typed' && world.isPausing)
+      world.decision = { turnId: body.turn.id, isAdmitted }
       if (isAdmitted && body.text !== undefined) world.kept.push(body.text)
       if (world.holdSync !== null) await world.holdSync
     }

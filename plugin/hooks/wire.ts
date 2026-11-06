@@ -51,12 +51,18 @@ export type JoinBody = {
   syncs?: boolean; missed?: boolean;
 };
 /**
+ * The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
+ * answer belongs to; absent from a turn with none behind it. A spoken reply that makes a typed
+ * turn a voice turn adds it to the turn's later lines.
+ */
+export type TurnRef = { id: string; request?: RequestId };
+/**
  * `start`: a turn's first word, which takes the turn's decision and records nothing; the only kind
  * with no `text`. `typed`: the owner's words, the only kind that refuses a turn. `answer`: Claude's
  * final answer. `report`: the mod's own line, which goes as Claude's.
  */
 export type SyncKind = 'start' | 'typed' | 'answer' | 'report';
-export type SyncBody = { sessionId: SessionId; turnId: string; kind: SyncKind; text?: string };
+export type SyncBody = { sessionId: SessionId; turn: TurnRef; kind: SyncKind; text?: string };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 
@@ -70,10 +76,10 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  * `question`, with `approval`: Claude asked the owner this and waits for the reply, which the
  * voice may hand over as a `reply` work item; without it, a permission prompt waits, which the
  * voice only reports. `text`, with `approval`: what Claude wrote in the step that pauses.
- * `typedTurn`: the turn's id when it is not a voice turn.
+ * `turn`: the main-loop turn it belongs to; absent between turns.
  */
 export type ActivityBody =
-  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; typedTurn?: string };
+  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; turn?: TurnRef };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
 /**

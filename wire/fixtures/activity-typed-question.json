@@ -3,5 +3,7 @@
   "sessionId": "00000000-0000-0000-0000-000000000001",
   "state": "approval",
   "text": "Two folders hold build output.",
-  "typedTurn": "00000000-0000-0000-0000-0000000000a1"
+  "turn": {
+    "id": "00000000-0000-0000-0000-0000000000a1"
+  }
 }

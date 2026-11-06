@@ -109,14 +109,17 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   owner types after Stop with the pause on is dropped even into a turn that started synced, and
   the rest of that turn stops syncing, as its answer may repeat it. The own turn of a prompt typed
   into a running turn keeps that turn's decision.
-  A voice turn typed into so has no line to refuse, but its answer may repeat it too: the
-  request closes as failed, with its text neither recorded nor said.
+  A voice turn holds nothing of the owner's until the owner types into it, so its start refuses
+  nothing and marks nothing, whatever the call: only what was typed under the pause is dropped, and
+  its answer goes as an answer, past the turn's decision. A voice turn typed into so is refused like
+  any other, and its answer may repeat the text too: the request closes as failed, with its text
+  neither recorded nor said.
 - **A spoken reply makes the rest of the turn a voice turn** (the owner's decision). When the owner
   answers a typed turn's question by voice, the voice hands it off and the line waits for a result
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is
   spoken like any voice turn's. With another voice request already waiting behind that turn, the
-  answer is spoken as an update to it. Answered at the keyboard, the turn stays typed and its answer
-  is context: the owner is at the Mac.
+  answer is spoken as an update to it. Either way the turn's later lines name that request. Answered
+  at the keyboard, the turn stays typed and its answer is context: the owner is at the Mac.
 - **Text typed into a running turn** (a `prompt.submit` with a `turnId`, voice turns included) is
   the owner's words and is synced as a typed owner line (my call).
 - **Only the owner's words are the owner's** (my call). A prompt from another agent, plugin or
@@ -126,9 +129,10 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   rolled off the kept window or past what codex's seed limits carry, the next line loads a fresh
   summary itself and the menu says the session is out of sync (my call): the voice never silently
   forgets turns while the menu says it is current.
-- **The mod sends, the app decides.** The mod posts every main-loop turn that is not already a
-  voice request's answer, whatever the call state; the app applies the pause setting and records
-  out-of-sync. The mod needs no setting of the app's.
+- **The mod reports facts, the app decides policy.** Every main-loop turn opens with a `start`, a
+  voice turn's included, and every line and activity names its turn. The mod posts a turn's answer
+  as a line unless it is a voice request's, whatever the call state; the app applies the pause
+  setting and records out-of-sync. The mod needs no setting of the app's.
 - **Out of sync has two causes,** and they differ only in whether a line may load a summary
   itself:
   - *missed*: a turn the app did not receive (the app was not running, the session was not joined,
@@ -143,7 +147,8 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   tell it from speech.
 - **Older peers.** A newer mod against an older app gets an unknown route and carries on as today.
   An older mod against a newer app (its join does not say it syncs) leaves its session permanently
-  *missed*, so its lines load a summary as they do now.
+  *missed*, so its lines load a summary as they do now. It reports only its voice turns and names
+  no turn, so what it reports is said as ever, and no pause refuses it.
 - **No change to the permission boundary.** The approval notice from a typed turn is a notice; the
   mod still declares no `tool.check` hook.
 
@@ -155,7 +160,8 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   `background` turn outside the follow-up window, whose answer today goes nowhere) is posted to
   the app: the owner's prompt text for a typed turn (not for background, whose prompt is not the
   owner's words), and Claude's final answer when the turn completes with an answer. Posting the
-  prompt at the turn's start lets an open line know before Claude finishes.
+  prompt at the turn's start lets an open line know before Claude finishes. Every main-loop turn
+  opens with a `start`, which takes its decision, so the app has a real turn.
 - The guards on the AskUserQuestion `tool.call` and `classic.PermissionRequest` hooks widen from
   "a voice turn is running" to "a main-loop turn is running and the session is joined". The race
   between a spoken reply and the keyboard stays as it is for questions. A spoken reply tells the
@@ -174,11 +180,14 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
 
 ### Wire
 
-One new route, mod to app, for a synced line: the session, its turn, its `kind`, and its text; and
-on join, whether the session syncs at all and whether it missed a turn. `kind` is what the line is:
-`start`, a turn's first word, which takes its decision and is the only kind with no text; `typed`,
-the owner's words, the only kind that refuses a turn; `answer`, Claude's final answer; `report`, the
-mod's own line. Speaker and tag follow from it: `[TYPED]` as the owner's, or `[CLAUDE]` as Claude's.
+One new route, mod to app, for a synced line: the session, its `turn`, its `kind`, and its text;
+and on join, whether the session syncs at all and whether it missed a turn. Every main-loop line and
+activity carries `turn: { id, request? }`: the turn, and the voice request its answer belongs to, if
+one does; an activity between turns has none, and neither has a released mod's. `kind` is what the
+line is: `start`, a turn's first word, which takes its decision and is the only kind with no text;
+`typed`, the owner's words, the only kind that refuses a turn; `answer`, Claude's final answer;
+`report`, the mod's own line. Speaker and tag follow from it: `[TYPED]` as the owner's, or `[CLAUDE]`
+as Claude's.
 A reply work item names the request its turn's answer belongs to. New fixtures for each shape, `/Users/example`, `Example session`,
 `00000000-…` ids. `Wire.swift`, `plugin/hooks/wire.ts` and `wire/fixtures/` change together.
 `StatusReply` tells the mod nothing new, unless the builder needs the target's out-of-sync state
@@ -194,8 +203,8 @@ for the band.
   slot. A line opened later is seeded with it.
 - An answer under a request a newer one superseded is not said, and the mod is told it was taken,
   so it is a synced line of Claude's, unless it failed or its request is withheld.
-- With the pause setting on and the call `off`, a synced line is dropped and its session marked
-  *paused*.
+- With the pause setting on and the call `off`, a line of a turn with no voice request behind it
+  is dropped, as is a `typed` line of any turn, and its session marked *paused*.
 - `openLine` requests a summary only when the session has no context or is *missed* (and not
   *paused*); `Settings.autoContext` and its toggle in `SettingsView` go, and decoding an old
   settings file ignores the key.

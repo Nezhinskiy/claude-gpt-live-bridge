@@ -43,10 +43,12 @@ const WORK: Shape = {
   ],
 }
 
+const TURN = fields<Wire.TurnRef>({ id: S, request: optional(S) })
+
 const SHAPES: Record<string, Shape> = {
   'activity': fields<Wire.ActivityBody>({
     sessionId: S, state: { oneOf: ['idle', 'working', 'approval'] }, question: optional(S),
-    text: optional(S), typedTurn: optional(S),
+    text: optional(S), turn: optional(TURN),
   }),
   'answer': fields<Wire.AnswerBody>({
     sessionId: S, id: S, status: { oneOf: ['ok', 'failed', 'question', 'update'] }, text: S,
@@ -63,7 +65,7 @@ const SHAPES: Record<string, Shape> = {
   }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
   'sync': fields<Wire.SyncBody>({
-    sessionId: S, turnId: S, kind: { oneOf: ['start', 'typed', 'answer', 'report'] }, text: optional(S),
+    sessionId: S, turn: TURN, kind: { oneOf: ['start', 'typed', 'answer', 'report'] }, text: optional(S),
   }),
   'target': fields<Wire.TargetBody>({ sessionId: S }),
 }
@@ -93,7 +95,7 @@ function mismatches(value: unknown, shape: Shape, at: string): string[] {
 test('everyWireFixtureParsesIntoItsType', () => {
   const dir = `${import.meta.dirname}/../../../wire/fixtures`
   const names = readdirSync(dir).filter(name => name.endsWith('.json'))
-  assert.ok(names.length >= 26)
+  assert.ok(names.length >= 28)
   for (const name of names) {
     const shape = SHAPES[name.replace(/(-[a-z]+)*\.json$/, '')]
     assert.ok(shape, `${name}: no wire type for this fixture`)

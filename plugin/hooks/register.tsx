@@ -12,7 +12,7 @@ import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
-import type { AnswerStatus, LimitWindowBody, VoiceRequest, Work } from './wire.ts'
+import type { AnswerStatus, LimitWindowBody, TurnRef, VoiceRequest, Work } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
@@ -452,8 +452,8 @@ async function startHere(): Promise<void> {
 /** What the step that pauses wrote, as the activity's `text`; none when it wrote nothing. */
 const wrote = (text: string) => (text === '' ? {} : { text })
 
-/** Names a main-loop turn that is not a voice turn: the app decides on it as on its lines. */
-const typedTurn = ({ turnId, isVoice }: { turnId: string; isVoice: boolean }) => (isVoice ? {} : { typedTurn: turnId })
+/** Names the main-loop turn an activity belongs to, for the app; none between turns. */
+const under = (turn: TurnRef | null) => (turn === null ? {} : { turn })
 
 /** Whether a tool's run, failure or denial settles the permission request being reported. */
 function settles(e: { tool_name: string; agent_id?: string }): boolean {
@@ -468,8 +468,8 @@ function settles(e: { tool_name: string; agent_id?: string }): boolean {
  */
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
   const turn = tracker.current
-  if (turn) await postSync($, { turnId: turn.turnId, kind: 'report', text })
-  await link?.activity('working')
+  if (turn) await postSync($, { turn, kind: 'report', text })
+  await link?.activity('working', under(turn))
 }
 
 /** The tool ran, or failed, so the prompt was allowed. */
@@ -574,14 +574,14 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      const line = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
+      const lines = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
       noteLostTurn()
       lastOrigin = null
       lastPrompt = undefined
       await serial(() => follow($, false))  // /clear: the line goes under the session's new id
       await trySave($)
-      if (line) await postSync($, line)
-      await link?.activity('working')
+      for (const line of lines) await postSync($, line)
+      await link?.activity('working', under(tracker.current))
     }
     return next(e)
   })
@@ -608,6 +608,7 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       await promptGone($)
+      const turn = tracker.current
       const { post, sync } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
       noteLostTurn()
       staleSummary()
@@ -616,7 +617,7 @@ export const register: Register = on => {
       if (sync) await postSync($, sync)
       const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
       if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
-      await link?.activity('idle')
+      await link?.activity('idle', under(turn))
     }
     return next(e)
   })
@@ -632,7 +633,7 @@ export const register: Register = on => {
     const spoken = new Promise<Reply>(resolve => { answerQuestion = resolve })
     try {
       await link.activity('approval', {
-        question: askedText(e.questions), ...wrote(tracker.takeStepText()), ...typedTurn(turn),
+        question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn,
       })
       // Over at once: a reply from here on has no question, whatever posting the answer takes.
       const first = await Promise.race([answered, spoken]).finally(() => { answerQuestion = null })
@@ -642,10 +643,10 @@ export const register: Register = on => {
         return { result: { questions: e.questions, answers: {}, response: spokenReply(first) } }
       }
       const result = first.isError === true ? undefined : first.result
-      await postSync($, { turnId: turn.turnId, ...keyboardAnswer(result) })
+      await postSync($, { turn, ...keyboardAnswer(result) })
       return first
     } finally {
-      await link?.activity('working')
+      await link?.activity('working', under(tracker.current))
     }
   }).catch(($, e, next) => next(e))
 
@@ -656,7 +657,7 @@ export const register: Register = on => {
     const turn = tracker.current
     if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
       approval = { tool: e.tool_name, agent: e.agent_id }
-      const said = e.agent_id === undefined ? { ...wrote(tracker.takeStepText()), ...typedTurn(turn) } : {}
+      const said = e.agent_id === undefined ? { ...wrote(tracker.takeStepText()), turn } : {}
       await link.activity('approval', said)
     }
     return next(e)
@@ -666,7 +667,7 @@ export const register: Register = on => {
   on('classic.PostToolUseFailure', async ($, e, next) => (await toolRan($, e), next(e)))
     .catch(($, e, next) => next(e))
   // Auto mode's refusal, not the person's: nothing to tell the voice but that it goes on.
-  on('classic.PermissionDenied', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+  on('classic.PermissionDenied', async ($, e, next) => (settles(e) && (await link?.activity('working', under(tracker.current))), next(e)))
     .catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {

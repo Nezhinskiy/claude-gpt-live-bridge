@@ -70,9 +70,9 @@ microphone or Claude:
   its own, and only the 20 conversations used last are kept; New conversation keeps a
   *paused* mark and the turn's decision, which the pause needs after it. A synced line (below) is
   recorded by `Bridge.sync` once `Continuity.admits` takes it: with the pause setting on and the
-  call off the first line of a turn is refused and the session is marked *paused*; a Claude line
-  of a turn admitted before Stop still goes in, and an owner's line refuses the turn from there
-  on. A refused owner line also withholds the session's voice request in flight, whose
+  call off the first line of a turn with no voice request behind it is refused and the session is
+  marked *paused*; a Claude line of a turn admitted before Stop still goes in, and a `typed` line
+  refuses the turn from there on, a voice turn's too. A refused `typed` line also withholds the session's voice request in flight, whose
   answer then closes as failed with nothing of it recorded or said; a request waiting behind a
   typed turn is withheld as well, since the app cannot tell the two apart
   (`SessionRegistry.withholdAnswer`), and so are that turn's later questions and approval
@@ -171,8 +171,8 @@ that both test suites parse.
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question (`forRequest` names the request the turn's answer now belongs to) or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
-| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `typedTurn` the turn's id when it is not a voice turn |
-| `POST /v1/sync` | `sessionId`, `turnId`, `kind` and `text`: a line of a turn that is not a voice request, and the mod's keyboard-answer and settled-prompt lines under any main-loop turn, a voice turn included. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
+| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `turn` the main-loop turn it belongs to: `{ id, request? }`, `request` being the voice request the turn's answer belongs to; absent between turns and from a released mod |
+| `POST /v1/sync` | `sessionId`, `turn`, `kind` and `text`: a line of a main-loop turn. A voice turn posts its `start`, what is typed into it and the mod's lines; its answer goes by `/v1/answer`. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
 | `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |

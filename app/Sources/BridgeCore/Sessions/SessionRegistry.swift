@@ -198,11 +198,6 @@ public actor SessionRegistry {
     if sessions[id]?.hasOpenRequest == false { sessions[id]?.latest = nil }
   }
 
-  /// Whether the request in flight is withheld, so its turn's text stays out as its answer does.
-  public func isAnswerWithheld(of id: SessionID) -> Bool {
-    sessions[id]?.inFlight?.isWithheld == true
-  }
-
   /// Records an answer. `ok`, `failed` and `question` close the request in flight; `update`
   /// closes nothing. An answer under a withheld request closes it as failed, whatever its status,
   /// and none of its text goes on.

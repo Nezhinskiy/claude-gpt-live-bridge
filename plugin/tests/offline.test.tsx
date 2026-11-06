@@ -81,7 +81,7 @@ test('anOlderAppWithNoSyncRouteTakesTheTurnAsBefore', async ($, on) => {
   world.syncStatus = 404
   await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
   await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: { id: 't1' } }, { sessionId: ID, state: 'idle', turn: { id: 't1' } }])
 })
 
 test('joiningAgainOpensTheAppAgain', async ($, on) => {

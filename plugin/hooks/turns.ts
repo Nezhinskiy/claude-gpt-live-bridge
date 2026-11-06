@@ -2,7 +2,7 @@
 // the other main-loop turns the app is sent. Pure: the hooks feed it `prompt.submit` origins and
 // the main loop's turn starts and ends.
 import { voiceRequestId } from './prompt.ts'
-import type { AnswerStatus, RequestId, SyncBody } from './wire.ts'
+import type { AnswerStatus, RequestId, SyncBody, TurnRef } from './wire.ts'
 
 /**
  * In characters: under the app's 131,072-byte body limit even at four UTF-8 bytes each; the app
@@ -50,6 +50,10 @@ const FAILURE: Record<TurnOutcome, string> = {
   refusal: 'the model refused the request',
   error: 'the turn ended with an error',
 }
+
+/** How the wire names a turn: by the id its lines go under, with the request its answer belongs to. */
+const refOf = (turnId: string, turn: Tracked): TurnRef =>
+  ({ id: turn.linesUnder ?? turnId, ...(turn.id !== null && { request: turn.id }) })
 
 /** The first `limit` characters of `text`, counted as code points, so no surrogate pair is cut. */
 export function clip(text: string, limit: number): string {
@@ -103,10 +107,10 @@ export class TurnTracker {
     return null
   }
 
-  /** The main-loop turn running, by the id its lines go under; null between turns. */
-  get current(): { turnId: string; isVoice: boolean } | null {
+  /** The main-loop turn running, as the wire names it; null between turns. */
+  get current(): TurnRef | null {
     const running = this.#latest
-    return running && { turnId: running.turn.linesUnder ?? running.turnId, isVoice: running.turn.isVoice }
+    return running && refOf(running.turnId, running.turn)
   }
 
   /** The turn that started last: main-loop turns run one at a time. */
@@ -164,19 +168,23 @@ export class TurnTracker {
    * turn claims it.
    */
   typedInto(turnId: string, text: string, entered = text): SyncLine {
-    const lines = this.#turns.get(turnId)?.linesUnder ?? turnId
-    this.#typed.push({ text: entered, turnId: lines })
-    return { turnId: lines, kind: 'typed', text }
+    const turn = refOf(turnId, this.#turns.get(turnId) ?? { id: null, isVoice: false })
+    this.#typed.push({ text: entered, turnId: turn.id })
+    return { turn, kind: 'typed', text }
   }
 
   /**
-   * A main-loop turn started at `now` (ms): the line it opens with, if any. An owner's turn opens
-   * with its prompt; any other turn that is not a voice request's answer with a `start`, which
-   * takes the turn's decision. `text` is `turn.start`'s, which names the voice request; `prompt`
-   * is `prompt.submit`'s, what was typed. `origin` is null when no `prompt.submit` came first: so
-   * starts the turn of a prompt typed into the turn before it, whose lines stay under that id.
+   * A main-loop turn started at `now` (ms): the lines it opens with. Every turn opens with a
+   * `start`, which takes its decision, and an owner's turn with its prompt after that. `text` is
+   * `turn.start`'s, which names the voice request; `prompt` is `prompt.submit`'s, what was typed.
+   * `origin` is null when no `prompt.submit` came first: so starts the turn of a prompt typed into
+   * the turn before it, whose lines stay under that id and which has that turn's decision.
    */
-  turnStarted(turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt = text): SyncLine | null {
+  turnStarted(turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt = text): SyncLine[] {
+    const opened = (turn: Tracked): SyncLine[] => {
+      this.#turns.set(turnId, turn)
+      return [{ turn: refOf(turnId, turn), kind: 'start' }]
+    }
     // Main-loop turns run one at a time: one still held never reported its end.
     if (this.#turns.size > 0) this.#isTurnLost = true
     this.#turns.clear()
@@ -186,23 +194,21 @@ export class TurnTracker {
     // Prompts before the one claimed folded in; with none claimed, every one did.
     this.#typed = claimed === undefined ? [] : this.#typed.slice(at + 1)
     if (id !== null) {
-      this.#turns.set(turnId, { id, isVoice: true })
       this.#followUp = { id, until: now + FOLLOW_UP_MS }
       if (this.#pending === id) this.#pending = null
-      return null
+      return opened({ id, isVoice: true })
     }
     if (claimed !== undefined) {
       this.#turns.set(turnId, { id: null, isVoice: false, linesUnder: claimed.turnId })
       this.#followUp = null
-      return null
+      return []
     }
     if (origin === 'background' && this.#followUp !== null && now < this.#followUp.until) {
-      this.#turns.set(turnId, { id: this.#followUp.id, isVoice: false })
-      return null
+      return opened({ id: this.#followUp.id, isVoice: false })
     }
-    this.#turns.set(turnId, { id: null, isVoice: false })
     this.#followUp = null
-    return origin === 'owner' ? { turnId, kind: 'typed', text: prompt } : { turnId, kind: 'start' }
+    const lines = opened({ id: null, isVoice: false })
+    return origin === 'owner' ? [...lines, { turn: { id: turnId }, kind: 'typed', text: prompt }] : lines
   }
 
   /**
@@ -229,7 +235,7 @@ export class TurnTracker {
     const text = answer.trim()
     const isAnswered = outcome === 'answer' && text !== ''
     if (turn.id === null) {
-      return { post: null, sync: isAnswered ? { turnId: turn.linesUnder ?? turnId, kind: 'answer', text } : null }
+      return { post: null, sync: isAnswered ? { turn: refOf(turnId, turn), kind: 'answer', text } : null }
     }
     if (!turn.isVoice) return { post: isAnswered ? { id: turn.id, status: 'update', text } : null, sync: null }
     if (outcome !== 'answer' || text === '') return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }

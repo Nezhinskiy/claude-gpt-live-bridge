@@ -7,6 +7,8 @@ const START = { cwd: '/Users/example/Dev/example-project', surface: 'terminal', 
 const OTHER = '22222222-0000-0000-0000-000000000003'
 const REQUEST: Work = { kind: 'request', id: '00000000-0000-0000-0000-00000000000a', brief: 'Delete the build folder', transcript: [] }
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
+const TYPED = { id: 't1' }
+const VOICE = { id: 't1', request: REQUEST.id }
 declare const setTimeout: (fn: () => void, ms: number) => unknown
 /** Lets whatever is not held run as far as it can. */
 const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
@@ -143,7 +145,7 @@ test('aTurnRunningThroughClearKeepsItsTurn', async ($, on) => {
   world.sessionId = OTHER
   await world.clock.advance(1000)
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
-  expect(world.take('sync')).toEqual([{ sessionId: OTHER, turnId: 't1', kind: 'answer', text: 'Nothing.' }])
+  expect(world.take('sync')).toEqual([{ sessionId: OTHER, turn: { id: 't1' }, kind: 'answer', text: 'Nothing.' }])
 })
 
 test('aTurnRunningThroughAReloadKeepsItsLines', async ($, on) => {
@@ -154,7 +156,7 @@ test('aTurnRunningThroughAReloadKeepsItsLines', async ($, on) => {
   await $.session.start(START)
   world.take('sync')
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
-  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', kind: 'answer', text: 'Nothing.' }])
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turn: { id: 't1' }, kind: 'answer', text: 'Nothing.' }])
 })
 
 /** It started while the mod was away, so neither its prompt nor its answer went to the app. */
@@ -199,7 +201,7 @@ test('aSnapshotThatFailsCostsATurnNothing', async ($, on) => {
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
   expect(world.take('sync')).toHaveLength(2)
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }, { sessionId: ID, state: 'idle', turn: TYPED }])
 })
 
 test('aSnapshotThatFailsCostsARenamedTurnNothing', async ($, on) => {
@@ -209,7 +211,7 @@ test('aSnapshotThatFailsCostsARenamedTurnNothing', async ($, on) => {
   world.isStoreBroken = true
   world.title = 'Renamed session'
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
 })
 
 /** /clear gives the session a new id, whose join runs in `turn.start`; forgetting the old key can fail there. */
@@ -223,7 +225,7 @@ test('aStoreThatFailsAfterClearCostsATurnNothing', async ($, on) => {
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
   expect(world.joined).toEqual(new Set([OTHER]))
   expect(world.take('sync').map(line => line?.sessionId)).toEqual([OTHER])
-  expect(world.take('activity')).toEqual([{ sessionId: OTHER, state: 'working' }])
+  expect(world.take('activity')).toEqual([{ sessionId: OTHER, state: 'working', turn: TYPED }])
 })
 
 test('aSnapshotThatFailsCostsAVoiceAnswerNothing', async ($, on) => {
@@ -237,7 +239,7 @@ test('aSnapshotThatFailsCostsAVoiceAnswerNothing', async ($, on) => {
   world.isStoreBroken = true
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Deleted.' })
   expect(world.take('answer')).toHaveLength(1)
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle', turn: VOICE }])
 })
 
 test('aSnapshotThatFailsDoesNotHideALostAnswer', async ($, on) => {
@@ -252,7 +254,7 @@ test('aSnapshotThatFailsDoesNotHideALostAnswer', async ($, on) => {
   world.answerStatus = 409
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Deleted.' })
   expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(true)
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle', turn: VOICE }])
 })
 
 test('offLeaves', async ($, on) => {
@@ -273,7 +275,7 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, missed: true }])
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
 })
 
 test('bareCommandShowsTheStatus', async ($, on) => {
