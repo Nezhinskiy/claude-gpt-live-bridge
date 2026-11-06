@@ -565,6 +565,7 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       await promptGone($)
+      if (tracker.current === null) link?.noteGap()  // it started while the mod was away
       const { post, sync } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
       staleSummary()
       approval = null

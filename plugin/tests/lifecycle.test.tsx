@@ -157,6 +157,18 @@ test('aTurnRunningThroughAReloadKeepsItsLines', async ($, on) => {
   expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'claude', text: 'Nothing.' }])
 })
 
+/** It started while the mod was away, so neither its prompt nor its answer went to the app. */
+test('aTurnTheModNeverSawStartIsAGap', async ($, on) => {
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.take('join')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+})
+
 test('offLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
