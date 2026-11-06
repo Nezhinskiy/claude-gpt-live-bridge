@@ -123,6 +123,21 @@ public struct ContextBody: Codable, Sendable, Equatable {
   public var summary: String
 }
 
+/// One usage window as the mod reads it from Claude Code: `kind` is `five_hour` or `seven_day`
+/// (others are ignored), `percentUsed` is 0 to 100 and `resetsAt` an ISO 8601 time, omitted when
+/// the engine gave none.
+public struct LimitWindowBody: Codable, Sendable, Equatable {
+  public var kind: String
+  public var percentUsed: Double
+  public var resetsAt: String?
+}
+
+/// `POST /v1/limits`: Claude's usage windows, as one joined session read them.
+public struct LimitsBody: Codable, Sendable, Equatable {
+  public var sessionId: SessionID
+  public var windows: [LimitWindowBody]
+}
+
 public enum CallAction: String, Codable, Sendable { case start, stop, mute, unmute }
 
 /// `POST /v1/call`: Start, Stop, Mute or Unmute from the Claude Code band.

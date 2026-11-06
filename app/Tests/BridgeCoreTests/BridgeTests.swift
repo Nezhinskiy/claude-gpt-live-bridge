@@ -1468,4 +1468,78 @@ struct BridgeTests {
     #expect(await bridge.status.problem == "No microphone is connected.")
     #expect(await audio.calls.contains("stopListening"))
   }
+
+  // MARK: Claude's usage limits
+
+  static let reset = "2026-01-01T06:00:00Z"
+  static let resetDate = Date(timeIntervalSince1970: 1_767_247_200)
+
+  @discardableResult
+  func limits(_ windows: [LimitWindowBody], from id: SessionID? = nil) async throws
+    -> HTTPResponse
+  {
+    try await post("/v1/limits", LimitsBody(sessionId: id ?? a, windows: windows))
+  }
+
+  @Test func aReadingReachesTheUpdate() async throws {
+    try await join(a, "Alpha")
+    #expect(await bridge.current.claudeLimits == nil)
+    try await limits([
+      LimitWindowBody(kind: "five_hour", percentUsed: 23.5, resetsAt: Self.reset),
+      LimitWindowBody(kind: "seven_day", percentUsed: 7, resetsAt: nil),
+    ])
+    let reading = try #require(await bridge.current.claudeLimits)
+    #expect(reading.fiveHour == LimitWindow(usedPercent: 23.5, resetsAt: Self.resetDate))
+    #expect(reading.week == LimitWindow(usedPercent: 7, resetsAt: nil))
+    #expect(reading.readAt == time.now)
+  }
+
+  @Test func anUnknownKindIsIgnored() async throws {
+    try await join(a, "Alpha")
+    try await limits([LimitWindowBody(kind: "spend_limit", percentUsed: 90, resetsAt: nil)])
+    #expect(await bridge.current.claudeLimits == nil)
+  }
+
+  @Test func anIdleSessionDoesNotLowerTheFigures() async throws {
+    try await join(a, "Alpha")
+    try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: Self.reset)])
+    try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 12, resetsAt: Self.reset)])
+    #expect(await bridge.current.claudeLimits?.fiveHour?.usedPercent == 40)
+  }
+
+  @Test func anUnjoinedSessionIsIgnored() async throws {
+    try await join(a, "Alpha")
+    let reply = try await limits(
+      [LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: nil)], from: b)
+    #expect(reply.status == 200)
+    #expect(await bridge.current.claudeLimits == nil)
+  }
+
+  @Test func theReadingOutlivesTheLastSession() async throws {
+    try await join(a, "Alpha")
+    try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: Self.reset)])
+    try await post("/v1/leave", LeaveBody(sessionId: a))
+    #expect(await bridge.current.claudeLimits?.fiveHour?.usedPercent == 40)
+  }
+
+  @Test func aResetThatDoesNotParseIsNoReset() async throws {
+    try await join(a, "Alpha")
+    try await limits([
+      LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: "tomorrow"),
+      LimitWindowBody(kind: "seven_day", percentUsed: 5, resetsAt: "2026-01-01T06:00:00.250Z"),
+    ])
+    let reading = try #require(await bridge.current.claudeLimits)
+    #expect(reading.fiveHour == LimitWindow(usedPercent: 40, resetsAt: nil))
+    #expect(reading.week?.resetsAt == Self.resetDate.addingTimeInterval(0.25))
+  }
+
+  @Test func theStatusDoesNotChange() async throws {
+    try await join(a, "Alpha")
+    try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: nil)])
+    let json =
+      try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(await bridge.status)) as? [String: Any]
+    #expect(
+      Set(try #require(json).keys) == ["call", "sessions", "minutesToday", "unheard", "isMuted"])
+  }
 }

@@ -58,6 +58,14 @@ export type ActivityBody =
   { sessionId: SessionId; state: SessionActivity; question?: string; text?: string };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
+/**
+ * One usage window as the engine reports it: `kind` is `five_hour` or `seven_day` (the app
+ * ignores others), `percentUsed` 0 to 100, `resetsAt` an ISO 8601 time, omitted when absent.
+ */
+export type LimitWindowBody = { kind: string; percentUsed: number; resetsAt?: string };
+/** Claude's usage windows, as this session read them. */
+export type LimitsBody = { sessionId: SessionId; windows: LimitWindowBody[] };
+
 export type CallAction = 'start' | 'stop' | 'mute' | 'unmute';
 export type CallBody = { action: CallAction };
 
