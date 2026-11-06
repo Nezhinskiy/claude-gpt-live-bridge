@@ -13,14 +13,16 @@ the status section at most 50 lines); detail lives in the documents it links to.
   microphone or Claude; `LiveBridge` is the menu bar app and its hidden audio page.
 - `plugin/`: the mod. `hooks/register.tsx` is the wiring; the other `hooks/*.ts` modules are pure.
 - `wire/fixtures/`: one JSON example of every message between the mod and the app.
-- `scripts/`: `check.sh`, `smoke.sh`, `build-app.sh`.
+- `scripts/`: `check.sh`, `check-mod.sh`, `check-floor.sh`, `smoke.sh`, `build-app.sh`.
 - `docs/`: the [architecture](docs/architecture/overview.md), [ADRs](docs/adr/), and the
   stayfixed scaffold ([CONTRIBUTING.md](CONTRIBUTING.md#stayfixed) says what each file is for).
 
 ## Build and test
 
-- `scripts/check.sh` runs every check CI runs and must exit 0 before a commit. Without `claude`
-  on `PATH` it skips the mod's engine-facing half and says so; CI does not skip it.
+- `scripts/check.sh` runs every check CI runs but the floor run, and must exit 0 before a commit.
+  Without `claude` on `PATH` it skips the mod's engine-facing half and says so; CI does not skip
+  it. `scripts/check-floor.sh`, the floor run, repeats that half on the lowest Claude Code the
+  README promises; it downloads that version, so only CI runs it by default.
 - `scripts/smoke.sh` drives the real codex end to end and spends your ChatGPT plan's
   realtime voice (the cost is in the script's header), so run it for changes to the voice path,
   not for every change.
