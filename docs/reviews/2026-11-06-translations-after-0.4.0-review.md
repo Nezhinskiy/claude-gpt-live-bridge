@@ -17,7 +17,7 @@ loses a limit.
 | `README.es.md:468` | `tus propias sesiones` → `tus propios inicios de sesión` | `README.md:438` "under your own logins" | Right. "Sesiones" read as Claude Code sessions; these are the `gh` and `claude` logins. Matches the file's own "inicio de sesión" (line 28). |
 | `README.uk.md:410` | `ваша мова й мова голосу` → `ваші слова й слова голосу` | `README.md:393` "your speech and the voice's" | Right. "Мова" also means language, so the old line could read as "your language and the voice's". "Слова" is a little looser than "speech"; see note 1. |
 | `README.uk.md:459` | `лічильник хвилин` → `лічильник використання` | `README.md:441` "the usage meter" | Right. Both are true of the code: `UsageMeter` keeps open intervals in `usage.json`, and minutes are derived. Promises nothing new. |
-| `README.uk.md:520` | `Запит` → `Промпт` | `README.md:497` "A prompt" | Right, and worth having. The file uses "запит" for a voice request, a different thing, 62 lines mention it, and this bullet is about what is not one. |
+| `README.uk.md:520` | `Запит` → `Промпт` | `README.md:497` "A prompt" | Right, and worth having. The file uses "запит" for a voice request ("голосовий запит"), a different thing, and this bullet is about what is not one. |
 | `README.uk.md:523` | `запити` → `промпти` | `README.md:500` "which prompts count as yours" | Right. Same term as line 520, so the bullet reads as one thing. |
 
 ## The open question: "lines that fail"
@@ -72,7 +72,7 @@ English, Spanish, Hindi and Chinese, so keep it.
    leaves speech out too. Correct the body when the fix goes in.
 3. Three of the changed lines are 100 to 102 characters. Nothing checks this, and these files
    already have longer ones.
-4. CI's `check` was still pending at the time of writing; it needs to be green before merge.
+4. CI's `check` passed on `d278249`; it runs again on the fix.
 
 ## Outside this PR
 
