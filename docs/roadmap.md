@@ -6,7 +6,7 @@ prose above the trail marker.
 
 ## Now
 
-0.4.0 is out, with conversation sync and the usage limits in the menu. A short demo recording
+0.4.1 is out, on 0.4.0's conversation sync and usage limits in the menu. A short demo recording
 follows it.
 
 ## Next
