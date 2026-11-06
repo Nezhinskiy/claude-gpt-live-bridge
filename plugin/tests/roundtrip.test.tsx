@@ -180,7 +180,7 @@ test('claudesQuestionIsAnsweredByVoice', async ($, on) => {
     sessionId: ID, state: 'approval',
     question: 'Which name should the folder get? Options: build: the default; out: shorter.',
   }])
-  world.work.push({ kind: 'reply', ...SPOKEN })
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
   await world.clock.advance(1000)
   expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
@@ -278,7 +278,7 @@ test('claudesQuestionAnsweredAtTheKeyboard', async ($, on) => {
   world.answerDialog('out')
   expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'out' } })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
-  world.work.push({ kind: 'reply', ...SPOKEN })
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
   await world.clock.advance(1000)
   expect(world.logs.some(line => line.includes('came after the question was answered'))).toBe(true)
   expect(world.submitted).toHaveLength(1)

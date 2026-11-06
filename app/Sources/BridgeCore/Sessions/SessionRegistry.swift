@@ -142,7 +142,7 @@ public actor SessionRegistry {
       if let reply = session.reply {
         session.reply = nil
         session.isAsking = false
-        return .reply(reply)
+        return .reply(reply, forRequest: session.inFlight?.id ?? reply.id)
       }
       if session.inFlight == nil, !session.queued.isEmpty {
         let request = session.queued.removeFirst()

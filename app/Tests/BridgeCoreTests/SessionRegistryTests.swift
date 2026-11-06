@@ -142,7 +142,7 @@ struct SessionRegistryTests {
     _ = try await registry.poll(a)
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
     try await registry.enqueue(request(2), for: a)
-    #expect(try await registry.poll(a) == .reply(request(2)))
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(1).id))
     #expect(try await registry.poll(a) == nil)
     #expect(try await registry.complete(answer(request(1)))?.text == "done")
     // the question was answered: the next handoff is a request again

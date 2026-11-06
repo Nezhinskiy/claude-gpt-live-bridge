@@ -1,5 +1,5 @@
 // The JSON messages between the mod and the app: `POST /v1/join|leave|answer|activity|context|
-// target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
+// sync|target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
 // `wire/fixtures` holds an example of each and `plugin/hooks/wire.ts` mirrors these types; a
 // change here changes both. Optional fields are omitted when absent, never `null`.
 
@@ -33,23 +33,28 @@ public struct VoiceRequest: Codable, Sendable, Equatable {
 }
 
 /// Work for a session, tagged by `kind`: `{"kind":"request", <VoiceRequest>}`,
-/// `{"kind":"reply", <VoiceRequest>}` (the owner's reply to the question Claude is waiting on,
-/// for the request already in flight) or `{"kind":"context"}` (summarise the session for the
+/// `{"kind":"reply", <VoiceRequest>, "forRequest"}` (the owner's reply to the question Claude is
+/// waiting on; `forRequest` is the request its answer belongs to) or `{"kind":"context"}` (summarise the session for the
 /// voice).
 public enum Work: Sendable, Equatable {
   case request(VoiceRequest)
-  case reply(VoiceRequest)
+  /// `forRequest`: the request the turn's answer belongs to, the one in flight once this reply
+  /// goes out.
+  case reply(VoiceRequest, forRequest: RequestID)
   case context
 }
 
 extension Work: Codable {
   private enum Kind: String, Codable { case request, reply, context }
-  private enum CodingKeys: String, CodingKey { case kind }
+  private enum CodingKeys: String, CodingKey { case kind, forRequest }
 
   public init(from decoder: any Decoder) throws {
     switch try decoder.container(keyedBy: CodingKeys.self).decode(Kind.self, forKey: .kind) {
     case .request: self = .request(try VoiceRequest(from: decoder))
-    case .reply: self = .reply(try VoiceRequest(from: decoder))
+    case .reply:
+      let forRequest = try decoder.container(keyedBy: CodingKeys.self)
+        .decode(RequestID.self, forKey: .forRequest)
+      self = .reply(try VoiceRequest(from: decoder), forRequest: forRequest)
     case .context: self = .context
     }
   }
@@ -60,8 +65,9 @@ extension Work: Codable {
     case .request(let request):
       try container.encode(Kind.request, forKey: .kind)
       try request.encode(to: encoder)
-    case .reply(let request):
+    case .reply(let request, let forRequest):
       try container.encode(Kind.reply, forKey: .kind)
+      try container.encode(forRequest, forKey: .forRequest)
       try request.encode(to: encoder)
     case .context:
       try container.encode(Kind.context, forKey: .kind)
@@ -81,6 +87,21 @@ public struct JoinBody: Codable, Sendable, Equatable {
   /// The mod's version, from its own plugin.json; absent from a mod from before this field, or
   /// one that could not read it.
   public var modVersion: String?
+  /// `true` from a mod that posts sync lines (`POST /v1/sync`); absent from one that does not.
+  public var syncs: Bool?
+  /// `true`: a turn of this session did not arrive, so the voice's picture of it has a gap.
+  public var missed: Bool?
+}
+
+public enum SyncSource: String, Codable, Sendable { case owner, claude }
+
+/// `POST /v1/sync`: a line of a turn that is not a voice request. Empty `text`, at a turn's
+/// start, takes the turn's decision and records nothing.
+public struct SyncBody: Codable, Sendable, Equatable {
+  public var sessionId: SessionID
+  public var turnId: String
+  public var from: SyncSource
+  public var text: String
 }
 
 /// `POST /v1/leave`.
@@ -109,12 +130,13 @@ public enum SessionActivity: String, Codable, Sendable { case idle, working, app
 /// `POST /v1/activity`. `question`, with `approval`: Claude asked the owner this in a voice
 /// turn and waits for the reply, which the voice may hand over as `Work.reply`; without it, a
 /// permission prompt waits, which the voice only reports. `text`, with `approval`: what Claude
-/// wrote in the step that pauses.
+/// wrote in the step that pauses. `typedTurn`: the turn's id when it is not a voice turn.
 public struct ActivityBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var state: SessionActivity
   public var question: String?
   public var text: String?
+  public var typedTurn: String?
 }
 
 /// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`.

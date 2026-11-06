@@ -568,7 +568,8 @@ struct BridgeTests {
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question))
     #expect(await voice.added == ["[ASKING] Alpha: \(question)"])
     voice.emit(.handoff(request(2)))
-    #expect(try await eventually { try await registry.poll(a) == .reply(request(2)) })
+    let reply = Work.reply(request(2), forRequest: request(1).id)
+    #expect(try await eventually { try await registry.poll(a) == reply })
   }
 
   /// A handoff queued for a session is confirmed by a sound, so the owner can tell a request

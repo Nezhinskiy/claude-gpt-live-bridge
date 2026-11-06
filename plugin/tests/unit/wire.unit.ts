@@ -37,7 +37,7 @@ const WORK: Shape = {
       kind: { oneOf: ['request'] }, id: S, brief: S, transcript: { list: UTTERANCE },
     }),
     fields<Extract<Wire.Work, { kind: 'reply' }>>({
-      kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE },
+      kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE }, forRequest: S,
     }),
     fields<Extract<Wire.Work, { kind: 'context' }>>({ kind: { oneOf: ['context'] } }),
   ],
@@ -46,7 +46,7 @@ const WORK: Shape = {
 const SHAPES: Record<string, Shape> = {
   'activity': fields<Wire.ActivityBody>({
     sessionId: S, state: { oneOf: ['idle', 'working', 'approval'] }, question: optional(S),
-    text: optional(S),
+    text: optional(S), typedTurn: optional(S),
   }),
   'answer': fields<Wire.AnswerBody>({
     sessionId: S, id: S, status: { oneOf: ['ok', 'failed', 'question', 'update'] }, text: S,
@@ -55,9 +55,10 @@ const SHAPES: Record<string, Shape> = {
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop', 'mute', 'unmute'] } }),
   'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
-  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S) }),
+  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S), syncs: optional('boolean'), missed: optional('boolean') }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
+  'sync': fields<Wire.SyncBody>({ sessionId: S, turnId: S, from: { oneOf: ['owner', 'claude'] }, text: S }),
   'target': fields<Wire.TargetBody>({ sessionId: S }),
 }
 
@@ -86,9 +87,9 @@ function mismatches(value: unknown, shape: Shape, at: string): string[] {
 test('everyWireFixtureParsesIntoItsType', () => {
   const dir = `${import.meta.dirname}/../../../wire/fixtures`
   const names = readdirSync(dir).filter(name => name.endsWith('.json'))
-  assert.ok(names.length >= 13)
+  assert.ok(names.length >= 23)
   for (const name of names) {
-    const shape = SHAPES[name.replace(/(-[a-z]+)?\.json$/, '')]
+    const shape = SHAPES[name.replace(/(-[a-z]+)*\.json$/, '')]
     assert.ok(shape, `${name}: no wire type for this fixture`)
     assert.deepEqual(mismatches(JSON.parse(readFileSync(`${dir}/${name}`, 'utf8')), shape, name), [])
   }

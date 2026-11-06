@@ -1,5 +1,7 @@
 // The JSON messages between the mod and LiveBridge.app, mirroring
-// app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). Optional
+// app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). The routes:
+// `POST /v1/join|leave|answer|activity|context|sync|target|call` and `GET /v1/next?sessionId=`,
+// which answers a PollReply. Optional
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
 // `removed`; also the reply to its join unless `owner` is true), 413 body over 131072 bytes.
@@ -23,10 +25,13 @@ export type Utterance = { role: Role; text: string };
 
 /** brief: the voice model's self-contained request; transcript: the speech since the last one. */
 export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance[] };
-/** `reply`: the owner's reply to the question Claude is waiting on, for the request in flight. */
+/**
+ * `reply`: the owner's reply to the question Claude is waiting on. `forRequest` is the request
+ * the turn's answer belongs to: the one in flight once this reply goes out.
+ */
 export type Work =
   | ({ kind: 'request' } & VoiceRequest)
-  | ({ kind: 'reply' } & VoiceRequest)
+  | ({ kind: 'reply'; forRequest: RequestId } & VoiceRequest)
   | { kind: 'context' };
 
 /**
@@ -35,10 +40,18 @@ export type Work =
  * says the owner asked for it (`/live on`): only such a join brings back a session the owner
  * removed, any other is answered 410 `removed`; absent means false. `modVersion` is this mod's
  * version, from its plugin.json; absent from a mod from before the field, or one that could not
- * read it, and Settings then lists the session as on the old mod. Whether a new target is asked
- * for its summary is the app's own setting, not the join's.
+ * read it, and Settings then lists the session as on the old mod. `syncs: true` says this mod
+ * posts its turns as sync lines (POST /v1/sync), so the app may rely on what it has recorded of
+ * the session; absent, the app asks for a summary as before. `missed: true` says a turn of the
+ * session did not arrive, so the voice's picture of it has a gap.
  */
-export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string };
+export type JoinBody = {
+  sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string;
+  syncs?: boolean; missed?: boolean;
+};
+/** `from`: the owner's typed line or Claude's text. Empty `text`, at a turn's start, takes the turn's decision and records nothing. */
+export type SyncSource = 'owner' | 'claude';
+export type SyncBody = { sessionId: SessionId; turnId: string; from: SyncSource; text: string };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 
@@ -52,10 +65,10 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  * `question`, with `approval`: Claude asked the owner this in a voice turn and waits for the
  * reply, which the voice may hand over as a `reply` work item; without it, a permission prompt
  * waits, which the voice only reports. `text`, with `approval`: what Claude wrote in the step
- * that pauses.
+ * that pauses. `typedTurn`: the turn's id when it is not a voice turn.
  */
 export type ActivityBody =
-  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string };
+  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; typedTurn?: string };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
 export type CallAction = 'start' | 'stop' | 'mute' | 'unmute';
