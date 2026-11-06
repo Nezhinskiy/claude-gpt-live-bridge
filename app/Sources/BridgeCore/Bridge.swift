@@ -241,10 +241,9 @@ public actor Bridge: Router {
         if let delivery { await deliver(delivery) }
       case ("POST", "/v1/answer"):
         let body = try req.decodeBody(AnswerBody.self)
-        if let delivery = try await registry.complete(body) {
-          await deliver(delivery)
-        } else {
-          await keepSuperseded(body)
+        switch try await registry.complete(body) {
+        case .delivery(let delivery): await deliver(delivery)
+        case .superseded: await keepSuperseded(body)
         }
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))

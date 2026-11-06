@@ -3,6 +3,13 @@ import Testing
 
 @testable import BridgeCore
 
+extension Completion {
+  /// What is to be said, if anything.
+  var delivery: Delivery? {
+    if case .delivery(let delivery) = self { delivery } else { nil }
+  }
+}
+
 struct SessionRegistryTests {
   let time = TestTime()
   let registry: SessionRegistry
@@ -128,9 +135,9 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
     try await registry.enqueue(request(2), for: a)
-    #expect(try await registry.complete(answer(request(1))) == nil)
+    #expect(try await registry.complete(answer(request(1))) == .superseded)
     _ = try await registry.poll(a)
-    let delivery = try await registry.complete(answer(request(2)))
+    let delivery = try await registry.complete(answer(request(2))).delivery
     #expect(delivery == Delivery(session: a, label: "Example session", status: .ok, text: "done"))
   }
 
@@ -144,7 +151,7 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(2), for: a)
     #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(1).id))
     #expect(try await registry.poll(a) == nil)
-    #expect(try await registry.complete(answer(request(1)))?.text == "done")
+    #expect(try await registry.complete(answer(request(1))).delivery?.text == "done")
     // the question was answered: the next handoff is a request again
     try await registry.enqueue(request(3), for: a)
     #expect(try await registry.poll(a) == .request(request(3)))
@@ -158,7 +165,7 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(2), for: a)
     #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
     #expect(await registry.hasOpenRequests)
-    #expect(try await registry.complete(answer(request(2)))?.text == "done")
+    #expect(try await registry.complete(answer(request(2))).delivery?.text == "done")
     #expect(await !registry.hasOpenRequests)
   }
 
@@ -173,7 +180,7 @@ struct SessionRegistryTests {
     await #expect(throws: RegistryError.unknownRequest(request(2).id)) {
       try await registry.complete(answer(request(2)))
     }
-    #expect(try await registry.complete(answer(request(1)))?.text == "done")
+    #expect(try await registry.complete(answer(request(1))).delivery?.text == "done")
     #expect(await !registry.hasOpenRequests)
   }
 
@@ -184,9 +191,9 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(2), for: a)
     try await registry.enqueue(request(3), for: a)
     #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
-    #expect(try await registry.complete(answer(request(2))) == nil)
+    #expect(try await registry.complete(answer(request(2))) == .superseded)
     #expect(try await registry.poll(a) == .request(request(3)))
-    #expect(try await registry.complete(answer(request(3)))?.text == "done")
+    #expect(try await registry.complete(answer(request(3))).delivery?.text == "done")
   }
 
   /// A question answered in Claude Code before the reply went out leaves that reply to go as a
@@ -199,7 +206,7 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(2), for: a)
     await registry.setActivity(ActivityBody(sessionId: a, state: .working))
     #expect(try await registry.poll(a) == nil)
-    #expect(try await registry.complete(answer(request(1))) == nil)
+    #expect(try await registry.complete(answer(request(1))) == .superseded)
     #expect(try await registry.poll(a) == .request(request(2)))
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval))
     try await registry.enqueue(request(3), for: a)
@@ -210,10 +217,11 @@ struct SessionRegistryTests {
     await join(a)
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    #expect(try await registry.complete(answer(request(1), .update))?.status == .update)
-    #expect(try await registry.complete(answer(request(1), .question))?.status == .question)
+    #expect(try await registry.complete(answer(request(1), .update)).delivery?.status == .update)
+    let question = try await registry.complete(answer(request(1), .question))
+    #expect(question.delivery?.status == .question)
     // After the request closed, a later update is still tied to it.
-    #expect(try await registry.complete(answer(request(1), .update))?.status == .update)
+    #expect(try await registry.complete(answer(request(1), .update)).delivery?.status == .update)
     await #expect(throws: RegistryError.self) { try await registry.complete(answer(request(1))) }
   }
 
@@ -291,7 +299,7 @@ struct SessionRegistryTests {
     try await registry.join(JoinBody(sessionId: c, title: "Alpha", replaces: a))
     #expect(await registry.target == c)
     #expect(await registry.rows().map(\.sessionId) == [c, b])
-    let delivery = try await registry.complete(answer(request(1), from: c))
+    let delivery = try await registry.complete(answer(request(1), from: c)).delivery
     #expect(delivery == Delivery(session: c, label: "Alpha", status: .ok, text: "done"))
   }
 

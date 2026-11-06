@@ -8,6 +8,14 @@ public struct Delivery: Sendable, Equatable {
   public var text: String
 }
 
+/// What became of an answer the session posted.
+public enum Completion: Sendable, Equatable {
+  /// To be said.
+  case delivery(Delivery)
+  /// A newer request superseded its request: it is not said.
+  case superseded
+}
+
 public enum RegistryError: Error, Equatable {
   case unknownSession(SessionID)
   /// The id is not this session's open request (or, for an `update`, its latest one).
@@ -175,8 +183,8 @@ public actor SessionRegistry {
   public func requestContext(for id: SessionID) { sessions[id]?.wantsContext = true }
 
   /// Records an answer. `ok`, `failed` and `question` close the request in flight; `update`
-  /// closes nothing. Returns `nil` when a newer request superseded this one.
-  public func complete(_ answer: AnswerBody) throws -> Delivery? {
+  /// closes nothing.
+  public func complete(_ answer: AnswerBody) throws -> Completion {
     let label = labels()[answer.sessionId]
     return try update(answer.sessionId) { session in
       let isInFlight = session.inFlight?.id == answer.id
@@ -188,9 +196,10 @@ public actor SessionRegistry {
         guard isInFlight else { throw RegistryError.unknownRequest(answer.id) }
         session.inFlight = nil
       }
-      guard session.latest == answer.id, let label else { return nil }
+      guard session.latest == answer.id, let label else { return .superseded }
       let text = answer.text.isEmpty ? answer.reason ?? "" : answer.text
-      return Delivery(session: answer.sessionId, label: label, status: answer.status, text: text)
+      return .delivery(
+        Delivery(session: answer.sessionId, label: label, status: answer.status, text: text))
     }
   }
 
