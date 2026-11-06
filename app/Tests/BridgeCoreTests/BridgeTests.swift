@@ -1655,4 +1655,135 @@ struct BridgeTests {
     #expect(try await sync(a, "Fix the build.").status == 404)
     #expect(try saved()[a].lines.isEmpty)
   }
+
+  // MARK: Questions and approvals from typed turns
+
+  /// Claude's question in a turn the owner typed, on the target after an owner line, is said and
+  /// opens the closed line.
+  @Test func aTypedTurnsQuestionOpensTheTargetsLine() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    try await sync(a, "Rename the folder.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    #expect(await eventually { await voice.opens.count == 1 })
+    #expect(
+      await voice.opens.last?.map(\.text).contains("[TYPED] Alpha: Rename the folder.") == true)
+  }
+
+  @Test func aTypedTurnsApprovalOpensTheTargetsLine() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    try await sync(a, "Delete the build folder.")
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .approval, typedTurn: "turn-1"))
+    #expect(await eventually { await voice.opens.count == 1 })
+  }
+
+  /// A typed turn's question in a session that is not the target is context: no chime, nothing
+  /// unheard, no route for the next handoff, no line opened.
+  @Test func anotherSessionsTypedQuestionIsContextOnly() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    try await sync(b, "Rename the folder.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    #expect(await bridge.status.unheard == 0)
+    #expect(await !audio.calls.contains("chime"))
+    #expect(await bridge.status.call == .listening)
+    #expect(await voice.opens.isEmpty)
+    await bridge.audioEvent(.speechStarted)  // the line opens with Alpha, the target
+    voice.emit(.handoff(request(1)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
+    #expect(try await registry.poll(b) == nil)
+    await bridge.setTarget(b)
+    #expect(
+      await lines() == [
+        "You: [TYPED] Beta: Rename the folder.", "Claude: [ASKING] Beta: Which name?",
+      ])
+  }
+
+  /// A question still open when its session becomes the target is in the seed, and the next
+  /// handoff is its reply.
+  @Test func aQuestionStillOpenAtASwitchIsAnswerable() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    try await sync(b, "Rename the folder.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    await bridge.setTarget(b)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.last?.map(\.text).contains("[ASKING] Beta: Which name?") == true)
+    voice.emit(.handoff(request(1)))
+    let reply = Work.reply(request(1), forRequest: request(1).id)
+    #expect(try await eventually { try await registry.poll(b) == reply })
+  }
+
+  /// A voice turn's question in another session is delivered as before.
+  @Test func anotherSessionsVoiceTurnQuestionChimesAsBefore() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    #expect(await bridge.status.unheard == 1)
+    #expect(await audio.calls.contains("chime"))
+  }
+
+  /// A turn the pause refused leaves no trace: its question is not recorded, and the registry
+  /// is not asking.
+  @Test func aRefusedTurnsQuestionGoesNowhere() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: test.a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    #expect(await test.lines().isEmpty)
+    #expect(await test.bridge.status.unheard == 0)
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    #expect(try await test.registry.poll(test.a) == .request(test.request(1)))
+  }
+
+  /// A subagent's prompt already has the session waiting; a refused turn's question after it
+  /// must still not make the session ask.
+  @Test func aRefusedTurnIsCheckedWhilePausedOnAnotherPrompt() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/activity", ActivityBody(sessionId: test.a, state: .approval))
+    try await test.sync(test.a, "Private thing.")
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: test.a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    #expect(try await test.registry.poll(test.a) == .request(test.request(1)))
+    // only the subagent's prompt is kept, not the refused turn's question
+    #expect(
+      await test.lines() == ["Claude: [APPROVAL] Alpha: Claude is waiting for your approval"])
+  }
+
+  /// The owner answers a typed turn's question by voice: the mod answers the reply under its
+  /// own id, and the answer is delivered and spoken.
+  @Test func aSpokenReplyToATypedQuestionIsAwaited() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await sync(a, "Rename the folder.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    voice.emit(.handoff(request(1)))
+    let reply = Work.reply(request(1), forRequest: request(1).id)
+    #expect(try await eventually { try await registry.poll(a) == reply })
+    let answered = try await post(
+      "/v1/answer",
+      AnswerBody(sessionId: a, id: request(1).id, status: .ok, text: "Renamed.", reason: nil))
+    #expect(answered.status == 200)
+    #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Renamed."] })
+  }
 }

@@ -540,25 +540,45 @@ public actor Bridge: Router {
   /// A session that starts waiting for approval sends the voice a notice, which goes once the
   /// approval is settled. A question Claude asked goes to the voice whole, and the next handoff
   /// is routed to that session as its reply. Either carries what Claude wrote before it.
+  /// From a turn the owner typed (`typedTurn`) in a session that is not the target, either is
+  /// context only: kept in its conversation, with no chime and no route. From a turn the pause
+  /// refused, neither is kept or said, and the registry is told of no question.
   private func activity(_ body: ActivityBody) async {
-    guard let row = try? await label(of: body.sessionId) else { return }
+    let id = body.sessionId
+    guard let row = try? await label(of: id) else { return }
+    var body = body
+    if let turn = body.typedTurn {
+      let before = continuity[id].turn
+      let pausing = pausesSync() && machine.phase == .off
+      let admitted = continuity.admits(turn: turn, from: .claude, in: id, pausing: pausing)
+      if continuity[id].turn != before || !admitted { save() }
+      guard admitted else {
+        body.question = nil
+        await registry.setActivity(body)
+        return
+      }
+    }
     await registry.setActivity(body)
     switch (row.activity == .approval, body.state == .approval) {
     case (false, true):
-      if let question = body.question {
-        if machine.phase != .off { questionRoute = body.sessionId }
-        await say(
+      let line =
+        if let question = body.question {
           AnswerShaper.line(
             .asking, label: row.label,
             body: AnswerShaper.paused(AnswerShaper.prose(question), wrote: body.text),
-            session: body.sessionId))
-      } else {
-        await say(
+            session: id)
+        } else {
           AnswerShaper.line(
             .approval, label: row.label,
             body: AnswerShaper.paused("Claude is waiting for your approval", wrote: body.text),
-            session: body.sessionId))
+            session: id)
+        }
+      if body.typedTurn != nil, await registry.target != id {
+        record(.claude, line.text, in: id)
+        break
       }
+      if body.question != nil, machine.phase != .off { questionRoute = id }
+      await say(line)
     case (true, false):
       if questionRoute == body.sessionId { questionRoute = nil }
       await withdraw { $0.session == body.sessionId && [.approval, .asking].contains($0.kind) }

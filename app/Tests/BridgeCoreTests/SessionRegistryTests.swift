@@ -150,6 +150,45 @@ struct SessionRegistryTests {
     #expect(try await registry.poll(a) == .request(request(3)))
   }
 
+  /// A reply to a question the request in flight did not ask (a typed turn's) is itself the
+  /// request in flight: its answer closes it.
+  @Test func aReplyWithNothingInFlightGoesInFlight() async throws {
+    await join(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
+    #expect(await registry.hasOpenRequests)
+    #expect(try await registry.complete(answer(request(2)))?.text == "done")
+    #expect(await !registry.hasOpenRequests)
+  }
+
+  /// With a request in flight the reply is for that request, which its answer still closes.
+  @Test func aReplyLeavesARequestInFlightAlone() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(1).id))
+    await #expect(throws: RegistryError.unknownRequest(request(2).id)) {
+      try await registry.complete(answer(request(2)))
+    }
+    #expect(try await registry.complete(answer(request(1)))?.text == "done")
+    #expect(await !registry.hasOpenRequests)
+  }
+
+  /// A request queued after the reply is the newer one: only its answer is delivered.
+  @Test func aReplyLeavesLatestToANewerQueuedRequest() async throws {
+    await join(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    try await registry.enqueue(request(3), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
+    #expect(try await registry.complete(answer(request(2))) == nil)
+    #expect(try await registry.poll(a) == .request(request(3)))
+    #expect(try await registry.complete(answer(request(3)))?.text == "done")
+  }
+
   /// A question answered in Claude Code before the reply went out leaves that reply to go as a
   /// request of its own; an approval without a question takes no reply.
   @Test func replyOutlivingItsQuestionGoesAsARequest() async throws {
