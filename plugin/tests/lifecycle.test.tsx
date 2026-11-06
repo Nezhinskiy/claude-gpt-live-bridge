@@ -30,6 +30,32 @@ test('joinSaysItSyncs', async ($, on) => {
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true }])
 })
 
+/** Disabling the mod ends no session, so its key stays: enabled again, the snapshot is all there is. */
+test('aTurnWhileTheModWasOffIsAGap', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  world.take('join')
+  world.turns = 2
+  await $.session.start(START)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
+test('aReloadWithNoNewTurnIsNoGap', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  world.take('join')
+  await $.session.start(START)
+  expect(world.take('join').map(body => body?.missed)).toEqual([undefined])
+})
+
 test('aTurnBeforeJoiningIsMissed', async ($, on) => {
   // /live on in a session with turns: the app got none of them.
   const world = fakeWorld(on)

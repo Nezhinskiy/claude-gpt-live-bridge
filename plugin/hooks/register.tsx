@@ -84,7 +84,9 @@ const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
  */
 async function save($: EngineInterface): Promise<void> {
   if (!link?.session) return
-  await $.store.set(joinedKey(link.session.sessionId), { ...tracker.snapshot(), hasGap: link.hasGap }).catch(() => {})
+  const key = joinedKey(link.session.sessionId)
+  const sessionTurns = await turnCount($)
+  await $.store.set(key, { ...tracker.snapshot(), hasGap: link?.hasGap, sessionTurns }).catch(() => {})
 }
 
 /**
@@ -349,13 +351,14 @@ function showContext($: EngineInterface, context: Band['context']) {
   })
 }
 
+/** How many prompts the session has had; undefined when the engine does not say. */
+function turnCount($: EngineInterface): Promise<number | undefined> {
+  return $.session.turns().catch(() => undefined)
+}
+
 /** Whether the session has had a prompt: a new one has nothing to summarise. */
 async function hasTurns($: EngineInterface): Promise<boolean> {
-  try {
-    return (await $.session.turns()) > 0
-  } catch {
-    return true  // not known: the model says when there is nothing
-  }
+  return ((await turnCount($)) ?? 1) > 0  // not known: the model says when there is nothing
 }
 
 /**
@@ -538,8 +541,10 @@ export const register: Register = on => {
     const saved = await $.store.get(joinedKey(await $.session.id()))
     if (saved !== undefined) {
       tracker = new TurnTracker(saved as TurnSnapshot)
-      // A snapshot from before sync says nothing: none of its turns reached the app.
-      if ((saved as { hasGap?: boolean }).hasGap !== false) noteGap()
+      // A snapshot from before sync says nothing: none of its turns reached the app. More turns than
+      // the snapshot saw ran with the mod off: disabling it ends no session, so its key stayed.
+      const { hasGap, sessionTurns } = saved as { hasGap?: boolean; sessionTurns?: number }
+      if (hasGap !== false || (sessionTurns ?? Infinity) < ((await turnCount($)) ?? 0)) noteGap()
       await serial(() => turnOn($, false))
     }
     return next(e)
