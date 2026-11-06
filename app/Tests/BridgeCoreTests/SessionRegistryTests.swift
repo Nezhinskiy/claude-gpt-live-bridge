@@ -374,6 +374,56 @@ struct SessionRegistryTests {
     #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
   }
 
+  /// A closed withheld request takes no later update: it would be a follow-up of the same text.
+  @Test func aWithheldRequestClosedTakesNoUpdate() async throws {
+    try await withheld()
+    _ = try await registry.complete(answer(request(1)))
+    await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
+      try await registry.complete(answer(request(1), .update))
+    }
+  }
+
+  @Test func aWithheldRequestTimedOutTakesNoUpdate() async throws {
+    try await withheld()
+    #expect(await run(600).map(\.text) == ["timed out"])
+    await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
+      try await registry.complete(answer(request(1), .update))
+    }
+  }
+
+  /// A background turn in the follow-up window, typed into: nothing is open to mark.
+  @Test func withNothingOpenTheFollowUpEnds() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    _ = try await registry.complete(answer(request(1)))
+    await registry.withholdAnswer(of: a)
+    await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
+      try await registry.complete(answer(request(1), .update))
+    }
+  }
+
+  /// A request waiting to go out is still the one whose answer is said.
+  @Test func aQueuedRequestStaysTheLatest() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    _ = try await registry.complete(answer(request(1)))
+    try await registry.enqueue(request(2), for: a)
+    await registry.withholdAnswer(of: a)
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
+  }
+
+  /// A withheld request a newer one superseded leaves that newer one the latest.
+  @Test func aWithheldSupersededRequestLeavesTheNewerOneTheLatest() async throws {
+    try await withheld()
+    try await registry.enqueue(request(2), for: a)
+    _ = try await registry.complete(answer(request(1)))
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
+  }
+
   @Test func leavingWithAnOpenRequestFailsIt() async throws {
     await join(a)
     try await registry.enqueue(request(1), for: a)

@@ -1526,6 +1526,37 @@ struct BridgeTests {
     #expect(await eventually { await test.bridge.status.unheard == 0 })
   }
 
+  /// A later background turn's update under the withheld request: refused, so the mod notes a gap.
+  @Test func anUpdateAfterAWithheldAnswerIsRefused() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.typedIntoAVoiceTurn()
+    try await test.voiceAnswer()
+    let lines = await test.lines()
+    let reply = try await test.post(
+      "/v1/answer",
+      AnswerBody(
+        sessionId: test.a, id: test.request(1).id, status: .update,
+        text: "It repeats the private thing.", reason: nil))
+    #expect(reply.status == 409)
+    #expect(await test.lines() == lines)
+  }
+
+  /// The owner types into a background turn in the follow-up window: nothing is in flight to mark.
+  @Test func anUpdateFromABackgroundTurnTypedIntoIsRefused() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.answer(test.request(1), from: test.a)
+    let lines = await test.lines()
+    try await test.sync(test.a, turn: "background-turn", "Private thing.")
+    let reply = try await test.post(
+      "/v1/answer",
+      AnswerBody(
+        sessionId: test.a, id: test.request(1).id, status: .update,
+        text: "It repeats the private thing.", reason: nil))
+    #expect(reply.status == 409)
+    #expect(await test.lines() == lines)
+  }
+
   /// Under the pause a voice turn nobody typed into keeps its answer.
   @Test func aVoiceTurnNobodyTypedIntoKeepsItsAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)

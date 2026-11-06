@@ -191,9 +191,11 @@ public actor SessionRegistry {
 
   /// The owner typed while the sync was paused, and the turn refused it. The request in flight
   /// is that turn's, or waits behind it, so its answer may repeat what was typed: it stays out.
-  /// It can only be told apart from a voice turn nobody typed into by this.
+  /// It can only be told apart from a voice turn nobody typed into by this. With nothing open the
+  /// turn is a background one, whose answer would be an update to the last request: that ends too.
   public func withholdAnswer(of id: SessionID) {
     sessions[id]?.inFlight?.isWithheld = true
+    if sessions[id]?.hasOpenRequest == false { sessions[id]?.latest = nil }
   }
 
   /// Whether the request in flight is withheld, so its turn's text stays out as its answer does.
@@ -221,6 +223,7 @@ public actor SessionRegistry {
       guard session.latest == answer.id, let label else {
         return isWithheld ? .dropped : .superseded
       }
+      if isWithheld { session.latest = nil }  // no later update goes under it
       let text = answer.text.isEmpty ? answer.reason ?? "" : answer.text
       return .delivery(
         Delivery(
@@ -266,6 +269,7 @@ public actor SessionRegistry {
         if session.latest == flight.id, let label = labels[id] {
           deliveries.append(
             Delivery(session: id, label: label, status: .failed, text: "timed out"))
+          if flight.isWithheld { sessions[id]?.latest = nil }
         }
       }
     }

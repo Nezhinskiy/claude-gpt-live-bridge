@@ -876,6 +876,27 @@ test('aRefusedUpdateMeansAMissedJoin', async ($, on) => {
   expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(false)
 })
 
+/** Typed into under the pause, a background turn's update is refused (409): a gap, not a lost answer. */
+test('anUpdateRefusedForATurnTypedIntoIsAGap', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Started the build.' })
+  await $.prompt.submit({ text: 'A task finished.', wait: false, origin: { kind: 'task-notification' } as never })
+  await $.turn.start({ text: 'A task finished.', turnId: 't2' })
+  world.isPausing = true
+  await $.prompt.submit(composer('private', 't2'))
+  world.answerStatus = 409
+  await $.turn.complete({ ...DONE, turnId: 't2', answer: 'It repeats private.' })
+  world.take('join')
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+  expect(world.kept).toEqual([])
+  expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(false)
+})
+
 test('bandShowsTheCallAndStartsIt', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
