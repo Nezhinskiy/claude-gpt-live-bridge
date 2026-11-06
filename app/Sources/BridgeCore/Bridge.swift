@@ -711,14 +711,16 @@ public actor Bridge: Router {
     let id = body.sessionId
     let row = try await label(of: id)
     let admitted = continuity.admits(turn: body.turn, kind: body.kind, in: id, pausing: pausing)
-    save()  // the turn's decision persists, a `start`'s included
     if !admitted, body.kind == .typed, let request = body.turn.request {
       await registry.withholdAnswer(request, of: id)
     }
     guard admitted,
       let line = AnswerShaper.synced(
         body.text ?? "", kind: body.kind, label: row.label, session: id)
-    else { return }
+    else {
+      save()  // the turn's decision persists, a `start`'s included
+      return
+    }
     await addSynced(line, as: body.kind == .typed ? .owner : .claude)
   }
 
