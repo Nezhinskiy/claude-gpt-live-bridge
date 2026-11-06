@@ -175,6 +175,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         row.show(SentView(text: text))
         sent = row
         return row.item
+
+      case .limit(let row):
+        let item = native("\(path)|limit|\(row.name)", used: &used) { NSMenuItem() }
+        item.title = "\(row.name)  \(row.text)"
+        item.isEnabled = false
+        return item
       }
     }
     sync(menu, built)

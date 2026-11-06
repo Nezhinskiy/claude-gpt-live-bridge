@@ -259,3 +259,140 @@ struct MenuContentTests {
   }
 
 }
+
+struct LimitRowTests {
+  static var utc: Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    return calendar
+  }
+  static let gb = Locale(identifier: "en_GB")
+
+  /// A UTC time in November 2026; the 6th is a Friday.
+  static func at(_ day: Int, _ hour: Int, _ minute: Int) -> Date {
+    utc.date(
+      from: DateComponents(
+        year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+  }
+
+  static let now = at(6, 5, 8)
+  static let reset = at(6, 6, 4)
+  static let weekReset = at(11, 8, 1)  // a Wednesday
+
+  static func limits(
+    five: Double? = 7, week: Double? = 19, blocked: Bool = false, readAt: Date = now
+  ) -> UsageLimits {
+    UsageLimits(
+      fiveHour: five.map { LimitWindow(usedPercent: $0, resetsAt: reset) },
+      week: week.map { LimitWindow(usedPercent: $0, resetsAt: weekReset) },
+      isBlocked: blocked, readAt: readAt)
+  }
+
+  static func row(
+    _ limits: UsageLimits?, name: String = "Codex", locale: Locale = gb
+  ) -> LimitRow? {
+    LimitRow(name: name, limits: limits, now: now, calendar: utc, locale: locale)
+  }
+
+  @Test func aRowShowsBothWindows() {
+    #expect(Self.row(Self.limits())?.figures.map(\.text) == ["7% of 5 h", "19% of week"])
+  }
+
+  @Test func percentsAreRounded() {
+    #expect(Self.row(Self.limits(five: 7.5))?.figures.first?.text == "8% of 5 h")
+  }
+
+  @Test func anAbsurdPercentDoesNotCrash() {
+    let row = Self.row(Self.limits(five: 1e300, week: -5))
+    #expect(row?.figures.map(\.text) == ["100% of 5 h", "0% of week"])
+  }
+
+  @Test func aMissingWindowIsLeftOut() {
+    #expect(Self.row(Self.limits(five: nil))?.figures.map(\.text) == ["19% of week"])
+  }
+
+  @Test func noWindowAndNoBlockIsNoRow() {
+    #expect(Self.row(Self.limits(five: nil, week: nil)) == nil)
+    #expect(Self.row(nil) == nil)
+  }
+
+  @Test func aWindowPastItsResetIsLeftOut() {
+    let stale = UsageLimits(
+      fiveHour: LimitWindow(usedPercent: 50, resetsAt: Self.now - 60),
+      week: LimitWindow(usedPercent: 19, resetsAt: Self.weekReset), readAt: Self.now - 3600)
+    #expect(Self.row(stale)?.figures.map(\.text) == ["19% of week"])
+  }
+
+  @Test func aFigureShowingNinetyIsNear() {
+    let below = Self.row(Self.limits(five: 89.4, week: 89.5))
+    #expect(below?.figures.map(\.isNear) == [false, true])
+    #expect(below?.figures.last?.text == "90% of week")
+  }
+
+  @Test func aBlockWithNoWindowStillShows() {
+    let row = Self.row(Self.limits(five: nil, week: nil, blocked: true))
+    #expect(row?.isBlocked == true)
+    #expect(row?.figures.isEmpty == true)
+    #expect(row?.text == "blocked")
+  }
+
+  @Test func aBlockFollowsTheFigures() {
+    #expect(
+      Self.row(Self.limits(blocked: true))?.text == "7% of 5 h · 19% of week · blocked")
+  }
+
+  @Test func theTooltipSaysWhenEachWindowResets() {
+    #expect(
+      Self.row(Self.limits())?.tooltip
+        == "5-hour window resets at 06:04\nWeekly window resets Wed 08:01\nRead at 05:08")
+  }
+
+  @Test func timesFollowTheLocale() {
+    let tooltip = Self.row(Self.limits(), locale: Locale(identifier: "en_US"))?.tooltip ?? ""
+    #expect(tooltip.contains("resets at 6:04"))
+    #expect(tooltip.contains("resets Wed 8:01"))
+    #expect(tooltip.contains("AM"))
+  }
+
+  @Test func anOldReadingSaysItsDay() {
+    let row = Self.row(Self.limits(readAt: Self.at(2, 5, 8)))
+    #expect(row?.tooltip.hasSuffix("Read at Mon 05:08") == true)
+  }
+
+  @Test func aBlockedTooltipOpensWithTheBlock() {
+    let row = Self.row(Self.limits(blocked: true))
+    #expect(
+      row?.tooltip.components(separatedBy: "\n").first
+        == "Codex reports usage is blocked right now.")
+  }
+
+  @Test func aWindowWithNoResetHasNoResetLine() {
+    let limits = UsageLimits(
+      fiveHour: LimitWindow(usedPercent: 7, resetsAt: nil), readAt: Self.now)
+    #expect(Self.row(limits)?.tooltip == "Read at 05:08")
+  }
+
+  @Test func theMenuHoldsTheRowsAboveTheMinutes() {
+    let menu = MenuContent(
+      update: MenuContentTests.status(sessions: 0), problem: nil, contextLoad: .ready,
+      available: nil, codexLimits: Self.limits(),
+      claudeLimits: Self.limits(five: nil, week: nil, blocked: true),
+      now: Self.now, calendar: Self.utc, locale: Self.gb)
+    let lines = menu.outline
+    let at = lines.firstIndex(of: "[limit] Codex — 7% of 5 h · 19% of week")
+    #expect(at != nil)
+    guard let at else { return }
+    #expect(lines[at + 1] == "[limit] Claude — blocked")
+    #expect(lines[at + 2] == "---")
+    #expect(lines[at + 3] == "4 min this call · 31 min today (disabled)")
+    #expect(lines[at - 1] == "---")
+  }
+
+  @Test func withNoRowsTheSectionIsNotThere() {
+    let lines = MenuContentTests.menu(MenuContentTests.status(sessions: 0)).outline
+    #expect(!lines.contains { $0.hasPrefix("[limit]") })
+    let minutes = lines.firstIndex(of: "4 min this call · 31 min today (disabled)")
+    #expect(minutes.map { lines[$0 - 1] } == "---")
+    #expect(minutes.map { lines[$0 - 2] } == "Conversation (disabled)")
+  }
+}
