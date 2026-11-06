@@ -154,14 +154,19 @@ public struct Continuity: Codable, Sendable, Equatable {
 
   /// Whether a line of `turn` goes in. A turn's first line decides, and later lines keep that
   /// decision, except that a `typed` line while `pausing` refuses the turn from there on. A voice
-  /// turn holds nothing of the owner's until then, so only a `typed` line refuses it.
+  /// turn holds nothing of the owner's until then, so only a `typed` line refuses it. A line of
+  /// Claude's that opens a turn in a `paused` session stays out: the turn's `start` never arrived,
+  /// and its prompt may be the paused text.
   /// `pausing`: the pause setting is on and the call is off. Every refused line marks `paused`.
   public mutating func admits(
     turn: TurnRef, kind: SyncKind, in id: SessionID, pausing: Bool
   ) -> Bool {
     use(id) { conversation in
       let decided = conversation.turn.flatMap { $0.id == turn.id ? $0.admitted : nil }
-      let admitted = (decided ?? (turn.request != nil || !pausing)) && !(kind == .typed && pausing)
+      let isClaudes = kind == .answer || kind == .report
+      let isUnseen = isClaudes && conversation.outOfSync == .paused
+      let first = turn.request != nil || !(pausing || isUnseen)
+      let admitted = (decided ?? first) && !(kind == .typed && pausing)
       conversation.turn = Conversation.TurnDecision(id: turn.id, admitted: admitted)
       if !admitted { conversation.markPaused() }
       return admitted

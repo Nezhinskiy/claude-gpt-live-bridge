@@ -114,7 +114,8 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   its answer goes as an answer, past the turn's decision. A voice turn typed into so is refused like
   any other, and its answer may repeat the text too: the request the turn names closes as failed,
   with its text neither recorded nor said. A request that only waits behind the turn is not its
-  own and keeps its answer.
+  own and keeps its answer. A turn whose `start` never arrived has no decision, and its prompt may
+  be the paused text: while the session is *paused*, a line of Claude's opening it stays out.
 - **A spoken reply makes the rest of the turn a voice turn** (the owner's decision). When the owner
   answers a typed turn's question by voice, the voice hands it off and the line waits for a result
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is

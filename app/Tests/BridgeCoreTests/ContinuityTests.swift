@@ -180,10 +180,37 @@ extension ContinuityTests {
     #expect(continuity[a].outOfSync == .paused)
   }
 
+  /// The `start` of its turn never arrived: its prompt may be the paused text.
+  @Test(arguments: [SyncKind.answer, .report])
+  func aClaudeLineWithNoDecisionStaysOutOfAPausedSession(kind: SyncKind) {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: true)
+    #expect(!admit(&continuity, "t1", kind, a, pausing: false))
+  }
+
+  @Test func aClaudeLineWithNoDecisionGoesInOutsideThePause() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: false)
+    #expect(admit(&continuity, "t1", .answer, a, pausing: false))
+  }
+
+  /// The owner's own words with the call on are no paused line, whatever the session's mark.
+  @Test func aTypedLineWithNoDecisionGoesInToAPausedSession() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: true)
+    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
+  }
+
+  @Test func aVoiceTurnsLineWithNoDecisionGoesInToAPausedSession() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: true)
+    #expect(admit(&continuity, "t1", request: voice, .report, a, pausing: true))
+  }
+
   @Test func aNewTurnDecidesAgain() {
     var continuity = Continuity()
     #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
-    #expect(admit(&continuity, "t2", .answer, a, pausing: false))
+    #expect(admit(&continuity, "t2", .start, a, pausing: false))
     #expect(continuity[a].outOfSync == .paused)
     #expect(!admit(&continuity, "t3", .answer, a, pausing: true))
     continuity.setContext("[CONTEXT] Alpha: x", for: a)

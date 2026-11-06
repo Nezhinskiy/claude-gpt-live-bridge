@@ -2036,6 +2036,17 @@ struct BridgeTests {
     #expect(await test.lines().isEmpty)
   }
 
+  /// R-12: the owner's post failed, so the join says the session missed a turn, under the pause.
+  /// The turn's answer, which may repeat what was typed, stays off the line opened after Start.
+  @Test func anAnswerOfATurnTheAppNeverSawStaysOutOfAPausedSession() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha", missed: true)
+    await test.live()
+    try await test.sync(test.a, kind: .answer, "It repeats the private thing.")
+    #expect(await !test.voice.added.contains { $0.contains("private thing") })
+    #expect(await test.lines().isEmpty)
+  }
+
   /// The app restarts after the refused turn: its decision was saved, so its answer stays out.
   @Test func aPausedTurnsAnswerStaysOutAfterARestart() async throws {
     let test = try BridgeTests(pausesSync: true)

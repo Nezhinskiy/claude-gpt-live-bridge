@@ -68,6 +68,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     syncStatus: 200,
     /** The pause setting is on and the call is off, as `Continuity.admits` sees them. */
     isPausing: false,
+    /** The session is marked *paused*: a line was refused. */
+    isPaused: false,
     /** The last turn the app decided on, its one slot per conversation (`Continuity.admits`). */
     decision: null as { turnId: string; isAdmitted: boolean } | null,
     /** The sync lines with text the app admitted, in order. */
@@ -200,9 +202,11 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     }
     if (route === 'sync') {
       const held = world.decision?.turnId === body.turn.id ? world.decision : null
-      const isFirstAdmitted = body.turn.request !== undefined || !world.isPausing
+      const isUnseen = (body.kind === 'answer' || body.kind === 'report') && world.isPaused
+      const isFirstAdmitted = body.turn.request !== undefined || !(world.isPausing || isUnseen)
       const isAdmitted = (held?.isAdmitted ?? isFirstAdmitted) && !(body.kind === 'typed' && world.isPausing)
       world.decision = { turnId: body.turn.id, isAdmitted }
+      world.isPaused ||= !isAdmitted
       if (isAdmitted && body.text !== undefined) world.kept.push(body.text)
       if (world.holdSync !== null) await world.holdSync
     }

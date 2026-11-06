@@ -72,7 +72,8 @@ microphone or Claude:
   recorded by `Bridge.sync` once `Continuity.admits` takes it: with the pause setting on and the
   call off the first line of a turn with no voice request behind it is refused and the session is
   marked *paused*; a Claude line of a turn admitted before Stop still goes in, and a `typed` line
-  refuses the turn from there on, a voice turn's too. A refused `typed` line in a turn with a
+  refuses the turn from there on, a voice turn's too. A Claude line with no decision for its turn
+  stays out while the session is *paused*. A refused `typed` line in a turn with a
   voice request behind it (`turn.request`) also withholds exactly that request, whose answer then
   closes as failed with nothing of it recorded or said (`SessionRegistry.withholdAnswer`); a request
   waiting behind the turn is not its own and keeps its answer. A refused turn's later questions and
