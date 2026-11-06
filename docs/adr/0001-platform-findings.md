@@ -402,6 +402,40 @@ or failing (`classic.PostToolUse`, `classic.PostToolUseFailure`, both with `tool
 `classic.PermissionDenied`, or with the turn ending (`turn.complete`). Not observed: the CLI could
 not run a model turn here.
 
+**(p) Where an organization manages Claude Code.** Observed, 2026-11-06, in a throwaway Linux
+container on release builds, with a real `/etc/claude-code/managed-settings.json`, a real
+permission dialog in a terminal, a scripted local stand-in for the model and a probe mod that
+logged its hooks. `CLAUDE_CODE_MANAGED_SETTINGS_PATH` has no effect on 2.1.312, so this cannot be
+run on a Mac without a real policy file. Claude Code's built-in guard, `cc-plugin-sec-default`,
+[loads](https://code.claude.com/docs/en/plugins/mods/admin#know-what-happens-by-default) on a
+machine with managed settings or for a `/login` on a Team or Enterprise plan, unless managed
+`prependPlugins` leaves it out, and sends `classic.*` past the `user` tier. A mod from a marketplace
+copy or `--plugin-dir` sits in that tier.
+
+| Managed settings | Versions | Mod | Hooks that ran on the tool call |
+| --- | --- | --- | --- |
+| none | 2.1.301, 2.1.312, 2.1.318 | `user` tier | `tool.call`, `classic.PermissionRequest`, `classic.PostToolUse` |
+| one key about nothing here (`cleanupPeriodDays`) | 2.1.301, 2.1.312, 2.1.318 | `user` tier | `tool.call` |
+| `prependPlugins: []`, which leaves the guard out, with no dialog | 2.1.312 | `user` tier | `tool.call`, `classic.PostToolUse` |
+| a folder marketplace by absolute path, the mod by relative path, managed `enabledPlugins` | 2.1.312 | `prepend` tier | as with none, the guard loaded |
+| `allowManagedHooksOnly`, the guard's `allowManagedModsOnly`, or `disableAllHooks` | 2.1.312 | not loaded | none |
+
+The first, second and fourth rows answered a real dialog with Yes: it appeared and the tool ran.
+The rest is 2.1.312 too, except where it says otherwise. Esc on the dialog gave the same result
+without `classic.PostToolUse`. On a denial in auto mode `classic.PermissionDenied` ran only without
+the guard. `tool.call` ran for `AskUserQuestion` under the guard, so the mod's spoken questions
+keep their hook. The mod itself, from the working tree: `/live status`
+answers under the guard, each skipped hook prints a line in the session, and `/plugin` lists the
+four hooks (2.1.312 and 2.1.318); with `allowManagedHooksOnly` Claude Code answers `/live` with an
+unknown command (2.1.312).
+
+Not observed: a Team or Enterprise sign-in (documented; a Max login's debug log says the guard is
+not seated), a managed `enabledPlugins` entry for a copied plugin (documented to count as a
+user's), and a real voice line. What the owner hears comes from reading `classic.PermissionRequest`
+in `register.tsx` and `activity` in `Bridge.swift`: the plain `approval` activity has no other
+sender, so no notice is said and the app keeps showing Claude working. `claude plugin validate`
+warns of this on 2.1.301 and not on 2.1.312, where it still holds.
+
 **(j) Framing of a plugin's prompt.** Observed: `turn.start` reports a plugin's
 `$.prompt.submit({ text })` (without `asUser`) as
 

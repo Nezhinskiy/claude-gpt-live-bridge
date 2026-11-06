@@ -290,7 +290,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   tablas se quedan en la sesión, y las credenciales que reconoce se ocultan.
 - Cuando Claude hace una pregunta, la voz te la plantea y devuelve tu respuesta a esa sesión. El
   trabajo que Claude termina más tarde en segundo plano se comunica como una actualización.
-- Cuando Claude está esperando una solicitud de permiso, la voz lo dice. Tú respondes a la
+- Cuando Claude está esperando una solicitud de permiso, la voz lo dice, salvo
+  [donde una organización administra Claude Code](#limitaciones-conocidas). Tú respondes a la
   solicitud en Claude Code; LiveBridge nunca la responde por ti.
 
 ## Facturación bajo control por diseño
@@ -420,6 +421,21 @@ sesión.
   palabras comunes solo en inglés y ruso
   ([la regla](docs/architecture/overview.md#a-result-while-the-line-is-closed)). En otro idioma, un
   resultado puede contar como escuchado cuando la voz solo lo ha mencionado.
+- Donde una organización administra Claude Code, nada en LiveBridge te avisa de que hay una
+  solicitud de permiso esperando. El guardián integrado de Claude Code se carga en un equipo con
+  ajustes administrados y en una sesión iniciada con un plan Team o Enterprise, y ahí los hooks de
+  permisos del mod no se ejecutan. La solicitud sigue apareciendo en Claude Code y sigue
+  esperándote, pero la voz no dice nada de ella y la barra de menús muestra a Claude trabajando,
+  así que mira Claude Code si una respuesta parece tardar. Claude Code imprime una línea que dice
+  que el hook se omitió, y `/plugin` nombra los hooks. Las preguntas de Claude siguen llegando a
+  la voz. Con `allowManagedHooksOnly`, `allowManagedModsOnly` o `disableAllHooks` en los ajustes
+  administrados, el mod no se carga y `/live` no funciona. Un administrador puede [instalar el mod
+  como propio de la
+  organización](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods-and-set-the-order),
+  desde una carpeta en cada equipo, y entonces esos hooks se ejecutan; activar la copia del
+  marketplace en los ajustes administrados no basta. Los casos con ajustes administrados están
+  [medidos](docs/adr/0001-platform-findings.md); el caso de Team y Enterprise y el de la copia del
+  marketplace vienen de la documentación de Claude Code.
 
 ## Cómo funciona
 
