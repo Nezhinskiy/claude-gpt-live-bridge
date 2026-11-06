@@ -530,6 +530,10 @@ export const register: Register = on => {
       lastPrompt = e.text
     }
     const entered = await next(e)
+    if (e.turnId === undefined && entered.drop !== undefined) {
+      lastOrigin = null
+      lastPrompt = undefined
+    }
     // Whether it folds in or gets a turn of its own, it goes to the app now, under the running turn.
     if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
       await postSync($, tracker.typedInto(e.turnId, e.text))

@@ -793,6 +793,16 @@ test('aPromptThatDidNotEnterIsNotSynced', async ($, on) => {
   expect(world.take('sync')).toEqual([])
 })
 
+/** Blocked by a settings hook while idle: the next turn, with no `prompt.submit` of its own, is not that prompt's. */
+test('aBlockedPromptIsNotTheNextTurnsOwnerLine', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  world.isPromptDropped = true
+  await $.prompt.submit(composer('private'))
+  await $.turn.start({ text: 'Something else.', turnId: 't1' })
+  expect(world.take('sync')).toEqual([claude('t1', '')])
+})
+
 test('aVoicePromptIntoARunningTurnIsNotSynced', async ($, on) => {
   const world = fakeWorld(on)
   await joined($, world)
