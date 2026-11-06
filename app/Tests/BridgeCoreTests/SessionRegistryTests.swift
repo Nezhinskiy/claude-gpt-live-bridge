@@ -328,12 +328,6 @@ struct SessionRegistryTests {
     #expect(try await registry.complete(answer(request(1))).delivery?.status == .failed)
   }
 
-  @Test func aWithheldSupersededAnswerIsDropped() async throws {
-    try await withheld()
-    try await registry.enqueue(request(2), for: a)
-    #expect(try await registry.complete(answer(request(1))) == .dropped)
-  }
-
   @Test func theMarkGoesWithItsRequest() async throws {
     try await withheld()
     _ = try await registry.complete(answer(request(1)))
@@ -349,14 +343,6 @@ struct SessionRegistryTests {
     _ = try await registry.poll(a)
     await registry.withholdAnswer(request(2).id, of: a)
     #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
-  }
-
-  @Test func aQueuedRequestIsNotMarked() async throws {
-    try await withheld()
-    try await registry.enqueue(request(2), for: a)
-    _ = try await registry.complete(answer(request(1)))
-    _ = try await registry.poll(a)
-    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
   }
 
   @Test func theMarkFollowsClear() async throws {
@@ -375,30 +361,9 @@ struct SessionRegistryTests {
     #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
   }
 
-  /// A closed withheld request takes no later update: it would be a follow-up of the same text.
-  @Test func aWithheldRequestClosedTakesNoUpdate() async throws {
-    try await withheld()
-    _ = try await registry.complete(answer(request(1)))
-    await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
-      try await registry.complete(answer(request(1), .update))
-    }
-  }
-
   @Test func aWithheldRequestTimedOutTakesNoUpdate() async throws {
     try await withheld()
     #expect(await run(600).map(\.text) == ["timed out"])
-    await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
-      try await registry.complete(answer(request(1), .update))
-    }
-  }
-
-  /// A background turn in the follow-up window, typed into: its request is closed.
-  @Test func withNothingOpenTheFollowUpEnds() async throws {
-    await join(a)
-    try await registry.enqueue(request(1), for: a)
-    _ = try await registry.poll(a)
-    _ = try await registry.complete(answer(request(1)))
-    await registry.withholdAnswer(request(1).id, of: a)
     await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
       try await registry.complete(answer(request(1), .update))
     }

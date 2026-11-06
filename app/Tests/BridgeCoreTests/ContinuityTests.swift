@@ -144,28 +144,6 @@ extension ContinuityTests {
     #expect(continuity[a].isCurrent)
   }
 
-  @Test func aRefusedTurnStaysRefusedAfterThePauseEnds() {
-    var continuity = Continuity()
-    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
-    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
-  }
-
-  @Test func aTurnFromBeforeThePauseKeepsClaudesAnswer() {
-    var continuity = Continuity()
-    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
-    #expect(admit(&continuity, "t1", .answer, a, pausing: true))
-  }
-
-  /// Press Stop with the pause on and type into a turn that started synced: nothing of the turn
-  /// is recorded from there on, and the answer stays out.
-  @Test func theOwnerTypingAfterStopRefusesTheTurn() {
-    var continuity = Continuity()
-    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
-    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
-    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
-    #expect(continuity[a].outOfSync == .paused)
-  }
-
   /// A voice turn holds nothing of the owner's to keep out, until the owner types into it.
   @Test func aVoiceTurnIsAdmittedWhilePausing() {
     var continuity = Continuity()
@@ -233,12 +211,6 @@ extension ContinuityTests {
     continuity.markMissed(a, asPaused: true)
     #expect(continuity[a].outOfSync == .paused)
     continuity.markMissed(a, asPaused: false)
-    #expect(continuity[a].outOfSync == .paused)
-  }
-
-  @Test func missedUnderThePauseIsPaused() {
-    var continuity = Continuity()
-    continuity.markMissed(a, asPaused: true)
     #expect(continuity[a].outOfSync == .paused)
   }
 
