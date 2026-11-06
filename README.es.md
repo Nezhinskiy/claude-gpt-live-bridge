@@ -465,7 +465,7 @@ GitHub ve la dirección IP de tu Mac. **Check for update**, en Settings, envía 
 cuando lo pulsas. Cuando la comprobación automática encuentra una versión más reciente, la
 aplicación ejecuta `gh auth status` para indicar si la imagen se puede verificar. Solo cuando
 pulsas **Install** descarga la imagen y ejecuta `gh attestation verify` y `claude plugin`, que se
-conectan a GitHub, y a Sigstore para la raíz de confianza de `gh`, con tus propias sesiones.
+conectan a GitHub, y a Sigstore para la raíz de confianza de `gh`, con tus propios inicios de sesión.
 [SECURITY.md](SECURITY.md#what-leaves-the-mac) enumera cada petición.
 
 En tu Mac, la aplicación guarda sus ajustes, el contador de uso, cuándo buscó actualizaciones por
