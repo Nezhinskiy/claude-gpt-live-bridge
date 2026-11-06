@@ -508,10 +508,12 @@ mid-turn, were not observed.
   and `sdk` included, is other, whose answer syncs and whose prompt does not. A turn with no
   `prompt.submit` before it whose text equals a prompt typed into the turn before is that prompt's
   own, and stays under that turn's id.
-- "Waiting for approval" is `classic.PermissionRequest` during a voice turn (or a subagent it
-  started); it clears at the next `classic.PostToolUse`, `classic.PostToolUseFailure` or
-  `classic.PermissionDenied` for the same tool, or at `turn.complete`. `tool.check` is not used
-  for this.
+- "Waiting for approval" is `classic.PermissionRequest` during a main-loop turn of a joined
+  session (or a subagent it started); it clears at the next `classic.PostToolUse`,
+  `classic.PostToolUseFailure` or `classic.PermissionDenied` for the same tool, at the next main
+  `turn.step`, or at `turn.complete`. The first two mean the person allowed it; no hook reports a
+  person's No, so the step and the turn's end say only that it was settled. `tool.check` is not
+  used for this.
 
 ## Consequences
 

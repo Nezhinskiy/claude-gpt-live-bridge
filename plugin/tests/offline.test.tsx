@@ -50,6 +50,20 @@ test('aFailedPostMeansAMissedJoin', async ($, on) => {
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true }])
 })
 
+test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.take('join')
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.joined.delete(ID)
+  world.syncStatus = 404
+  await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+})
+
 test('aFailedJoinKeepsTheGapForTheNextOne', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })

@@ -41,7 +41,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     return { turnId: e.turnId, index: e.index, answer: world.stepText, toolUses: [], stopReason: 'end_turn', usage: null }
   })
   on('store.get', (_, e) => ({ value: world.stored.get(e.key) }))
-  on('store.set', async (_, e) => (await held(), world.stored.set(e.key, e.value), { value: undefined }))
+  on('store.set', async (_, e) => {
+    if (world.isStoreBroken) throw new Error('the store is full')
+    await held()
+    world.stored.set(e.key, e.value)
+    return { value: undefined }
+  })
   on('store.delete', async (_, e) => (await held(), world.stored.delete(e.key), { value: undefined }))
   const world = {
     clock,
@@ -100,14 +105,22 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     onNextHeld: () => {},
     /** What the mod's store holds. */
     stored: new Map(Object.entries(store)),
+    /** The mod's writes to its store fail. */
+    isStoreBroken: false,
     /** While set, the mod's next write to its store is held until it resolves. */
     holdStore: null as Promise<void> | null,
     /** Called once a write is being held. */
     onStoreHeld: () => {},
     /** Prompts submitted and leaves posted, in the order they happened. */
     timeline: [] as ('submit' | 'leave')[],
+    /** While set, the app's reply to a sync line is held until it resolves. */
+    holdSync: null as Promise<void> | null,
+    /** How many AskUserQuestion dialogs the session opened. */
+    dialogs: 0,
     /** Answers the open AskUserQuestion dialog at the keyboard with a label. */
     answerDialog: (_label: string) => {},
+    /** Closes the open AskUserQuestion dialog with Esc: the tool reports an error. */
+    cancelDialog: () => {},
     /** The registry's other `*.json` files, by name: Claude Code rewrites them, so one may be half written. */
     otherRecords: {} as Record<string, string>,
     /** The calls to one route since the last look, then forgets them. */
@@ -172,6 +185,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
       const isAdmitted = held ? held.isAdmitted && !(body.from === 'owner' && world.isPausing) : !world.isPausing
       world.decision = { turnId: body.turnId, isAdmitted }
       if (isAdmitted && body.text !== '') world.kept.push(body.text)
+      if (world.holdSync !== null) await world.holdSync
     }
     const reply = route !== 'next'
       ? {}
@@ -219,8 +233,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('tool.call', (_, e) => {
     if (e.tool !== 'AskUserQuestion') return { deny: 'no other tool runs in this world' }
     const { questions } = e
+    world.dialogs += 1
     return new Promise(resolve => {
       world.answerDialog = label => resolve({ result: { questions, answers: { [questions[0]!.question]: label } } })
+      world.cancelDialog = () => resolve({ isError: true, result: 'User declined to answer questions' })
     })
   })
   on('classic.PermissionRequest', () => ({}))

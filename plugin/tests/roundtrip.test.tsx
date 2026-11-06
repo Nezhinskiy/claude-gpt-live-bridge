@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { spokenReply, voicePrompt } from '../hooks/prompt.ts'
+import { keyboardAnswer, spokenReply, voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
 import { BAND, fakeWorld, framed, ID, LIVE, step } from './fake-bridge.ts'
 
@@ -11,6 +11,9 @@ const REQUEST: VoiceRequest = {
   transcript: [{ role: 'user', text: 'Please list the files in this folder' }],
 }
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
+declare const setTimeout: (fn: () => void, ms: number) => unknown
+/** Lets whatever is not held run as far as it can. */
+const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
 
 test('roundtrip', async ($, on) => {
   const world = fakeWorld(on)
@@ -59,11 +62,13 @@ test('refusedPromptFailsTheRequestAtOnce', async ($, on) => {
   expect(world.take('answer')).toEqual([
     { sessionId: ID, id: REQUEST.id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' },
   ])
-  // A typed turn after it is no voice turn: its permission dialog is not reported.
+  // A typed turn after it is no voice turn: its permission dialog says so.
   world.take('activity')
   await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'working' }, { sessionId: ID, state: 'approval', typedTurn: 't1' },
+  ])
 })
 
 test('approvalIsReported', async ($, on) => {
@@ -135,11 +140,58 @@ test('aLongStepIsCutForTheApproval', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', text: 'a'.repeat(32_000) }])
 })
 
+/** A permission prompt is announced whatever started the turn, with what Claude wrote before it. */
+test('aTypedTurnsApprovalIsReported', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  world.take('activity')
+  await step($, world, 't1', "I'm going to delete build/.")
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'approval', text: "I'm going to delete build/.", typedTurn: 't1' },
+  ])
+})
+
 /** A voice request waiting for the next turn does not make the typed turn's approval the voice's. */
-test('aTypedTurnsApprovalIsNotReportedWhileAVoiceRequestWaits', async ($, on) => {
+test('aTypedTurnsApprovalIsReportedWhileAVoiceRequestWaits', async ($, on) => {
   const world = fakeWorld(on)
   await inTypedTurnWithVoiceWaiting($, world, 'Remove the build folder')
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', typedTurn: 't1' }])
+})
+
+/** The app keeps no text of a turn it refused, and a subagent's prompt carries none to refuse. */
+test('aSubagentsApprovalInATypedTurnIsNotTheTurns', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  world.take('activity')
+  await step($, world, 't1', "I'm going to delete build/.")
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval' }])
+})
+
+/** Between turns a prompt is a background subagent's, which no turn answers for. */
+test('aPermissionPromptOutsideATurnIsNotReported', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} })
+  expect(world.take('activity')).toEqual([])
+})
+
+/** A prompt from before the join was never announced, so nothing says it settled. */
+test('aPermissionPromptBeforeJoiningIsNotSettled', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  expect(world.take('sync')).toEqual([])
   expect(world.take('activity')).toEqual([])
 })
 
@@ -284,8 +336,8 @@ test('claudesQuestionAnsweredAtTheKeyboard', async ($, on) => {
   expect(world.submitted).toHaveLength(1)
 })
 
-/** In a typed turn the dialog is Claude Code's alone: nothing goes to the voice. */
-test('aTypedTurnsQuestionStaysInClaudeCode', async ($, on) => {
+/** Asked from any main-loop turn; the dialog stays open for the keyboard as in a voice turn. */
+test('aTypedTurnsQuestionIsAsked', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...LIVE, args: 'on' })
@@ -293,20 +345,322 @@ test('aTypedTurnsQuestionStaysInClaudeCode', async ($, on) => {
   world.take('activity')
   const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
   await world.clock.advance(1000)
-  expect(world.take('activity')).toEqual([])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN, typedTurn: 't1' }])
   world.answerDialog('build')
   expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' } })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
 
 /** A voice request waiting for the next turn does not make the typed turn's question the voice's. */
-test('aTypedTurnsQuestionStaysInClaudeCodeWhileAVoiceRequestWaits', async ($, on) => {
+test('aTypedTurnsQuestionIsAskedWhileAVoiceRequestWaits', async ($, on) => {
   const world = fakeWorld(on)
   await inTypedTurnWithVoiceWaiting($, world, 'Rename the folder')
   const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
   await world.clock.advance(1000)
-  expect(world.take('activity')).toEqual([])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN, typedTurn: 't1' }])
   world.answerDialog('build')
   expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' } })
+})
+
+test('aQuestionOutsideATurnStaysInClaudeCode', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.take('activity')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([])
+  world.answerDialog('build')
+  await asked
+})
+
+/** AskUserQuestion raises the permission hooks too: the question has its own report. */
+test('aQuestionIsNoApprovalAndNothingWasAllowed', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('activity')
+  world.take('sync')
+  await $.classic.PermissionRequest({ tool_name: 'AskUserQuestion', tool_input: {} })
+  await $.classic.PostToolUse({ tool_name: 'AskUserQuestion', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  expect(world.take('activity')).toEqual([])
+  expect(world.take('sync')).toEqual([])
+})
+
+test('aKeyboardAnswerIsSynced', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('sync')
+  const typed = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.answerDialog('out')
+  await typed
+  const said = keyboardAnswer({ answers: { [ASKED[0]!.question]: 'out' } })
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'owner', text: said }])
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed.' })
+  // In a voice turn too.
+  world.take('sync')
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(voicePrompt(REQUEST)), turnId: 't2' })
+  const spoken = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.answerDialog('out')
+  await spoken
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't2', from: 'owner', text: said }])
+})
+
+test('aQuestionCancelledAtTheKeyboardSaysItWasClosed', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('sync')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.cancelDialog()
+  await asked
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'owner', text: keyboardAnswer(undefined) }])
+})
+
+test('aSpokenReplyMakesTheTurnAVoiceTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('sync')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.take('answer')).toEqual([{ sessionId: ID, id: SPOKEN.id, status: 'ok', text: 'Renamed to out.' }])
+  expect(world.take('sync')).toEqual([])
+})
+
+test('aSpokenReplyIsSavedForAReload', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  await asked
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.take('answer')).toEqual([{ sessionId: ID, id: SPOKEN.id, status: 'ok', text: 'Renamed to out.' }])
+})
+
+test('aSpokenReplyInAVoiceTurnKeepsItsRequest', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: REQUEST.id })
+  await world.clock.advance(1000)
+  await asked
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.take('answer')).toEqual([{ sessionId: ID, id: REQUEST.id, status: 'ok', text: 'Renamed to out.' }])
+})
+
+test('aSpokenReplyWithARequestWaitingIsAnUpdate', async ($, on) => {
+  const world = fakeWorld(on)
+  await inTypedTurnWithVoiceWaiting($, world, 'Rename the folder')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: REQUEST.id })
+  await world.clock.advance(1000)
+  await asked
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.take('answer')).toEqual([{ sessionId: ID, id: REQUEST.id, status: 'update', text: 'Renamed to out.' }])
+  expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(false)
+})
+
+/** The hook's `.catch` runs the tool again: past the dialog, a snapshot that fails must not reach it. */
+test('aSnapshotThatFailsAfterTheDialogOpensNoSecondOne', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.isStoreBroken = true
+  const spoken = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  expect((await spoken).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
+  world.syncStatus = 500
+  const typed = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.answerDialog('out')
+  await typed
+  expect(world.dialogs).toBe(2)
+})
+
+/** A reply that lost to the keyboard closes what the app opened for it, or it times out ten minutes later. */
+test('aLateSpokenReplyClosesItsRequest', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.answerDialog('out')
+  await asked
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  expect(world.take('answer')).toEqual([{
+    sessionId: ID, id: SPOKEN.id, status: 'failed', text: '', reason: 'the question was answered at the keyboard',
+  }])
+  expect(world.logs.some(line => line.includes('came after the question was answered'))).toBe(true)
+})
+
+/** The keyboard won, and the mod is still telling the app so: a reply then has no question either. */
+test('aSpokenReplyWhileTheKeyboardAnswerIsPostedClosesItsRequest', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  let release = () => {}
+  world.holdSync = new Promise<void>(resolve => { release = resolve })
+  world.answerDialog('out')
+  await aMoment()
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  expect(world.take('answer').map(body => body?.id)).toEqual([SPOKEN.id])
+  release()
+  await asked
+})
+
+/** Cancelling may leave the tool's call unfinished: the turn's end shows the question is over. */
+test('aQuestionOpenAtTheTurnsEndTakesNoReply', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  void $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: '' })
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  expect(world.take('answer').map(body => body?.status)).toEqual(['failed'])
+})
+
+/** A turn of a prompt typed into the turn before it stays under that id, as its lines do. */
+test('aQueuedTurnsQuestionCarriesTheFirstTurnsId', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  await $.prompt.submit(composer('second', 't1'))
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'One.' })
+  await $.turn.start({ text: 'second', turnId: 't2' })
+  world.take('activity')
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN, typedTurn: 't1' }])
+  world.answerDialog('build')
+  await asked
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} })
+  expect(world.take('activity').at(-1)).toEqual({ sessionId: ID, state: 'approval', typedTurn: 't1' })
+})
+
+/** In a typed turn with a permission prompt open; the lines and activity so far are taken. */
+async function atAPrompt($: Engine, world: ReturnType<typeof fakeWorld>) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  await step($, world, 't1', '')
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
+  world.take('activity')
+  world.take('sync')
+}
+
+test('anAllowedPromptIsSynced', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  const [line] = world.take('sync')
+  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'owner' })
+  expect(line?.text).toContain('allowed')
+  expect(line?.text).toContain('Bash')
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+  await step($, world, 't1', '')
+  expect(world.take('sync')).toEqual([])
+})
+
+test('anotherToolsRunSettlesNothing', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.classic.PostToolUse({ tool_name: 'Read', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  expect(world.take('sync')).toEqual([])
+  expect(world.take('activity')).toEqual([])
+})
+
+/** A No with feedback: no tool ran, and the model's next step shows the dialog is gone. */
+test('aNoAtTheDialogSettlesAtTheNextStep', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await step($, world, 't1', 'Another way, then.')
+  const [line] = world.take('sync')
+  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'owner' })
+  expect(line?.text).toContain('Bash')
+  expect(line?.text).not.toContain('allowed')
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+})
+
+/** The app announces a prompt only on a change to `approval`: one left there hides every next one. */
+test('theNextPromptIsAnnouncedAfterANo', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await step($, world, 't1', 'Another way, then.')
+  world.take('activity')
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm build/a' } })
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'approval', text: 'Another way, then.', typedTurn: 't1' },
+  ])
+})
+
+/** A subagent's step says nothing about the main loop's dialog. */
+test('aSubagentsStepSettlesNoPrompt', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await step($, world, 't1', 'A subagent report.', 'a1')
+  expect(world.take('sync')).toEqual([])
+  expect(world.take('activity')).toEqual([])
+})
+
+/** A plain No: only the turn's end comes (ADR 0001, item i). */
+test('aPromptOpenAtTheTurnsEndIsSettled', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: '' })
+  const lines = world.take('sync')
+  expect(lines).toHaveLength(1)
+  expect(lines[0]).toMatchObject({ sessionId: ID, turnId: 't1', from: 'owner' })
+  expect(lines[0]?.text).toContain('Bash')
+  expect(lines[0]?.text).not.toContain('allowed')
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
+})
+
+/** A subagent's prompt open at the turn's end was not the main loop's to report. */
+test('aSubagentsPromptOpenAtTheTurnsEndIsNotSaid', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {}, agent_id: 'a1' })
+  world.take('activity')
+  world.take('sync')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Done.' })
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'claude', text: 'Done.' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle' }])
 })
 
 /** What the composer hands the engine: a prompt the owner typed, over a running turn when `turnId` is given. */

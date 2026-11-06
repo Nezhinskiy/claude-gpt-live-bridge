@@ -132,6 +132,31 @@ test('renameRejoins', async ($, on) => {
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Renamed session', modVersion: '0.3.1', syncs: true }])
 })
 
+/** The app moved the conversation, its decision with it: the rest of the turn goes under the new id. */
+test('aTurnRunningThroughClearKeepsItsTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.take('sync')
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  world.sessionId = OTHER
+  await world.clock.advance(1000)
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect(world.take('sync')).toEqual([{ sessionId: OTHER, turnId: 't1', from: 'claude', text: 'Nothing.' }])
+})
+
+test('aTurnRunningThroughAReloadKeepsItsLines', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.session.start(START)
+  world.take('sync')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'claude', text: 'Nothing.' }])
+})
+
 test('offLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
@@ -347,6 +372,22 @@ test('aRemovalTheAnswerMeetsTurnsTheSessionOff', async ($, on) => {
   await world.clock.advance(3000)
   expect(world.logs).toEqual(['Removed from LiveBridge. /live on joins again.'])
   expect(world.take('next')).toEqual([])
+  expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
+})
+
+test('aRemovalALineMeetsTurnsTheSessionOff', async ($, on) => {
+  const world = fakeWorld(on)
+  world.modVersion = '0.3.1'
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.joined.delete(ID)
+  world.removed.add(ID)
+  world.take('join')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(3000)
+  expect(world.logs).toEqual(['Removed from LiveBridge. /live on joins again.'])
+  expect(world.take('join')).toEqual([])
   expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
 })
 
