@@ -1,6 +1,6 @@
 # Usage limits in the menu
 
-Status: designed, approved by the owner on 2026-11-06. The data below was read that day on the
+Status: delivered, 2026-11-06. The data below was read that day on the
 owner's Plus login with codex 0.166.0, spending no voice. The wider research:
 [`docs/research/2026-11-05-gpt-live-limits.md`](../research/2026-11-05-gpt-live-limits.md).
 
@@ -135,7 +135,9 @@ left out until a new reading comes. That matters for Claude, whose readings arri
 
 **The menu.** `MenuContent` gets a limit item carrying the row's parts, tooltip and which windows are
 near the limit; `outline` prints it for the tests. All rules are pure and tested there. The
-threshold is one constant, 90.
+threshold is one constant, 90. A row is an enabled native `NSMenuItem` with `toolTip`: on a disabled
+hosted row SwiftUI's `.help` did not show in the real menu. So a row highlights under the pointer,
+and a click only closes the menu, which the owner accepted.
 
 ## Docs
 
@@ -151,9 +153,3 @@ threshold is one constant, 90.
 
 Warnings, notifications, a badge on the glyph, a reset timer that counts down, credits, the
 reset-credit offer, spend limits, and showing limits in the band or `/live status`.
-
-## Left to the builder
-
-Which file the read and the reset wording live in, and whether the row is a hosted
-view or a native item, provided the tooltip shows on hover in the real menu. A by-hand look at the
-real menu closes the work: no voice is needed.

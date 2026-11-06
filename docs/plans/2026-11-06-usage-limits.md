@@ -424,11 +424,9 @@ This target has no tests (the repo's rule: `BridgeCore` holds every rule), so no
 - [ ] **Step 2:** In `StatusMenu`: `content` passes `codexLimits: model.codexLimits(at: Date())` and
   `claudeLimits: model.update?.claudeLimits`; `menuNeedsUpdate` calls `model.refreshLimits()` for the
   main menu only.
-- [ ] **Step 3:** `LimitRowView` in `MenuRows.swift`, hosted with `HostedItem(view, enabled: false)`
-  as `SentView` is, replacing Task 3's arm: name, then each figure, orange when `isNear`, joined by
-  ` · `, then `blocked`. A blocked row is orange whole, name included. `MenuStyle.subtitle`, no image.
-  Tooltip by `.help(row.tooltip)`; `accessibilityLabel` of the whole row. `fill` keys it
-  `limit|<name>`, and `show` drops unused rows as it does the others.
+- [ ] **Step 3:** The `.limit` arm of `StatusMenu.fill`: an enabled native `NSMenuItem`, no action,
+  `toolTip` from the row, `attributedTitle` at 11 pt, secondary, with a near figure orange and a
+  blocked row orange whole. (As built: a hosted row with `.help` showed no tooltip; see the spec.)
 - [ ] **Step 4: Check the hover in the real menu now,** before any doc promises it:
   `CFFIXED_USER_HOME=<scratch> scripts/build-app.sh --run`, open the menu, hold the pointer on the row.
   Nothing records that `.help` shows on a disabled hosted item. In order, until it shows: `enabled:
