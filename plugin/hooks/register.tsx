@@ -10,9 +10,9 @@ import { BridgeLink, REMOVED } from './link.ts'
 import { askedText, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
-import type { TurnOrigin, TurnSnapshot } from './turns.ts'
+import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
-import type { VoiceRequest } from './wire.ts'
+import type { AnswerStatus, VoiceRequest } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
@@ -43,6 +43,8 @@ let home = ''
 let modVersion: string | undefined
 let tracker = new TurnTracker()
 let lastOrigin: TurnOrigin | null = null
+/** That `prompt.submit`'s text, what was typed: a slash command's `turn.start` holds its expansion. */
+let lastPrompt: string | undefined
 /** When a surface last asked for the band while this session was joined. */
 let drawnAt = 0
 let approval: { tool: string; agent: string | undefined } | null = null
@@ -55,15 +57,12 @@ let note: string | null = null
 let recordFile: string | null = null
 let lastScan = -Infinity
 /**
- * The last summary the model wrote, until a turn whose answer did not go to the voice completes,
- * or `/clear`: sending it again costs no model call. Kept in memory only, as the transcript it
- * summarises is the session's own.
+ * The last summary the model wrote, while nothing has happened since: until any main turn
+ * completes, or `/clear`. Sending it again costs no model call. Kept in memory only, as the
+ * transcript it summarises is the session's own.
  */
 let summary: string | null = null
-/**
- * Counts completed main turns whose answer did not go to the voice, so a summary written across
- * one is not kept as current: the voice already heard a voice turn's answer.
- */
+/** Counts what ends a summary's use, so a summary written across one is not kept as current. */
 let turnsDone = 0
 /** The summary on its way, which a second ask joins instead of asking the model again. */
 let sending: Promise<ContextOutcome> | null = null
@@ -76,7 +75,14 @@ const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
 
 async function save($: EngineInterface): Promise<void> {
-  if (link?.session) await $.store.set(joinedKey(link.session.sessionId), tracker.snapshot())
+  if (link?.session) await $.store.set(joinedKey(link.session.sessionId), { ...tracker.snapshot(), hasGap: link.hasGap })
+}
+
+/** Posts a line of a turn; one the app did not take is a gap, which the next join says. */
+async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
+  if ((await link?.sync({ ...line, text: clip(line.text, ANSWER_LIMIT) })) === true) return
+  link?.noteGap()
+  await save($)
 }
 
 /**
@@ -155,8 +161,10 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   note = null
   const sessionId = await $.session.id()
   const title = (await readTitle($, sessionId)) ?? ''
+  // The app got no turn from before the owner's join; a reload's gap is in its snapshot.
+  if (byOwner && (await hasTurns($))) link?.noteGap()
   // Only the owner's own join brings back a session they removed.
-  const isJoined = (await link?.join({ sessionId, title, modVersion, ...(byOwner && { owner: true }) })) === true
+  const isJoined = (await link?.join({ sessionId, title, modVersion, syncs: true, ...(byOwner && { owner: true }) })) === true
   await save($)
   await setBand($, {})
   redrawBand($)
@@ -210,8 +218,10 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
  */
 async function tick($: EngineInterface): Promise<void> {
   if (!link?.session) return  // it left, or was removed, while this poll waited its turn
+  const hadGap = link.hasGap
   const reply = await link.next()
   if (reply === REMOVED) return  // the link queued `removed`
+  if (hadGap && !link.hasGap) await save($)  // a join said it: a reload must not say it again
   if (!reply) {
     const now = await $.clock.now()
     if (offlineSince === null) {
@@ -246,6 +256,24 @@ async function tick($: EngineInterface): Promise<void> {
   } else if (work?.kind === 'context') {
     void contextAsked($)
   }
+}
+
+/** The owner's prompt into running turn `turnId`: it goes to the app now, whatever becomes of it. */
+async function typedIntoTurn($: EngineInterface, turnId: string, text: string): Promise<void> {
+  await postSync($, tracker.typedInto(turnId, text))
+  await save($)
+}
+
+/**
+ * The app took neither a turn's answer nor, so, its place in the conversation. An update to a
+ * request a newer one replaced is refused by design, so only a result is said to be lost.
+ */
+async function answerLost($: EngineInterface, status: AnswerStatus): Promise<void> {
+  link?.noteGap()
+  await save($)
+  if (status === 'update') return
+  note = LOST_ANSWER
+  $.ui.log(LOST_ANSWER)
 }
 
 /** A voice request into a prompt, unless the session left or was removed since the poll. */
@@ -439,6 +467,8 @@ export const register: Register = on => {
     const saved = await $.store.get(joinedKey(await $.session.id()))
     if (saved !== undefined) {
       tracker = new TurnTracker(saved as TurnSnapshot)
+      // A snapshot from before sync says nothing: none of its turns reached the app.
+      if ((saved as { hasGap?: boolean }).hasGap !== false) link.noteGap()
       await serial(() => turnOn($, false))
     }
     return next(e)
@@ -454,18 +484,27 @@ export const register: Register = on => {
   })
 
   // The hooks at sites that can refuse only observe: one that fails lets the event go on.
-  on('prompt.submit', ($, e, next) => {
-    // A delivery into a running turn starts no turn of its own.
-    if (e.turnId === undefined) lastOrigin = originOf(e.origin, PLUGIN_NAME, e.isMeta)
-    return next(e)
+  on('prompt.submit', async ($, e, next) => {
+    const origin = originOf(e.origin, PLUGIN_NAME, e.isMeta)
+    if (e.turnId === undefined) {
+      lastOrigin = origin
+      lastPrompt = e.text
+    }
+    const entered = await next(e)
+    if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
+      await typedIntoTurn($, e.turnId, e.text).catch((error: unknown) => $.ui.log(`LiveBridge: ${String(error)}`))
+    }
+    return entered
   }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now())
+      const line = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
       lastOrigin = null
-      await serial(() => follow($, false))
+      lastPrompt = undefined
+      await serial(() => follow($, false))  // /clear: the line goes under the session's new id
       await save($)
+      if (line) await postSync($, line)
       await link?.activity('working')
     }
     return next(e)
@@ -491,16 +530,13 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
-      const { post } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
-      if (!post) staleSummary()  // a voice turn's answer went to the voice: the summary still holds
+      const { post, sync } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
+      staleSummary()
       approval = null
       await save($)
+      if (sync) await postSync($, sync)
       const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
-      // An update to a request a newer one replaced is refused by design; a removal says so itself.
-      if (post && taken !== true && taken !== REMOVED && post.status !== 'update') {
-        note = LOST_ANSWER
-        $.ui.log(LOST_ANSWER)
-      }
+      if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
       await link?.activity('idle')
     }
     return next(e)

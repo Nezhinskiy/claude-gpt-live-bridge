@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { BAND, fakeWorld, LIVE } from './fake-bridge.ts'
+import { BAND, fakeWorld, ID, LIVE } from './fake-bridge.ts'
 
 test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   const world = fakeWorld(on)
@@ -29,6 +29,45 @@ test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   expect(await band.find({ type: 'Text', text: /bridge offline|menu bar/ })).toBeUndefined()
   expect(await band.find({ type: 'Text', text: /Voice off/ })).toBeDefined()
   await band.unmount()
+})
+
+test('aFailedPostMeansAMissedJoin', async ($, on) => {
+  // The app is down for a turn; the join after it says so, once.
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.take('join')
+  world.isAppUp = false
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
+  world.joined.delete(ID)
+  world.isAppUp = true
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  world.joined.delete(ID)
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true }])
+})
+
+test('aFailedJoinKeepsTheGapForTheNextOne', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  world.isAppUp = false
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.isAppUp = true
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
+test('anOlderAppWithNoSyncRouteTakesTheTurnAsBefore', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.syncStatus = 404
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
 })
 
 test('joiningAgainOpensTheAppAgain', async ($, on) => {

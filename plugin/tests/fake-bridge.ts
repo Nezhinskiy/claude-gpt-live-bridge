@@ -54,7 +54,17 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isAppInstalled: false,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
+    /** The status the app answers a sync line with (404: an older app has no such route). */
+    syncStatus: 200,
+    /** The pause setting is on and the call is off, as `Continuity.admits` sees them. */
+    isPausing: false,
+    /** The last turn the app decided on, its one slot per conversation (`Continuity.admits`). */
+    decision: null as { turnId: string; isAdmitted: boolean } | null,
+    /** The non-empty sync lines the app admitted, in order. */
+    kept: [] as string[],
     isSubmitRefused: false,
+    /** A hook beneath the mod refuses the owner's prompt (`{ drop }`). */
+    isPromptDropped: false,
     /** The engine refuses the command's name (as it does a built-in's). */
     isCommandRefused: false,
     /** Every slash command the mod declared, in order. */
@@ -150,9 +160,18 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'answer' && world.answerStatus !== 200) {
       return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
     }
+    if (route === 'sync' && world.syncStatus !== 200) {
+      return { value: { status: world.syncStatus, ok: false, headers: {}, text: '{"error":"unknown session"}' } }
+    }
     // The app answers every call from a removed session so, its own joins included, until the owner joins it again.
     if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {
       return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
+    }
+    if (route === 'sync') {
+      const held = world.decision?.turnId === body.turnId ? world.decision : null
+      const isAdmitted = held ? held.isAdmitted && !(body.from === 'owner' && world.isPausing) : !world.isPausing
+      world.decision = { turnId: body.turnId, isAdmitted }
+      if (isAdmitted && body.text !== '') world.kept.push(body.text)
     }
     const reply = route !== 'next'
       ? {}
@@ -168,6 +187,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   })
   on('prompt.submit', (_, e) => {
     if (world.isSubmitRefused) throw new Error('the session is closing')
+    if (world.isPromptDropped) return { drop: 'a hook refused the prompt' }
     world.submitted.push(e.text)
     world.timeline.push('submit')
     return { text: e.text, origin: e.origin }

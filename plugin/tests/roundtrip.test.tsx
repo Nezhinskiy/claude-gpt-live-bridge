@@ -17,7 +17,7 @@ test('roundtrip', async ($, on) => {
   await $.session.start({ cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true })
   const reply = await $.command.run({ ...LIVE, args: 'on' })
   expect(reply.text).toContain('Joined')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, missed: true }])
   expect(world.read.every(path => path.endsWith('.json'))).toBe(true)
 
   world.work.push({ kind: 'request', ...REQUEST })
@@ -307,6 +307,191 @@ test('aTypedTurnsQuestionStaysInClaudeCodeWhileAVoiceRequestWaits', async ($, on
   expect(world.take('activity')).toEqual([])
   world.answerDialog('build')
   expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' } })
+})
+
+/** What the composer hands the engine: a prompt the owner typed, over a running turn when `turnId` is given. */
+const composer = (text: string, turnId?: string) =>
+  ({ text, wait: false, origin: { kind: 'composer' }, ...(turnId !== undefined && { turnId }) }) as const
+
+/** The owner's prompt, then the turn it starts; the mod has joined. */
+async function ownerTurn($: Engine, turnId: string, text: string) {
+  await $.prompt.submit(composer(text))
+  await $.turn.start({ text, turnId })
+}
+
+async function joined($: Engine, world: ReturnType<typeof fakeWorld>) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.take('join')
+}
+
+const owner = (turnId: string, text: string) => ({ sessionId: ID, turnId, from: 'owner', text })
+const claude = (turnId: string, text: string) => ({ sessionId: ID, turnId, from: 'claude', text })
+
+test('anOwnerTurnIsSynced', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'Rename the folder')
+  // Posted at the turn's start, so an open line knows before Claude finishes.
+  expect(world.calls.map(call => call.route).filter(route => route === 'sync' || route === 'activity')).toEqual(['sync', 'activity'])
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.take('sync')).toEqual([owner('t1', 'Rename the folder'), claude('t1', 'Renamed to out.')])
+  expect(world.take('answer')).toEqual([])
+})
+
+test('aTurnSyncsWhileTheCallIsOff', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  for (const call of ['off', 'listening', 'live'] as const) {
+    world.status = { ...world.status, call }
+    await world.clock.advance(1000)
+    await ownerTurn($, `t-${call}`, 'Rename the folder')
+    await $.turn.complete({ ...DONE, turnId: `t-${call}`, answer: 'Renamed.' })
+    expect(world.take('sync')).toHaveLength(2)
+  }
+})
+
+test('anOtherTurnPostsNoOwnerLine', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await $.prompt.submit({ text: 'A peer session wrote.', wait: false, origin: { kind: 'peer' } as never })
+  await $.turn.start({ text: 'A peer session wrote.', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Noted.' })
+  expect(world.take('sync')).toEqual([claude('t1', ''), claude('t1', 'Noted.')])
+})
+
+test('textTypedIntoARunningTurnIsSynced', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  world.take('sync')
+  await $.prompt.submit(composer('second', 't1'))
+  expect(world.take('sync')).toEqual([owner('t1', 'second')])
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Done.' })
+  world.take('sync')
+  // A voice turn's too.
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(voicePrompt(REQUEST)), turnId: 't2' })
+  await $.prompt.submit(composer('third', 't2'))
+  expect(world.take('sync')).toEqual([owner('t2', 'third')])
+})
+
+/** Terminal, ADR 0001 (m): a prompt typed while the final text streams has `turn.start` with no second `prompt.submit`. */
+test('aPromptIsNotPostedTwice', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  await $.prompt.submit(composer('second', 't1'))
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'One.' })
+  world.take('sync')
+  await $.turn.start({ text: 'second', turnId: 't2' })
+  expect(world.take('sync')).toEqual([])
+})
+
+test('aQueuedPromptsTurnIsUnderTheFirstTurnsId', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  await $.prompt.submit(composer('second', 't1'))
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'One.' })
+  await $.turn.start({ text: 'second', turnId: 't2' })
+  await $.turn.complete({ ...DONE, turnId: 't2', answer: 'Two.' })
+  expect(world.take('sync')).toEqual([
+    owner('t1', 'first'), owner('t1', 'second'), claude('t1', 'One.'), claude('t1', 'Two.'),
+  ])
+})
+
+/** Press Stop with the pause on, type into a running turn, press Start: its own turn stays out. */
+test('aRefusedTurnStaysRefusedThroughItsQueuedPrompt', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  world.isPausing = true
+  await $.prompt.submit(composer('private', 't1'))
+  world.isPausing = false
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'One.' })
+  await $.turn.start({ text: 'private', turnId: 't2' })
+  await $.turn.complete({ ...DONE, turnId: 't2', answer: 'It repeats private.' })
+  expect(world.kept).toEqual(['first'])
+})
+
+test('aSlashCommandsOwnerLineIsWhatWasTyped', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await $.prompt.submit({ ...composer('/expand foo'), command: { name: 'expand', args: 'foo' } as never })
+  await $.turn.start({ text: '<command-message>expand</command-message>\n<command-name>/expand</command-name>', turnId: 't1' })
+  expect(world.take('sync')).toEqual([owner('t1', '/expand foo')])
+})
+
+test('aPromptThatDidNotEnterIsNotSynced', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  world.take('sync')
+  world.isPromptDropped = true
+  await $.prompt.submit(composer('second', 't1'))
+  expect(world.take('sync')).toEqual([])
+})
+
+test('aVoicePromptIntoARunningTurnIsNotSynced', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  world.take('sync')
+  await $.prompt.submit({ text: voicePrompt(REQUEST), wait: false, turnId: 't1', origin: { kind: 'plugin', name: 'livebridge' } })
+  expect(world.take('sync')).toEqual([])
+})
+
+test('aDeliveryThatIsNotTheOwnersIsNotSynced', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  world.take('sync')
+  await $.prompt.submit({ text: 'A task finished.', wait: false, turnId: 't1', origin: { kind: 'task-notification' } as never })
+  await $.prompt.submit({ text: 'A peer session wrote.', wait: false, turnId: 't1', origin: { kind: 'peer' } as never })
+  await $.prompt.submit({ ...composer('Not seen as typed.', 't1'), isMeta: true })
+  expect(world.take('sync')).toEqual([])
+})
+
+/** A long prompt or answer is cut to what fits the app's body limit; the app shapes it for the voice. */
+test('aLongLineIsCutToAnAnswersLimit', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await ownerTurn($, 't1', 'first')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'a'.repeat(40_000) })
+  expect(world.take('sync').at(-1)).toEqual(claude('t1', 'a'.repeat(32_000)))
+})
+
+test('aLostVoiceAnswerMeansAMissedJoin', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  world.answerStatus = 409
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Three files.' })
+  world.take('join')
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+})
+
+/** The answer went to neither the voice nor the conversation, whatever the reason the app gave. */
+test('aRefusedUpdateMeansAMissedJoin', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  world.work.push({ kind: 'request', ...REQUEST })
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Started the build.' })
+  await $.prompt.submit({ text: 'A task finished.', wait: false, origin: { kind: 'task-notification' } as never })
+  await $.turn.start({ text: 'A task finished.', turnId: 't2' })
+  world.answerStatus = 409
+  await $.turn.complete({ ...DONE, turnId: 't2', answer: 'The build passed.' })
+  world.take('join')
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(false)
 })
 
 test('bandShowsTheCallAndStartsIt', async ($, on) => {

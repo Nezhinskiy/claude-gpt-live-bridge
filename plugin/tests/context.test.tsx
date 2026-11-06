@@ -172,7 +172,9 @@ test('twoAsksAtOnceShareOneSummary', async ($, on) => {
   expect(world.forks).toBe(1)
 })
 
-test('aVoiceTurnKeepsTheSummaryCached', async ($, on) => {
+test('everyCompletedTurnStalesTheSummary', async ($, on) => {
+  // The app asks for one when the conversation could not carry something: it must not be a
+  // summary from before that, which would clear the out-of-sync mark with nothing new.
   const world = await joined($, on)
   await appAsks(world)
   expect(world.forks).toBe(1)
@@ -182,10 +184,10 @@ test('aVoiceTurnKeepsTheSummaryCached', async ($, on) => {
   await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Three files.' })
   await appAsks(world)
-  expect(world.forks).toBe(1)
+  expect(world.forks).toBe(2)
   await typedTurn($, 't2', 'Renamed.')
   await appAsks(world)
-  expect(world.forks).toBe(2)
+  expect(world.forks).toBe(3)
 })
 
 test('clearMakesTheContextSummariseAgain', async ($, on) => {
