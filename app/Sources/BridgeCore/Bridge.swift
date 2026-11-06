@@ -244,6 +244,7 @@ public actor Bridge: Router {
         switch try await registry.complete(body) {
         case .delivery(let delivery): await deliver(delivery)
         case .superseded: await keepSuperseded(body)
+        case .dropped: break
         }
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
@@ -628,6 +629,7 @@ public actor Bridge: Router {
     let row = try await label(of: id)
     let admitted = continuity.admits(turn: body.turnId, from: body.from, in: id, pausing: pausing)
     save()  // the turn's decision persists, an empty line's included
+    if !admitted, body.from == .owner { await registry.withholdAnswer(of: id) }
     guard admitted,
       let line = AnswerShaper.synced(body.text, from: body.from, label: row.label, session: id)
     else { return }

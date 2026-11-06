@@ -109,6 +109,8 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   owner types after Stop with the pause on is dropped even into a turn that started synced, and
   the rest of that turn stops syncing, as its answer may repeat it. The own turn of a prompt typed
   into a running turn keeps that turn's decision.
+  A voice turn typed into so has no line to refuse, but its answer may repeat it too: the
+  request closes as failed, with its text neither recorded nor said.
 - **A spoken reply makes the rest of the turn a voice turn** (the owner's decision). When the owner
   answers a typed turn's question by voice, the voice hands it off and the line waits for a result
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is
@@ -187,7 +189,7 @@ for the band.
   connect for a `connecting` one, which `CallMachine` keeps; `heldContext` stays the summary's one
   slot. A line opened later is seeded with it.
 - An answer under a request a newer one superseded is not said, and the mod is told it was taken,
-  so it is a synced line of Claude's, unless it failed.
+  so it is a synced line of Claude's, unless it failed or its request is withheld.
 - With the pause setting on and the call `off`, a synced line is dropped and its session marked
   *paused*.
 - `openLine` requests a summary only when the session has no context or is *missed* (and not

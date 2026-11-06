@@ -14,6 +14,8 @@ public enum Completion: Sendable, Equatable {
   case delivery(Delivery)
   /// A newer request superseded its request: it is not said.
   case superseded
+  /// Its request is withheld and nothing of it goes anywhere: an `update`, or a superseded answer.
+  case dropped
 }
 
 public enum RegistryError: Error, Equatable {
@@ -66,7 +68,8 @@ public actor SessionRegistry {
     var lastPoll: Date
     var activity = SessionActivity.idle
     var queued: [VoiceRequest] = []
-    var inFlight: (id: RequestID, brief: String, since: Date)?
+    /// `isWithheld`: its answer stays out (`withholdAnswer`).
+    var inFlight: (id: RequestID, brief: String, since: Date, isWithheld: Bool)?
     /// The newest request enqueued; only its answers are delivered.
     var latest: RequestID?
     /// Claude waits on a question it asked the owner in the request in flight.
@@ -88,6 +91,10 @@ public actor SessionRegistry {
   private var lastSweep: Date?
   /// A longer gap between sweeps means the Mac slept, not that every mod went quiet.
   private static let sleepGap: TimeInterval = 3
+  /// Why a withheld request failed.
+  private static let withheldReason =
+    "the answer stays out because you typed into the turn while the sync was paused; "
+    + "it is in the session."
   /// The longest title kept; the label, the band and every voice line carry it.
   public static let maxTitle = 80
   public private(set) var target: SessionID?
@@ -157,7 +164,7 @@ public actor SessionRegistry {
         session.isAsking = false
         // Nothing in flight: a typed turn asked, so the reply is the request its turn's answer
         // closes. A newer request queued behind it stays the latest.
-        let flight = session.inFlight ?? (reply.id, reply.brief, now)
+        let flight = session.inFlight ?? (reply.id, reply.brief, now, false)
         if session.inFlight == nil {
           session.inFlight = flight
           if session.queued.isEmpty { session.latest = reply.id }
@@ -166,7 +173,7 @@ public actor SessionRegistry {
       }
       if session.inFlight == nil, !session.queued.isEmpty {
         let request = session.queued.removeFirst()
-        session.inFlight = (request.id, request.brief, now)
+        session.inFlight = (request.id, request.brief, now, false)
         return .request(request)
       }
       guard session.wantsContext else { return nil }
@@ -182,24 +189,38 @@ public actor SessionRegistry {
   /// Asks the session for its context summary at its next poll.
   public func requestContext(for id: SessionID) { sessions[id]?.wantsContext = true }
 
+  /// The owner typed while the sync was paused, and the turn refused it. The request in flight
+  /// is that turn's, or waits behind it, so its answer may repeat what was typed: it stays out.
+  /// It can only be told apart from a voice turn nobody typed into by this.
+  public func withholdAnswer(of id: SessionID) {
+    sessions[id]?.inFlight?.isWithheld = true
+  }
+
   /// Records an answer. `ok`, `failed` and `question` close the request in flight; `update`
-  /// closes nothing.
+  /// closes nothing. An answer under a withheld request closes it as failed, whatever its status,
+  /// and none of its text goes on.
   public func complete(_ answer: AnswerBody) throws -> Completion {
     let label = labels()[answer.sessionId]
     return try update(answer.sessionId) { session in
       let isInFlight = session.inFlight?.id == answer.id
+      let isWithheld = isInFlight && session.inFlight?.isWithheld == true
       if answer.status == .update {
         guard isInFlight || session.latest == answer.id else {
           throw RegistryError.unknownRequest(answer.id)
         }
+        if isWithheld { return .dropped }
       } else {
         guard isInFlight else { throw RegistryError.unknownRequest(answer.id) }
         session.inFlight = nil
       }
-      guard session.latest == answer.id, let label else { return .superseded }
+      guard session.latest == answer.id, let label else {
+        return isWithheld ? .dropped : .superseded
+      }
       let text = answer.text.isEmpty ? answer.reason ?? "" : answer.text
       return .delivery(
-        Delivery(session: answer.sessionId, label: label, status: answer.status, text: text))
+        Delivery(
+          session: answer.sessionId, label: label, status: isWithheld ? .failed : answer.status,
+          text: isWithheld ? Self.withheldReason : text))
     }
   }
 

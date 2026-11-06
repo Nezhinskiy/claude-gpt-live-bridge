@@ -1425,6 +1425,92 @@ struct BridgeTests {
     #expect(try test.saved()[test.a].outOfSync == .paused)
   }
 
+  /// With the pause on and the call off: a voice turn runs, and the owner types into it.
+  func typedIntoAVoiceTurn() async throws {
+    try await join(a, "Alpha")
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    try await sync(a, "Private thing.")
+  }
+
+  /// The voice turn's answer, which may repeat what was typed.
+  func voiceAnswer(_ id: Int = 1, _ status: AnswerStatus = .ok) async throws {
+    try await post(
+      "/v1/answer",
+      AnswerBody(
+        sessionId: a, id: request(id).id, status: status, text: "It repeats the private thing.",
+        reason: nil))
+  }
+
+  /// The answer may repeat what was typed: it reaches neither the conversation nor the next seed.
+  @Test func theOwnerTypingIntoAVoiceTurnWithholdsItsAnswer() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.typedIntoAVoiceTurn()
+    try await test.voiceAnswer()
+    #expect(await !test.lines().contains { $0.contains("private thing") })
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    await test.bridge.perform(.start)
+    await test.bridge.audioEvent(.speechStarted)
+    let seed = await test.voice.opens.last?.map(\.text) ?? []
+    #expect(!seed.contains { $0.contains("private thing") })
+  }
+
+  /// Start pressed before the answer: a plain failure goes to the line, and none of the text.
+  @Test func aWithheldAnswerOnAnOpenLineIsAFailure() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.typedIntoAVoiceTurn()
+    await test.live()
+    try await test.voiceAnswer()
+    let added = await test.voice.added
+    #expect(added.count == 1)
+    #expect(added.first?.hasPrefix("[FAILED] Alpha:") == true)
+    #expect(!added.contains { $0.contains("private thing") })
+    #expect(await test.voice.spoken.isEmpty)
+  }
+
+  /// A line waiting for that request's result is told at once, which ends its wait: only an
+  /// awaited line is spoken to, and an unawaited one is added to.
+  @Test func aWithheldAnswerEndsTheLinesWait() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")  // refused: the turn stays so
+    await test.live()
+    await test.bridge.audioEvent(.speechEnded)
+    try await test.handOff()
+    try await test.sync(test.a, "More of it.")
+    try await test.voiceAnswer()
+    #expect(await eventually { await test.voice.spoken.count == 1 })
+    #expect(await test.voice.spoken.first?.hasPrefix("[FAILED] Alpha:") == true)
+    #expect(await !test.lines().contains { $0.contains("private thing") })
+  }
+
+  /// Under the pause a voice turn nobody typed into keeps its answer.
+  @Test func aVoiceTurnNobodyTypedIntoKeepsItsAnswer() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.answer(test.request(1), from: test.a)
+    #expect(await test.lines() == ["Claude: [RESULT] Alpha: Done."])
+  }
+
+  /// A claude line refused under the pause says nothing of the owner's: no answer is withheld.
+  @Test func aRefusedClaudeLineWithholdsNoAnswer() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    try await test.sync(test.a, from: .claude, "")
+    try await test.voiceAnswer()
+    #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
+  }
+
+  @Test func aWithheldSupersededAnswerStaysOut() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.typedIntoAVoiceTurn()
+    try await test.registry.enqueue(test.request(2), for: test.a)
+    try await test.voiceAnswer()
+    #expect(await test.lines().isEmpty)
+  }
+
   /// A result not heard yet is given to the line once it opens, so it is not seeded too.
   @Test func unheardResultIsNotSeededTwice() async throws {
     try await join(a, "Alpha")

@@ -303,6 +303,77 @@ struct SessionRegistryTests {
     #expect(delivery == Delivery(session: c, label: "Alpha", status: .ok, text: "done"))
   }
 
+  /// A request in flight whose answer is withheld.
+  func withheld() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.withholdAnswer(of: a)
+  }
+
+  /// Whatever the turn ended with, the request closes as failed and none of it goes on.
+  @Test(arguments: [AnswerStatus.ok, .question, .failed])
+  func aWithheldAnswerClosesAsFailed(status: AnswerStatus) async throws {
+    try await withheld()
+    let delivery = try #require(try await registry.complete(answer(request(1), status)).delivery)
+    #expect(delivery.status == .failed)
+    #expect(!delivery.text.contains("done"))
+    #expect(await !registry.hasOpenRequests)
+  }
+
+  @Test func aWithheldUpdateIsDroppedAndClosesNothing() async throws {
+    try await withheld()
+    #expect(try await registry.complete(answer(request(1), .update)) == .dropped)
+    #expect(await registry.hasOpenRequests)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .failed)
+  }
+
+  @Test func aWithheldSupersededAnswerIsDropped() async throws {
+    try await withheld()
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.complete(answer(request(1))) == .dropped)
+  }
+
+  @Test func theMarkGoesWithItsRequest() async throws {
+    try await withheld()
+    _ = try await registry.complete(answer(request(1)))
+    try await registry.enqueue(request(2), for: a)
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
+  }
+
+  @Test func withNothingInFlightNoRequestIsMarked() async throws {
+    await join(a)
+    await registry.withholdAnswer(of: a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
+  }
+
+  @Test func aQueuedRequestIsNotMarked() async throws {
+    try await withheld()
+    try await registry.enqueue(request(2), for: a)
+    _ = try await registry.complete(answer(request(1)))
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
+  }
+
+  @Test func theMarkFollowsClear() async throws {
+    try await withheld()
+    try await registry.join(JoinBody(sessionId: c, title: "Alpha", replaces: a))
+    #expect(try await registry.complete(answer(request(1), from: c)).delivery?.status == .failed)
+  }
+
+  /// The same id joining again is a new session, with a new request.
+  @Test func theMarkDoesNotOutliveItsSession() async throws {
+    try await withheld()
+    await registry.leave(a)
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
+  }
+
   @Test func leavingWithAnOpenRequestFailsIt() async throws {
     await join(a)
     try await registry.enqueue(request(1), for: a)
