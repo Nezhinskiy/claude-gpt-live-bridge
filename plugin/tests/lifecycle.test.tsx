@@ -212,6 +212,20 @@ test('aSnapshotThatFailsCostsARenamedTurnNothing', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
 
+/** /clear gives the session a new id, whose join runs in `turn.start`; forgetting the old key can fail there. */
+test('aStoreThatFailsAfterClearCostsATurnNothing', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  world.sessionId = OTHER
+  world.isStoreBroken = true
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  expect(world.joined).toEqual(new Set([OTHER]))
+  expect(world.take('sync').map(line => line?.sessionId)).toEqual([OTHER])
+  expect(world.take('activity')).toEqual([{ sessionId: OTHER, state: 'working' }])
+})
+
 test('aSnapshotThatFailsCostsAVoiceAnswerNothing', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)

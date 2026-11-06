@@ -219,7 +219,7 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
   if (!isNewId && title === joined.title) return
   if (isNewId) {
     staleSummary()  // /clear: a new transcript
-    await $.store.delete(joinedKey(joined.sessionId))
+    await $.store.delete(joinedKey(joined.sessionId)).catch(() => {})  // the join matters more
   }
   await link.rejoin({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
   await trySave($)

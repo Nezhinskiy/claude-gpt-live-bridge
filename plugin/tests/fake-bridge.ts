@@ -47,7 +47,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     world.stored.set(e.key, e.value)
     return { value: undefined }
   })
-  on('store.delete', async (_, e) => (await held(), world.stored.delete(e.key), { value: undefined }))
+  on('store.delete', async (_, e) => {
+    if (world.isStoreBroken) throw new Error('the store is full')
+    await held()
+    world.stored.delete(e.key)
+    return { value: undefined }
+  })
   const world = {
     clock,
     sessionId: ID,
