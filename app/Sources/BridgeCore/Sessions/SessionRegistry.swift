@@ -189,13 +189,15 @@ public actor SessionRegistry {
   /// Asks the session for its context summary at its next poll.
   public func requestContext(for id: SessionID) { sessions[id]?.wantsContext = true }
 
-  /// The owner typed while the sync was paused, and the turn refused it. The request in flight
-  /// is that turn's, or waits behind it, so its answer may repeat what was typed: it stays out.
-  /// It can only be told apart from a voice turn nobody typed into by this. With nothing open the
-  /// turn is a background one, whose answer would be an update to the last request: that ends too.
-  public func withholdAnswer(of id: SessionID) {
-    sessions[id]?.inFlight?.isWithheld = true
-    if sessions[id]?.hasOpenRequest == false { sessions[id]?.latest = nil }
+  /// The turn of `request` refused what the owner typed into it, so its answer may repeat that
+  /// text: it stays out. Closed already, the turn is a background one, whose answer would be an
+  /// update to the request: no update goes under it.
+  public func withholdAnswer(_ request: RequestID, of id: SessionID) {
+    if sessions[id]?.inFlight?.id == request {
+      sessions[id]?.inFlight?.isWithheld = true
+    } else if sessions[id]?.latest == request {
+      sessions[id]?.latest = nil
+    }
   }
 
   /// Records an answer. `ok`, `failed` and `question` close the request in flight; `update`

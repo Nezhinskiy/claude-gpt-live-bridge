@@ -1621,7 +1621,7 @@ struct BridgeTests {
     await test.live()
     await test.bridge.audioEvent(.speechEnded)
     try await test.handOff()
-    try await test.sync(test.a, "More of it.")
+    try await test.sync(test.a, request: test.request(1).id, "More of it.")
     try await test.voiceAnswer()
     #expect(await eventually { await test.voice.spoken.count == 1 })
     #expect(await test.voice.spoken.first?.hasPrefix("[FAILED] Alpha:") == true)
@@ -1658,7 +1658,7 @@ struct BridgeTests {
     try await test.post(
       "/v1/activity", ActivityBody(sessionId: test.a, state: .approval, question: "Which name?"))
     #expect(await eventually { await test.bridge.status.unheard == 1 })
-    try await test.sync(test.a, "More of it.")
+    try await test.sync(test.a, request: test.request(1).id, "More of it.")
     try await test.post("/v1/activity", ActivityBody(sessionId: test.a, state: .working))
     #expect(await eventually { await test.bridge.status.unheard == 0 })
   }
@@ -1684,7 +1684,8 @@ struct BridgeTests {
     try await test.join(test.a, "Alpha")
     try await test.answer(test.request(1), from: test.a)
     let lines = await test.lines()
-    try await test.sync(test.a, turn: "background-turn", "Private thing.")
+    try await test.sync(
+      test.a, turn: "background-turn", request: test.request(1).id, "Private thing.")
     let reply = try await test.post(
       "/v1/answer",
       AnswerBody(
@@ -1723,6 +1724,20 @@ struct BridgeTests {
     try await test.voiceTurn()
     try await test.voiceApproval(question: "Which name?")
     #expect(await test.lines() == ["Claude: [ASKING] Alpha: Which name?"])
+  }
+
+  /// R-13: a refused turn, Start, a spoken request that waits behind that turn, one more line typed
+  /// into the turn with the call on. The request is not that turn's, and the sync was not paused.
+  @Test func aRequestWaitingBehindARefusedTurnIsNotWithheld() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    await test.live()
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    try await test.sync(test.a, "One more thing, typed with the call on.")
+    try await test.voiceAnswer()
+    #expect(await !test.voice.added.contains { $0.hasPrefix("[FAILED]") })
   }
 
   /// A released mod names no turn and reports only its voice turns: its question is said, as it
@@ -2428,7 +2443,7 @@ struct BridgeTests {
     _ = try await test.registry.poll(test.a)
     await test.live()
     await test.pausedAtTheLimit()
-    try await test.sync(test.a, "Private thing.")
+    try await test.sync(test.a, request: test.request(1).id, "Private thing.")
     try await test.voiceAnswer()
     #expect(await !test.lines().contains { $0.contains("private thing") })
     await test.live()

@@ -112,8 +112,9 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   A voice turn holds nothing of the owner's until the owner types into it, so its start refuses
   nothing and marks nothing, whatever the call: only what was typed under the pause is dropped, and
   its answer goes as an answer, past the turn's decision. A voice turn typed into so is refused like
-  any other, and its answer may repeat the text too: the request closes as failed, with its text
-  neither recorded nor said.
+  any other, and its answer may repeat the text too: the request the turn names closes as failed,
+  with its text neither recorded nor said. A request that only waits behind the turn is not its
+  own and keeps its answer.
 - **A spoken reply makes the rest of the turn a voice turn** (the owner's decision). When the owner
   answers a typed turn's question by voice, the voice hands it off and the line waits for a result
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is

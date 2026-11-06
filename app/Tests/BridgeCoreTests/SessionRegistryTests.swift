@@ -308,7 +308,7 @@ struct SessionRegistryTests {
     await join(a)
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    await registry.withholdAnswer(of: a)
+    await registry.withholdAnswer(request(1).id, of: a)
   }
 
   /// Whatever the turn ended with, the request closes as failed and none of it goes on.
@@ -342,11 +342,12 @@ struct SessionRegistryTests {
     #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
   }
 
-  @Test func withNothingInFlightNoRequestIsMarked() async throws {
+  /// Only the request named: another in flight keeps its answer.
+  @Test func anotherRequestIsNotMarked() async throws {
     await join(a)
-    await registry.withholdAnswer(of: a)
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
+    await registry.withholdAnswer(request(2).id, of: a)
     #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
   }
 
@@ -391,13 +392,13 @@ struct SessionRegistryTests {
     }
   }
 
-  /// A background turn in the follow-up window, typed into: nothing is open to mark.
+  /// A background turn in the follow-up window, typed into: its request is closed.
   @Test func withNothingOpenTheFollowUpEnds() async throws {
     await join(a)
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
     _ = try await registry.complete(answer(request(1)))
-    await registry.withholdAnswer(of: a)
+    await registry.withholdAnswer(request(1).id, of: a)
     await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
       try await registry.complete(answer(request(1), .update))
     }
@@ -410,7 +411,7 @@ struct SessionRegistryTests {
     _ = try await registry.poll(a)
     _ = try await registry.complete(answer(request(1)))
     try await registry.enqueue(request(2), for: a)
-    await registry.withholdAnswer(of: a)
+    await registry.withholdAnswer(request(1).id, of: a)
     _ = try await registry.poll(a)
     #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
   }
