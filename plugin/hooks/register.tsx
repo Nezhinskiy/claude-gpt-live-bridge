@@ -81,6 +81,11 @@ async function save($: EngineInterface): Promise<void> {
   if (link?.session) await $.store.set(joinedKey(link.session.sessionId), { ...tracker.snapshot(), hasGap: link.hasGap })
 }
 
+/** A turn the tracker lost reached the app in no way, which the next join says. */
+function noteLostTurn(): void {
+  if (tracker.takeLostTurn()) link?.noteGap()
+}
+
 /** For a hook past its `next`, whose `.catch` would run the event again: the snapshot matters less. */
 const trySave = ($: EngineInterface) => save($).catch(() => {})
 
@@ -533,6 +538,7 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
       const line = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
+      noteLostTurn()
       lastOrigin = null
       lastPrompt = undefined
       await serial(() => follow($, false))  // /clear: the line goes under the session's new id
@@ -565,8 +571,8 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       await promptGone($)
-      if (tracker.current === null) link?.noteGap()  // it started while the mod was away
       const { post, sync } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
+      noteLostTurn()
       staleSummary()
       approval = null
       answerQuestion = null  // a question cancelled at the dialog may leave its tool's call unfinished

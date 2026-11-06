@@ -81,6 +81,7 @@ export class TurnTracker {
   #followUp: FollowUp | null
   #turns: Map<string, Tracked>
   #typed: TypedPrompt[]
+  #isTurnLost = false
   /** The visible text of the main loop's model step so far, until a question or an approval takes it. */
   #stepText = ''
 
@@ -110,6 +111,17 @@ export class TurnTracker {
   get #latest(): { turnId: string; turn: Tracked } | null {
     const entry = [...this.#turns].at(-1)
     return entry === undefined ? null : { turnId: entry[0], turn: entry[1] }
+  }
+
+  /**
+   * Whether a turn ended where the tracker could not follow it, since the last ask: one that
+   * completed unseen, or one still held when the next started. Neither its lines nor its answer
+   * went to the app.
+   */
+  takeLostTurn(): boolean {
+    const isLost = this.#isTurnLost
+    this.#isTurnLost = false
+    return isLost
   }
 
   /** The main loop's next model step starts: nothing of it is written yet. */
@@ -162,6 +174,9 @@ export class TurnTracker {
    * starts the turn of a prompt typed into the turn before it, whose lines stay under that id.
    */
   turnStarted(turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt = text): SyncLine | null {
+    // Main-loop turns run one at a time: one still held never reported its end.
+    if (this.#turns.size > 0) this.#isTurnLost = true
+    this.#turns.clear()
     const id = voiceRequestId(text)
     const at = id === null && origin !== 'owner' ? this.#typed.findIndex(one => one.text === text) : -1
     const claimed = this.#typed[at]
@@ -203,7 +218,10 @@ export class TurnTracker {
   /** A main-loop turn ended: what to post for it, as an answer to the voice request or a line. */
   turnCompleted(turnId: string, answer: string, outcome: TurnOutcome): { post: Post | null; sync: SyncLine | null } {
     const turn = this.#turns.get(turnId)
-    if (turn === undefined) return { post: null, sync: null }
+    if (turn === undefined) {
+      this.#isTurnLost = true
+      return { post: null, sync: null }
+    }
     this.#turns.delete(turnId)
     const text = answer.trim()
     const isAnswered = outcome === 'answer' && text !== ''

@@ -222,6 +222,36 @@ test('current is the running turn of either kind, null after it ends', () => {
   assert.equal(tracker.current, null)
 })
 
+test('a turn the tracker never saw start is lost, once', () => {
+  const tracker = new TurnTracker()
+  assert.equal(tracker.takeLostTurn(), false)
+  tracker.turnCompleted('t1', 'Done.', 'answer')
+  assert.equal(tracker.takeLostTurn(), true)
+  assert.equal(tracker.takeLostTurn(), false)
+})
+
+test('a turn that started and ended is not lost', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'first', 'owner', 0)
+  tracker.turnCompleted('t1', 'Done.', 'answer')
+  assert.equal(tracker.takeLostTurn(), false)
+})
+
+/** Crash, then --resume: the snapshot holds a turn whose end never came. */
+test('a turn still held when the next one starts ended unseen', () => {
+  const tracker = new TurnTracker({ pending: null, followUp: null, turns: [['t0', { id: null, isVoice: false }]] })
+  tracker.turnStarted('t1', 'first', 'owner', 0)
+  assert.equal(tracker.takeLostTurn(), true)
+  assert.deepEqual(tracker.snapshot().turns.map(([id]) => id), ['t1'])
+  assert.deepEqual(tracker.current, { turnId: 't1', isVoice: false })
+})
+
+test('a held turn does not hide one the tracker never saw', () => {
+  const tracker = new TurnTracker({ pending: null, followUp: null, turns: [['t0', { id: null, isVoice: false }]] })
+  tracker.turnCompleted('t1', 'Done.', 'answer')
+  assert.equal(tracker.takeLostTurn(), true)
+})
+
 test('a snapshot from before sync loads', () => {
   const tracker = new TurnTracker({
     pending: null, followUp: { id: ID, until: 5000 }, turns: [['t1', { id: ID, isVoice: true }]],

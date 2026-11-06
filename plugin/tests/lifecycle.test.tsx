@@ -169,6 +169,27 @@ test('aTurnTheModNeverSawStartIsAGap', async ($, on) => {
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
 })
 
+const HELD = { pending: null, followUp: null, turns: [['t0', { id: null, isVoice: false }]], hasGap: false }
+
+/** Crash, then --resume: the turn's end never came, so its answer never went. */
+test('aTurnLeftInASnapshotIsAGapAtTheNextTurn', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: HELD })
+  await $.session.start(START)
+  world.take('join')
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
+test('aTurnNeverSeenIsAGapThoughASnapshotHoldsAnother', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: HELD })
+  await $.session.start(START)
+  world.take('join')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
 test('offLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
