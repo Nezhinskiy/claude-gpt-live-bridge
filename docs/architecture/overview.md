@@ -105,7 +105,8 @@ Settings' voice list is; it asks `account/rateLimits/read`, also while the call 
 lifecycle is separate from `RealtimeSession`'s. A failed read leaves the last reading until it is
 15 minutes old. Claude's arrive from the mod on `POST /v1/limits` and merge window by window (the
 later reset wins, on the same reset the higher percent), so sessions on one account feed one
-reading; a window whose reset has passed is left out until a new reading comes. `LimitRow` turns a
+reading; a window whose reset has passed is left out until a new reading comes, and one with no
+reset is left out 15 minutes after its reading. `LimitRow` turns a
 reading into the menu's row and tooltip.
 
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
