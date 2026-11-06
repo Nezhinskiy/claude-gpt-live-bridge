@@ -179,7 +179,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
       case .limit(let shown):
         let item = native("limit|\(shown.name)", used: &used) { NSMenuItem() }
-        item.title = "\(shown.name) \(shown.text)"
+        // The attributed title's string is what VoiceOver reads.
         item.attributedTitle = Self.limitTitle(shown)
         item.toolTip = shown.tooltip
         item.isEnabled = true
@@ -189,7 +189,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     sync(menu, built)
   }
 
-  /// A limit row's title: the name and the figures, small and quiet, a figure near its limit
+  /// A limit row's title: the name and the row's runs, small and quiet, a run near its limit
   /// orange, and the whole title orange when blocked.
   private static func limitTitle(_ row: LimitRow) -> NSAttributedString {
     let font = NSFont.systemFont(ofSize: 11)
@@ -198,13 +198,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
       NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
     }
     let title = NSMutableAttributedString(attributedString: part(row.name + "  ", quiet))
-    for (index, figure) in row.figures.enumerated() {
-      if index > 0 { title.append(part(" · ", quiet)) }
-      title.append(part(figure.text, figure.isNear ? .systemOrange : quiet))
-    }
-    if row.isBlocked {
-      title.append(part(row.figures.isEmpty ? "blocked" : " · blocked", quiet))
-    }
+    for run in row.runs { title.append(part(run.text, run.isNear ? .systemOrange : quiet)) }
     return title
   }
 

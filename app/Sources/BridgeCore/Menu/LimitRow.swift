@@ -3,8 +3,9 @@ import Foundation
 /// One source's usage in the menu: its name, a figure per window it reports, whether it says
 /// usage is blocked, and a tooltip with the reset times. Pure.
 public struct LimitRow: Sendable, Equatable {
-  /// One window's used share, as "7% of 5 h", and whether it is close to the limit.
-  public struct Figure: Sendable, Equatable {
+  /// A piece of the row's text, in order: a window's used share as "7% of 5 h", a separator, or
+  /// "blocked". `isNear` marks a share close to its limit; the app only colours the runs.
+  public struct Run: Sendable, Equatable {
     public let text: String
     public let isNear: Bool
   }
@@ -13,14 +14,13 @@ public struct LimitRow: Sendable, Equatable {
   public static let nearPercent = 90
 
   public let name: String
-  public let figures: [Figure]
+  /// The figures, then "blocked", with " · " between each two.
+  public let runs: [Run]
   public let isBlocked: Bool
   public let tooltip: String
 
-  /// The figures, then "blocked", joined by " · ".
-  public var text: String {
-    (figures.map(\.text) + (isBlocked ? ["blocked"] : [])).joined(separator: " · ")
-  }
+  /// The runs joined: the row's text after its name.
+  public var text: String { runs.map(\.text).joined() }
 
   /// nil when `limits` has no window still current and no block: there is nothing to show.
   public init?(name: String, limits: UsageLimits?, now: Date, calendar: Calendar, locale: Locale) {
@@ -29,10 +29,10 @@ public struct LimitRow: Sendable, Equatable {
 
     // The value comes from the socket. `Int(_:)` traps on NaN and on infinity, which `min` and `max`
     // let through, so a value that is not finite is 0; the rest is clamped to 0...100 here only.
-    func figure(_ window: LimitWindow) -> Figure {
+    func figure(_ window: LimitWindow) -> Run {
       let value = window.usedPercent.isFinite ? window.usedPercent : 0
       let percent = Int(min(max(value, 0), 100).rounded())
-      return Figure(
+      return Run(
         text: "\(percent)% of \(window.span.label)", isNear: percent >= Self.nearPercent)
     }
     let windows = current.windows
@@ -71,7 +71,12 @@ public struct LimitRow: Sendable, Equatable {
     lines.append("Read at " + when(current.readAt).text)
 
     self.name = name
-    figures = windows.map(figure)
+    let separator = Run(text: " · ", isNear: false)
+    var runs = Array(windows.map(figure).map { [$0] }.joined(separator: [separator]))
+    if current.isBlocked {
+      runs += (runs.isEmpty ? [] : [separator]) + [Run(text: "blocked", isNear: false)]
+    }
+    self.runs = runs
     isBlocked = current.isBlocked
     tooltip = lines.joined(separator: "\n")
   }

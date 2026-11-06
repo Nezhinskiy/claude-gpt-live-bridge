@@ -297,26 +297,36 @@ struct LimitRowTests {
   }
 
   @Test func aRowShowsBothWindows() {
-    #expect(Self.row(Self.limits())?.figures.map(\.text) == ["7% of 5 h", "19% of week"])
+    #expect(Self.row(Self.limits())?.text == "7% of 5 h · 19% of week")
+  }
+
+  @Test func theRunsAreTheTextInOrder() {
+    let row = Self.row(Self.limits(five: 95, blocked: true))
+    #expect(
+      row?.runs.map(\.text) == ["95% of 5 h", " · ", "19% of week", " · ", "blocked"])
+    #expect(row?.runs.map(\.isNear) == [true, false, false, false, false])
+    #expect(row?.runs.map(\.text).joined() == row?.text)
+    #expect(
+      Self.row(Self.limits(five: nil, week: nil, blocked: true))?.runs.map(\.text) == ["blocked"])
   }
 
   @Test func percentsAreRounded() {
-    #expect(Self.row(Self.limits(five: 7.5))?.figures.first?.text == "8% of 5 h")
+    #expect(Self.row(Self.limits(five: 7.5))?.runs.first?.text == "8% of 5 h")
   }
 
   @Test func anAbsurdPercentDoesNotCrash() {
     let row = Self.row(Self.limits(five: 1e300, week: -5))
-    #expect(row?.figures.map(\.text) == ["100% of 5 h", "0% of week"])
+    #expect(row?.text == "100% of 5 h · 0% of week")
   }
 
   @Test func aNonFinitePercentIsZero() {
     // Built directly: the wire refuses these, but the row must not trap on them.
     let row = Self.row(Self.limits(five: .nan, week: .infinity))
-    #expect(row?.figures.map(\.text) == ["0% of 5 h", "0% of week"])
+    #expect(row?.text == "0% of 5 h · 0% of week")
   }
 
   @Test func aMissingWindowIsLeftOut() {
-    #expect(Self.row(Self.limits(five: nil))?.figures.map(\.text) == ["19% of week"])
+    #expect(Self.row(Self.limits(five: nil))?.text == "19% of week")
   }
 
   @Test func noWindowAndNoBlockIsNoRow() {
@@ -330,19 +340,19 @@ struct LimitRowTests {
         LimitWindow(span: .minutes(300), usedPercent: 50, resetsAt: Self.now - 60),
         LimitWindow(span: .minutes(10080), usedPercent: 19, resetsAt: Self.weekReset),
       ], readAt: Self.now - 3600)
-    #expect(Self.row(stale)?.figures.map(\.text) == ["19% of week"])
+    #expect(Self.row(stale)?.text == "19% of week")
   }
 
   @Test func aFigureShowingNinetyIsNear() {
     let below = Self.row(Self.limits(five: 89.4, week: 89.5))
-    #expect(below?.figures.map(\.isNear) == [false, true])
-    #expect(below?.figures.last?.text == "90% of week")
+    #expect(below?.runs.map(\.isNear) == [false, false, true])
+    #expect(below?.runs.last?.text == "90% of week")
   }
 
   @Test func aBlockWithNoWindowStillShows() {
     let row = Self.row(Self.limits(five: nil, week: nil, blocked: true))
     #expect(row?.isBlocked == true)
-    #expect(row?.figures.isEmpty == true)
+    #expect(row?.runs.map(\.text) == ["blocked"])
     #expect(row?.text == "blocked")
   }
 
@@ -406,7 +416,7 @@ struct LimitRowTests {
       windows: [LimitWindow(span: .minutes(240), usedPercent: 22, resetsAt: Self.reset)],
       readAt: Self.now)
     let row = Self.row(limits)
-    #expect(row?.figures.map(\.text) == ["22% of 4 h"])
+    #expect(row?.text == "22% of 4 h")
     #expect(row?.tooltip.hasPrefix("4-hour window resets at 06:04") == true)
   }
 
@@ -415,7 +425,7 @@ struct LimitRowTests {
       windows: [LimitWindow(span: .unknown, usedPercent: 22, resetsAt: Self.reset)],
       readAt: Self.now)
     let row = Self.row(limits)
-    #expect(row?.figures.map(\.text) == ["22% of limit"])
+    #expect(row?.text == "22% of limit")
     #expect(row?.tooltip.hasPrefix("Limit resets at 06:04") == true)
   }
 

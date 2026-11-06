@@ -1596,7 +1596,7 @@ struct BridgeTests {
       LimitRow(
         name: "Claude", limits: update.claudeLimits, now: time.now, calendar: utc,
         locale: Locale(identifier: "en_GB")))
-    #expect(row.figures.map(\.text) == ["22% of week"])
+    #expect(row.text == "22% of week")
     #expect(update.claudeLimits?.windows.map(\.span) == [.minutes(10080)])
     let lines = row.tooltip.split(separator: "\n").map(String.init)
     #expect(lines.count == 2)
