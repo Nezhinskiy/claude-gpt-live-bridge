@@ -25,6 +25,21 @@ struct RedactionTests {
     #expect(!redacted.contains(secret) && redacted.contains("(redacted)"), "\(redacted)")
   }
 
+  /// All typed text goes through this on the bridge's actor, so a pasted dump of the mod's 32,000
+  /// characters must not hold up every session's poll.
+  @Test(arguments: ["a3f9", "token", "secret_"])
+  func aLongUnbrokenRunTakesNoTime(run: String) {
+    let text = String(repeating: run, count: 32_000 / run.count)
+    let took = ContinuousClock().measure { _ = Redaction.redact(text) }
+    #expect(took < .seconds(1))
+  }
+
+  /// The field name may run on after the keyword, up to a limit that keeps the rule linear.
+  @Test func aLongFieldNameIsStillAField() {
+    let name = "api_key_" + String(repeating: "x", count: 56)
+    #expect(Redaction.redact("\(name)=hunter2") == "\(name)=(redacted)")
+  }
+
   @Test func keepsFullGitShas() {
     let shas =
       "commit 0123456789abcdef0123456789abcdef01234567 and "
