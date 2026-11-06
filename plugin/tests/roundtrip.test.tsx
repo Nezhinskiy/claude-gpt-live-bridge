@@ -228,7 +228,7 @@ test('claudesQuestionIsAnsweredByVoice', async ($, on) => {
     question: 'Which name should the folder get? Options: build: the default; out: shorter.',
     turn: VOICE,
   }])
-  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: REQUEST.id })
   await world.clock.advance(1000)
   expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: VOICE }])
@@ -487,6 +487,22 @@ test('aSpokenReplyInAVoiceTurnKeepsItsRequest', async ($, on) => {
   expect(world.take('answer')).toEqual([{ sessionId: ID, id: REQUEST.id, status: 'ok', text: 'Renamed to out.' }])
 })
 
+/** The app restarted mid-turn, so it holds the reply as the request: the turn's answer must close it. */
+test('aSpokenReplyAfterAnAppRestartTakesTheTurnsAnswer', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  world.joined.delete(ID)
+  await world.clock.advance(1000)
+  expect(world.joined.has(ID)).toBe(true)
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  await asked
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.take('answer')).toEqual([{ sessionId: ID, id: SPOKEN.id, status: 'ok', text: 'Renamed to out.' }])
+})
+
 test('aSpokenReplyWithARequestWaitingIsAnUpdate', async ($, on) => {
   const world = fakeWorld(on)
   await inTypedTurnWithVoiceWaiting($, world, 'Rename the folder')
@@ -599,6 +615,33 @@ test('anAllowedPromptIsSynced', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
   await step($, world, 't1', '')
   expect(world.take('sync')).toEqual([])
+})
+
+/** The tool ran and failed: the prompt for that run was allowed all the same. */
+test('aToolThatFailsSettlesItsPromptAsAllowed', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.classic.PostToolUseFailure({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_use_id: 'u1', error: 'exit 1' })
+  expect(world.take('sync').map(line => line?.text)).toEqual(['You allowed Bash at the keyboard.'])
+})
+
+/** Auto mode refused, not the person: nothing to tell the voice but that the session goes on. */
+test('anAutoDenialSaysOnlyThatTheSessionWorks', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.classic.PermissionDenied({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_use_id: 'u1', reason: 'auto' })
+  expect(world.take('sync')).toEqual([])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
+})
+
+test('anAutoDenialLeavesAnOpenQuestionAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  const { asked } = await atAQuestion($, world)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  await $.classic.PermissionDenied({ tool_name: 'Bash', tool_input: { command: 'ls' }, tool_use_id: 'u1', reason: 'auto', agent_id: 'a1' })
+  expect(world.take('activity')).toEqual([])
+  world.answerDialog('out')
+  await asked
 })
 
 /** Stop with the pause on: a Yes is not typing, so the turn that started synced keeps its answer. */
@@ -772,6 +815,51 @@ test('aQuestionWhileAPromptIsOpenIsAsked', async ($, on) => {
   expect(world.take('activity')).toEqual([
     { sessionId: ID, state: 'working', turn: TYPED }, { sessionId: ID, state: 'approval', question: PLAIN, turn: TYPED },
   ])
+  world.answerDialog('out')
+  await asked
+})
+
+/** A question's hook can run inside this hook's save; a bare `approval` landing after it takes the question back. */
+test('aPromptSavingWhileAQuestionOpensLeavesItAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await world.clock.advance(1000)
+  world.take('activity')
+  let release = () => {}
+  world.holdStore = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onStoreHeld = resolve })
+  const prompt = $.classic.PermissionRequest({ tool_name: 'Read', tool_input: { file_path: '/Users/example/a' } })
+  await held
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  release()
+  await prompt
+  await aMoment()
+  expect(world.take('activity').at(-1)).toEqual({ sessionId: ID, state: 'approval', question: PLAIN, turn: TYPED })
+  world.answerDialog('out')
+  await asked
+})
+
+/** The same inside a settled prompt's save, whose `working` would take the question back. */
+test('aPromptSettlingWhileAQuestionOpensLeavesItAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await world.clock.advance(1000)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  world.take('activity')
+  let release = () => {}
+  world.holdStore = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onStoreHeld = resolve })
+  const ran = $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' }, tool_response: {}, tool_use_id: 'u1', agent_id: 'a1' })
+  await held
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  release()
+  await ran
+  await aMoment()
+  expect(world.take('activity').at(-1)).toEqual({ sessionId: ID, state: 'approval', question: PLAIN, turn: TYPED })
   world.answerDialog('out')
   await asked
 })

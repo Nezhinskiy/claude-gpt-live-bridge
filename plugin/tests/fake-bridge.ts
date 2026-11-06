@@ -122,6 +122,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     holdStore: null as Promise<void> | null,
     /** Called once a write is being held. */
     onStoreHeld: () => {},
+    /** While set, the engine's next count of the session's prompts is held until it resolves. */
+    holdTurns: null as Promise<void> | null,
     /** Prompts submitted and leaves posted, in the order they happened. */
     timeline: [] as ('submit' | 'leave')[],
     /** While set, the app's reply to a sync line is held until it resolves. */
@@ -145,7 +147,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('session.measure', (_, e) => ({ changed: e.changed }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('session.id', () => ({ value: world.sessionId }))
-  on('session.turns', () => ({ value: world.turns }))
+  on('session.turns', async () => {
+    const hold = world.holdTurns
+    world.holdTurns = null
+    if (hold !== null) await hold
+    return { value: world.turns }
+  })
   on('session.cwd', () => ({ value: '/Users/example/Dev/example-project' }))
   on('command.register', (_, e) => {
     if (world.isCommandRefused) return { deny: `"/${e.name}" refused: it is the built-in /${e.name}` }
@@ -271,6 +278,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   })
   on('classic.PermissionRequest', () => ({}))
   on('classic.PostToolUse', () => ({}))
+  on('classic.PostToolUseFailure', () => ({}))
+  on('classic.PermissionDenied', () => ({}))
   return world
 }
 

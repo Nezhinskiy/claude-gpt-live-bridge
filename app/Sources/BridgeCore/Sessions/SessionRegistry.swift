@@ -51,8 +51,9 @@ public enum RegistryError: Error, Equatable {
 /// Each session has at most one request in flight: `poll` hands out the next queued request only
 /// after the previous one completed. While Claude waits on a question it asked the owner, the
 /// next request is that question's reply instead: it goes out at once, for the request in
-/// flight, and supersedes nothing; with none in flight (a turn the owner typed asked), the reply
-/// is the request in flight, and the turn's final answer closes it. A newer request supersedes
+/// flight, and supersedes nothing; with none in flight (a turn the owner typed asked, or a voice
+/// turn outlived its request) the reply is the request in flight, and the turn's final answer
+/// closes it, unless the session's mod does not sync. A newer request supersedes
 /// the answer of an older one, which is then not delivered. A session that stops polling for
 /// 5 s is dropped and its open request fails; a request in flight for 10 minutes fails too.
 /// Exactly one session is the target while any is joined.
@@ -164,14 +165,15 @@ public actor SessionRegistry {
       if let reply = session.reply {
         session.reply = nil
         session.isAsking = false
-        // Nothing in flight: a typed turn asked, so the reply is the request its turn's answer
-        // closes. A newer request queued behind it stays the latest.
-        let flight = session.inFlight ?? (reply.id, reply.brief, now, false)
-        if session.inFlight == nil {
-          session.inFlight = flight
+        // Nothing in flight: a typed turn asked, or a voice turn outlived its request, so the reply
+        // is the request its turn's answer closes. A newer request queued behind it stays the
+        // latest. A mod that does not sync moves no turn onto the reply, so nothing would close
+        // it, and it opens nothing.
+        if session.inFlight == nil, session.syncs {
+          session.inFlight = (reply.id, reply.brief, now, false)
           if session.queued.isEmpty { session.latest = reply.id }
         }
-        return .reply(reply, forRequest: flight.id)
+        return .reply(reply, forRequest: session.inFlight?.id ?? reply.id)
       }
       if session.inFlight == nil, !session.queued.isEmpty {
         let request = session.queued.removeFirst()

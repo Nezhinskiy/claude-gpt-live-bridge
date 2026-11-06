@@ -1132,7 +1132,7 @@ struct BridgeTests {
     await bridge.perform(.start)
     await live()
     voice.emit(.handoff(request(2)))
-    #expect(await eventually { (try? await registry.poll(a)) != nil })
+    #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
     #expect(try await registry.poll(b) == nil)
   }
 
@@ -1159,6 +1159,19 @@ struct BridgeTests {
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: "Which?"))
     #expect(
       await eventually { await notifier.posted.last?.body.contains("start the call") == true })
+  }
+
+  /// The ask dates the summary, so it outlives a restart, or the summary clears a gap it missed.
+  @Test func aSummaryAskedForBeforeARestartClearsNoLaterPause() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.bridge.loadContext()
+    let restarted = try test.restart()
+    restarted.setPause(true)
+    try await restarted.join(test.a, "Alpha")
+    try await restarted.sync(test.a, kind: .start)  // refused, so the session is paused
+    try await restarted.post("/v1/context", ContextBody(sessionId: test.a, summary: "Old."))
+    #expect(await restarted.bridge.current.needsContext)
   }
 
   /// A summary asked for before a refused turn does not hold that turn, so the session stays out
@@ -1837,6 +1850,106 @@ struct BridgeTests {
     #expect(try test.saved()[test.a].outOfSync == nil)
   }
 
+  /// The app restarted under a voice turn, whose request it forgot, and Claude asks. The reply is
+  /// the request now, and the turn's answer, which the mod moves onto it, closes it.
+  @Test func aReplyAfterARestartIsClosedByItsTurnsAnswer() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    let restarted = try test.restart()
+    try await restarted.join(test.a, "Alpha")
+    try await restarted.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: test.a, state: .approval, question: "Which?",
+        turn: TurnRef(id: "voice-turn", request: test.request(1).id)))
+    let reply = test.request(2)
+    try await restarted.registry.enqueue(reply, for: test.a)
+    #expect(try await restarted.registry.poll(test.a) == .reply(reply, forRequest: reply.id))
+    let answered = try await restarted.post(
+      "/v1/answer",
+      AnswerBody(sessionId: test.a, id: reply.id, status: .ok, text: "Done.", reason: nil))
+    #expect(answered.status == 200)
+    try await restarted.registry.enqueue(test.request(3), for: test.a)
+    #expect(try await restarted.registry.poll(test.a) == .request(test.request(3)))
+  }
+
+  /// The same restart under a released mod: its answer goes under the forgotten request and is
+  /// refused, as before this app, and the session's next request is not held behind the reply.
+  @Test func aReplyAfterARestartLeavesAReleasedModsQueueFree() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha", syncs: nil)
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    let restarted = try test.restart()
+    try await restarted.join(test.a, "Alpha", syncs: nil)
+    try await restarted.post(
+      "/v1/activity", ActivityBody(sessionId: test.a, state: .approval, question: "Which?"))
+    try await restarted.registry.enqueue(test.request(2), for: test.a)
+    _ = try await restarted.registry.poll(test.a)
+    let answered = try await restarted.post(
+      "/v1/answer",
+      AnswerBody(sessionId: test.a, id: test.request(1).id, status: .ok, text: "Done.", reason: nil)
+    )
+    #expect(answered.status == 409)
+    try await restarted.registry.enqueue(test.request(3), for: test.a)
+    #expect(try await restarted.registry.poll(test.a) == .request(test.request(3)))
+  }
+
+  /// `/clear` while the line connects: the stored context moves with the session, and so does the
+  /// summary held for that line.
+  @Test func aHeldSummaryIsGivenAfterAClear() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.voice.holdOpen()
+    await test.bridge.perform(.start)
+    let opened = Task { await test.bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await test.voice.openWaiting == 1 })
+    try await test.post("/v1/context", ContextBody(sessionId: test.a, summary: "Held summary"))
+    let new = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await test.post(
+      "/v1/join", JoinBody(sessionId: new, title: "Alpha", replaces: test.a, syncs: true))
+    await test.voice.releaseOpen()
+    await opened.value
+    #expect(await eventually { await test.bridge.status.call == .live })
+    #expect(await test.voice.added.contains { $0.contains("Held summary") })
+  }
+
+  /// A voice turn's question keeps today's behaviour outside the target: said, not only recorded.
+  /// A typed turn's there is context (`anotherSessionsTypedQuestionIsContextOnly`).
+  @Test func aVoiceTurnsQuestionInAnotherSessionIsSaid() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which folder?",
+        turn: TurnRef(id: "voice-turn", request: request(1).id)))
+    #expect(await bridge.status.unheard == 1)
+  }
+
+  /// `working` settles what was said, whatever became of the turn: it takes no decision of its own,
+  /// so a question the pause kept goes though the owner typed into its turn since.
+  @Test func aRefusedTurnsWorkingStillWithdrawsItsQuestion() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    await test.live()
+    let turn = TurnRef(id: "turn-1", request: nil)
+    try await test.sync(test.a, kind: .start)
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(sessionId: test.a, state: .approval, question: "Which?", turn: turn))
+    test.voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
+    #expect(await eventually { await test.bridge.status.call == .off })
+    try await test.sync(test.a, "Private thing.")  // refused: the turn stays so
+    #expect(await test.bridge.status.unheard == 1)
+    try await test.post(
+      "/v1/activity", ActivityBody(sessionId: test.a, state: .working, turn: turn))
+    #expect(await test.bridge.status.unheard == 0)
+  }
+
   /// A `start` refused under the pause says nothing of the owner's: no answer is withheld.
   @Test func aRefusedStartWithholdsNoAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)
@@ -1844,6 +1957,19 @@ struct BridgeTests {
     try await test.registry.enqueue(test.request(1), for: test.a)
     _ = try await test.registry.poll(test.a)
     try await test.sync(test.a, kind: .start)
+    try await test.voiceAnswer()
+    #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
+  }
+
+  /// Only the owner's words withhold: a line of the mod's refused with the turn says nothing typed.
+  @Test func aRefusedReportWithholdsNoAnswer() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    try await test.sync(test.a, kind: .start)  // refused, with no request named yet
+    try await test.sync(
+      test.a, request: test.request(1).id, kind: .report, "The turn was interrupted.")
     try await test.voiceAnswer()
     #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
   }

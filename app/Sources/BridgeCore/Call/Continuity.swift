@@ -129,8 +129,8 @@ public struct Conversation: Codable, Sendable, Equatable {
     summaryAsk.flatMap { now < $0.at + Self.askLife ? $0 : nil }
   }
 
-  /// What "New conversation" leaves: a pause, the turn's decision, and an ask that can no longer
-  /// cover anything.
+  /// What forgetting leaves: a pause, the turn's decision, and an ask that can no longer cover
+  /// anything.
   var afterForgetting: Conversation? {
     var kept = Conversation()
     kept.lastUsed = lastUsed

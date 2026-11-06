@@ -87,9 +87,10 @@ const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
  * the app matters more, and a hook past its `next` would have its `.catch` run the event again.
  */
 async function save($: EngineInterface): Promise<void> {
+  // The count first: a `/live off` during it deletes the key, which this must not write back.
+  const sessionTurns = await turnCount($)
   if (!link?.session) return
   const key = joinedKey(link.session.sessionId)
-  const sessionTurns = await turnCount($)
   await $.store.set(key, { ...tracker.snapshot(), hasGap: link?.hasGap, sessionTurns }).catch(() => {})
 }
 
@@ -497,11 +498,13 @@ async function awaiting($: EngineInterface, said: Omit<ActivityBody, 'sessionId'
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
   const turn = tracker.current
   const isOver = nothingWaits()
-  await save($)
-  await inOrder($, async () => {
+  // Its place in the queue first: a question's hook can run inside the save.
+  const posted = inOrder($, async () => {
     if (turn) await postSync($, { turn, kind: 'report', text })
     if (isOver) await link?.activity('working', under(turn))
   })
+  await save($)
+  await posted
 }
 
 /** Whether the session works on: the app has one row for a prompt and for Claude's question. */
@@ -703,8 +706,10 @@ export const register: Register = on => {
       // A bare approval would take back the open question, and the app would say nothing for it.
       const isAsking = answerQuestion !== null
       const said = { ...(!isAsking && e.agent_id === undefined && wrote(tracker.takeStepText())), turn }
+      // Its place in the queue first: a question's hook can run inside the save.
+      const posted = isAsking ? null : inOrder($, () => awaiting($, said))
       await save($)
-      if (!isAsking) await inOrder($, () => awaiting($, said))
+      await posted
     }
     return next(e)
   }).catch(($, e, next) => next(e))

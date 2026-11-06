@@ -67,7 +67,7 @@ microphone or Claude:
   target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
   mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
   own session's conversation. New conversation forgets the target's, removing a session forgets
-  its own, and only the 20 conversations used last are kept; New conversation keeps a
+  its own, and only the 20 conversations used last are kept; both forgets keep a
   *paused* mark and the turn's decision, which the pause needs after it. A synced line (below) is
   recorded by `Bridge.sync` once `Continuity.admits` takes it: with the pause setting on and the
   call off the first line of a turn with no voice request behind it is refused and the session is
@@ -76,7 +76,7 @@ microphone or Claude:
   stays out while the session is *paused*. A refused `typed` line in a turn with a
   voice request behind it (`turn.request`) also withholds exactly that request, whose answer then
   closes as failed with nothing of it recorded or said (`SessionRegistry.withholdAnswer`); a request
-  waiting behind the turn is not its own and keeps its answer. A refused turn's later questions and
+  that only waits behind the turn, unnamed, keeps its answer. A refused turn's later questions and
   approval notices stay out with it (`Bridge.activity`). The open line about the
   session is given an admitted line at once with `addContext`, a connecting one when it is
   connected.
@@ -415,8 +415,10 @@ dialog opens as usual and the question, with its options, goes to the voice as a
 line, followed by the step's text (above). The voice may explain it and talk it over from what it
 knows, without handoffs; the owner's next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
-dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
-has not polled by then goes as a request of its own.
+dialog. With none in flight (a typed turn asked, or a voice turn outlived its request) the reply is
+the request in flight and the mod moves the turn onto it, so the turn's answer closes it; a mod that
+does not sync cannot, so there it opens nothing. An answer at the keyboard that comes first
+withdraws the line, and a reply the session has not polled by then goes as a request of its own.
 
 ```mermaid
 sequenceDiagram

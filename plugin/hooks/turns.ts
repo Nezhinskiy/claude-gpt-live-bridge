@@ -242,12 +242,15 @@ export class TurnTracker {
 
   /**
    * The owner's spoken reply `replyId` answered the running turn's question, and the app says
-   * its answer belongs to `forRequest`, undefined from an older app. The same request: the rest of
-   * the turn is a voice turn. Another one, already in flight: the answer is an update to it.
+   * its answer belongs to `forRequest`, undefined from an older app. The turn's own request:
+   * nothing changes. The reply itself: the rest of the turn is a voice turn, as it is for a typed
+   * turn, and for a voice turn whose request timed out or went with an app restart, which would
+   * otherwise leave the reply open with no answer to close it. Another one, already in flight: the
+   * answer is an update to it.
    */
   replied(replyId: RequestId, forRequest: RequestId | undefined, now: number): void {
     const turn = this.#turn
-    if (turn === null || turn.isVoice || forRequest === undefined) return
+    if (turn === null || forRequest === undefined || turn.id === forRequest) return
     const isOwn = forRequest === replyId
     this.#turn = { ...turn, id: forRequest, isVoice: isOwn }
     if (isOwn) this.#followUp = { id: forRequest, until: now + FOLLOW_UP_MS }

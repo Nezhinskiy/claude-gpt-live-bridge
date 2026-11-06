@@ -421,6 +421,23 @@ test('offWhileAPollIsAtWorkNeverSubmitsAfterTheLeave', async ($, on) => {
   expect(world.stored.has(`joined:${ID}`)).toBe(false)
 })
 
+/** A reload would otherwise join again with no action of the owner's. */
+test('offWhileASaveCountsTheTurnsStaysOff', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await world.clock.advance(1000)
+  let release = () => {}
+  world.holdTurns = new Promise(resolve => { release = resolve })
+  const done = $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed.' })
+  await aMoment()
+  await $.command.run({ ...LIVE, args: 'off' })
+  release()
+  await done
+  await aMoment()
+  expect(world.stored.has(`joined:${ID}`)).toBe(false)
+})
+
 test('offWhileATitleIsFollowedStaysOff', async ($, on) => {
   // After /clear the poll joins under the new id; an off in the middle of it is not undone.
   const world = fakeWorld(on)

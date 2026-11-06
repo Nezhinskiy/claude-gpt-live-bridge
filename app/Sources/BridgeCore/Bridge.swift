@@ -177,6 +177,7 @@ public actor Bridge: Router {
 
   private func askForContext(of id: SessionID) async {
     continuity.noteSummaryAsk(of: id, at: time.now)
+    save()
     await registry.requestContext(for: id)
   }
 
@@ -246,7 +247,10 @@ public actor Bridge: Router {
         if let old = body.replaces, replaced {  // after /clear: the same session, a new id
           continuity.move(old, to: body.sessionId)
           machine.rename(old, to: body.sessionId)
-          if lineSession == old { lineSession = body.sessionId }
+          if lineSession == old {
+            lineSession = body.sessionId
+            heldContext?.session = body.sessionId
+          }
           save()
         }
         if body.missed == true {
