@@ -137,13 +137,9 @@ public struct MenuContent: Sendable, Equatable {
       if !talk.isEmpty { talk.append(.separator) }
       talk += [.header("What was sent"), .sent(Self.capped(sent))]
     }
-    // a summary just loaded, or on its way, is shown as that; otherwise a current voice has
-    // nothing to load
-    let isCurrent = target != nil && contextLoad == .ready && !update.needsContext
+    let load = target == nil ? contextLoad : contextLoad.shown(needsContext: update.needsContext)
     let context: [Item] = [
-      .command(
-        .loadContext, title: isCurrent ? "Context up to date" : contextLoad.title,
-        isEnabled: target != nil && contextLoad.isEnabled && !isCurrent),
+      .command(.loadContext, title: load.title, isEnabled: target != nil && load.isEnabled),
       .command(.newConversation, title: "New conversation…", isEnabled: target != nil),
       .submenu("Conversation", isEnabled: !talk.isEmpty, items: talk),
     ]
