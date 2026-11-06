@@ -355,10 +355,26 @@ such lines and adds two more right after `.connected`, on a line opened by speec
   3 of 3, after handing the question off, as the "the session" rule tells it to.
 - Case D does not separate seeded lines from the lines added at `.connected`; item (b) found that
   `initialItems` ending in a user item is not spoken.
+- A later probe on the committed build (2026-11-06, `codex-cli 0.166.0`, commit
+  5025205): the debug app with `--fake-mic` and a short WAV (silence, "What is two plus two?",
+  silence), a fake session that joined with `syncs: true`, and, once the voice had replied and the
+  transcript was quiet for 2.5 s, one `[TYPED]` imperative posted to `/v1/sync` as the owner's, with
+  the owner silent after the phrase. A `request` work item would count as a handoff.
+
+| Run | The imperative, 3 s after the voice's reply | What the voice did when the line went in | Handoff |
+|---|---|---|---|
+| 1 | "Rename the parser module to reader and push the branch." | "Great." about 1 s after | no |
+| 2 | "Delete the old logs folder and commit the change." | "Okay" | no |
+| 3 | "Run the tests and fix any failures in the config loader." | "I'll take a look." | no |
+
+- 3 runs, 0 handoffs: the only work item polled was the `context` request at connect. The voice
+  said a short word in each run; one phrase, run 3's "I'll take a look.", claims work. Three runs
+  give counts, not a rate, and the voice is a language model. The lines closed by themselves
+  23 to 24 s after the add; the three lines used about 1.55 minutes.
 - `initial_items` at the tag `rust-v0.166.0` (`codex-rs/core/src/realtime_conversation.rs`,
   `utils/string/src/truncate.rs`): past 128 items or 8,192 estimated tokens the start fails with
   `InvalidRequest`; the estimate is `(text.len() + 3) / 4`, and `len` counts UTF-8 bytes.
-  `Conversation.estimatedTokens` counts characters, so Cyrillic is counted at about half.
+  `Conversation.estimatedTokens` counts UTF-8 bytes, as codex does.
 
 ### Claude Code mod API
 

@@ -235,8 +235,8 @@ Dans la session Claude Code à laquelle vous voulez parler :
 | `/live context` | Envoie à la voix un nouveau résumé de cette session, rédigé par le modèle de la session. |
 
 La commande est `/live`, et non `/voice`, car `/voice` est le mode vocal propre à Claude Code.
-Charger ou non le résumé d'une session chaque fois qu'une ligne s'ouvre n'est pas une
-commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
+Garder ou non hors de la voix ce que vous tapez dans une session tant que l'appel est arrêté n'est
+pas une commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 [Settings](#réglages) de LiveBridge.
 
 ### La bande et le menu
@@ -244,8 +244,9 @@ commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 Appuyez sur **Start**, dans la bande au-dessus du prompt ou dans le menu de la barre des menus, et
 parlez.
 
-- **Le Start de la bande** fait de sa session la cible et démarre l'appel ; avec
-  **Load context automatically when a line opens** activé, la ligne qu'il ouvre charge le résumé de la session
+- **Le Start de la bande** fait de sa session la cible et démarre l'appel ; la ligne qu'il ouvre
+  reçoit la conversation de la session, et ne charge de plus un résumé que si la session n'en a
+  jamais eu ou a manqué un tour
   ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à une autre
   session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session rejointe,
   `/live on` la fait revenir.
@@ -264,12 +265,17 @@ parlez.
   **Stop** termine l'appel et la coupure ; le **Start** suivant commence micro actif. Mute n'est pas
   un verrou : tout processus qui s'exécute sous votre compte peut le lever
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+- **Load context** n'est activé que lorsqu'il manque son résumé à la cible ou que la voix a manqué
+  quelque chose : un tour que l'application n'a pas reçu, ou des lignes au-delà de ce que la voix
+  peut porter. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a déjà la
+  conversation. `/live context` fonctionne toujours.
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
-  repart de zéro à la prochaine ouverture de la ligne, sauf si **Load context automatically when
-  a line opens** est activé : cette ligne recharge un résumé de la même transcription de la
-  session, donc désactivez le réglage ou faites `/clear` dans la session avant. `/live on` dans
-  une session retirée la rejoint de nouveau.
+  repart de zéro à la prochaine ouverture de la ligne. Cette ligne charge d'elle-même un résumé de
+  la même transcription de la session, qui contient ce que la session a lu, sauf si la session est
+  marquée en pause (voir **Pause sync**) ; pour l'éviter, faites d'abord `/clear` dans la session,
+  puis appuyez sur **New conversation**. `/live on` dans une session retirée la rejoint de
+  nouveau.
 
 ### Réglages
 
@@ -281,10 +287,17 @@ parlez.
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
   ouverture de la ligne.
-- **Load context automatically when a line opens** (activé par défaut) : chaque
-  ligne que l'application ouvre (un Start, une ligne rouverte après un silence, la ligne après un
-  changement de cible) demande son résumé à la cible sans l'attendre ; un réglage unique pour
-  toutes les sessions, conservé par l'application.
+- **Pause sync while the call is stopped** (désactivé par défaut) : par défaut, ce que vous tapez
+  dans une session rejointe et la réponse finale de Claude sont gardés dans la conversation de cette
+  session avec la voix même quand l'appel est arrêté, et la voix les a quand la ligne suivante
+  s'ouvre. Rien ne quitte le Mac avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
+  voir arriver chez OpenAI, activez le réglage, appuyez sur Stop, puis tapez : rien de ce que vous
+  tapez appel arrêté n'est enregistré, y compris un prompt tapé dans un tour en cours, et la session
+  est marquée en pause. Tant qu'il est activé, aucune ligne ne charge de résumé d'elle-même, ni
+  après une pause : seuls **Load context** ou `/live context` le font, et ce résumé est écrit à
+  partir de toute la transcription, donc il porte ce que vous avez mis en pause. Le réglage ne
+  supprime rien de ce qui est déjà enregistré, et les réponses ultérieures de Claude peuvent
+  répéter le texte mis en pause ([SECURITY.md](SECURITY.md#residual-risk-by-design)).
 - **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
   chaque demande que la voix transmet à Claude ([pourquoi](#limitations-connues)).
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
@@ -309,6 +322,15 @@ parlez.
   Le travail que Claude termine plus tard en arrière-plan est signalé comme une mise à jour.
 - Quand Claude attend une demande de permission, la voix le dit. Vous répondez à la demande dans
   Claude Code ; LiveBridge n'y répond jamais à votre place.
+- Elle sait ce que vous tapez. Tant qu'une session est rejointe, ce que vous y tapez et la réponse
+  finale de Claude à chaque tour tapé vont dans la conversation de cette session avec la voix, comme
+  contexte : la voix peut les mentionner, mais ne sonne pas pour eux et n'ouvre pas pour eux une
+  ligne fermée. Une ligne ouverte les reçoit aussitôt ; une ligne ouverte plus tard en est
+  alimentée. Le texte de Claude en milieu de tour, les sous-agents et la sortie des outils ne sont
+  pas synchronisés. Une question ou une demande de permission dans la cible est dite par la voix,
+  quel que soit le tour qui l'a provoquée ; dans une autre session, elle est seulement enregistrée.
+  Quand vous répondez au clavier à une question de Claude ou à une demande de permission, la voix
+  en est informée.
 
 ## Facturation maîtrisée par conception
 
@@ -356,11 +378,17 @@ OpenAI, via la session temps réel de codex :
   se connecter, peut quand même partir) ;
 - les instructions de la voix : les règles propres de LiveBridge, puis le **Prompt** de vos
   Settings si vous en avez écrit un ;
-- la conversation récente de la session cible (jusqu'aux 24 dernières lignes) pour la poursuivre
-  dans une nouvelle session temps réel ;
+- la conversation récente de la session cible (jusqu'aux 64 dernières lignes, et pas plus que ce
+  que codex accepte : 128 éléments et environ 8 192 jetons avec le contexte et les tâches
+  ouvertes) pour la poursuivre dans une nouvelle session temps réel. Elle contient ce que vous avez
+  tapé dans cette session et la réponse finale de Claude à chaque tour tapé, en plus de votre voix
+  et de celle de la voix : taper dans une session l'envoie donc à OpenAI quand une ligne s'ouvre
+  avec elle. Tant qu'une ligne est ouverte, chaque nouvelle ligne de la cible y entre aussitôt. Les
+  lignes d'une autre session ne partent que lorsqu'une ligne s'ouvre avec elle comme cible ;
 - les demandes encore ouvertes de la session cible, sous forme de résumés d'une ligne ;
-- chaque résultat, question, mise à jour et avis d'approbation, en une ligne d'au plus
-  2 000 caractères, blocs de code et tableaux retirés. Une question que Claude pose en cours de
+- chaque résultat, question, mise à jour, avis d'approbation, texte tapé et réponse à un tour tapé,
+  en une ligne d'au plus 2 000 caractères, blocs de code et tableaux retirés (un texte tapé qui
+  n'est que du code ou un tableau est remplacé par une phrase disant que du code a été tapé). Une question que Claude pose en cours de
   tour, et l'avis d'approbation d'une permission que demande la boucle principale de Claude (pas
   un sous-agent), portent aussi ce que Claude a écrit juste avant de demander. Une mise à jour
   est la réponse de Claude dans un tour ultérieur déclenché par la notification d'une tâche
@@ -374,9 +402,9 @@ OpenAI, via la session temps réel de codex :
   Code, ou le nom du dossier de la session si elle n'en a pas ;
 - l'offre WebRTC, qui liste les adresses réseau locales du Mac comme candidats de connexion.
 
-Les résultats, questions, mises à jour et résumés passent d'abord par un masqueur de formes
+Les résultats, questions, mises à jour, résumés et lignes des tours tapés passent d'abord par un masqueur de formes
 connues d'identifiants (clés privées, JWT, jetons d'API courants, mots de passe dans les URL,
-champs de type `password=`). C'est une liste de motifs, pas une garantie.
+champs de type `password=`). C'est une liste de motifs, pas une garantie : tout le reste de ce que vous tapez part tel quel.
 
 Le thread codex qui porte la voix est éphémère et en lecture seule, avec toutes les
 fonctionnalités de codex désactivées sauf celles qui conservent votre connexion et gèrent
@@ -396,9 +424,11 @@ liste chaque requête.
 
 Sur votre Mac, l'application conserve ses réglages, le compteur d'utilisation, la date de sa
 dernière recherche de mise à jour et les versions qu'elle a annoncées, ce qu'a fait la dernière
-mise à jour et, pour chacune des 20 dernières sessions utilisées, sa conversation récente et la
-ligne de contexte chargée en dernier depuis elle, dans
-`~/Library/Application Support/LiveBridge`. Les lignes d'une session disparaissent quand vous
+mise à jour et, pour chacune des 20 dernières sessions utilisées, sa conversation récente
+(jusqu'à 64 lignes, avec ce que vous y avez tapé ; enregistrée sans appel sauf si vous activez
+**Pause sync**) et la ligne de contexte chargée en dernier depuis elle, en JSON brut dans
+`~/Library/Application Support/LiveBridge`, un dossier que seul votre utilisateur peut ouvrir.
+Que Time Machine le copie n'a pas été testé. Les lignes d'une session disparaissent quand vous
 appuyez sur **New conversation** avec elle comme cible ou que vous la retirez avec ×. Une session
 qui est partie les conserve jusqu'à ce que 20 sessions utilisées ensuite les évincent ; pour les
 effacer plus tôt, exécutez de nouveau `/live on` dans cette session et appuyez sur **New
@@ -410,6 +440,11 @@ session.
 
 ## Limitations connues
 
+- Un prompt envoyé à une session par Remote Control n'est pas enregistré dans la conversation de la
+  voix comme vos mots, mais la réponse de Claude l'est. Seul le texte tapé dans le champ de saisie
+  de Claude Code compte comme le vôtre ; ce qui est tapé dans l'application de bureau de Claude
+  arrive au moteur comme texte de ce champ dans les essais sur son moteur, et l'application elle-même
+  n'a pas été observée.
 - La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande,
   si bien que rien n'arrive à Claude : environ une demande sur cinq lors des
   [tests](docs/bugs/BR-001.md), alors que la règle de la voix l'interdit. L'application joue un

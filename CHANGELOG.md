@@ -8,6 +8,19 @@ All notable changes to this project are listed here. The format follows
 
 ### Added
 
+- **Conversation sync.** What you type in a joined session and Claude's final answer to it now
+  go into that session's conversation with the voice, as context: an open line gets them at once,
+  a line opened later is seeded with them, and neither chimes nor opens a closed line. This
+  happens while the call is on, and also while it is stopped, so the voice has them at the next
+  Start; nothing leaves the Mac until a line opens. A question Claude asks or a permission
+  prompt it waits on is said by the voice in the target whoever started the turn, and a question
+  you answer at the keyboard, or a prompt you settle there, is told to the voice. **Load context**
+  is enabled only when the voice has missed something. A mod and an app from before this keep
+  working together: an older mod's sessions are treated as missing turns, so their lines load a
+  summary as before. The data is described in [SECURITY.md](SECURITY.md#residual-risk-by-design).
+- **Pause sync while the call is stopped** in Settings (off by default): with it on, what you type
+  while the call is stopped is not recorded, and no line loads a summary by itself; only **Load
+  context** or `/live context` does. It removes nothing already recorded.
 - **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
   want to support the project.
 - **Mute** beside Stop, in the band above the prompt and in the menu's call card (**Unmute**
@@ -20,6 +33,13 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
+- The conversation kept for each session holds its last 64 lines instead of 24.
+- **Load context automatically when a line opens** is gone from Settings. A line now loads a
+  summary by itself only for a session that has never had one or missed a turn, and never after a
+  pause. An owner who had turned it off gets **Pause sync while the call is stopped** turned on at
+  the update, so summaries stay by hand; turns typed while the call is on now sync all the same.
+- **Load context** in the menu is disabled, reading **Context up to date**, while the voice has
+  the whole conversation.
 - A voice line that Claude's answer opens now closes and chimes when nobody has spoken on it 5
   seconds after it connects, instead of after 20 seconds of silence. In the runs measured, the
   voice started within about 2 seconds or not at all

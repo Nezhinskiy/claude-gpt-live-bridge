@@ -55,14 +55,26 @@ microphone or Claude:
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
   session was the last one, which stops the call ([failure behaviour](#failure-behaviour)).
-- `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
-  (the owner's, the voice's, the lines the session sent the voice and the brief of each request
-  its queue took) and the context loaded from it. Each new realtime session is seeded with the
+- `Continuity`: one conversation per Claude Code session, by session id: its last 64 lines
+  (`keptLines`: the owner's speech and typing, the voice's, Claude's final answers to turns that
+  were not voice requests, the lines the session sent the voice and the brief of each request
+  its queue took), the context loaded from it, and whether the voice is out of sync with the
+  session (`missed`: a turn did not arrive; `paused`: the pause setting kept text out) with the
+  decision on the turn last offered. A conversation written before these fields still decodes.
+  `isCurrent` is false when the lines since the summary are more than the seed can carry
+  (`initialItems`: 128 items, 8,192 estimated tokens, counted in UTF-8 bytes). Each new realtime session is seeded with the
   target's conversation, less those briefs (an open request goes in as its task), and only the
   target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
   mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
   own session's conversation. New conversation forgets the target's, removing a session forgets
-  its own, and only the 20 conversations used last are kept.
+  its own, and only the 20 conversations used last are kept; New conversation keeps a
+  *paused* mark and the turn's decision, which the pause needs after it. A synced line (below) is
+  recorded by `Bridge.sync` once `Continuity.admits` takes it: with the pause setting on and the
+  call off it is refused and the session is marked *paused*, and an owner's line refuses the rest
+  of its turn. A refused owner line also withholds the session's voice request in flight, whose
+  answer then closes as failed with nothing of it recorded or said. The open line about the
+  session is given an admitted line at once with `addContext`, a connecting one when it is
+  connected.
 - `RealtimeSession`: one ephemeral, read-only codex thread per realtime session; it refuses to go
   on unless codex reports every MCP server disabled, interrupts every codex turn and declines
   every request codex sends.
@@ -102,15 +114,22 @@ desktop's own, read from Claude Code's session registry, or the folder's name wh
 and joins again when that title changes, polls it once a second, submits each voice request to
 the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
-origin. A voice turn is one that has started: while a voice request waits for the running turn
-to end, that turn's questions, and the notice of its permission prompts, stay in Claude Code. It
+origin. It posts every other main-loop turn to the app as synced lines (`POST /v1/sync`): the
+owner's prompt at the turn's start, but only when its origin is `composer`, the only kind
+observed to be a person typing ([ADR 0001](../adr/0001-platform-findings.md), item m; a Remote
+Control prompt is not the owner's, its answer is Claude's), and Claude's final answer at its end.
+It also posts a keyboard answer to Claude's question, and the mod's own report that a permission
+prompt was settled, as Claude's lines. A question Claude asks, or a permission prompt it waits on,
+in any main-loop turn of a joined session goes to the app; the app says it for the target, and
+records it only for another session when the turn was typed. A voice request that waits for the
+running turn to end waits as before. It
 draws a band above the prompt with the call's phase, the target, the unheard count and the
 buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries `isMuted`, with a
 `· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own.
 A surface that has drawn no band for 3 s while the session is joined is asked for it again, and
 `/live on` in a joined session asks every surface for it. Start makes the session the target and
-starts the call; the line the app opens then asks the target for its summary (with Load context
-automatically on), which the mod writes (none for a session with no prompt yet; the last one again,
+starts the call; the line the app opens then asks the target for its summary only when the session
+has none or *missed* a turn and is not *paused*, which the mod writes (none for a session with no prompt yet; the last one again,
 with no model call, until a turn whose answer the voice did not get completes, or `/clear`), with a
 short note in the band while it goes. Talk here shows only while the call talks to another session,
 and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
@@ -132,6 +151,7 @@ that both test suites parse.
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn (none: a permission prompt), `text` what Claude wrote in the step that pauses |
+| `POST /v1/sync` | `sessionId`, `turnId`, `from` (`owner` or `claude`) and `text`: a line of a turn that is not a voice request. Empty `text` at a turn's start only takes the turn's decision. Join also says whether the mod `syncs` and whether it `missed` a turn; a reply work item names the request its answer belongs to |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
@@ -200,7 +220,7 @@ The realtime session is billed while open, so silence closes it. Voice detection
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
-its context when **Load context automatically** is on (the default); the line does not wait for
+its context when the session has none or *missed* a turn, and neither the pause setting is on nor the session *paused*; the line does not wait for
 it, and a summary that comes while the line connects is added once it is connected, unless the
 line was seeded with the same one.
 

@@ -30,10 +30,13 @@ tells the voice that a prompt is waiting, with what Claude's main loop wrote in 
 asks for it.
 
 A question Claude asks you while it works (the AskUserQuestion dialog) is not a permission
-prompt: Claude asks for your input, not for leave to run a tool. During a voice turn the mod
-sends it to the voice, and your spoken reply, given before you answer at the keyboard, answers
-the dialog as free text. That gives speech no reach it did not have, since it already reaches
-Claude as a request, and whatever Claude then does still passes the permission prompt.
+prompt: Claude asks for your input, not for leave to run a tool. In any turn of a joined
+session, one you typed included, the mod sends it to the voice, and a spoken reply, given before
+you answer at the keyboard, answers the dialog as free text. So a steered voice can answer the
+dialog of a turn you typed, not only of a voice turn. That gives speech no reach it did not
+have, since it already reaches Claude as a request, and whatever Claude then does still passes
+the permission prompt. The mod does not tell a reply you spoke from one an injected line talked
+the voice into: nothing but your answer at the keyboard, given first, stands between them.
 
 In a mode that acts without asking, nothing else stands between what the microphone hears and
 what Claude does. For such a session, keep voice off, or keep the microphone away from other
@@ -73,11 +76,19 @@ voices.
     processes;
   - read the status, which names every joined session and its id;
   - post a `[CONTEXT]` line for any joined session. It is saved and seeds every later call with
-    that session, long after the process has exited (see "A loaded context persists" below);
+    that session, long after the process has exited (see "What the voice keeps" below);
+  - post sync lines for any joined session, labelled as typed by you (`[TYPED]`) or as Claude's
+    (`[CLAUDE]`). They are saved and seed later calls the same way, and go to the open line when
+    that session is the target. The app takes the label on the process's word;
+  - join a session as one that missed a turn, or that does not sync, which makes the next line
+    that session opens ask it for a fresh summary (never while the pause setting is on or the
+    session is marked paused, below), and so makes it write one;
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation.
 
-  It can also read the data folder itself, every kept conversation included. Such a process can
+  It can also read the data folder itself. That folder now holds what you typed in every joined
+  session and Claude's answers to it, as well as the voice's calls, and it fills without a call
+  (see "What the voice keeps" below). Such a process can
   already do worse without LiveBridge: for example, it can add hooks to
   `~/.claude/settings.json` that run in every Claude Code session.
 - **The app the mod opens.** When the socket does not answer, the mod opens
@@ -123,45 +134,91 @@ act" is a model instruction.
 
 ### What session text can do
 
-Results, questions, updates, approval notices, open tasks and context summaries go to the voice
-as one tagged line each, `[TAG] label: text`. Every bracket in the text becomes a parenthesis and every line break a
-space. That keeps the format unambiguous, but it is not a control: each line goes in with the
-rank of the owner's own words (`user`), so a session's text needs no fake tag to give the voice
-orders. The voice is told to treat such text as data to relay, which is again an instruction.
+Results, questions, updates, approval notices, open tasks, context summaries and synced lines go
+to the voice as one tagged line each, `[TAG] label: text`. Every bracket in the text becomes a
+parenthesis and every line break a space. That keeps the format unambiguous, but it is not a
+control: each line goes in with the rank of the owner's own words (`user`), so a session's text
+needs no fake tag to give the voice orders. The voice is told to treat such text as data to
+relay, which is again an instruction.
+
+A synced line is either `[TYPED]`, what you typed in the session, or `[CLAUDE]`, Claude's final
+answer to a turn. "Data to relay" does not fit a `[TYPED]` line, which is meant to read as what
+you said, so the voice prompt tells the voice to use it as what it knows and never to hand it
+off. That paragraph of the voice prompt enforces nothing: a model instruction is not a control.
+What the app does enforce is smaller. A line is cut to one line of at most 2,000 characters
+(`AnswerShaper.line`); its fenced code blocks and table rows are removed from the prose, and what
+you typed that was only code or a table becomes a sentence saying so (`AnswerShaper.synced`); and
+the redactor runs on it. The label `[TYPED]` is put on by the app when a mod says the line is
+yours, and it records as yours only a prompt the engine marks as typed in the composer, which is
+how the Claude desktop app's typed prompts reach the engine (checked on the engine, not on the
+real desktop app). A prompt from Remote Control, another agent, a plugin or a schedule is not
+recorded as yours, though Claude's answer to it is. The mod's own notes (that you allowed a
+tool, settled a prompt, or closed a question at the keyboard) go as Claude's.
 
 The redactor that removes credential shapes from these lines (private keys, JWTs, common API
 tokens, URL passwords, `password=`-style fields) is a convenience against an accidental leak. It
 is a list of patterns, and it does not stop an adversary: injected text can spell out or encode a
-secret.
+secret. It also does not make a synced line safe to send: anything you type that is not one of
+those shapes goes to OpenAI as typed, personal text included.
 
 ### Residual risk, by design
 
 - **Anything that steers the voice can start work.** Text a joined session read (a README, an
   issue, a web page, a tool's output) can reach the voice in a result, a question, an update, an
-  approval notice or a summary, and talk it into a handoff, including the "confirmed by voice" sentence above.
+  approval notice, a summary or, now, Claude's answer to a turn you typed, and talk it into a
+  handoff, including the "confirmed by voice" sentence above. A page Claude reads while you type
+  to it can steer the voice through Claude's answer, as it could in a voice turn.
 - **A handoff can hop between sessions.** The voice hands work to the target session, or to the
   session that asked the last question. So text that session A read can become a prompt in
   session B, which may run in a more permissive mode.
-- **A loaded context persists.** Each session's `[CONTEXT]` line is saved in the data folder
-  with that session's conversation and given to every later realtime session while that session
-  is the target, across Stop and Start and app restarts, until you press **New conversation**
-  with it as the target, load a new summary from it, or remove it from LiveBridge. With **Load
-  context automatically when a line opens** on (the default) in LiveBridge's Settings, the
-  target session sends a new one whenever the app opens a line: a Start, a line reopened after
-  silence, the line after a target switch. The menu's Load context and `/live context` send one
-  too. One injected summary can therefore steer every later call with that session, and **New
-  conversation** alone does not end that while the setting is on: the next line the app opens
-  loads a summary of the same transcript again, the text the session read included. Its recent
-  conversation is carried over the same way, including the lines the session sent the voice. A
-  result from another session is still spoken in whatever line is open, and the voice's reply to
-  it stays in that line's conversation, so one session's text can still reach the conversation
-  about another.
+- **What the voice keeps.** Each session's conversation with the voice is saved in the data
+  folder as plain JSON: your typed text and Claude's final answers to typed turns, the voice's
+  and your spoken lines, the lines the session sent the voice, and the session's `[CONTEXT]`
+  line. It holds at most 64 lines for each of the 20 sessions used last (`Conversation.keptLines`,
+  `Continuity.keptConversations`), longer for none of them: a session that has left keeps its
+  lines until 20 others have been used since, or until you press **New conversation** or remove
+  it. The folder is `0700`; whether Time Machine or another backup copies it has not been tested.
+  The sync fills it **with no call running**: while a session is joined, what you type in it and
+  Claude's answers are recorded, and the next line opened with that session gives them to
+  OpenAI. Claude already repeats much of the same text in its answers to voice requests; what is
+  new is that your own typing goes too.
+- **The pause keeps new text out and removes nothing.** With **Pause sync while the call is
+  stopped** on and the call stopped, what you type is not recorded, a prompt typed into a running
+  turn included, and the session is marked *paused* (`Continuity.admits`, `Bridge.sync`). While
+  the setting is on, no line loads a summary by itself (`Bridge.openLine`), and none does for a
+  session marked paused after the setting is off again: only **Load context** or `/live context`
+  does, because a summary is written from the whole transcript and carries the paused text.
+  What the pause does not do:
+  - It removes nothing already recorded, in the data folder or in a line that is open.
+  - It cannot stop Claude's later answers from repeating paused text: a turn that began synced
+    keeps being synced to its end, apart from what you type after Stop, and a later turn's answer
+    can quote the paused text. The next turn's answer then goes to the voice as any does.
+  - A prompt typed while Claude streams its final text starts a turn of its own, which keeps the
+    decision of the turn it was typed into; a slash command queued behind a turn takes a
+    decision of its own, so the pause reaches less far there.
+  - Eviction past the 20 sessions loses the paused mark. With the setting still on, no summary
+    loads; with it off, you have ended the pause.
+  - It does not hold if the app was not running or the mod could not post: a turn the app did not
+    receive marks the session *missed*, and a missed session, unlike a paused one, loads a
+    summary by itself once the setting is off.
+- **Ending what the voice carries.** The saved context and conversation go when you press **New
+  conversation** with the session as the target, or remove it with ×, and not otherwise: a load
+  of a new summary replaces the old one but keeps the lines. `/clear` gives the session a new id
+  and carries its lines and context to it, so `/clear` ends nothing until **New conversation**
+  follows. Removing a session holds until you join it again, since the mod's own joins are
+  refused (`410`). **New conversation** keeps the *paused* mark, so the next line asks for no
+  summary of that transcript. A session with no summary and no pause mark does get one from the
+  next line, written from the whole transcript, the text the session read included.
+- **A result from another session** is still spoken in whatever line is open, and the voice's
+  reply to it stays in that line's conversation, so one session's text can still reach the
+  conversation about another.
 
-Join only sessions whose input you trust. After a session has read text you do not trust, turn
-**Load context automatically when a line opens** off or `/clear` that session, then press **New
-conversation** with it as the target; with the setting on and the transcript unchanged, the next
-line loads a summary of the same text again. Keep voice off for a session whose permission mode
-acts without asking.
+Join only sessions whose input you trust. After a session has read text you do not trust,
+`/clear` it, then press **New conversation** with it as the target, and do not press **Load
+context** for it until you want the transcript's summary. To keep what you type out of the
+voice, press Stop first and turn on **Pause sync while the call is stopped**; what you typed
+before that stays recorded. Keep voice off for a session whose permission mode acts without
+asking.
 
 ### What an update installs
 

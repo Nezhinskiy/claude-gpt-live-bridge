@@ -216,16 +216,17 @@ claude plugin uninstall livebridge@livebridge
 | `/live status` (या सिर्फ़ `/live`) | एक पंक्ति: call, target, न सुने गए नतीजे, आज के मिनट। |
 | `/live context` | voice को इस session का नया सारांश भेजता है, जिसे session का model लिखता है। |
 
-Command `/live` है, `/voice` नहीं, क्योंकि `/voice` Claude Code का अपना voice mode है। हर बार line खुलने पर
-session का सारांश भी load किया जाए या नहीं, यह कोई command नहीं है: यह सभी sessions के लिए एक
+Command `/live` है, `/voice` नहीं, क्योंकि `/voice` Claude Code का अपना voice mode है। call रुकी होने पर session में टाइप किया
+हुआ voice से बाहर रखा जाए या नहीं, यह कोई command नहीं है: यह सभी sessions के लिए एक
 setting है, जो LiveBridge की [सेटिंग्स](#सेटिंग्स) window में है।
 
 ### बैंड और मेन्यू
 
 **Start** दबाएँ, prompt के ऊपर वाले band में या menu bar menu में, और बोलें।
 
-- **band का Start** अपने session को target बनाता है और call शुरू करता है; **Load context automatically when a line opens**
-  चालू हो तो जो line वह खोलता है वह session का सारांश load करती है
+- **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है
+  उसे session की conversation मिलती है, और सारांश वह तभी load करती है जब session का कभी सारांश
+  न रहा हो या उसका कोई turn छूट गया हो
   ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही
   हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे
   वापस ले आता है।
@@ -242,11 +243,15 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू होता
   है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge))।
+- **Load context** तभी चालू होता है जब target का सारांश नहीं है या voice से कुछ छूट गया है: ऐसा turn जो app को
+  नहीं मिला, या उतनी पंक्तियाँ जितनी voice सँभाल नहीं सकता। नहीं तो यह item **Context up to date**
+  दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। `/live context` हमेशा काम करता है।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
-  line खुलने से नए सिरे से शुरू होता है, सिवाय तब जब **Load context automatically when a line opens**
-  चालू हो: वह line उसी session के transcript का सारांश फिर से load करती है, इसलिए पहले setting बंद
-  करें या session में `/clear` करें। हटाए गए session में `/live on` उसे फिर से जोड़ देता है।
+  line खुलने से नए सिरे से शुरू होता है। वह line उसी session के transcript का सारांश अपने-आप load
+  करती है, जिसमें वह भी है जो session ने पढ़ा, सिवाय तब जब session paused चिह्नित हो (देखें
+  **Pause sync**); इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ।
+  हटाए गए session में `/live on` उसे फिर से जोड़ देता है।
 
 ### सेटिंग्स
 
@@ -257,9 +262,16 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **Prompt** (डिफ़ॉल्ट रूप से खाली): voice के लिए आपके अपने निर्देश, जैसे "मुझसे Spanish में बात
   करो", अधिकतम 2,000 अक्षर। ये LiveBridge के अपने voice नियमों के बाद जोड़े जाते हैं, और दोनों में
   टकराव होने पर उन्हीं नियमों की चलती है, और अगली बार line खुलने से लागू होते हैं।
-- **Load context automatically when a line opens** (डिफ़ॉल्ट रूप से चालू): app जो भी
-  line खोलता है (Start, चुप्पी के बाद दोबारा खोली गई line, target बदलने के बाद की line) वह target से उसका
-  सारांश माँगती है और उसका इंतज़ार नहीं करती; सभी sessions के लिए एक setting, जिसे app सँभालकर रखता है।
+- **Pause sync while the call is stopped** (डिफ़ॉल्ट रूप से बंद): डिफ़ॉल्ट रूप से, जुड़े हुए session में आप जो
+  टाइप करते हैं और उस पर Claude का अंतिम जवाब, call रुकी होने पर भी voice के साथ उस session की
+  conversation में रखे जाते हैं, और अगली line खुलने पर voice के पास होते हैं। line खुलने तक Mac से कुछ
+  बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू करें, Stop दबाएँ,
+  फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, चलते turn में टाइप किया गया
+  prompt भी नहीं, और session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load
+  नहीं करती, और pause के बाद भी नहीं: यह सिर्फ़ **Load context** या `/live context` करता है, और वह
+  सारांश पूरे transcript से लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था। यह पहले
+  से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते हैं
+  ([SECURITY.md](SECURITY.md#residual-risk-by-design))।
 - **Play a sound when a request is queued for Claude** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध
   Claude को सौंपता है, हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ))।
 - **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
@@ -282,6 +294,13 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   भेजता है। Claude जो काम बाद में background में पूरा करता है, उसकी रिपोर्ट update के रूप में दी जाती है।
 - जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice यह बताता है। Prompt का जवाब आप
   Claude Code में देते हैं; LiveBridge उसका जवाब कभी आपकी जगह नहीं देता।
+- आप जो टाइप करते हैं, वह उसे पता रहता है। session के जुड़े रहते, आप उसमें जो टाइप करते हैं और हर टाइप किए
+  गए turn पर Claude का अंतिम जवाब, उस session की voice के साथ conversation में context के रूप में जाते
+  हैं: voice उनका ज़िक्र कर सकता है, पर उनके लिए chime नहीं बजता और वह उनके लिए बंद line नहीं खोलता।
+  खुली line को वे तुरंत मिलते हैं; बाद में खुली line उनसे शुरू होती है। turn के बीच का Claude का text,
+  subagents और tools का output sync नहीं होते। target में Claude का सवाल या permission prompt voice
+  बोलता है, चाहे turn किसी ने भी शुरू किया हो; किसी दूसरे session में वे सिर्फ़ दर्ज होते हैं। जब आप
+  Claude के सवाल या permission prompt का जवाब keyboard पर देते हैं, तो voice को बता दिया जाता है।
 
 ## बिलिंग का ध्यान रखने वाला डिज़ाइन
 
@@ -324,11 +343,16 @@ session के ज़रिए OpenAI को यह जाता है:
   रहते LiveBridge कुछ capture नहीं करता, इसलिए कुछ नहीं जाता; Mute दबाने से पहले आपने जो बोला, जो
   line पहले से connect हो रही थी उस पर, वह फिर भी जा सकता है);
 - voice के निर्देश: LiveBridge के अपने नियम, फिर आपकी Settings का **Prompt**, अगर आपने लिखा हो;
-- target session की हाल की conversation (आख़िरी 24 पंक्तियों तक), ताकि उसे नए realtime session में
-  जारी रखा जा सके;
+- target session की हाल की conversation (आख़िरी 64 पंक्तियों तक, और उससे ज़्यादा नहीं जितना codex लेता
+  है: context और खुले कामों समेत 128 items और लगभग 8,192 tokens), ताकि उसे नए realtime session में
+  जारी रखा जा सके। इसमें वह है जो आपने उस session में टाइप किया और हर टाइप किए गए turn पर Claude का
+  अंतिम जवाब, साथ में आपकी और voice की बोली, इसलिए किसी session में टाइप करना उसे OpenAI तक पहुँचा देता
+  है जब उस session के साथ line खुलती है। line खुली रहते target की हर नई पंक्ति तुरंत उसमें जाती है। दूसरे
+  session की पंक्तियाँ तभी जाती हैं जब line उसके साथ target के रूप में खुलती है;
 - target session के अभी खुले अनुरोध, उनके एक-पंक्ति के सार (brief) के रूप में;
-- हर नतीजा, सवाल, update और approval notice, अधिकतम 2,000 अक्षरों की एक पंक्ति के रूप में, code
-  blocks और tables हटाकर। Turn के बीच Claude का पूछा सवाल, और Claude के main loop (subagent
+- हर नतीजा, सवाल, update, approval notice, टाइप किया गया text और टाइप किए गए turn का जवाब, अधिकतम
+  2,000 अक्षरों की एक पंक्ति के रूप में, code blocks और tables हटाकर (टाइप किया गया text जो सिर्फ़ code या
+  table है, उसकी जगह यह बताने वाला वाक्य रखा जाता है कि code टाइप किया गया)। Turn के बीच Claude का पूछा सवाल, और Claude के main loop (subagent
   नहीं) की permission prompt का approval notice, वह text भी साथ लाते हैं जो Claude ने पूछने से
   ठीक पहले लिखा। Update, Claude का जवाब है जो किसी background task के notification से शुरू हुए
   बाद के turn में आता है, voice अनुरोध के बाद 10 मिनट तक और तब तक जब तक session में कोई दूसरा
@@ -341,9 +365,9 @@ session के ज़रिए OpenAI को यह जाता है:
   session folder का नाम;
 - WebRTC offer, जो Mac के local network addresses को connection candidates के रूप में सूचीबद्ध करता है।
 
-नतीजे, सवाल, updates और सारांश पहले जानी-पहचानी credential आकृतियों (private keys, JWTs, आम API
+नतीजे, सवाल, updates, सारांश और टाइप किए गए turns की पंक्तियाँ पहले जानी-पहचानी credential आकृतियों (private keys, JWTs, आम API
 tokens, URL में passwords, `password=` जैसे fields) के redactor से गुज़रते हैं। यह patterns की सूची है,
-कोई गारंटी नहीं।
+कोई गारंटी नहीं: आप जो और टाइप करते हैं वह जैसा है वैसा ही जाता है।
 
 voice को ले जाने वाला codex thread अस्थायी (ephemeral) और read-only है, जिसमें हर codex feature बंद है
 सिवाय उनके जहाँ वह आपका login रखता है और जहाँ वह आपके proxy का उपयोग करता है, और हर MCP server बंद
@@ -361,8 +385,10 @@ release मिलने पर app `gh auth status` चलाता है, य�
 
 आपके Mac पर app अपनी settings, usage meter, update की पिछली जाँच का समय और जिन versions की सूचना दी
 गई, पिछले update ने क्या किया, और, सबसे हाल में इस्तेमाल हुए 20 sessions में से हर एक की, उसकी हाल
-की conversation और उससे आख़िरी बार load की गई context पंक्ति
-`~/Library/Application Support/LiveBridge` में रखता है। किसी session की पंक्तियाँ तब जाती हैं जब आप
+की conversation (64 पंक्तियों तक, जिसमें आपका उसमें टाइप किया हुआ भी है; call के बिना दर्ज होती है,
+जब तक आप **Pause sync** चालू न करें) और उससे आख़िरी बार load की गई context पंक्ति सादे JSON के रूप में
+`~/Library/Application Support/LiveBridge` में रखता है, ऐसे folder में जिसे केवल आपका user खोल सकता है।
+Time Machine उसकी copy लेता है या नहीं, यह जाँचा नहीं गया। किसी session की पंक्तियाँ तब जाती हैं जब आप
 उसे target रखकर **New conversation** दबाते हैं या उसे × से हटाते हैं। जो session चला गया है, उसकी
 पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए 20 sessions उन्हें बाहर न धकेल दें; उन्हें
 जल्दी मिटाने के लिए, उसी session में फिर से `/live on` चलाएँ और **New conversation** दबाएँ।
@@ -373,6 +399,10 @@ Uninstall करने से वे सब हट जाती हैं।
 
 ## ज्ञात सीमाएँ
 
+- Remote Control से किसी session को भेजा गया prompt voice की conversation में आपके शब्दों के रूप में दर्ज
+  नहीं होता, हालाँकि उस पर Claude का जवाब दर्ज होता है। केवल Claude Code के composer में टाइप किया गया text
+  ही आपका माना जाता है; Claude desktop app में टाइप किया गया उसके engine पर परीक्षणों में composer text के रूप में
+  engine तक पहुँचता है, और desktop app को खुद नहीं देखा गया।
 - voice कभी-कभी कहता है कि वह देख रहा है ("On it", "Looking now"), पर अनुरोध Claude को नहीं सौंपता,
   इसलिए Claude तक कुछ नहीं पहुँचता: [टेस्टिंग](docs/bugs/BR-001.md) में लगभग पाँच में से एक अनुरोध,
   जबकि voice का नियम इसकी मनाही करता है। जब app किसी अनुरोध को Claude की queue में डालता है, तो एक
