@@ -76,6 +76,9 @@ voices.
     releases the microphone, so while muted LiveBridge captures nothing and the indicator shows
     it; that protects against being heard by accident, and is not a control against these
     processes;
+  - open the voice line, by starting a call or, as the target, by posting an approval notice, which
+    spends your plan's Codex usage budget. Withdrawing the notice closes that line and a new notice
+    opens another, each billed like any open line;
   - read the status, which names every joined session and its id;
   - post a `[CONTEXT]` line for any joined session. It is saved and seeds every later call with
     that session, long after the process has exited (see "What the voice keeps" below);
