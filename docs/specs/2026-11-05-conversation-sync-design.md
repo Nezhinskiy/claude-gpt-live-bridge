@@ -125,10 +125,12 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   A voice turn holds nothing of the owner's until the owner types into it, so its start refuses
   nothing and marks nothing, whatever the call: only what was typed under the pause is dropped, and
   its answer goes as an answer, past the turn's decision. A voice turn typed into so is refused like
-  any other, and its answer may repeat the text too: the request the turn names closes as failed,
-  with its text neither recorded nor said. A request that only waits behind the turn is not its
-  own and keeps its answer. A turn whose `start` never arrived has no decision, and its prompt may
-  be the paused text: while the session is *paused*, a line of Claude's opening it stays out.
+  any other, and its answer may repeat the text too: the request a typed-into turn names is what it
+  withholds, and it closes as failed, with its text neither recorded nor said; a request that only
+  waits behind the turn keeps its answer. One a spoken reply tied the turn to is named, so it is
+  withheld, and its own later answer fails. A turn whose `start` never arrived has no decision, and
+  its prompt may be the paused text: while the session is *paused*, a line of Claude's opening it
+  stays out.
 - **A spoken reply makes the rest of the turn a voice turn** (the owner's decision). When the owner
   answers a typed turn's question by voice, the voice hands it off and the line waits for a result
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is
@@ -165,11 +167,14 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   A loaded summary clears both, unless the app asked for it before the latest gap or New
   conversation: that one is ignored, as it does not cover the gap and may hold what was forgotten.
   A summary nobody asked for (`/live context`) cannot be dated, and is taken, unless an older ask is
-  still open. So a `/live context` summary written across a turn the app refused (Stop, then typing
-  under the pause) can clear the *paused* mark, and the paused text may be in it; the mod drops a
-  summary only across a gap it notes itself, and a refused line answers 200. Accepted, as the chain
-  needs the pause on, a line, Stop and typing all inside one summary. The flag persists
-  with the conversation across app restarts.
+  still open. So a `/live context` summary written across a turn the app refused can clear the
+  *paused* mark, and the paused text may be in it, and one written across New conversation brings
+  back what was forgotten; the mod drops a summary only across a gap it notes itself, and a refused
+  line answers 200. It takes no more than the pause on, the call off and typing during the owner's
+  own `/live context`; a later line of the refused turn marks *paused* again, so the mark stays
+  cleared only if the turn's last line lands before the summary. Accepted, as a 60 s window on an
+  explicit command ([BR-002](../bugs/BR-002.md)). The flag persists with the conversation across app
+  restarts.
 - **Redacted and clipped.** Each synced line goes through the existing redactor
   (`Text/Redaction.swift`), loses its code and tables as an answer does, and is clipped to at most
   2,000 characters (my call; the builder may tune it against codex's `initialItems` limits in
