@@ -72,6 +72,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     decision: null as { turnId: string; isAdmitted: boolean } | null,
     /** The non-empty sync lines the app admitted, in order. */
     kept: [] as string[],
+    /** The status the app answers a usage reading with (404: it refuses it). */
+    limitsStatus: 200,
     isSubmitRefused: false,
     /** A hook beneath the mod refuses the owner's prompt (`{ drop }`). */
     isPromptDropped: false,
@@ -138,6 +140,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     },
   }
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.measure', (_, e) => ({ changed: e.changed }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('session.id', () => ({ value: world.sessionId }))
   on('session.turns', () => ({ value: world.turns }))
@@ -183,12 +186,15 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'sync' && world.syncStatus !== 200) {
       return { value: { status: world.syncStatus, ok: false, headers: {}, text: '{"error":"unknown session"}' } }
     }
+    if (route === 'limits' && world.limitsStatus !== 200) {
+      return { value: { status: world.limitsStatus, ok: false, headers: {}, text: '{"error":"refused"}' } }
+    }
     // The app answers a removed session's calls so, its own joins included, until the owner joins it
-    // again. Two routes look the session up among the joined instead: `sync` finds none, 404, and
-    // `activity` ignores it, 200.
+    // again. Three routes look the session up among the joined instead: `sync` finds none, 404, and
+    // `activity` and `limits` ignore it, 200.
     if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {
       if (route === 'sync') return { value: { status: 404, ok: false, headers: {}, text: '{"error":"unknown session"}' } }
-      if (route !== 'activity') {
+      if (route !== 'activity' && route !== 'limits') {
         return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
       }
     }

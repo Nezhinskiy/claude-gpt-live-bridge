@@ -1,7 +1,7 @@
 // Wiring only: engine events to the bridge link, the turn tracker and the band. A hooks module
 // passes `$` only to functions declared at its top level, so the session's state lives here too.
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 
 import type { Band } from '../types'
 import { bandStatus, drawBand, JOINING } from './band.tsx'
@@ -12,7 +12,7 @@ import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
-import type { AnswerStatus, VoiceRequest, Work } from './wire.ts'
+import type { AnswerStatus, LimitWindowBody, VoiceRequest, Work } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
@@ -298,6 +298,22 @@ async function deliver($: EngineInterface, request: VoiceRequest): Promise<void>
   await save($)
 }
 
+/** Claude's usage windows as the wire carries them; `resetsAt` only where the engine gave one. */
+function windowsOf(limits: readonly SessionRateLimit[]): LimitWindowBody[] {
+  return limits.map(one => ({
+    kind: one.kind, percentUsed: one.percentUsed, ...(one.resetsAt !== undefined && { resetsAt: one.resetsAt }),
+  }))
+}
+
+/** Sends the windows the session has now. An engine that has none to give leaves the join as it was. */
+async function sendLimits($: EngineInterface): Promise<void> {
+  try {
+    await link?.limits(windowsOf((await $.session.usage()).rateLimits))
+  } catch {
+    // the windows are a courtesy to the menu: no reading is no harm
+  }
+}
+
 /** The owner removed this session in the app: off here too, with no leave and no rejoin. */
 async function removed($: EngineInterface, sessionId: string): Promise<void> {
   await $.store.delete(joinedKey(sessionId))
@@ -501,6 +517,7 @@ export const register: Register = on => {
       every: (ms, fn) => $.clock.every(ms, fn),
       log: text => $.ui.log(text),
       removed: sessionId => enqueue($, () => removed($, sessionId)),
+      joined: () => enqueue($, () => sendLimits($)),
     }, {
       socketPath: socketPath(home, await $.env.get('CFFIXED_USER_HOME')),
       appPath: '/Applications/LiveBridge.app',
@@ -543,6 +560,15 @@ export const register: Register = on => {
       await trySave($)
     }
     return entered
+  }).catch(($, e, next) => next(e))
+
+  // A window moved: tell the app. Observes only, and queued so the engine is not held up.
+  on('session.measure', ($, e, next) => {
+    if (e.changed.includes('rateLimits')) {
+      const windows = windowsOf(e.rateLimits)
+      enqueue($, async () => { await link?.limits(windows) })
+    }
+    return next(e)
   }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {

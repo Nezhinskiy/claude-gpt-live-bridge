@@ -26,6 +26,11 @@ All notable changes to this project are listed here. The format follows
   into a turn that has a voice request in flight (or waiting behind it) makes that request's
   answer fail with a plain reason, with nothing of it recorded or said, and that turn's later
   questions and approval notices stay out.
+- The menu shows how much of your Codex and Claude usage is used, one row each, with the percent
+  used of every window the plan reports (up to three), orange from 90 %, and the reset times on
+  hover. Codex's figures are read when the menu opens, at most once a minute, by a short-lived
+  codex that asks OpenAI, also while the call is off; Claude's come from a joined session that has
+  answered ([Privacy](README.md#privacy)).
 - **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
   want to support the project.
 - **Mute** beside Stop, in the band above the prompt and in the menu's call card (**Unmute**
@@ -79,6 +84,15 @@ All notable changes to this project are listed here. The format follows
   saying the answer is code or a table only.
 - A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
   after the call has ended: the Start that was waiting on the prompt is cancelled.
+
+### Note
+
+- The README's [known limitations](README.md#known-limitations) now say what the mod loses where
+  an organization manages Claude Code: there the mod's hooks on `classic.PermissionRequest`,
+  `classic.PostToolUse`, `classic.PostToolUseFailure` and `classic.PermissionDenied` do not run,
+  so the voice does not say that a permission prompt is waiting, and three managed settings keep
+  a mod you installed from loading. Nothing about the prompt itself changes: it still appears in Claude Code
+  and only you can answer it. No code changed.
 
 ## [0.3.0]
 

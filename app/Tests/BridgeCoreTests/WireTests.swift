@@ -19,7 +19,7 @@ struct WireTests {
     "activity": roundTrip(ActivityBody.self), "activity-question": roundTrip(ActivityBody.self),
     "activity-approval": roundTrip(ActivityBody.self),
     "activity-typed-question": roundTrip(ActivityBody.self),
-    "context": roundTrip(ContextBody.self),
+    "context": roundTrip(ContextBody.self), "limits": roundTrip(LimitsBody.self),
     "answer-ok": roundTrip(AnswerBody.self), "answer-failed": roundTrip(AnswerBody.self),
     "next-request": roundTrip(PollReply.self), "next-context": roundTrip(PollReply.self),
     "next-idle": roundTrip(PollReply.self), "next-reply": roundTrip(PollReply.self),

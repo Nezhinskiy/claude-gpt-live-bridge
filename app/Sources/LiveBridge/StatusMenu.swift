@@ -71,7 +71,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var content: MenuContent {
     MenuContent(
       update: model.update, problem: model.problem, contextLoad: model.contextLoad,
-      available: model.available?.version)
+      available: model.available?.version, codexLimits: model.codexLimits(at: Date()),
+      claudeLimits: model.update?.claudeLimits)
   }
 
   /// Renders the model's current content, and again whenever it changes. Only the content is
@@ -175,9 +176,30 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         row.show(SentView(text: text))
         sent = row
         return row.item
+
+      case .limit(let shown):
+        let item = native("limit|\(shown.name)", used: &used) { NSMenuItem() }
+        // The attributed title's string is what VoiceOver reads.
+        item.attributedTitle = Self.limitTitle(shown)
+        item.toolTip = shown.tooltip
+        item.isEnabled = true
+        return item
       }
     }
     sync(menu, built)
+  }
+
+  /// A limit row's title: the name and the row's runs, small and quiet, a run near its limit
+  /// orange, and the whole title orange when blocked.
+  private static func limitTitle(_ row: LimitRow) -> NSAttributedString {
+    let font = NSFont.systemFont(ofSize: 11)
+    let quiet: NSColor = row.isBlocked ? .systemOrange : .secondaryLabelColor
+    func part(_ text: String, _ color: NSColor) -> NSAttributedString {
+      NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
+    }
+    let title = NSMutableAttributedString(attributedString: part(row.name + "  ", quiet))
+    for run in row.runs { title.append(part(run.text, run.isNear ? .systemOrange : quiet)) }
+    return title
   }
 
   /// Puts `items` in `menu`, in order, unless it holds exactly them already. An item stands in
@@ -267,6 +289,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   func menuNeedsUpdate(_ menu: NSMenu) {
     guard menu === self.menu else { return }
+    model.refreshLimits()
     show(content)
   }
 

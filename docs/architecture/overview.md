@@ -113,6 +113,18 @@ again with no permission prompt. For updates,
 `UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced
 release's Install.
 
+**Usage limits.** The menu shows the windows each source reports, as `UsageLimits`
+(`BridgeCore/Limits/`), held in memory only and never written to disk or logs. Codex's are read
+each time the menu opens, at most once a minute and one read at a time, by a short-lived
+`codex app-server` on the voice's locked-down argv, started for the read and closed after it, as
+Settings' voice list is; it asks `account/rateLimits/read`, also while the call is off, and its
+lifecycle is separate from `RealtimeSession`'s. A failed read leaves the last reading until it is
+15 minutes old. Claude's arrive from the mod on `POST /v1/limits` and merge window by window (the
+later reset wins, on the same reset the higher percent), so sessions on one account feed one
+reading; a window whose reset has passed is left out until a new reading comes, and one with no
+reset is left out 15 minutes after its reading. `LimitRow` turns a
+reading into the menu's row and tooltip.
+
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
 desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
 and joins again when that title changes, polls it once a second, submits each voice request to
@@ -161,6 +173,7 @@ that both test suites parse.
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `typedTurn` the turn's id when it is not a voice turn |
 | `POST /v1/sync` | `sessionId`, `turnId`, `from` (`owner` or `claude`) and `text`: a line of a turn that is not a voice request, and the mod's keyboard-answer and settled-prompt lines under any main-loop turn, a voice turn included. Empty `text` at a turn's start only takes the turn's decision |
+| `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
 | `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
@@ -353,6 +366,9 @@ sequenceDiagram
 ```
 
 ### Approval notice
+
+This notice is not sent where Claude Code's built-in guard loads and the mod is not the
+organization's own ([known limitations](../../README.md#known-limitations), [ADR 0001](../adr/0001-platform-findings.md)).
 
 The bridge never answers a permission prompt. When a main-loop turn hits one, the voice says that
 Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and

@@ -43,6 +43,9 @@ public actor Bridge: Router {
   /// is connected unless the line was seeded with it.
   private var heldContext: VoiceLine?
   private var problem: Problem?
+  /// What Claude Code last said of Claude's usage windows, merged over the readings before it.
+  /// Memory only; it outlives the sessions that sent it.
+  private var claudeLimits: UsageLimits?
   /// The session that asked the last `[QUESTION]`; the next handoff goes there.
   private var questionRoute: SessionID?
   private var callStart: Date?
@@ -116,7 +119,8 @@ public actor Bridge: Router {
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes, context: shown.context,
-        conversation: shown.lines, labelsOnAnOlderMod: olderMods, needsContext: needsContext)
+        conversation: shown.lines, labelsOnAnOlderMod: olderMods, needsContext: needsContext,
+        claudeLimits: claudeLimits)
     }
   }
 
@@ -252,6 +256,7 @@ public actor Bridge: Router {
         case .dropped: break
         }
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
+      case ("POST", "/v1/limits"): await limits(try req.decodeBody(LimitsBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
       case ("POST", "/v1/sync"): try await sync(try req.decodeBody(SyncBody.self))
       case ("POST", "/v1/target"):
@@ -568,6 +573,48 @@ public actor Bridge: Router {
     return row
   }
 
+  /// A joined session's reading of Claude's usage windows, merged into what is held: a session
+  /// that sat idle may report figures older than another's. What is held counts only while it is
+  /// current: an expired window takes no slot from a live one. A reset that is not an ISO 8601
+  /// time is no reset.
+  private func limits(_ body: LimitsBody) async {
+    guard (try? await label(of: body.sessionId)) != nil else { return }
+    let windows = body.windows.compactMap { one -> LimitWindow? in
+      Self.span(ofKind: one.kind).map {
+        LimitWindow(
+          span: $0, usedPercent: one.percentUsed, resetsAt: one.resetsAt.flatMap(Self.isoDate))
+      }
+    }
+    let reading = UsageLimits(windows: windows, readAt: time.now)
+    guard !reading.windows.isEmpty else { return }
+    claudeLimits = claudeLimits?.current(at: time.now).merging(reading) ?? reading
+  }
+
+  /// The span of a Claude window kind: `five_hour` and `seven_day` are the two lengths the app
+  /// names, `spend_limit` is not a usage window, and any other kind shows by name. A kind comes
+  /// from the socket and reaches the menu, so only `[a-z0-9_]{1,32}` with a character other than
+  /// `_` is accepted.
+  static func span(ofKind kind: String) -> LimitSpan? {
+    switch kind {
+    case "five_hour": return .minutes(LimitSpan.shortMinutes)
+    case "seven_day": return .minutes(LimitSpan.aWeek)
+    case "spend_limit": return nil
+    default:
+      let allowed = kind.utf8.allSatisfy {
+        ($0 >= 97 && $0 <= 122) || ($0 >= 48 && $0 <= 57) || $0 == 95
+      }
+      // A kind of only underscores would show as blanks.
+      let named = kind.utf8.contains { $0 != 95 }
+      return allowed && named && kind.utf8.count <= 32 ? .kind(kind) : nil
+    }
+  }
+
+  /// An ISO 8601 time, with or without fractional seconds.
+  private static func isoDate(_ text: String) -> Date? {
+    (try? Date(text, strategy: .iso8601))
+      ?? (try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+  }
+
   /// A session that starts waiting for approval sends the voice a notice, which goes once the
   /// approval is settled. A question Claude asked goes to the voice whole, and the next handoff
   /// is routed to that session as its reply. Either carries what Claude wrote before it.
@@ -735,4 +782,6 @@ public struct BridgeUpdate: Sendable, Equatable {
   /// The target's voice lacks part of the session (no summary, a gap, or a mod that does not
   /// sync): Load context has something to do.
   public let needsContext: Bool
+  /// What Claude Code last said of Claude's usage windows; nil until a session has.
+  public var claudeLimits: UsageLimits? = nil
 }

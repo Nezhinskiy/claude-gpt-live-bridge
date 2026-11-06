@@ -1,5 +1,5 @@
 // The JSON messages between the mod and the app: `POST /v1/join|leave|answer|activity|context|
-// sync|target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
+// sync|limits|target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
 // `wire/fixtures` holds an example of each and `plugin/hooks/wire.ts` mirrors these types; a
 // change here changes both. Optional fields are omitted when absent, never `null`.
 
@@ -143,6 +143,23 @@ public struct ActivityBody: Codable, Sendable, Equatable {
 public struct ContextBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var summary: String
+}
+
+/// One usage window as the mod reads it from Claude Code. The app takes `five_hour` as a window of
+/// five hours and `seven_day` as a week, ignores `spend_limit`, and shows any other kind of
+/// `[a-z0-9_]{1,32}` by name; a kind outside that is ignored. `percentUsed` is usually 0 to 100
+/// but is not checked: it is clamped only when shown. `resetsAt` is an ISO 8601 time, omitted when
+/// the engine gave none.
+public struct LimitWindowBody: Codable, Sendable, Equatable {
+  public var kind: String
+  public var percentUsed: Double
+  public var resetsAt: String?
+}
+
+/// `POST /v1/limits`: Claude's usage windows, as one joined session read them.
+public struct LimitsBody: Codable, Sendable, Equatable {
+  public var sessionId: SessionID
+  public var windows: [LimitWindowBody]
 }
 
 public enum CallAction: String, Codable, Sendable { case start, stop, mute, unmute }
