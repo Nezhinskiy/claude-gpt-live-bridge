@@ -475,6 +475,8 @@ also settled the seed's limit: codex counts UTF-8 bytes over 4, and refuses a st
     // owner: the prompt. other, or background outside the window: Claude's empty line, which takes
     // the turn's decision. voice, or background in the window: null
   turnCompleted(turnId, answer, outcome): { post: Post | null; sync: SyncLine | null }
+  takeLostTurn(): boolean
+    // once: a turn completed unseen, or still held when the next started, which is evicted
   replied(replyId: RequestId, forRequest: RequestId | undefined, now: number): void
     // no-op with no turn, a voice turn, or an older app's undefined. forRequest === replyId: the rest
     // of the turn is a voice turn, with its follow-up window. Otherwise: an update to forRequest
@@ -603,7 +605,8 @@ also settled the seed's limit: codex counts UTF-8 bytes over 4, and refuses a st
   reply from the dialog's result: a reply calls `tracker.replied` and saves; the dialog's result posts
   `keyboardAnswer(first.result)` as `from: 'owner'`, in every turn. `tick`, finding no question open for a
   `reply`, posts `failed` for its id with the reason `the question was answered at the keyboard`: a 409
-  for a voice turn is harmless. `settles(e)` keeps its job. Lines are `from: 'claude'`, the mod's report and not the owner's typing:
+  for a voice turn is harmless. `settles(e)` keeps its job. Lines are `from: 'claude'`, the mod's report
+  and not the owner's typing:
   `You allowed <tool> at the keyboard.` from a settling `PostToolUse` or `PostToolUseFailure`;
   `The permission prompt for <tool> was settled at the keyboard.` when a main `turn.step` starts or
   `turn.complete` comes with `approval` still set by the main loop, which also posts `activity('working')`.
