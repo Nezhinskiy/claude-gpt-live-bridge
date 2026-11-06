@@ -61,7 +61,7 @@ let recordFile: string | null = null
 let lastScan = -Infinity
 /**
  * The last summary the model wrote, while nothing has happened since: until any main turn
- * completes, or `/clear`. Sending it again costs no model call. Kept in memory only, as the
+ * completes, a gap, or `/clear`. Sending it again costs no model call. Kept in memory only, as the
  * transcript it summarises is the session's own.
  */
 let summary: string | null = null
@@ -69,7 +69,7 @@ let summary: string | null = null
 let turnsDone = 0
 /** The summary on its way, which a second ask joins instead of asking the model again. */
 let sending: Promise<ContextOutcome> | null = null
-/** Counts sends; one that timed out is over, and what it wrote later is dropped. */
+/** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
 let sendCount = 0
 
 type ContextOutcome = 'sent' | 'empty' | 'failed'
@@ -81,9 +81,19 @@ async function save($: EngineInterface): Promise<void> {
   if (link?.session) await $.store.set(joinedKey(link.session.sessionId), { ...tracker.snapshot(), hasGap: link.hasGap })
 }
 
-/** A turn the tracker lost reached the app in no way, which the next join says. */
+/**
+ * A turn did not reach the app, which the next join says. No summary from before it covers it: the
+ * one kept goes, and the one being written is dropped, as nothing could date it once posted.
+ */
+function noteGap(): void {
+  link?.noteGap()
+  staleSummary()
+  if (sending !== null) sendCount += 1
+}
+
+/** A turn the tracker lost reached the app in no way. */
 function noteLostTurn(): void {
-  if (tracker.takeLostTurn()) link?.noteGap()
+  if (tracker.takeLostTurn()) noteGap()
 }
 
 /**
@@ -96,7 +106,7 @@ const trySave = ($: EngineInterface) => save($).catch(() => {})
 async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
   const body = line.text === undefined ? line : { ...line, text: clip(line.text, ANSWER_LIMIT) }
   if ((await link?.sync(body)) === true) return
-  link?.noteGap()
+  noteGap()
   await trySave($)
 }
 
@@ -177,7 +187,7 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   const sessionId = await $.session.id()
   const title = (await readTitle($, sessionId)) ?? ''
   // The app got no turn from before the owner's join; a reload's gap is in its snapshot.
-  if (byOwner && (await hasTurns($))) link?.noteGap()
+  if (byOwner && (await hasTurns($))) noteGap()
   // Only the owner's own join brings back a session they removed.
   const isJoined = (await link?.join({ sessionId, title, modVersion, syncs: true, ...(byOwner && { owner: true }) })) === true
   await save($)
@@ -283,7 +293,7 @@ async function tick($: EngineInterface): Promise<void> {
  * request a newer one replaced is refused by design, so only a result is said to be lost.
  */
 async function answerLost($: EngineInterface, status: AnswerStatus): Promise<void> {
-  link?.noteGap()
+  noteGap()
   await trySave($)
   if (status === 'update') return
   note = LOST_ANSWER
@@ -528,7 +538,7 @@ export const register: Register = on => {
     if (saved !== undefined) {
       tracker = new TurnTracker(saved as TurnSnapshot)
       // A snapshot from before sync says nothing: none of its turns reached the app.
-      if ((saved as { hasGap?: boolean }).hasGap !== false) link.noteGap()
+      if ((saved as { hasGap?: boolean }).hasGap !== false) noteGap()
       await serial(() => turnOn($, false))
     }
     return next(e)

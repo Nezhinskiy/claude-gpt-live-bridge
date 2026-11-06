@@ -187,8 +187,10 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
 - The mod tracks whether every turn since the last delivered summary reached the app. When one did
   not (no link, a refused post, a lost voice answer, a turn before joining), its next join says the
   session is *missed*.
-- The summary cache (`summary`, `staleSummary`) stays, but goes stale with every completed turn: a
-  summary the app asks for has to hold what the conversation could not carry.
+- The summary cache (`summary`, `staleSummary`) stays, but goes stale with every completed turn and
+  every gap: a summary the app asks for has to hold what the conversation could not carry. A summary
+  still being written when the mod notes a gap is not posted either: `/live context` has no ask for
+  the app to date, so only the mod can drop it.
 
 ### Wire
 

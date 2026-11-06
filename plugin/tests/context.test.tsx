@@ -9,6 +9,9 @@ import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
 
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
 const SUMMARY = { sessionId: ID, summary: 'Goal: tidy the example project.' }
+declare const setTimeout: (fn: () => void, ms: number) => unknown
+/** Lets whatever is not held run as far as it can. */
+const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
 
 /** Joined, the call off, this session the target. */
 async function joined(...[$, on]: Parameters<TestBody>) {
@@ -188,6 +191,60 @@ test('everyCompletedTurnStalesTheSummary', async ($, on) => {
   await typedTurn($, 't2', 'Renamed.')
   await appAsks(world)
   expect(world.forks).toBe(3)
+})
+
+/** The prompt never reached the app, so a summary from before it would clear the mark with it still lost. */
+test('aGapStalesTheSummary', async ($, on) => {
+  const world = await joined($, on)
+  await appAsks(world)
+  expect(world.forks).toBe(1)
+  world.syncStatus = 503
+  await $.turn.start({ text: 'Count the files', turnId: 't1' })
+  world.syncStatus = 200
+  await world.clock.advance(1000)
+  await appAsks(world)
+  expect(world.forks).toBe(2)
+})
+
+/** Crash, then --resume: t1 never ended, and neither its lines nor its answer reached the app. */
+test('aTurnLostAtTheNextStartStalesTheSummary', async ($, on) => {
+  const world = await joined($, on)
+  await appAsks(world)
+  expect(world.forks).toBe(1)
+  await $.turn.start({ text: 'Count the files', turnId: 't1' })
+  await $.turn.start({ text: 'Count them again', turnId: 't2' })
+  await world.clock.advance(1000)
+  await appAsks(world)
+  expect(world.forks).toBe(2)
+})
+
+/** The app cannot date `/live context`: only the mod knows the gap came while the summary was written. */
+test('aSummaryWrittenAcrossAGapIsNotPosted', async ($, on) => {
+  const world = await joined($, on)
+  world.forkMs = 5000
+  const asked = $.command.run({ ...LIVE, args: 'context' })
+  await aMoment()
+  expect(world.forks).toBe(1)
+  world.syncStatus = 503
+  await $.turn.start({ text: 'Count the files', turnId: 't1' })
+  world.syncStatus = 200
+  await world.clock.advance(5000)
+  expect((await asked).text).toContain('could not summarise')
+  expect(world.take('context')).toEqual([])
+})
+
+/** A gap ends a send under way, and only that: the note of one already sent still comes down. */
+test('aGapAfterASummaryWasSentLeavesItsNoteToGo', async ($, on) => {
+  const world = await joined($, on)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await appAsks(world)
+  expect(await note(band)).toBe('Context sent')
+  world.syncStatus = 503
+  await $.turn.start({ text: 'Count the files', turnId: 't1' })
+  world.syncStatus = 200
+  await world.clock.advance(3000)
+  expect(await note(band)).toBeUndefined()
+  await band.unmount()
 })
 
 test('clearMakesTheContextSummariseAgain', async ($, on) => {
