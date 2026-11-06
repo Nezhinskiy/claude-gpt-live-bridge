@@ -486,8 +486,10 @@ only if it is still the one it bound.
   with no known body, recognised in codex's wording, as this path carries no code; or an `error`
   about usage on the line's data channel, which codex does not report, recognised by its code.
   The call ends, so speech does not open lines that fail, and until Start or Stop it keeps what
-  waits to be said, lines that arrive meanwhile too, with a question's route. Only a spent budget
-  is called a limit: the others are said as ChatGPT not allowing the voice.
+  waits to be said, lines that arrive meanwhile too, with a question's route. A synced line is
+  context, not one of those: the conversation keeps it for the next seed. The pause setting counts
+  this call as stopped. Only a spent budget is called a limit: the others are said as ChatGPT not
+  allowing the voice.
 - **Codex installed with npm, or found only through a shell's start-up files:** the app reads
   `PATH` from the user's own shell (at most 3 s) and starts codex with it; a codex whose runtime
   is still missing gets its own sentence.

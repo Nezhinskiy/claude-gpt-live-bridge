@@ -479,4 +479,33 @@ struct CallMachineTests {
     for event in Self.live + [.mute] { _ = machine.handle(event) }
     #expect(machine.handle(.synced(Self.claude)) == [.addContext(Self.claude)])
   }
+
+  /// The conversation has them, and seeds the next line; a refusal keeps only what is to be said.
+  @Test func aRefusalDropsThem() {
+    var machine = CallMachine()
+    for event in Self.connecting + [.synced(Self.typed), .refused(Self.limit)] {
+      _ = machine.handle(event)
+    }
+    for event in Self.connecting { _ = machine.handle(event) }
+    #expect(!machine.handle(.connected).contains(.addContext(Self.typed)))
+  }
+
+  @Test func aPausedCallHoldsNoSyncedLine() {
+    var machine = CallMachine()
+    for event in Self.live + [.refused(Self.limit)] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aLineThePauseKeptAndASyncedLineAreEachGivenOnce() {
+    var machine = CallMachine()
+    for event in Self.live + [Self.deliver(Self.result), .refused(Self.limit)] {
+      _ = machine.handle(event)
+    }
+    for event in Self.connecting + [.synced(Self.typed)] { _ = machine.handle(event) }
+    let added = machine.handle(.connected).filter {
+      $0 == .addContext(Self.result) || $0 == .addContext(Self.typed)
+    }
+    #expect(added == [.addContext(Self.result), .addContext(Self.typed)])
+  }
 }

@@ -2179,4 +2179,154 @@ struct BridgeTests {
     #expect(answered.status == 200)
     #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Renamed."] })
   }
+
+  // MARK: Synced lines in a call paused at the plan's limit
+
+  /// The line closes at the plan's usage limit: the call is off, and keeps what arrives.
+  func pausedAtTheLimit() async {
+    voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
+    #expect(await eventually { await bridge.status.call == .off })
+  }
+
+  /// How many items of the latest seed carry `text`.
+  func seeded(_ text: String) async -> Int {
+    (await voice.opens.last ?? []).filter { $0.text.contains(text) }.count
+  }
+
+  /// A paused call keeps what the voice has to say. A synced line is context: the conversation
+  /// keeps it, with no chime, and the next line gets it once, as seed.
+  @Test func aTypedLineDuringAPausedCallIsSeededOnce() async throws {
+    await live()
+    await pausedAtTheLimit()
+    let chimes = await audio.calls.filter { $0 == "chime" }.count
+    try await sync(a, "Rename the folder.")
+    #expect(await bridge.status.unheard == 0)
+    #expect(await audio.calls.filter { $0 == "chime" }.count == chimes)
+    #expect(await bridge.status.problem != nil)
+    await live()
+    #expect(await seeded("[TYPED] Alpha: Rename the folder.") == 1)
+    #expect(await !voice.added.contains { $0.contains("Rename the folder.") })
+  }
+
+  /// The line was cut after its seed: a line that came in between reaches the next line once.
+  @Test func aSyncedLineOnALineCutByARefusalIsSeededOnce() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    await voice.holdOpen()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.openWaiting == 1 })
+    try await sync(a, "Rename the folder.")
+    await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
+    await voice.releaseOpen()
+    await opening.value
+    #expect(await bridge.status.call == .off)
+    await live()
+    #expect(await seeded("[TYPED] Alpha: Rename the folder.") == 1)
+    #expect(await !voice.added.contains { $0.contains("Rename the folder.") })
+  }
+
+  /// A result is kept to be said as well as in the conversation: it is not seeded too.
+  @Test func aResultDuringAPausedCallIsGivenOnce() async throws {
+    await live()
+    await pausedAtTheLimit()
+    try await answer(request(1), from: a)
+    #expect(await bridge.status.unheard == 1)
+    await live()
+    #expect(await seeded("[RESULT] Alpha: Done.") == 0)
+    #expect(await voice.added.filter { $0 == "[RESULT] Alpha: Done." }.count == 1)
+  }
+
+  @Test func aSupersededAnswerDuringAPausedCallIsSeededUnsaid() async throws {
+    await live()
+    await pausedAtTheLimit()
+    try await superseded()
+    #expect(await bridge.status.unheard == 0)
+    await live()
+    #expect(await seeded("[CLAUDE] Alpha: Done.") == 1)
+    #expect(await !voice.added.contains("[CLAUDE] Alpha: Done."))
+  }
+
+  /// A typed turn's question in the target is said, so a paused call keeps it for the next line.
+  @Test func aTypedQuestionDuringAPausedCallWaitsForTheNextLine() async throws {
+    await live()
+    await pausedAtTheLimit()
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    #expect(await bridge.status.unheard == 1)
+    await live()
+    #expect(await seeded("Which name?") == 0)
+    #expect(await voice.added.filter { $0.hasPrefix("[ASKING] Alpha:") }.count == 1)
+  }
+
+  @Test func aTypedQuestionSettledDuringAPausedCallIsNotSaid() async throws {
+    await live()
+    await pausedAtTheLimit()
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .working, typedTurn: "turn-1"))
+    #expect(await bridge.status.unheard == 0)
+  }
+
+  /// In another session a typed turn's question is only recorded, whatever the call is doing.
+  @Test func aTypedQuestionInAnotherSessionDuringAPausedCallIsOnlyRecorded() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    await pausedAtTheLimit()
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    #expect(await bridge.status.unheard == 0)
+    await live()
+    voice.emit(.handoff(request(2)))
+    #expect(await eventually { (try? await registry.poll(a)) != nil })
+    #expect(try await registry.poll(b) == nil)
+  }
+
+  /// A paused call is a stopped call to the pause setting: the microphone is released, and the
+  /// owner who keeps the setting on must not have what is typed now recorded.
+  @Test func thePauseSettingTreatsAPausedCallAsStopped() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    await test.live()
+    await test.pausedAtTheLimit()
+    try await test.sync(test.a, "Private thing.")
+    #expect(await test.lines().isEmpty)
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    await test.live()
+    #expect(await test.seeded("Private thing.") == 0)
+  }
+
+  /// A turn admitted while the line was live is admitted still: the limit did not stop it.
+  @Test func aTurnTypedBeforeTheLimitKeepsItsAnswerUnderThePauseSetting() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    await test.live()
+    try await test.sync(test.a, "Rename the folder.")
+    await test.pausedAtTheLimit()
+    try await test.sync(test.a, from: .claude, "Renamed.")
+    #expect(await test.lines().contains("Claude: [CLAUDE] Alpha: Renamed."))
+  }
+
+  /// A paused call keeps the plain failure a withheld answer closes with, and none of its text.
+  @Test func aWithheldAnswerDuringAPausedCallWaitsAsAPlainFailure() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    await test.live()
+    await test.pausedAtTheLimit()
+    try await test.sync(test.a, "Private thing.")
+    try await test.voiceAnswer()
+    #expect(await !test.lines().contains { $0.contains("private thing") })
+    await test.live()
+    #expect(await test.seeded("private thing") == 0)
+    let added = await test.voice.added
+    #expect(added.count == 1)
+    #expect(added.first?.hasPrefix("[FAILED] Alpha:") == true)
+    #expect(!added.contains { $0.contains("private thing") })
+  }
 }
