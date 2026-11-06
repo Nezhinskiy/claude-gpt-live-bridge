@@ -1,12 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Work } from '../hooks/wire.ts'
-import { fakeWorld, framed, ID, LIVE, SOCKET } from './fake-bridge.ts'
+import { fakeWorld, framed, ID, LIVE, liveOn, SOCKET } from './fake-bridge.ts'
 
 const START = { cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true } as const
 const OTHER = '22222222-0000-0000-0000-000000000003'
 const REQUEST: Work = { kind: 'request', id: '00000000-0000-0000-0000-00000000000a', brief: 'Delete the build folder', transcript: [] }
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
+const TYPED = { id: 't1' }
+const VOICE = { id: 't1', request: REQUEST.id }
 declare const setTimeout: (fn: () => void, ms: number) => unknown
 /** Lets whatever is not held run as far as it can. */
 const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
@@ -15,9 +17,118 @@ test('reloadResumesPolling', async ($, on) => {
   // A hot reload runs session.start again with the module's own variables gone; the store stays.
   const world = fakeWorld(on, { [`joined:${ID}`]: { pending: null, followUp: null, turns: [] } })
   await $.session.start(START)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session' }])
+  expect(world.take('join')).toHaveLength(1)
   await world.clock.advance(1000)
   expect(world.take('next')).toHaveLength(1)
+})
+
+test('joinSaysItSyncs', async ($, on) => {
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true }])
+})
+
+/** Disabling the mod ends no session, so its key stays: enabled again, the snapshot is all there is. */
+test('aTurnWhileTheModWasOffIsAGap', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  world.take('join')
+  world.turns = 2
+  await $.session.start(START)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
+test('aReloadWithNoNewTurnIsNoGap', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  world.take('join')
+  await $.session.start(START)
+  expect(world.take('join').map(body => body?.missed)).toEqual([undefined])
+})
+
+test('aTurnBeforeJoiningIsMissed', async ($, on) => {
+  // /live on in a session with turns: the app got none of them.
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  world.turns = 1
+  await $.command.run({ ...LIVE, args: 'on' })
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, missed: true }])
+  // Said once: the app has it.
+  world.joined.delete(ID)
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true }])
+})
+
+test('aFreshSessionJoinsWithoutMissed', async ($, on) => {
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  expect(world.take('join')[0]?.missed).toBeUndefined()
+})
+
+test('aSnapshotFromBeforeSyncIsAGap', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: { pending: null, followUp: null, turns: [] } })
+  await $.session.start(START)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+})
+
+test('aSnapshotWithNoGapJoinsWithoutMissed', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: { pending: null, followUp: null, turns: [], hasGap: false } })
+  await $.session.start(START)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true }])
+})
+
+test('aGapSurvivesAReload', async ($, on) => {
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.syncStatus = 500
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect((world.stored.get(`joined:${ID}`) as { hasGap?: boolean }).hasGap).toBe(true)
+  world.syncStatus = 200
+  world.take('join')
+  await $.session.start(START)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+})
+
+test('theSavedGapClearsOnceAJoinSaidIt', async ($, on) => {
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.syncStatus = 500
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  world.syncStatus = 200
+  await world.clock.advance(1000)
+  expect((world.stored.get(`joined:${ID}`) as { hasGap?: boolean }).hasGap).toBe(false)
+})
+
+/** The turn's prompt and answer both go after the join that follows /clear, under the new id. */
+test('aTurnAfterClearSyncsUnderTheNewId', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  world.sessionId = OTHER
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect(world.take('sync').map(line => line?.sessionId)).toEqual([OTHER, OTHER])
 })
 
 test('clearRejoinsWithNewId', async ($, on) => {
@@ -32,7 +143,7 @@ test('clearRejoinsWithNewId', async ($, on) => {
   // One join that replaces the old id, so the app keeps the target and any open request.
   expect(world.take('leave')).toEqual([])
   // It names the mod's version again, or Settings would list the session as on the old mod.
-  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', modVersion: '0.3.1', replaces: ID }])
+  expect(world.take('join')).toEqual([{ sessionId: OTHER, title: 'Example session', modVersion: '0.3.1', syncs: true, replaces: ID }])
   expect(world.joined).toEqual(new Set([OTHER]))
   await world.clock.advance(1000)
   expect(world.take('join')).toEqual([])
@@ -46,7 +157,106 @@ test('renameRejoins', async ($, on) => {
   world.take('join')
   world.title = 'Renamed session'
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Renamed session', modVersion: '0.3.1' }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Renamed session', modVersion: '0.3.1', syncs: true }])
+})
+
+/** The app moved the conversation, its decision with it: the rest of the turn goes under the new id. */
+test('aTurnRunningThroughClearKeepsItsTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.take('sync')
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  world.sessionId = OTHER
+  await world.clock.advance(1000)
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect(world.take('sync')).toEqual([{ sessionId: OTHER, turn: { id: 't1' }, kind: 'answer', text: 'Nothing.' }])
+})
+
+test('aTurnRunningThroughAReloadKeepsItsLines', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.session.start(START)
+  world.take('sync')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turn: { id: 't1' }, kind: 'answer', text: 'Nothing.' }])
+})
+
+/** It started while the mod was away, so neither its prompt nor its answer went to the app. */
+test('aTurnTheModNeverSawStartIsAGap', async ($, on) => {
+  const world = fakeWorld(on)
+  world.turns = 0
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.take('join')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+})
+
+const HELD = { pending: null, followUp: null, turns: [['t0', { id: null, isVoice: false }]], hasGap: false }
+
+/** Crash, then --resume: the turn's end never came, so its answer never went. */
+test('aTurnLeftInASnapshotIsAGapAtTheNextTurn', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: HELD })
+  await $.session.start(START)
+  world.take('join')
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
+test('aTurnNeverSeenIsAGapThoughASnapshotHoldsAnother', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: HELD })
+  await $.session.start(START)
+  world.take('join')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(1000)
+  expect(world.take('join').map(body => body?.missed)).toEqual([true])
+})
+
+/** The answer matters more than the snapshot: a store that fails costs the turn none of its lines. */
+test('aSnapshotThatFailsCostsATurnNothing', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.isStoreBroken = true
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect(world.take('sync')).toHaveLength(2)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }, { sessionId: ID, state: 'idle', turn: TYPED }])
+})
+
+/** /clear gives the session a new id, whose join runs in `turn.start`; forgetting the old key can fail there. */
+test('aStoreThatFailsAfterClearCostsATurnNothing', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  world.sessionId = OTHER
+  world.isStoreBroken = true
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  expect(world.joined).toEqual(new Set([OTHER]))
+  expect(world.take('sync').map(line => line?.sessionId)).toEqual([OTHER])
+  expect(world.take('activity')).toEqual([{ sessionId: OTHER, state: 'working', turn: TYPED }])
+})
+
+/** Work is handed out once: a join that said a gap must not lose what its poll brought. */
+test('aSnapshotThatFailsCostsThePollItsWork', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.syncStatus = 503
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.syncStatus = 200
+  world.isStoreBroken = true
+  world.work.push(REQUEST)
+  await world.clock.advance(1000)
+  await aMoment()
+  expect(world.submitted).toHaveLength(1)
 })
 
 test('offLeaves', async ($, on) => {
@@ -65,9 +275,9 @@ test('aHalfWrittenRecordDoesNotBreakTheJoin', async ($, on) => {
   world.otherRecords = { '1.json': '', '2.json': '{"sessionId": "', '3.json': 'null' }
   await $.session.start(START)
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, missed: true }])
   await $.turn.start({ text: 'What changed?', turnId: 't1' })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
 })
 
 test('bareCommandShowsTheStatus', async ($, on) => {
@@ -153,7 +363,7 @@ test('aRemovedSessionTurnsItselfOffAndDoesNotRejoin', async ($, on) => {
   await $.session.start(START)
   expect(world.take('join')).toEqual([])
   expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, missed: true }])
 })
 
 test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
@@ -163,10 +373,10 @@ test('aTitleGivenAfterTheJoinIsFollowedOnThePoll', async ($, on) => {
   world.title = ''
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'example-project', owner: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'example-project', owner: true, syncs: true, missed: true }])
   world.title = 'Live mode'
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Live mode' }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Live mode', syncs: true }])
   // Once found, a poll reads this session's record alone.
   world.read = []
   await world.clock.advance(1000)
@@ -185,7 +395,7 @@ test('theJoinNamesNoTitleTheAppWillReplace', async ($, on) => {
   expect(joined).not.toContain('example-project')
   world.title = 'Live on'
   await world.clock.advance(1000)
-  expect(world.take('join').at(-1)).toEqual({ sessionId: ID, title: 'Live on' })
+  expect(world.take('join').at(-1)).toEqual({ sessionId: ID, title: 'Live on', syncs: true })
 })
 
 test('offWhileAPollIsAtWorkNeverSubmitsAfterTheLeave', async ($, on) => {
@@ -208,6 +418,23 @@ test('offWhileAPollIsAtWorkNeverSubmitsAfterTheLeave', async ($, on) => {
   await world.clock.advance(3000)
   expect(world.timeline.at(-1)).toBe('leave')
   expect(world.take('next')).toHaveLength(1)
+  expect(world.stored.has(`joined:${ID}`)).toBe(false)
+})
+
+/** A reload would otherwise join again with no action of the owner's. */
+test('offWhileASaveCountsTheTurnsStaysOff', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await world.clock.advance(1000)
+  let release = () => {}
+  world.holdTurns = new Promise(resolve => { release = resolve })
+  const done = $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed.' })
+  await aMoment()
+  await $.command.run({ ...LIVE, args: 'off' })
+  release()
+  await done
+  await aMoment()
   expect(world.stored.has(`joined:${ID}`)).toBe(false)
 })
 
@@ -267,13 +494,30 @@ test('aRemovalTheAnswerMeetsTurnsTheSessionOff', async ($, on) => {
   expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
 })
 
+/** The app answers the line 404, so the gap's join is what meets the removal: nothing is reopened. */
+test('aRemovalALineMeetsTurnsTheSessionOff', async ($, on) => {
+  const world = fakeWorld(on)
+  world.modVersion = '0.3.1'
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.joined.delete(ID)
+  world.removed.add(ID)
+  world.take('join')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  await world.clock.advance(3000)
+  expect(world.logs).toEqual(['Removed from LiveBridge. /live on joins again.'])
+  expect(world.take('join').map(body => body?.owner)).toEqual([undefined])
+  expect(world.launches).toEqual([])
+  expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
+})
+
 /** The join names the mod's version, read from its own plugin.json, for the app's Settings. */
 test('theJoinNamesTheModsVersion', async ($, on) => {
   const world = fakeWorld(on)
   world.modVersion = '0.3.1'
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, modVersion: '0.3.1' }])
+  await liveOn($)
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, modVersion: '0.3.1', syncs: true, missed: true }])
 })
 
 /** A mod that cannot read its own plugin.json says so: Settings will list it as on the old mod. */

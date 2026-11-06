@@ -8,17 +8,26 @@ public enum ContextLoadState: Sendable, Equatable {
   case loading
   /// The summary arrived a moment ago.
   case loaded
+  /// The voice has the whole session: there is nothing to load.
+  case current
 
   public var title: String {
     switch self {
     case .ready: "Load context"
     case .loading: "Loading context…"
     case .loaded: "Context loaded"
+    case .current: "Context up to date"
     }
   }
 
   /// Pressing again while a summary is on its way would only ask for it twice.
   public var isEnabled: Bool { self == .ready }
+
+  /// As the menu shows it: a summary just loaded, or on its way, is shown as that; otherwise a
+  /// voice that needs no context has nothing to load.
+  public func shown(needsContext: Bool) -> ContextLoadState {
+    self == .ready && !needsContext ? .current : self
+  }
 }
 
 /// The menu's Load context presses, per session: pending from the press until that session's

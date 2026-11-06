@@ -13,6 +13,10 @@ public struct VoiceLine: Equatable, Sendable {
     case asking = "ASKING"
     case context = "CONTEXT"
     case task = "TASK"
+    /// A line the owner typed into the session's own terminal.
+    case typed = "TYPED"
+    /// What Claude said in a turn that is not a voice request.
+    case claude = "CLAUDE"
 
     /// It ends a request, so the line stops waiting for that session: a result, a failure or a
     /// question. An update, an approval notice, a question Claude waits on or context leaves the
@@ -53,12 +57,17 @@ public enum CallEvent: Equatable, Sendable {
   case assistantSpeaking, userTranscribed
   /// `opensLine`: the bridge found that the line opens a closed line (the target's answer,
   /// question or approval notice, while the target's conversation holds a turn of the owner's).
-  case deliver(VoiceLine, opensLine: Bool = false)
+  /// `onOwnLine`: the open line is about the line's session, so its question or approval notice is
+  /// given to say, whoever started the turn.
+  case deliver(VoiceLine, opensLine: Bool = false, onOwnLine: Bool = false)
   case remoteClosed(Problem)
   case audioFailed(Problem)
   /// The open line carries a conversation that is not the target's any more: another session
   /// became the target, or the target's conversation was erased.
   case conversationChanged
+  /// A line of a turn that is not a voice request (`.typed` or `.claude`): the voice is given it
+  /// as context, not delivered to be said. It chimes and opens nothing.
+  case synced(VoiceLine)
 }
 
 /// What the bridge does in reply, in order.
@@ -116,11 +125,18 @@ public struct CallMachine: Sendable {
   public var pending: [VoiceLine] { unheard.map(\.line) }
   /// A line that arrives now waits to be said; a stopped call drops it.
   public var keepsLines: Bool { phase != .off || isPaused }
+  /// The sessions whose question the call kept, oldest first, each once. The next handoff goes to
+  /// the last of them, so a question that closes gives the route back to the one before it. They
+  /// end with the call. A question dropped while off routes nothing, and a pause keeps a route
+  /// only while its question still waits to be said.
+  private var questionRoutes: [SessionID] = []
   /// The results given before the voice's current reply began; only that reply can say them.
   private var replyCanSay: [VoiceLine]?
   /// The sessions handed a request whose result the open line waits for; while any is, silence
   /// does not close it, until `resultWindowSeconds` after the latest handoff.
   public private(set) var awaited: Set<SessionID> = []
+  /// Synced lines that arrived while the line connects, given once it is live.
+  private var connectingSynced: [VoiceLine] = []
   /// The silence timer elapsed while the line waited for a result.
   private var isSilenceDue = false
   /// The voice is saying a reply: a transcript delta came and its reply has not finished.
@@ -159,6 +175,10 @@ public struct CallMachine: Sendable {
   }
 
   public mutating func handle(_ event: CallEvent) -> [CallEffect] {
+    if case .deliver(let line, _, _) = event, line.asks, keepsLines, let session = line.session {
+      questionRoutes.removeAll { $0 == session }
+      questionRoutes.append(session)
+    }
     switch (phase, event) {
     case (_, .stop):
       return end(with: [.closeRealtime, .stopLocalVAD])
@@ -169,7 +189,7 @@ public struct CallMachine: Sendable {
       isPaused = false
       // the problem first: listening waits on macOS's prompt, whose refusal is a new problem
       return [.problem(nil), .startLocalVAD]
-    case (.off, .deliver(let line, _)) where isPaused:
+    case (.off, .deliver(let line, _, _)) where isPaused:
       unheard.append(Unheard(line: line))
       return [.chime]
     case (.off, _):
@@ -194,30 +214,40 @@ public struct CallMachine: Sendable {
       isSoundOn = true
       phase = .connecting
       return [.openRealtime]
-    case (.listening, .deliver(let result, let opensLine)):
+    case (.listening, .deliver(let result, let opensLine, _)):
       unheard.append(Unheard(line: result))
       guard opensLine else { return [.chime] }
       phase = .connecting
       isAwaitingFirstWord = true
       return [.openRealtimeForResult]
-    case (.connecting, .deliver(let result, _)):
+    case (.connecting, .deliver(let result, _, _)):
       unheard.append(Unheard(line: result))
       return []
+    case (.connecting, .synced(let line)):
+      connectingSynced.append(line)
+      return []
+    case (.live, .synced(let line)):
+      return [.addContext(line)]
     case (.listening, .handedOff(.some)), (.connecting, .handedOff(.some)):
       return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
+      let synced = connectingSynced
+      connectingSynced = []
       // the problem first: a refusal while these run must not be erased by them
-      return [.problem(nil), .flushPreroll] + pending.map { .addContext($0) } + [armSilence()]
+      return [.problem(nil), .flushPreroll] + pending.map { .addContext($0) }
+        + synced.map { .addContext($0) } + [armSilence()]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return reason.pausesCall ? pause(for: reason) : [.problem(reason)] + hangUp()
-    case (.live, .deliver(let result, _)):  // a result the voice never speaks still hangs up
-      guard let session = result.session, awaited.contains(session) else {
+    case (.live, .deliver(let result, _, let onOwnLine)):
+      // a result the voice never speaks still hangs up
+      let isAwaited = result.session.map(awaited.contains) ?? false
+      guard isAwaited || (onOwnLine && [.asking, .approval].contains(result.kind)) else {
         unheard.append(Unheard(line: result))
         return [.addContext(result), armSilence()]
       }
-      if result.kind.answers { awaited.remove(session) }
+      if result.kind.answers, let session = result.session { awaited.remove(session) }
       let isHeld = isSoundOn || isVoiceSpeaking
       unheard.append(Unheard(line: result, isHeld: isHeld))
       return isHeld ? [armSilence()] : [.speak(result), armSilence()]
@@ -283,10 +313,37 @@ public struct CallMachine: Sendable {
     return [.closeRealtime] + hangUp()
   }
 
+  /// The session the next handoff goes to, if a question routes it. A route is used once, and it
+  /// takes the routes under it along: nothing tells a reply from a new request, so one handoff
+  /// follows a question and the next is the target's.
+  public mutating func takeQuestionRoute() -> SessionID? {
+    defer { questionRoutes = [] }
+    return questionRoutes.last
+  }
+
+  /// `id`'s question is settled or can get no reply: the next handoff is not about it.
+  public mutating func endQuestionRoute(of id: SessionID) {
+    questionRoutes.removeAll { $0 == id }
+  }
+
+  /// Ends every route, but one whose question still waits to be said: a waiting line is given to
+  /// the next line, whichever session it is about, and the reply must reach the session that
+  /// asked.
+  public mutating func endSaidQuestionRoutes() {
+    questionRoutes.removeAll { id in
+      !unheard.contains { $0.line.session == id && $0.line.asks }
+    }
+  }
+
+  /// Forgets the synced lines a connecting line waits to give: the conversation they are in has
+  /// just seeded the line with them.
+  public mutating func dropSynced() { connectingSynced = [] }
+
   /// A session got a new id (`/clear`): the line waits for it, and its results stay its own,
   /// under the new id.
   public mutating func rename(_ old: SessionID, to new: SessionID) {
     if awaited.remove(old) != nil { awaited.insert(new) }
+    questionRoutes = questionRoutes.map { $0 == old ? new : $0 }
     let moved = { (line: VoiceLine) in
       var line = line
       if line.session == old { line.session = new }
@@ -307,6 +364,7 @@ public struct CallMachine: Sendable {
       isVoiceSpeaking = false
       isAckUnfinished = false
       replyCanSay = nil
+      connectingSynced = []
     }
     return pending.isEmpty ? [] : [.chime]
   }
@@ -315,10 +373,13 @@ public struct CallMachine: Sendable {
   /// be said. Start tries once more.
   private mutating func pause(for reason: Problem, closing: [CallEffect] = []) -> [CallEffect] {
     let kept = withoutHolds
+    let routes = questionRoutes
     let effects = end(
       with: [.problem(reason)] + closing + [.stopLocalVAD, .endCodex]
         + (kept.isEmpty ? [] : [.chime]))
     unheard = kept
+    questionRoutes = routes
+    endSaidQuestionRoutes()
     isPaused = true
     return effects
   }

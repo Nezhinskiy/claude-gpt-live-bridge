@@ -58,11 +58,13 @@ struct SettingsView: View {
           Button("Open Notifications Settings") { NSWorkspace.shared.open(Notifier.settingsURL) }
         }
       }
-      Section("Context") {
-        Toggle(
-          "Load context automatically when a line opens", isOn: setting(\.autoContext))
-        Text("Otherwise only Load context in the menu or /live context sends it.")
-          .font(.caption).foregroundStyle(.secondary)
+      Section("Sync") {
+        Toggle("Pause sync while the call is stopped", isOn: setting(\.pauseSyncWhileStopped))
+        Text(
+          "What you type while the call is off stays out of the voice's conversation, and "
+            + "context loads only from the menu or /live context."
+        )
+        .font(.caption).foregroundStyle(.secondary)
       }
       Section("General") {
         Toggle("Open at login", isOn: $model.openAtLogin)

@@ -8,6 +8,24 @@ All notable changes to this project are listed here. The format follows
 
 ### Added
 
+- **Conversation sync.** What you type in a joined session and Claude's final answer to it now
+  go into that session's conversation with the voice, as context: an open line gets them at once,
+  a line opened later is seeded with them, and neither chimes nor opens a closed line. This
+  happens while the call is on, and also while it is stopped, so the voice has them at the next
+  Start; nothing leaves the Mac until a line opens. A question Claude asks or a permission
+  prompt it waits on is said by the voice in the target whoever started the turn (in another
+  session, one from a turn you typed is only recorded), and a question you answer at the
+  keyboard, or a prompt you settle there, is told to the voice. A voice answer a newer request
+  superseded is no longer dropped: it is kept in the conversation, unsaid, and added to the open
+  line as context. **Load context** is enabled only when the voice lacks part of the session. A mod and an app from before this keep
+  working together: an older mod's sessions are treated as missing turns, so their lines load a
+  summary as before. The data is described in [SECURITY.md](SECURITY.md#residual-risk-by-design).
+- **Pause sync while the call is stopped** in Settings (off by default): with it on, what you type
+  while the call is stopped is not recorded, and no line loads a summary by itself; only **Load
+  context** or `/live context` does. It removes nothing already recorded. Typing under the pause
+  into a turn that has a voice request in flight (or waiting behind it) makes that request's
+  answer fail with a plain reason, with nothing of it recorded or said, and that turn's later
+  questions and approval notices stay out.
 - The menu shows how much of your Codex and Claude usage is used, one row each, with the percent
   used of every window the plan reports (up to three), orange from 90 %, and the reset times on
   hover. Codex's figures are read when the menu opens, at most once a minute, by a short-lived
@@ -25,6 +43,14 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
+- The conversation kept for each session holds its last 64 lines instead of 24.
+- **Load context automatically when a line opens** is gone from Settings. A line now loads a
+  summary by itself when the voice lacks part of the session (it has none, a turn did not
+  arrive, the lines since the summary outgrew what the voice can carry, or the mod does not
+  sync), and never after a pause or while the pause setting is on. An owner who had turned it off gets **Pause sync while the call is stopped** turned on at
+  the update, so summaries stay by hand; turns typed while the call is on now sync all the same.
+- **Load context** in the menu is disabled, reading **Context up to date**, while the voice has
+  the whole conversation.
 - A voice line that Claude's answer opens now closes and chimes when nobody has spoken on it 5
   seconds after it connects, instead of after 20 seconds of silence. In the runs measured, the
   voice started within about 2 seconds or not at all
@@ -47,6 +73,15 @@ All notable changes to this project are listed here. The format follows
   data channel, which codex does not report; those are not called a limit, as nothing shows one.
 - A long conversation in a language other than English could stop a line from opening: the app
   measured its seed in characters while codex counts bytes and refuses a start past its limit.
+- An answer, a question or a permission prompt from the target now opens the closed line every
+  time. When the last line had been about another session, the app could close the new line
+  before it started, so the voice said nothing and the line waited for you to speak or for a
+  second one.
+- A question waiting to be said keeps its route when you pick another session: your reply reaches
+  the session that asked, instead of landing in the new target as a request of its own.
+- A voice request whose turn ends with no answer, as a plain **No** at a permission prompt or a
+  cancelled question does, now fails and says Claude ended the turn without an answer, instead of
+  saying the answer is code or a table only.
 - A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
   after the call has ended: the Start that was waiting on the prompt is cancelled.
 

@@ -66,7 +66,7 @@ struct MenuContentTests {
   static func status(
     _ call: CallPhase = .off, sessions count: Int, target: Int = 0, problem: Problem? = nil,
     lines: [Conversation.Line] = [], context: String? = nil, unheard: Int = 0,
-    muted: Bool = false
+    muted: Bool = false, needsContext: Bool = true
   ) -> BridgeUpdate {
     BridgeUpdate(
       status: StatusReply(
@@ -78,7 +78,7 @@ struct MenuContentTests {
         },
         minutesToday: 31.4, problem: problem?.sentence, unheard: unheard, isMuted: muted),
       problem: problem, minutesThisCall: 4.2, context: context, conversation: lines,
-      labelsOnAnOlderMod: [])
+      labelsOnAnOlderMod: [], needsContext: needsContext)
   }
 
   static func menu(
@@ -94,9 +94,30 @@ struct MenuContentTests {
     Conversation.Line(speaker: speaker, text: text)
   }
 
+  @Test func loadContextIsDisabledWhileCurrent() {
+    let outline = Self.menu(Self.status(sessions: 1, needsContext: false)).outline
+    #expect(outline.contains("Context up to date (disabled)"))
+    #expect(!outline.contains("Load context"))
+  }
+
+  /// Out of sync (missed or paused) or with no context: the update says it needs one.
+  @Test func loadContextIsEnabledOutOfSync() {
+    let outline = Self.menu(Self.status(sessions: 1, needsContext: true)).outline
+    #expect(outline.contains("Load context"))
+  }
+
+  /// A summary that just arrived says so for its 3 s, though the session is current by then.
+  @Test func loadedOutranksUpToDate() {
+    let current = Self.status(sessions: 1, needsContext: false)
+    #expect(
+      Self.menu(current, load: .loaded).outline.contains("Context loaded (disabled)"))
+    #expect(
+      Self.menu(current, load: .loading).outline.contains("Loading context… (disabled)"))
+  }
+
   @Test func withNoSessionsItOffersTheJoinCommand() {
     #expect(
-      Self.menu(Self.status(sessions: 0)).outline == [
+      Self.menu(Self.status(sessions: 0, needsContext: false)).outline == [
         "[call] Off · Start (disabled)",
         "---",
         "# Sessions",

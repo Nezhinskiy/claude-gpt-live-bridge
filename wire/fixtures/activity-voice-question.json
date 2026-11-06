@@ -1,0 +1,10 @@
+{
+  "question": "Which name should the folder get? Options: build (the default), out (shorter).",
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "state": "approval",
+  "text": "Two folders hold build output.",
+  "turn": {
+    "id": "00000000-0000-0000-0000-0000000000a1",
+    "request": "00000000-0000-0000-0000-00000000000a"
+  }
+}

@@ -41,8 +41,18 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     return { turnId: e.turnId, index: e.index, answer: world.stepText, toolUses: [], stopReason: 'end_turn', usage: null }
   })
   on('store.get', (_, e) => ({ value: world.stored.get(e.key) }))
-  on('store.set', async (_, e) => (await held(), world.stored.set(e.key, e.value), { value: undefined }))
-  on('store.delete', async (_, e) => (await held(), world.stored.delete(e.key), { value: undefined }))
+  on('store.set', async (_, e) => {
+    if (world.isStoreBroken) throw new Error('the store is full')
+    await held()
+    world.stored.set(e.key, e.value)
+    return { value: undefined }
+  })
+  on('store.delete', async (_, e) => {
+    if (world.isStoreBroken) throw new Error('the store is full')
+    await held()
+    world.stored.delete(e.key)
+    return { value: undefined }
+  })
   const world = {
     clock,
     sessionId: ID,
@@ -54,9 +64,23 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isAppInstalled: false,
     /** The status the app answers an answer with (409: it restarted and forgot the request). */
     answerStatus: 200,
+    /** The status the app answers a sync line with (404: an older app has no such route). */
+    syncStatus: 200,
+    /** The pause setting is on and the call is off, as `Continuity.admits` sees them. */
+    isPausing: false,
+    /** The session is marked *paused*: a line was refused. */
+    isPaused: false,
+    /** The last turn the app decided on, its one slot per conversation (`Continuity.admits`). */
+    decision: null as { turnId: string; isAdmitted: boolean } | null,
+    /** The sync lines with text the app admitted, in order. */
+    kept: [] as string[],
     /** The status the app answers a usage reading with (404: it refuses it). */
     limitsStatus: 200,
     isSubmitRefused: false,
+    /** A hook beneath the mod refuses the owner's prompt (`{ drop }`). */
+    isPromptDropped: false,
+    /** What a hook beneath the mod rewrites a prompt to, or null. */
+    enteredText: null as string | null,
     /** The engine refuses the command's name (as it does a built-in's). */
     isCommandRefused: false,
     /** Every slash command the mod declared, in order. */
@@ -92,14 +116,24 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     onNextHeld: () => {},
     /** What the mod's store holds. */
     stored: new Map(Object.entries(store)),
+    /** The mod's writes to its store fail. */
+    isStoreBroken: false,
     /** While set, the mod's next write to its store is held until it resolves. */
     holdStore: null as Promise<void> | null,
     /** Called once a write is being held. */
     onStoreHeld: () => {},
+    /** While set, the engine's next count of the session's prompts is held until it resolves. */
+    holdTurns: null as Promise<void> | null,
     /** Prompts submitted and leaves posted, in the order they happened. */
     timeline: [] as ('submit' | 'leave')[],
+    /** While set, the app's reply to a sync line is held until it resolves. */
+    holdSync: null as Promise<void> | null,
+    /** How many AskUserQuestion dialogs the session opened. */
+    dialogs: 0,
     /** Answers the open AskUserQuestion dialog at the keyboard with a label. */
     answerDialog: (_label: string) => {},
+    /** Closes the open AskUserQuestion dialog with Esc: the tool reports an error. */
+    cancelDialog: () => {},
     /** The registry's other `*.json` files, by name: Claude Code rewrites them, so one may be half written. */
     otherRecords: {} as Record<string, string>,
     /** The calls to one route since the last look, then forgets them. */
@@ -113,7 +147,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('session.measure', (_, e) => ({ changed: e.changed }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('session.id', () => ({ value: world.sessionId }))
-  on('session.turns', () => ({ value: world.turns }))
+  on('session.turns', async () => {
+    const hold = world.holdTurns
+    world.holdTurns = null
+    if (hold !== null) await hold
+    return { value: world.turns }
+  })
   on('session.cwd', () => ({ value: '/Users/example/Dev/example-project' }))
   on('command.register', (_, e) => {
     if (world.isCommandRefused) return { deny: `"/${e.name}" refused: it is the built-in /${e.name}` }
@@ -153,12 +192,30 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'answer' && world.answerStatus !== 200) {
       return { value: { status: world.answerStatus, ok: false, headers: {}, text: '{"error":"unknown or stale request id"}' } }
     }
+    if (route === 'sync' && world.syncStatus !== 200) {
+      return { value: { status: world.syncStatus, ok: false, headers: {}, text: '{"error":"unknown session"}' } }
+    }
     if (route === 'limits' && world.limitsStatus !== 200) {
       return { value: { status: world.limitsStatus, ok: false, headers: {}, text: '{"error":"refused"}' } }
     }
-    // The app answers every call from a removed session so, its own joins included, until the owner joins it again.
+    // The app answers a removed session's calls so, its own joins included, until the owner joins it
+    // again. Three routes look the session up among the joined instead: `sync` finds none, 404, and
+    // `activity` and `limits` ignore it, 200.
     if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {
-      return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
+      if (route === 'sync') return { value: { status: 404, ok: false, headers: {}, text: '{"error":"unknown session"}' } }
+      if (route !== 'activity' && route !== 'limits') {
+        return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
+      }
+    }
+    if (route === 'sync') {
+      const held = world.decision?.turnId === body.turn.id ? world.decision : null
+      const isUnseen = (body.kind === 'answer' || body.kind === 'report') && world.isPaused
+      const isFirstAdmitted = body.turn.request !== undefined || !(world.isPausing || isUnseen)
+      const isAdmitted = (held?.isAdmitted ?? isFirstAdmitted) && !(body.kind === 'typed' && world.isPausing)
+      world.decision = { turnId: body.turn.id, isAdmitted }
+      world.isPaused ||= !isAdmitted
+      if (isAdmitted && body.text !== undefined) world.kept.push(body.text)
+      if (world.holdSync !== null) await world.holdSync
     }
     const reply = route !== 'next'
       ? {}
@@ -174,9 +231,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   })
   on('prompt.submit', (_, e) => {
     if (world.isSubmitRefused) throw new Error('the session is closing')
+    if (world.isPromptDropped) return { drop: 'a hook refused the prompt' }
     world.submitted.push(e.text)
     world.timeline.push('submit')
-    return { text: e.text, origin: e.origin }
+    return { text: world.enteredText ?? e.text, origin: e.origin }
   })
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
@@ -205,12 +263,23 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   on('tool.call', (_, e) => {
     if (e.tool !== 'AskUserQuestion') return { deny: 'no other tool runs in this world' }
     const { questions } = e
+    world.dialogs += 1
     return new Promise(resolve => {
-      world.answerDialog = label => resolve({ result: { questions, answers: { [questions[0]!.question]: label } } })
+      // As the engine resolves them, ADR 0001 (i): `answers` inside `result`; an error's `result` a string.
+      world.answerDialog = label => resolve({
+        ref: 1, result: { questions, answers: { [questions[0]!.question]: label }, annotations: {} },
+        text: 'Your questions have been answered.', isReadOnly: true,
+      })
+      world.cancelDialog = () => resolve({
+        ref: 1, result: "Error: The user doesn't want to proceed with this tool use.",
+        text: "The user doesn't want to proceed with this tool use.", isError: true,
+      })
     })
   })
   on('classic.PermissionRequest', () => ({}))
   on('classic.PostToolUse', () => ({}))
+  on('classic.PostToolUseFailure', () => ({}))
+  on('classic.PermissionDenied', () => ({}))
   return world
 }
 
@@ -224,4 +293,10 @@ export async function step($: Engine, world: ReturnType<typeof fakeWorld>, turnI
   const stream = $.turn.step({ turnId, index: 0, model: 'example-model', messageCount: 1, ...(agentId && { agentId }) })
   for await (const chunk of stream) void chunk
   return stream.result
+}
+
+/** The session starts and `/live on` joins it. */
+export async function liveOn($: Engine) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
 }

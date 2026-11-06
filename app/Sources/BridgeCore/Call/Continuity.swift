@@ -1,20 +1,30 @@
+import Foundation
+
 /// One item seeding a realtime session (codex `initialItems`).
 public struct InitialItem: Codable, Sendable, Equatable {
   public var role: Role
   public var text: String
 }
 
+/// Why the voice may lack part of a session: a turn the app did not receive (`missed`), or one
+/// the pause setting kept out (`paused`).
+public enum OutOfSync: String, Codable, Sendable { case missed, paused }
+
 /// One Claude Code session's conversation with the voice, carried from one realtime session to
 /// the next, and across Stop and Start, so the owner does not notice the session was replaced.
 public struct Conversation: Codable, Sendable, Equatable {
-  public static let keptLines = 24
-  /// codex's limits on `initialItems`; tokens are estimated at 4 UTF-8 bytes each.
+  public static let keptLines = 64
+  /// codex's limits on `initialItems`; tokens are estimated at 4 UTF-8 bytes each, as codex counts.
   public static let maxItems = 128
   public static let maxTokens = 8_192
+  /// How long an ask can still be answered: twice what the mod allows a summary, which may never
+  /// come (a failure, or a session with nothing to summarise).
+  static let askLife = 2 * ContextLoads.timeout
 
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
-    /// notice), as the voice got it. `handoff`: the brief of a request the session's queue took,
+    /// notice), as the voice got it, or Claude's final answer to a turn that was not a voice
+    /// request (synced, as context). `handoff`: the brief of a request the session's queue took,
     /// so the menu shows that it was handed on.
     public enum Speaker: String, Codable, Sendable {
       case owner, voice, claude, handoff
@@ -47,11 +57,88 @@ public struct Conversation: Codable, Sendable, Equatable {
   public var context: String?
   /// When the conversation was last used, on `Continuity`'s count.
   var lastUsed = 0
+  /// Why the voice may lack part of the session, if it may. Each field below is optional, so a
+  /// file saved before they existed still decodes.
+  public private(set) var outOfSync: OutOfSync?
+  /// Lines with a seed role recorded since the last `setContext`; absent in an older file, where
+  /// the lines kept stand in for it.
+  private var linesSinceContext: Int?
+  /// The decision on the turn whose lines were last offered (`Continuity.admits`).
+  var turn: TurnDecision?
+  /// The summary asked for and not yet arrived.
+  private var summaryAsk: SummaryAsk?
+
+  struct TurnDecision: Codable, Sendable, Equatable {
+    var id: String
+    var admitted: Bool
+  }
+
+  struct SummaryAsk: Codable, Sendable, Equatable {
+    var at: Date
+    /// A gap or a forget came after the ask, so its summary cannot cover the conversation.
+    var isStale = false
+  }
 
   public init() {}
 
+  private var seedLinesSinceContext: Int {
+    linesSinceContext ?? lines.filter { $0.speaker.role != nil }.count
+  }
+
+  /// The voice has everything: a context, no gap, and the seed carries every line since the
+  /// summary (lines rolled off, or too many for codex's limits, are lost to it).
+  public var isCurrent: Bool {
+    guard context != nil, outOfSync == nil else { return false }
+    return seedLinesSinceContext <= initialItems(tasks: []).count - 1
+  }
+
   public mutating func record(_ speaker: Line.Speaker, _ text: String) {
+    if speaker.role != nil { linesSinceContext = seedLinesSinceContext + 1 }
     lines = Array((lines + [Line(speaker: speaker, text: text)]).suffix(Self.keptLines))
+  }
+
+  mutating func setContext(_ line: String) {
+    context = line
+    outOfSync = nil
+    linesSinceContext = 0
+  }
+
+  mutating func markPaused() {
+    outOfSync = .paused
+    summaryAsk?.isStale = true
+  }
+
+  mutating func markMissed(asPaused: Bool) {
+    if outOfSync != .paused { outOfSync = asPaused ? .paused : .missed }
+    summaryAsk?.isStale = true
+  }
+
+  /// A summary was asked for. An ask still open stays as it is: the mod joins a second ask to the
+  /// summary on its way, which is the first ask's.
+  mutating func noteSummaryAsk(at now: Date) {
+    if openAsk(at: now) == nil { summaryAsk = SummaryAsk(at: now) }
+  }
+
+  /// A summary arrived and answers the open ask. False: it was asked for before a gap or a forget.
+  mutating func takeSummaryAsk(at now: Date) -> Bool {
+    defer { summaryAsk = nil }
+    return openAsk(at: now)?.isStale != true
+  }
+
+  private func openAsk(at now: Date) -> SummaryAsk? {
+    summaryAsk.flatMap { now < $0.at + Self.askLife ? $0 : nil }
+  }
+
+  /// What forgetting leaves: a pause, the turn's decision, and an ask that can no longer cover
+  /// anything.
+  var afterForgetting: Conversation? {
+    var kept = Conversation()
+    kept.lastUsed = lastUsed
+    kept.turn = turn
+    if outOfSync == .paused { kept.outOfSync = .paused }
+    kept.summaryAsk = summaryAsk
+    kept.summaryAsk?.isStale = true
+    return kept.turn == nil && kept.outOfSync == nil && kept.summaryAsk == nil ? nil : kept
   }
 
   /// The context and the open task lines, then the newest lines that fit codex's limits. Notes
@@ -96,12 +183,55 @@ public struct Continuity: Codable, Sendable, Equatable {
     use(id) { $0.record(speaker, text) }
   }
 
+  /// A summary arrived: the voice has the session as of now.
   public mutating func setContext(_ line: String, for id: SessionID) {
-    use(id) { $0.context = line }
+    use(id) { $0.setContext(line) }
   }
 
-  /// "New conversation", or the session was removed from the app.
-  public mutating func forget(_ id: SessionID) { conversations[id.rawValue] = nil }
+  /// The app asked `id` for a summary.
+  public mutating func noteSummaryAsk(of id: SessionID, at now: Date) {
+    use(id) { $0.noteSummaryAsk(at: now) }
+  }
+
+  /// A summary from `id` arrived. False: it was asked for before the latest gap or forget, so it
+  /// covers less than the conversation lacks and must not be taken. One nobody asked for (`/live
+  /// context`) cannot be dated, and is taken.
+  public mutating func takeSummaryAsk(of id: SessionID, at now: Date) -> Bool {
+    use(id) { $0.takeSummaryAsk(at: now) }
+  }
+
+  /// Whether a line of `turn` goes in. A turn's first line decides, and later lines keep that
+  /// decision, except that a `typed` line while `pausing` refuses the turn from there on. A voice
+  /// turn holds nothing of the owner's until then, so only a `typed` line refuses it. A line of
+  /// Claude's that opens a turn in a `paused` session stays out: the turn's `start` never arrived,
+  /// and its prompt may be the paused text.
+  /// `pausing`: the pause setting is on and the call is off. Every refused line marks `paused`.
+  public mutating func admits(
+    turn: TurnRef, kind: SyncKind, in id: SessionID, pausing: Bool
+  ) -> Bool {
+    use(id) { conversation in
+      let decided = conversation.turn.flatMap { $0.id == turn.id ? $0.admitted : nil }
+      let isClaudes = kind == .answer || kind == .report
+      let isUnseen = isClaudes && conversation.outOfSync == .paused
+      let first = turn.request != nil || !(pausing || isUnseen)
+      let admitted = (decided ?? first) && !(kind == .typed && pausing)
+      conversation.turn = Conversation.TurnDecision(id: turn.id, admitted: admitted)
+      if !admitted { conversation.markPaused() }
+      return admitted
+    }
+  }
+
+  /// A turn of the session did not arrive. `asPaused`: the pause setting is on, so the gap may
+  /// hold text meant to stay out. Never replaces `paused`.
+  public mutating func markMissed(_ id: SessionID, asPaused: Bool) {
+    use(id) { $0.markMissed(asPaused: asPaused) }
+  }
+
+  /// "New conversation", or the session was removed from the app. The lines and the context go
+  /// and so does a `missed` mark; a `paused` mark and the turn's decision stay.
+  public mutating func forget(_ id: SessionID) {
+    conversations[id.rawValue] = conversations[id.rawValue]?.afterForgetting
+  }
 
   /// The session got a new id (`/clear`); its conversation goes with it.
   public mutating func move(_ old: SessionID, to new: SessionID) {
@@ -109,9 +239,12 @@ public struct Continuity: Codable, Sendable, Equatable {
     conversations[new.rawValue] = conversation
   }
 
-  private mutating func use(_ id: SessionID, _ change: (inout Conversation) -> Void) {
+  @discardableResult
+  private mutating func use<Result>(
+    _ id: SessionID, _ change: (inout Conversation) -> Result
+  ) -> Result {
     var conversation = self[id]
-    change(&conversation)
+    let result = change(&conversation)
     conversation.lastUsed = (conversations.values.map(\.lastUsed).max() ?? 0) + 1
     conversations[id.rawValue] = conversation
     while conversations.count > Self.keptConversations,
@@ -119,5 +252,6 @@ public struct Continuity: Codable, Sendable, Equatable {
     {
       conversations[oldest.key] = nil
     }
+    return result
   }
 }

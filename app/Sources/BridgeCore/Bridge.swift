@@ -16,8 +16,9 @@ public actor Bridge: Router {
   private let notifies: @Sendable () -> Bool
   /// Settings' "Play a sound when a request is queued for Claude", read at each handoff.
   private let confirmsHandoffs: @Sendable () -> Bool
-  /// Settings' "Load context automatically", read each time a line opens.
-  private let autoContext: @Sendable () -> Bool
+  /// Settings' "Pause sync while the call is stopped", read at each synced line, join and line
+  /// that opens.
+  private let pausesSync: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -32,7 +33,9 @@ public actor Bridge: Router {
   /// The session whose conversation the line last opened with; its transcripts are kept there.
   private var lineSession: SessionID?
   /// Whether `lineSession` is set for the line opening now; until then a target change cannot
-  /// be told from the target it will open with.
+  /// be told from the target it will open with. It goes false with the decision to open, not
+  /// when the attempt starts: the `changed()` that follows that decision could otherwise take the
+  /// last line's session for this line's, and close it.
   private var lineKnowsSession = false
   /// The context line the opening line was seeded with.
   private var seededContext: String?
@@ -43,8 +46,6 @@ public actor Bridge: Router {
   /// What Claude Code last said of Claude's usage windows, merged over the readings before it.
   /// Memory only; it outlives the sessions that sent it.
   private var claudeLimits: UsageLimits?
-  /// The session that asked the last `[QUESTION]`; the next handoff goes there.
-  private var questionRoute: SessionID?
   private var callStart: Date?
   /// What was last published, so an unchanged status and conversation are not published again.
   private var published: BridgeUpdate?
@@ -52,8 +53,8 @@ public actor Bridge: Router {
   private var changes = 0
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
-  /// The sessions whose summary just arrived (`POST /v1/context`), so the menu's Load
-  /// context stops waiting for it.
+  /// The sessions whose summary was just taken (`POST /v1/context`), so the menu's Load context
+  /// stops waiting for it.
   public nonisolated let contextArrivals: AsyncStream<SessionID>
   private let announceContext: AsyncStream<SessionID>.Continuation
   /// The running app's version; sessions on an older mod are listed against it.
@@ -67,13 +68,13 @@ public actor Bridge: Router {
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
-    autoContext: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
+    pausesSync: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
     self.confirmsHandoffs = confirmsHandoffs
-    self.autoContext = autoContext
+    self.pausesSync = pausesSync
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -109,12 +110,15 @@ public actor Bridge: Router {
     get async {
       let status = await status
       let minutes = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
-      let shown = await registry.target.map { continuity[$0] } ?? Conversation()
+      let target = await registry.target
+      let shown = target.map { continuity[$0] } ?? Conversation()
+      let needsContext = if let target { await needsContext(target) } else { false }
       var olderMods: [String] = []
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes, context: shown.context,
-        conversation: shown.lines, labelsOnAnOlderMod: olderMods, claudeLimits: claudeLimits)
+        conversation: shown.lines, labelsOnAnOlderMod: olderMods, needsContext: needsContext,
+        claudeLimits: claudeLimits)
     }
   }
 
@@ -130,7 +134,6 @@ public actor Bridge: Router {
       guard machine.phase == .off, connecting == nil else { return }
       await attempt { await self.launch() }
     case .stop:
-      questionRoute = nil
       await send(.stop)
       await endCodex()
     case .mute: await send(.mute)
@@ -169,21 +172,35 @@ public actor Bridge: Router {
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
   public func loadContext() async {
     guard let target = await registry.target else { return }
-    await registry.requestContext(for: target)
+    await askForContext(of: target)
   }
 
-  /// The menu's choice of target, which also ends a question's route; a session that left is
-  /// ignored.
+  private func askForContext(of id: SessionID) async {
+    continuity.noteSummaryAsk(of: id, at: time.now)
+    save()
+    await registry.requestContext(for: id)
+  }
+
+  /// The menu's choice of target; a session that left is ignored.
   public func setTarget(_ id: SessionID) async {
-    questionRoute = nil
-    try? await registry.setTarget(id)
+    try? await pickTarget(id)
     await changed()
+  }
+
+  /// The owner's choice of target, from the menu, the band or `/live target`. A change takes every
+  /// other session's question off the line's queue, so it is not said on the new target's line and
+  /// the reply does not reach the wrong session; it stays recorded, so it is in its own session's
+  /// seed. A route ends with its question.
+  private func pickTarget(_ id: SessionID) async throws {
+    let isChange = await registry.target != id
+    try await registry.setTarget(id)
+    if isChange { await withdraw { $0.asks && $0.session != id } }
+    machine.endSaidQuestionRoutes()
   }
 
   /// The menu's ×: forgets the session and its conversation. Its open request fails as
   /// "session left", and its next poll is told it was removed.
   public func remove(_ id: SessionID) async {
-    if questionRoute == id { questionRoute = nil }
     if let delivery = await registry.remove(id) { await deliver(delivery) }
     await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
   }
@@ -230,8 +247,14 @@ public actor Bridge: Router {
         if let old = body.replaces, replaced {  // after /clear: the same session, a new id
           continuity.move(old, to: body.sessionId)
           machine.rename(old, to: body.sessionId)
-          if lineSession == old { lineSession = body.sessionId }
-          if questionRoute == old { questionRoute = body.sessionId }
+          if lineSession == old {
+            lineSession = body.sessionId
+            heldContext?.session = body.sessionId
+          }
+          save()
+        }
+        if body.missed == true {
+          continuity.markMissed(body.sessionId, asPaused: pausesSync())
           save()
         }
         if problem == .noSession { problem = nil }
@@ -240,12 +263,17 @@ public actor Bridge: Router {
         if let delivery { await deliver(delivery) }
       case ("POST", "/v1/answer"):
         let body = try req.decodeBody(AnswerBody.self)
-        if let delivery = try await registry.complete(body) { await deliver(delivery) }
+        switch try await registry.complete(body) {
+        case .delivery(let delivery): await deliver(delivery)
+        case .superseded: await keepSuperseded(body)
+        case .dropped: break
+        }
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/limits"): await limits(try req.decodeBody(LimitsBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
+      case ("POST", "/v1/sync"): try await sync(try req.decodeBody(SyncBody.self))
       case ("POST", "/v1/target"):
-        try await registry.setTarget(try req.decodeBody(TargetBody.self).sessionId)
+        try await pickTarget(try req.decodeBody(TargetBody.self).sessionId)
       case ("POST", "/v1/call"): await perform(try req.decodeBody(CallBody.self).action)
       default: return .error(404, "no route \(req.method) \(req.path)")
       }
@@ -271,8 +299,8 @@ public actor Bridge: Router {
 
   private func run(_ effect: CallEffect) async {
     switch effect {
-    case .openRealtime: await attempt { await self.openLine(preroll: true) }
-    case .openRealtimeForResult: await attempt(waits: false) { await self.openLine(preroll: false) }
+    case .openRealtime: await startOpening(preroll: true)
+    case .openRealtimeForResult: await startOpening(preroll: false, waits: false)
     case .closeRealtime:
       connecting?.cancel()
       connecting = nil
@@ -282,11 +310,7 @@ public actor Bridge: Router {
       // a Mute meanwhile does not cancel a Start: the page records it, and listens muted
       if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
     case .stopLocalVAD: await audio.stopListening()
-    case .endCodex:
-      if !machine.pending.contains(where: { $0.session == questionRoute && $0.asks }) {
-        questionRoute = nil
-      }
-      await endCodex()
+    case .endCodex: await endCodex()
     case .flushPreroll: await audio.flushPreroll()
     case .muteMicrophone: await audio.muteMicrophone()
     case .unmuteMicrophone:
@@ -348,33 +372,55 @@ public actor Bridge: Router {
     await send(timer.event)
   }
 
-  /// Opens the line with the target's conversation, and asks the target for its context with
-  /// Load context automatically on; the line does not wait for it. Cancelled, it does nothing
+  /// Whether the voice lacks part of the session: it has no summary, a turn is missing from its
+  /// conversation, or the session's mod does not post sync lines.
+  private func needsContext(_ id: SessionID) async -> Bool {
+    if !continuity[id].isCurrent { return true }
+    return await !registry.syncs(id)
+  }
+
+  /// Starts the attempt that opens the line, in the same turn as the machine's decision to open.
+  private func startOpening(preroll: Bool, waits: Bool = true) async {
+    lineKnowsSession = false
+    await attempt(waits: waits) { await self.openLine(preroll: preroll) }
+  }
+
+  /// Opens the line with the target's conversation, and asks the target for its context when it
+  /// needs one and may have one; the line does not wait for it. Cancelled, it does nothing
   /// more: whoever cancelled it closes what it opened. A line the voice closed itself
   /// (`CancellationError`) says why in its `closed` event.
   private func openLine(preroll: Bool) async {
-    lineKnowsSession = false
     seededContext = nil
     heldContext = nil
     let session = await registry.target
     lineSession = session
     lineKnowsSession = true
-    if let session, autoContext() { await registry.requestContext(for: session) }
+    if let session, !pausesSync(), continuity[session].outOfSync != .paused,
+      await needsContext(session)
+    {
+      await askForContext(of: session)
+    }
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer(preroll: preroll)
-      // only the session's own conversation, context and open tasks: never another session's
-      let conversation = session.map { continuity[$0] } ?? Conversation()
-      let tasks = if let session { await registry.openTasks(of: session) } else { [String]() }
+      // `lineSession` from here: `/clear` during the awaits gives the session a new id.
+      let tasks =
+        if let lineSession { await registry.openTasks(of: lineSession) } else { [String]() }
+      try Task.checkCancellation()
+      // No await from here to `dropSynced()`: a synced line lands in the seed or in the hold,
+      // never both, and a stale attempt cannot drop a newer line's hold. Only the session's own
+      // conversation, context and open tasks: never another session's.
+      let conversation = lineSession.map { continuity[$0] } ?? Conversation()
       let items = conversation.initialItems(
         tasks: tasks, unheard: Set(machine.pending.map(\.text)))
       seededContext = conversation.context
+      machine.dropSynced()
       let answer = try await voice.open(offerSDP: offer, items: items)
       try Task.checkCancellation()
       try await audio.applyAnswer(answer)
       try Task.checkCancellation()
       await send(.connected)
-      if let held = heldContext, held.session == session, held.text != seededContext,
+      if let held = heldContext, held.session == lineSession, held.text != seededContext,
         machine.phase == .live
       {
         try? await voice.addContext(held.text)
@@ -458,7 +504,10 @@ public actor Bridge: Router {
   /// the open line is about, and spoken in the line as it is.
   private func say(_ line: VoiceLine) async {
     record(.claude, line.text, in: line.session)
-    await send(.deliver(line, opensLine: await opensLine(line)))
+    await send(
+      .deliver(
+        line, opensLine: await opensLine(line),
+        onOwnLine: lineKnowsSession && lineSession == line.session))
   }
 
   /// Whether `line` opens a closed line: an answer, a question or an approval notice from the
@@ -469,6 +518,15 @@ public actor Bridge: Router {
     else { return false }
     let target = await registry.target
     return session == target && continuity[session].lines.contains { $0.speaker == .owner }
+  }
+
+  /// A session that left can take no reply: its route ends, and neither its question nor its
+  /// approval notice is said. Both stay recorded.
+  private func withdrawQuestionsOfDroppedSessions() async {
+    for id in await registry.takeDropped() {
+      machine.endQuestionRoute(of: id)
+      await withdraw { $0.session == id && ($0.asks || $0.kind == .approval) }
+    }
   }
 
   /// Drops unheard lines; a line opened only for them closes.
@@ -493,6 +551,9 @@ public actor Bridge: Router {
     await send(.conversationChanged)
   }
 
+  /// The pause setting is on and the call is off: what the owner types now stays out.
+  private var pausing: Bool { pausesSync() && machine.phase == .off }
+
   private var isLineOpen: Bool { machine.phase == .connecting || machine.phase == .live }
 
   // MARK: Routing
@@ -502,8 +563,7 @@ public actor Bridge: Router {
   /// that session's conversation, so the menu shows its queue took it. Returns the session it
   /// went to, or nil when none is joined.
   private func route(_ request: VoiceRequest) async -> SessionID? {
-    let route = questionRoute
-    questionRoute = nil
+    let route = machine.takeQuestionRoute()
     for id in [route, await registry.target].compactMap({ $0 }) {
       guard (try? await registry.enqueue(request, for: id)) != nil else { continue }
       await withdraw { $0.session == id }
@@ -514,8 +574,6 @@ public actor Bridge: Router {
   }
 
   private func deliver(_ delivery: Delivery) async {
-    // only a question the call keeps (not one dropped while off) routes the next handoff
-    if delivery.status == .question, machine.keepsLines { questionRoute = delivery.session }
     await say(
       AnswerShaper.forVoice(
         delivery.text, status: delivery.status, label: delivery.label, session: delivery.session))
@@ -573,59 +631,111 @@ public actor Bridge: Router {
   /// A session that starts waiting for approval sends the voice a notice, which goes once the
   /// approval is settled. A question Claude asked goes to the voice whole, and the next handoff
   /// is routed to that session as its reply. Either carries what Claude wrote before it.
+  /// From a turn with no voice request behind it (`turn.request`) in a session that is not the
+  /// target, either is context only: kept in its conversation, with no chime and no route. From a
+  /// turn refused under the pause, neither is kept or said, and the registry is told of no
+  /// question; `working` and `idle` settle what was said before, whatever became of the turn. A
+  /// released mod names no turn: it reports only its voice turns, which nothing here refuses.
   private func activity(_ body: ActivityBody) async {
-    guard let row = try? await label(of: body.sessionId) else { return }
+    let id = body.sessionId
+    guard let row = try? await label(of: id) else { return }
+    var body = body
+    var isAdmitted = true
+    if body.state == .approval, let turn = body.turn {
+      isAdmitted = continuity.admits(turn: turn, kind: .report, in: id, pausing: pausing)
+      save()
+      if !isAdmitted { body.question = nil }
+    }
     await registry.setActivity(body)
+    guard isAdmitted else { return }
     switch (row.activity == .approval, body.state == .approval) {
     case (false, true):
-      if let question = body.question {
-        if machine.keepsLines { questionRoute = body.sessionId }
-        await say(
-          AnswerShaper.line(
-            .asking, label: row.label,
-            body: AnswerShaper.paused(AnswerShaper.prose(question), wrote: body.text),
-            session: body.sessionId))
-      } else {
-        await say(
-          AnswerShaper.line(
-            .approval, label: row.label,
-            body: AnswerShaper.paused("Claude is waiting for your approval", wrote: body.text),
-            session: body.sessionId))
+      let head = body.question.map(AnswerShaper.prose) ?? "Claude is waiting for your approval"
+      let line = AnswerShaper.line(
+        body.question == nil ? .approval : .asking, label: row.label,
+        body: AnswerShaper.paused(head, wrote: body.text), session: id)
+      if let turn = body.turn, turn.request == nil, await registry.target != id {
+        record(.claude, line.text, in: id)
+        break
       }
+      await say(line)
     case (true, false):
-      if questionRoute == body.sessionId { questionRoute = nil }
+      machine.endQuestionRoute(of: id)
       await withdraw { $0.session == body.sessionId && [.approval, .asking].contains($0.kind) }
     default: break
     }
   }
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
-  /// it is and kept in the session's conversation. An empty one keeps the stored line: the mod
-  /// never sends one, so this guards only against another socket peer, and it is not a control.
+  /// it is and kept in the session's conversation. One asked for before the latest gap or forget
+  /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
+  /// the menu's press stays pending. An empty one keeps the stored line: the mod never sends one,
+  /// so this guards only against another socket peer, and it is not a control.
   /// A live line about that session gets the summary at once, and one still connecting gets it
-  /// when connected; it does not hold the line open. A summary equal to the stored one is neither
-  /// saved nor added again.
+  /// when connected; it does not hold the line open. A summary equal to the stored one is not
+  /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
+    guard continuity.takeSummaryAsk(of: id, at: time.now) else { return }
     let line =
       body.summary.allSatisfy(\.isWhitespace)
       ? nil
       : AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
-    guard let line, line.text != continuity[id].context else {
+    guard let line else {
       announceContext.yield(id)
       return
     }
+    let isNew = line.text != continuity[id].context
     continuity.setContext(line.text, for: id)
     save()
     announceContext.yield(id)
-    guard lineSession == id else { return }
+    guard isNew, lineSession == id else { return }
     switch machine.phase {
     case .live: try? await realtime?.addContext(line.text)
     case .connecting: heldContext = line
     default: break
     }
+  }
+
+  /// A line of a turn. It is kept in its session's conversation if `Continuity.admits` takes it
+  /// (the pause setting with the call off refuses it, and marks the session paused); the open line
+  /// about that session is given it at once, as context. A `typed` line refused in a turn with a
+  /// voice request behind it withholds exactly that request.
+  private func sync(_ body: SyncBody) async throws {
+    let id = body.sessionId
+    let row = try await label(of: id)
+    let admitted = continuity.admits(turn: body.turn, kind: body.kind, in: id, pausing: pausing)
+    if !admitted, body.kind == .typed, let request = body.turn.request {
+      await registry.withholdAnswer(request, of: id)
+    }
+    guard admitted, await addSynced(body.text ?? "", kind: body.kind, of: row) else {
+      save()  // the turn's decision persists, a `start`'s included
+      return
+    }
+  }
+
+  /// A newer request superseded this answer, so it is not said, and the mod, told 200, notes no
+  /// gap. So it is kept as Claude's synced line, unless it is a failure, which holds no answer.
+  /// `SessionRegistry.complete` has already dropped one whose request is withheld.
+  private func keepSuperseded(_ body: AnswerBody) async {
+    guard body.status != .failed, let row = try? await label(of: body.sessionId) else { return }
+    await addSynced(body.text, kind: .answer, of: row)
+  }
+
+  /// Keeps a line of a turn in its session's conversation, as the owner's if it is typed; the open
+  /// line about that session is given it at once, as context. False, and nothing saved, when it
+  /// has nothing to say.
+  @discardableResult
+  private func addSynced(_ text: String, kind: SyncKind, of row: SessionRow) async -> Bool {
+    let id = row.sessionId
+    guard let line = AnswerShaper.synced(text, kind: kind, label: row.label, session: id) else {
+      return false
+    }
+    record(line.kind == .typed ? .owner : .claude, line.text, in: id)
+    if lineKnowsSession, lineSession == id { await send(.synced(line)) }
+    return true
   }
 
   private func sweep() async {
@@ -637,6 +747,7 @@ public actor Bridge: Router {
   /// Two changes can interleave across the awaits, so only the latest one publishes: an older
   /// one finishing last would show the status from before the newer change.
   @discardableResult private func changed() async -> StatusReply {
+    await withdrawQuestionsOfDroppedSessions()
     await followTarget()
     changes += 1
     let mine = changes
@@ -678,6 +789,9 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let conversation: [Conversation.Line]
   /// The joined sessions whose mod is older than the app, or names no version, by label.
   public let labelsOnAnOlderMod: [String]
+  /// The target's voice lacks part of the session (no summary, a gap, or a mod that does not
+  /// sync): Load context has something to do.
+  public let needsContext: Bool
   /// What Claude Code last said of Claude's usage windows; nil until a session has.
   public var claudeLimits: UsageLimits? = nil
 }

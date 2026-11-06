@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { askedText, FRAMING, PLUGIN_NAME, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
+import { askedText, FRAMING, keyboardAnswer, PLUGIN_NAME, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
 import type { VoiceRequest } from '../../hooks/wire.ts'
 
 const request: VoiceRequest = {
@@ -88,3 +88,32 @@ test('claudesQuestionIsToldWithItsOptions', () => {
     'Which name? Options: out: Shorter.')
 })
 
+test('aKeyboardAnswerSaysWhatWasChosen', () => {
+  const { text } = keyboardAnswer({ answers: { 'Which name?': 'out' } })
+  assert.match(text, /out/)
+  assert.doesNotMatch(text, /Which name/)
+})
+
+test('aKeyboardAnswerHoldsEveryLabel', () => {
+  const { text } = keyboardAnswer({ answers: { 'Which name?': 'out', 'Which folder?': 'src' } })
+  assert.match(text, /out/)
+  assert.match(text, /src/)
+})
+
+test('aKeyboardAnswerHoldsTheFreeText', () => {
+  assert.match(keyboardAnswer({ answers: {}, response: 'neither, ask me later' }).text, /neither, ask me later/)
+})
+
+test('aKeyboardAnswerIsTyped', () => {
+  assert.equal(keyboardAnswer({ answers: { 'Which name?': 'out' } }).kind, 'typed')
+  assert.equal(keyboardAnswer({ answers: {}, response: 'neither' }).kind, 'typed')
+})
+
+/** The owner wrote nothing: under the pause an owner's line would refuse the turn. */
+test('aQuestionClosedWithNoAnswerIsAReport', () => {
+  const closed = keyboardAnswer(undefined)
+  assert.equal(closed.kind, 'report')
+  assert.notEqual(closed.text, '')
+  assert.deepEqual(keyboardAnswer({ answers: {} }), closed)
+  assert.deepEqual(keyboardAnswer({ answers: { 'Which name?': ' ' }, response: '' }), closed)
+})

@@ -224,16 +224,19 @@ En la sesión de Claude Code con la que quieras hablar:
 | `/live status` (o solo `/live`) | Una línea: la llamada, el destino, los resultados sin escuchar, los minutos de hoy. |
 | `/live context` | Envía a la voz un nuevo resumen de esta sesión, escrito por el modelo de la sesión. |
 
-El comando es `/live` y no `/voice` porque `/voice` es el modo de voz propio de Claude Code. Que se
-cargue también el resumen de una sesión cada vez que se abre una línea no es un comando: es un
+El comando es `/live` y no `/voice` porque `/voice` es el modo de voz propio de Claude Code. Que lo
+que escribes en una sesión quede fuera de la voz mientras la llamada está detenida no es un comando: es un
 único ajuste para todas las sesiones, en la ventana de [Ajustes](#ajustes) de LiveBridge.
 
 ### La banda y el menú
 
 Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra de menús, y habla.
 
-- **El Start de la banda** convierte su sesión en el destino e inicia la llamada; con
-  **Load context automatically when a line opens** activado, la línea que abre carga el resumen de la sesión
+- **El Start de la banda** convierte su sesión en el destino e inicia la llamada; la línea que abre
+  recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
+  de ella (aún no hay resumen, un turno no llegó, hay más líneas desde el resumen de las que la voz
+  puede llevar, o el mod es anterior a la sincronización), pero nunca con **Pause sync** activado
+  ni tras una pausa
   ([detalles](docs/architecture/overview.md#components)). Mientras la llamada habla con otra
   sesión, la banda muestra **Talk here**. Si la banda no aparece en una sesión unida,
   `/live on` la recupera.
@@ -251,11 +254,18 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   ocupado, ausente), la llamada termina con el motivo. **Stop** termina la llamada y **Mute**; el
   siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier proceso que se ejecute
   como tú puede quitarlo ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen,
+  un turno no llegó, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
+  conversación larga lo supera), la sesión estuvo en pausa o su mod no sincroniza. En otro caso el
+  elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la
+  conversación. `/live context` funciona siempre.
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
-  que se abre la línea, salvo con **Load context automatically when a line opens** activado: esa
-  línea vuelve a cargar un resumen de la misma transcripción de la sesión, así que desactiva el
-  ajuste o haz `/clear` en la sesión antes. `/live on` en una sesión eliminada la une de nuevo.
+  que se abre la línea. Los resultados que aún no ha dicho se quedan y se añaden de nuevo; solo
+  **Stop** los borra. Con **Pause sync** desactivado y la sesión sin pausa, la siguiente línea carga
+  por sí sola un resumen de la misma transcripción de la sesión, que incluye lo que la sesión leyó;
+  para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New conversation**. `/live on` en
+  una sesión eliminada la une de nuevo.
 
 ### Ajustes
 
@@ -266,10 +276,18 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
   hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
-- **Load context automatically when a line opens** (activado por defecto): cada
-  línea que abre la aplicación (un Start, una línea reabierta tras el silencio, la línea tras
-  cambiar de destino) pide el resumen al destino y no lo espera; un único ajuste para todas las
-  sesiones, que guarda la aplicación.
+- **Pause sync while the call is stopped** (desactivado por defecto): por defecto, lo que escribes
+  en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
+  la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
+  sale del Mac hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI,
+  activa el ajuste, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida
+  se registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga
+  un resumen por sí sola, ni tampoco después de una pausa: solo lo hacen **Load context** o
+  `/live context`, y ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
+  pausaste. Si hay una petición por voz en curso en esa sesión, escribir hace fallar su respuesta,
+  sin que nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas
+  posteriores de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
+  [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Play a sound when a request is queued for Claude** (activado por defecto): un sonido breve por
   cada petición que la voz pasa a Claude ([por qué](#limitaciones-conocidas)).
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
@@ -295,6 +313,18 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - Cuando Claude está esperando una solicitud de permiso, la voz lo dice, salvo
   [donde una organización administra Claude Code](#limitaciones-conocidas). Tú respondes a la
   solicitud en Claude Code; LiveBridge nunca la responde por ti.
+- Sabe lo que escribes. Mientras una sesión está unida, lo que escribes en ella y la respuesta final
+  de Claude a cada turno que no fue una petición por voz pasan a la conversación de esa sesión con
+  la voz como contexto: la voz puede mencionarlos, pero no suena ningún aviso por ellos ni abre por
+  ellos una línea cerrada. Una línea abierta los recibe de inmediato; una línea que se abre después
+  empieza con ellos. Una respuesta por voz que una petición más nueva desplazó no se dice, pero se
+  guarda y se añade igual. El texto de Claude a mitad de turno no se sincroniza, salvo lo que
+  escribió justo antes de una pregunta o una solicitud de permiso, que va con ella; los subagentes
+  y la salida de las herramientas tampoco. Una pregunta o una solicitud de permiso en el destino la
+  dice la voz, sea cual sea el turno que la causó; en otra sesión se dice o suena un aviso, como un
+  resultado de ella, salvo que si el turno lo escribiste tú solo se registra. Un turno que la pausa
+  deja fuera no tiene nada de esto. Cuando respondes en el teclado a una pregunta de Claude o a una
+  solicitud de permiso, la voz se entera.
 
 ## Facturación bajo control por diseño
 
@@ -352,11 +382,18 @@ la sesión en tiempo real de codex:
   igualmente);
 - las instrucciones de la voz: las reglas propias de LiveBridge y, después, el **Prompt** de tus
   Ajustes si escribiste uno;
-- la conversación reciente de la sesión de destino (hasta las últimas 24 líneas) para continuarla
-  en una nueva sesión en tiempo real;
+- la conversación reciente de la sesión de destino (hasta las últimas 64 líneas, y no más de lo que
+  admite codex: 128 elementos y unos 8192 tokens con el contexto y las tareas abiertas) para
+  continuarla en una nueva sesión en tiempo real. Incluye lo que escribiste en esa sesión y la
+  respuesta final de Claude a cada turno escrito, además de tu voz y la de la voz, así que escribir
+  en una sesión lo envía a OpenAI cuando se abre una línea con ella. Mientras una línea está abierta,
+  cada línea nueva del destino entra de inmediato. Las líneas sincronizadas de otra sesión solo salen cuando se abre una línea con ella como destino;
+  sus resultados, preguntas y avisos de aprobación entran en la línea abierta sea cual sea la sesión;
 - las peticiones de la sesión de destino aún abiertas, como sus resúmenes de una línea;
-- cada resultado, pregunta, actualización y aviso de aprobación, como una línea de como máximo 2000
-  caracteres, sin bloques de código ni tablas. Una pregunta que Claude hace a mitad de turno, y el
+- cada resultado, pregunta, actualización, aviso de aprobación, texto escrito y respuesta a un
+  turno escrito, como una línea de como máximo 2000 caracteres, sin bloques de código ni tablas (un
+  texto escrito que es solo código o una tabla se sustituye por una frase que dice que se escribió
+  código). Una pregunta que Claude hace a mitad de turno, y el
   aviso de aprobación de un permiso que pide el bucle principal de Claude (no un subagente),
   llevan también lo que Claude escribió justo antes de pedirlo. Una actualización es la respuesta
   de Claude en un turno posterior iniciado por la notificación de una tarea en segundo plano,
@@ -370,9 +407,9 @@ la sesión en tiempo real de codex:
   tiene, el nombre de la carpeta de la sesión;
 - la oferta WebRTC, que enumera las direcciones de red local del Mac como candidatas de conexión.
 
-Los resultados, las preguntas, las actualizaciones y los resúmenes pasan antes por un redactor de
+Los resultados, las preguntas, las actualizaciones, los resúmenes y las líneas de los turnos escritos pasan antes por un redactor de
 formatos de credenciales conocidos (claves privadas, JWT, tokens de API comunes, contraseñas en
-URL, campos del tipo `password=`). Es una lista de patrones, no una garantía.
+URL, campos del tipo `password=`). Es una lista de patrones, no una garantía: todo lo demás que escribes sale tal cual.
 
 El hilo de codex que transporta la voz es efímero y de solo lectura, con todas las funciones de
 codex desactivadas salvo donde conserva tu inicio de sesión y cómo usa tu proxy, y con todos los
@@ -397,8 +434,9 @@ conectan a GitHub, y a Sigstore para la raíz de confianza de `gh`, con tus prop
 
 En tu Mac, la aplicación guarda sus ajustes, el contador de uso, cuándo buscó actualizaciones por
 última vez y qué versiones anunció, lo que hizo la última actualización y, para cada una de las
-últimas 20 sesiones usadas, su conversación reciente y la última línea de contexto cargada desde
-ella, en `~/Library/Application Support/LiveBridge`. Las líneas de una sesión desaparecen cuando
+últimas 20 sesiones usadas, su conversación reciente (hasta 64 líneas, con lo que escribiste en ella; se registra sin llamada
+salvo que actives **Pause sync**) y la última línea de contexto cargada desde ella, en `~/Library/Application Support/LiveBridge`, una carpeta que solo tu usuario puede abrir
+([cómo se guarda](SECURITY.md#residual-risk-by-design)). Las líneas de una sesión desaparecen cuando
 pulsas **New conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido
 las conserva hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta
 `/live on` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas.
@@ -409,6 +447,7 @@ sesión.
 
 ## Limitaciones conocidas
 
+- Un prompt enviado a una sesión por Remote Control no se registra en la conversación de la voz como palabras tuyas, aunque sí la respuesta de Claude ([SECURITY.md](SECURITY.md#what-session-text-can-do) dice qué prompts cuentan como tuyos).
 - A veces la voz dice que está mirando ("On it", "Looking now") sin pasar la petición, así que a
   Claude no le llega nada: más o menos una petición de cada cinco en las
   [pruebas](docs/bugs/BR-001.md), aunque la regla de la voz lo prohíbe. La aplicación emite un

@@ -1,6 +1,6 @@
 // How a voice request becomes a prompt for the session's own model, and how its turn is told
 // apart from every other turn. Pure: no engine calls.
-import type { Role, VoiceRequest } from './wire.ts'
+import type { Role, SyncKind, VoiceRequest } from './wire.ts'
 
 /** The plugin's name, as `plugin.json` has it and as the engine frames its messages. */
 export const PLUGIN_NAME = 'livebridge'
@@ -67,6 +67,17 @@ export function askedText(questions: readonly AskedQuestion[]): string {
 /** The owner's reply as the dialog's free-text answer, said to come by voice. */
 export function spokenReply(request: VoiceRequest): string {
   return `${clean(request.brief)}\n\n(The owner answered by voice; a voice assistant relayed it.)`
+}
+
+/**
+ * A question's end at the keyboard, as a line for the voice: what the owner chose, or that it
+ * closed with no answer, the mod's report: nothing was typed, so it cannot refuse a turn.
+ */
+export function keyboardAnswer(result: { answers?: Record<string, string>; response?: string } | undefined): { kind: SyncKind; text: string } {
+  const said = [...Object.values(result?.answers ?? {}), result?.response ?? ''].filter(text => text.trim() !== '')
+  return said.length === 0
+    ? { kind: 'report', text: "Claude's question was closed at the keyboard." }
+    : { kind: 'typed', text: `You answered at the keyboard: ${said.join('; ')}` }
 }
 
 /**
