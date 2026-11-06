@@ -105,7 +105,6 @@ export class TurnTracker {
   #turn: Running | null
   #typed: TypedPrompt[]
   #prompts: OpenPrompt[]
-  #isTurnLost = false
   /** The visible text of the main loop's model step so far, until a question or an approval takes it. */
   #stepText = ''
 
@@ -121,17 +120,6 @@ export class TurnTracker {
   /** The main-loop turn running, as the wire names it; null between turns. */
   get current(): TurnRef | null {
     return this.#turn && refOf(this.#turn)
-  }
-
-  /**
-   * Whether a turn ended where the tracker could not follow it, since the last ask: one that
-   * completed unseen, or one still held when the next started. Neither its lines nor its answer
-   * went to the app.
-   */
-  takeLostTurn(): boolean {
-    const isLost = this.#isTurnLost
-    this.#isTurnLost = false
-    return isLost
   }
 
   /** The main loop's next model step starts: nothing of it is written yet. */
@@ -212,16 +200,23 @@ export class TurnTracker {
    * `turn.start`'s, which names the voice request; `prompt` is `prompt.submit`'s, what was typed.
    * `origin` is null when no `prompt.submit` came first: so starts the turn of a prompt typed into
    * the turn before it, whose lines stay under that id and which has that turn's decision.
+   * `isLost`: a turn was still held, so it ended where the tracker could not follow it: neither its
+   * lines nor its answer went to the app.
    */
-  turnStarted(turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt = text): SyncLine[] {
+  turnStarted(
+    turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt = text,
+  ): { lines: SyncLine[]; isLost: boolean } {
+    const isLost = this.#turn !== null
+    this.#turn = null
+    this.#prompts = []
+    return { lines: this.#open(turnId, text, origin, now, prompt), isLost }
+  }
+
+  #open(turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt: string): SyncLine[] {
     const opened = (turn: Tracked): SyncLine[] => {
       this.#turn = { ...turn, turnId, linesUnder: turnId }
       return [{ turn: refOf(this.#turn), kind: 'start' }]
     }
-    // One still held never reported its end.
-    if (this.#turn !== null) this.#isTurnLost = true
-    this.#turn = null
-    this.#prompts = []
     const id = voiceRequestId(text)
     const at = id === null && origin !== 'owner' ? this.#typed.findIndex(one => one.text === text) : -1
     const claimed = this.#typed[at]
@@ -258,14 +253,14 @@ export class TurnTracker {
     if (isOwn) this.#followUp = { id: forRequest, until: now + FOLLOW_UP_MS }
   }
 
-  /** A main-loop turn ended: what to post for it, as an answer to the voice request or a line. */
-  turnCompleted(turnId: string, answer: string, outcome: TurnOutcome): { post: Post | null; sync: SyncLine | null } {
+  /**
+   * A main-loop turn ended: what to post for it, as an answer to the voice request or a line.
+   * `isLost`: the tracker never saw it start, so none of it went to the app.
+   */
+  turnCompleted(turnId: string, answer: string, outcome: TurnOutcome): { post: Post | null; sync: SyncLine | null; isLost?: true } {
     this.#prompts = []
     const turn = this.#turn
-    if (turn?.turnId !== turnId) {
-      this.#isTurnLost = true
-      return { post: null, sync: null }
-    }
+    if (turn?.turnId !== turnId) return { post: null, sync: null, isLost: true }
     this.#turn = null
     const text = answer.trim()
     const isAnswered = outcome === 'answer' && text !== ''

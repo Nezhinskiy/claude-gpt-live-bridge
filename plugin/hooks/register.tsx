@@ -90,11 +90,6 @@ function noteGap(): void {
   if (sending !== null) sendCount += 1
 }
 
-/** A turn the tracker lost reached the app in no way. */
-function noteLostTurn(): void {
-  if (tracker.takeLostTurn()) noteGap()
-}
-
 /**
  * A snapshot that may fail: for a hook with lines still to post, or past its `next`, whose
  * `.catch` would run the event again. What goes to the app matters more.
@@ -581,8 +576,8 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      const lines = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
-      noteLostTurn()
+      const { lines, isLost } = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
+      if (isLost) noteGap()
       lastOrigin = null
       lastPrompt = undefined
       await serial(() => follow($, false))  // /clear: the line goes under the session's new id
@@ -616,8 +611,8 @@ export const register: Register = on => {
     await promptGone($, e.agentId)
     if (e.agentId === undefined) {
       const turn = tracker.current
-      const { post, sync } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
-      noteLostTurn()
+      const { post, sync, isLost } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
+      if (isLost) noteGap()
       staleSummary()
       await trySave($)
       if (sync) await postSync($, sync)
