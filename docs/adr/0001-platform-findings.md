@@ -406,7 +406,9 @@ After the dialog: **Yes** gives `classic.PostToolUse` (with `tool_use_id`), the 
 not called again. `classic.PostToolUseFailure` and `classic.PermissionDenied` are documented and
 registered without error, but fired in no run. `AskUserQuestion` raises
 `classic.PermissionRequest` too and, once answered, `classic.PostToolUse`; cancelled, only
-`turn.complete {answer: ""}` follows. A host's `can_use_tool` answers end the same way: allow as
+`turn.complete {answer: ""}` follows. Its `tool.call`'s `next(e)` settles every time, before
+`turn.complete`, and never rejects: `{ref, result: {questions, answers, annotations}, text,
+isReadOnly}` answered, `{ref, result: "Error: …", text, isError: true}` cancelled or denied. A host's `can_use_tool` answers end the same way: allow as
 Yes, deny with a message as No with feedback, deny with `interrupt: true` as a plain No.
 
 How it was seen: Claude Code 2.1.312 in a terminal pty, and the SDK host's stream-json protocol

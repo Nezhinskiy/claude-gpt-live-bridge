@@ -235,8 +235,15 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     const { questions } = e
     world.dialogs += 1
     return new Promise(resolve => {
-      world.answerDialog = label => resolve({ result: { questions, answers: { [questions[0]!.question]: label } } })
-      world.cancelDialog = () => resolve({ isError: true, result: 'User declined to answer questions' })
+      // As the engine resolves them, ADR 0001 (i): `answers` inside `result`; an error's `result` a string.
+      world.answerDialog = label => resolve({
+        ref: 1, result: { questions, answers: { [questions[0]!.question]: label }, annotations: {} },
+        text: 'Your questions have been answered.', isReadOnly: true,
+      })
+      world.cancelDialog = () => resolve({
+        ref: 1, result: "Error: The user doesn't want to proceed with this tool use.",
+        text: "The user doesn't want to proceed with this tool use.", isError: true,
+      })
     })
   })
   on('classic.PermissionRequest', () => ({}))

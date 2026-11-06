@@ -328,7 +328,7 @@ test('claudesQuestionAnsweredAtTheKeyboard', async ($, on) => {
   await world.clock.advance(1000)
   world.take('activity')
   world.answerDialog('out')
-  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'out' } })
+  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'out' }, annotations: {} })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
   world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
   await world.clock.advance(1000)
@@ -347,7 +347,7 @@ test('aTypedTurnsQuestionIsAsked', async ($, on) => {
   await world.clock.advance(1000)
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN, typedTurn: 't1' }])
   world.answerDialog('build')
-  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' } })
+  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' }, annotations: {} })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
 })
 
@@ -359,7 +359,7 @@ test('aTypedTurnsQuestionIsAskedWhileAVoiceRequestWaits', async ($, on) => {
   await world.clock.advance(1000)
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN, typedTurn: 't1' }])
   world.answerDialog('build')
-  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' } })
+  expect((await asked).result).toEqual({ questions: ASKED, answers: { [ASKED[0]!.question]: 'build' }, annotations: {} })
 })
 
 test('aQuestionOutsideATurnStaysInClaudeCode', async ($, on) => {
