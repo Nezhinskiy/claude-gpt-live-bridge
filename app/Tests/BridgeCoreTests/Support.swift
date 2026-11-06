@@ -69,3 +69,16 @@ final class TestTime: TimeSource {
     for sleeper in due { sleeper.wake.resume() }
   }
 }
+
+extension BridgeUpdate {
+  /// The newest summary the conversation shows.
+  var context: String? { conversation.last { $0.speaker == .context }?.text }
+  var needsContext: Bool { contextNeed == .load }
+
+  func with(contextNeed: ContextNeed) -> BridgeUpdate {
+    BridgeUpdate(
+      status: status, problem: problem, minutesThisCall: minutesThisCall,
+      conversation: conversation, labelsOnAnOlderMod: labelsOnAnOlderMod,
+      contextNeed: contextNeed, claudeLimits: claudeLimits)
+  }
+}

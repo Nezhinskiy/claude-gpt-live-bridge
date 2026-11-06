@@ -247,7 +247,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
-  conserva LiveBridge (con una línea **Task** por cada petición que la voz pasó a Claude), los
+  conserva LiveBridge (con una línea **Task** por cada petición que la voz pasó a Claude y una línea **Loaded context** donde se cargó un resumen), los
   límites de uso, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
   **Settings…** y **Quit LiveBridge**.
 - **Mute** (junto a **Stop**, en la banda y en la tarjeta de llamada del menú; **Unmute** mientras
@@ -261,12 +261,13 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   llamada y **Mute**; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier
   proceso que se ejecute como tú puede quitarlo
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
-- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen,
+- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen con **Pause sync** activado,
   un turno no llegó, una pregunta o un aviso de permiso no llegó a la aplicación, hubo turnos con el
   mod apagado, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
   conversación larga lo supera), la sesión estuvo en pausa o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
-  Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado, y `/live
+  Sin resumen aún y sin nada perdido dice **Context loads with the line** y está deshabilitado, porque
+  la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado, y `/live
   context` puede fallar, devolver lo olvidado o quitar la marca de pausa
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
@@ -465,7 +466,7 @@ GitHub ve la dirección IP de tu Mac. **Check for update**, en Settings, envía 
 cuando lo pulsas. Cuando la comprobación automática encuentra una versión más reciente, la
 aplicación ejecuta `gh auth status` para indicar si la imagen se puede verificar. Solo cuando
 pulsas **Install** descarga la imagen y ejecuta `gh attestation verify` y `claude plugin`, que se
-conectan a GitHub, y a Sigstore para la raíz de confianza de `gh`, con tus propias sesiones.
+conectan a GitHub, y a Sigstore para la raíz de confianza de `gh`, con tus propios inicios de sesión.
 [SECURITY.md](SECURITY.md#what-leaves-the-mac) enumera cada petición.
 
 En tu Mac, la aplicación guarda sus ajustes, el contador de uso, cuándo buscó actualizaciones por

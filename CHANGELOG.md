@@ -6,6 +6,20 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1]
+
+### Changed
+
+- A loaded summary now sits in **Conversation** where it was loaded, marked **Loaded context** and
+  shown whole, instead of under **What was sent** at the bottom, cut to 600 characters.
+- **Load context** is no longer enabled just because a new session has no summary, since its next
+  line asks for one by itself: the item reads **Context loads with the line** and is disabled. It stays
+  enabled for a gap, a mod that does not sync, too many lines, and **Pause sync**.
+
+Note: neither change has been seen in the real menu on the final build. A debug build and the
+installed app share one data folder, so opening an older app after this version empties its saved
+conversations and paused marks; the in-app update never goes back.
+
 ## [0.4.0]
 
 ### Added
