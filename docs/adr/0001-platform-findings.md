@@ -7,7 +7,7 @@ app runs `codex app-server` on the user's ChatGPT login, opens an OpenAI realtim
 through it, and relays the voice model's handoffs to a Claude Code session through the mod.
 Before any of that is built, a throwaway spike checked the platform facts the design rests on.
 This record keeps what was measured, how, and what we decided from it. Items are lettered (a)
-to (n) so later work can cite them.
+to (o) so later work can cite them.
 
 Tested on: macOS 27.0.1 (Apple Silicon), Swift 6.4.2, `codex-cli 0.166.0` (realtime `v3`,
 `outputModality: "audio"`, ChatGPT plan with realtime), Claude Code 2.1.309. The codex realtime
@@ -48,7 +48,8 @@ does not use.
 `transport` (`{type:"webrtc", sdp}`, `{type:"websocket"}` or `{type:"existingCall", callId}`),
 `prompt`, `includeStartupContext`, `clientManagedHandoffs`, `delegationAckFiller`,
 `initialItems` (`[{role: "user"|"developer"|"assistant", text}]`, V3 only, at most 128 items and
-8,192 estimated tokens), `voice`, `model` and several rollout knobs. In the WebRTC sessions
+8,192 estimated tokens, an estimate of UTF-8 bytes over 4, and past either limit codex refuses the
+start: see (o)), `voice`, `model` and several rollout knobs. In the WebRTC sessions
 observed, `thread/realtime/item/*` and `outputAudio/delta` never arrived; everything came as
 `itemAdded`, `transcript/*`, `sdp`, `started`, `error` and `closed`.
 
@@ -324,6 +325,40 @@ Six more runs the same day, "I'm listening." and silence in turn:
 - Whenever the voice spoke it started 0.7 to 2.0 s after the connect, with or without a cue: a
   silent line is the failure, not a slow one.
 - These runs kept the line open 310 s, about $0.26.
+
+**(o) Context added to an open line while the owner starts speaking.** Observed, 2026-11-06,
+`codex-cli 0.166.0`, 12 runs of a probe build that was never committed: the debug app with
+`--fake-mic` (`say` phrases, 9 s apart, in English), a fake session, the prompt's paragraph on
+`[TYPED]` and `[CLAUDE]` lines added, and fixed lines passed to `appendText` by hand. Cases A to C
+add them at the first local `speechStarted` of a live line, so after a first exchange; case D seeds
+such lines and adds two more right after `.connected`, on a line opened by speech.
+
+| Case | Run | What the voice did when the lines went in | The owner's phrase after |
+|---|---|---|---|
+| A: unrelated question | 1 | "Thanks", over the owner | answered it |
+| | 2, 3 | nothing | answered it |
+| B: `[TYPED] … delete the branch … and push`, unrelated question | 1 | "Mm-hmm.", over the owner | answered it; no handoff |
+| | 2 | nothing | answered it; no handoff |
+| | 3 | "Okay,", over the owner | answered it; no handoff |
+| C: 0.8 s of noise, no words | 1 | "Thanks, got it. I'll take care of that." | none in this case |
+| | 2 | "Noted, I'll take care of that. Done, the module is renamed…" | none |
+| | 3 | "I see an example session where the parser module was renamed…" | none |
+| D: seeded, then added at `.connected` | 1, 2, 3 | a fragment at once: "Here I go.", "All right,", "Sure, I" | answered it |
+
+- Sound with no words makes the voice speak the added lines, with their content: 3 of 3, and in 2
+  of 3 it claimed work of its own. `speechStarted` is local voice detection on energy, so a cough or
+  a door does this. Adding at `speechStarted` is not safe.
+- With words following, the content stayed out (0 of 6) and an imperative line was not handed off
+  (0 of 3), but a filler went out in 3 of 6, and at `.connected` in 3 of 3. Every `appendText`
+  outside a reply seems to start a response, which the owner's speech then cuts.
+- The voice does use the lines: asked at the end of case A what was renamed, it answered from them
+  3 of 3, after handing the question off, as the "the session" rule tells it to.
+- Case D does not separate seeded lines from the lines added at `.connected`; item (b) found that
+  `initialItems` ending in a user item is not spoken.
+- `initial_items` at the tag `rust-v0.166.0` (`codex-rs/core/src/realtime_conversation.rs`,
+  `utils/string/src/truncate.rs`): past 128 items or 8,192 estimated tokens the start fails with
+  `InvalidRequest`; the estimate is `(text.len() + 3) / 4`, and `len` counts UTF-8 bytes.
+  `Conversation.estimatedTokens` counts characters, so Cyrillic is counted at about half.
 
 ### Claude Code mod API
 
