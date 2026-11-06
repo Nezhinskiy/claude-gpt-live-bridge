@@ -1,5 +1,5 @@
 // The JSON messages between the mod and the app: `POST /v1/join|leave|answer|activity|context|
-// target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
+// sync|limits|target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
 // `wire/fixtures` holds an example of each and `plugin/hooks/wire.ts` mirrors these types; a
 // change here changes both. Optional fields are omitted when absent, never `null`.
 
@@ -33,23 +33,28 @@ public struct VoiceRequest: Codable, Sendable, Equatable {
 }
 
 /// Work for a session, tagged by `kind`: `{"kind":"request", <VoiceRequest>}`,
-/// `{"kind":"reply", <VoiceRequest>}` (the owner's reply to the question Claude is waiting on,
-/// for the request already in flight) or `{"kind":"context"}` (summarise the session for the
+/// `{"kind":"reply", <VoiceRequest>, "forRequest"}` (the owner's reply to the question Claude is
+/// waiting on; `forRequest` is the request its answer belongs to) or `{"kind":"context"}` (summarise the session for the
 /// voice).
 public enum Work: Sendable, Equatable {
   case request(VoiceRequest)
-  case reply(VoiceRequest)
+  /// `forRequest`: the request the turn's answer belongs to, the one in flight once this reply
+  /// goes out. With none in flight, for a mod that does not sync and does not read it, the reply.
+  case reply(VoiceRequest, forRequest: RequestID)
   case context
 }
 
 extension Work: Codable {
   private enum Kind: String, Codable { case request, reply, context }
-  private enum CodingKeys: String, CodingKey { case kind }
+  private enum CodingKeys: String, CodingKey { case kind, forRequest }
 
   public init(from decoder: any Decoder) throws {
     switch try decoder.container(keyedBy: CodingKeys.self).decode(Kind.self, forKey: .kind) {
     case .request: self = .request(try VoiceRequest(from: decoder))
-    case .reply: self = .reply(try VoiceRequest(from: decoder))
+    case .reply:
+      let forRequest = try decoder.container(keyedBy: CodingKeys.self)
+        .decode(RequestID.self, forKey: .forRequest)
+      self = .reply(try VoiceRequest(from: decoder), forRequest: forRequest)
     case .context: self = .context
     }
   }
@@ -60,8 +65,9 @@ extension Work: Codable {
     case .request(let request):
       try container.encode(Kind.request, forKey: .kind)
       try request.encode(to: encoder)
-    case .reply(let request):
+    case .reply(let request, let forRequest):
       try container.encode(Kind.reply, forKey: .kind)
+      try container.encode(forRequest, forKey: .forRequest)
       try request.encode(to: encoder)
     case .context:
       try container.encode(Kind.context, forKey: .kind)
@@ -81,6 +87,40 @@ public struct JoinBody: Codable, Sendable, Equatable {
   /// The mod's version, from its own plugin.json; absent from a mod from before this field, or
   /// one that could not read it.
   public var modVersion: String?
+  /// `true` from a mod that posts sync lines (`POST /v1/sync`); absent from one that does not.
+  public var syncs: Bool?
+  /// `true`: a turn of this session did not arrive, so the voice's picture of it has a gap.
+  public var missed: Bool?
+}
+
+/// The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
+/// answer belongs to; absent from a turn with none behind it. A spoken reply that makes a typed
+/// turn a voice turn adds it to the turn's later lines.
+public struct TurnRef: Codable, Sendable, Equatable {
+  public var id: String
+  public var request: RequestID?
+}
+
+/// What a line of a turn is. Only `typed` refuses a turn and only `start` has no text; who said a
+/// line and its tag follow from this.
+public enum SyncKind: String, Codable, Sendable {
+  /// A turn's first word: it takes the turn's decision and records nothing.
+  case start
+  /// The owner's words: a prompt, text typed into a running turn, a keyboard answer.
+  case typed
+  /// Claude's final answer.
+  case answer
+  /// The mod's own line: a settled prompt, or a question closed with no answer. It goes as
+  /// Claude's.
+  case report
+}
+
+/// `POST /v1/sync`: a line of a turn. `text` is absent from `start` alone.
+public struct SyncBody: Codable, Sendable, Equatable {
+  public var sessionId: SessionID
+  public var turn: TurnRef
+  public var kind: SyncKind
+  public var text: String?
 }
 
 /// `POST /v1/leave`.
@@ -106,15 +146,17 @@ public struct AnswerBody: Codable, Sendable, Equatable {
 
 public enum SessionActivity: String, Codable, Sendable { case idle, working, approval }
 
-/// `POST /v1/activity`. `question`, with `approval`: Claude asked the owner this in a voice
-/// turn and waits for the reply, which the voice may hand over as `Work.reply`; without it, a
-/// permission prompt waits, which the voice only reports. `text`, with `approval`: what Claude
-/// wrote in the step that pauses.
+/// `POST /v1/activity`. `question`, with `approval`: Claude asked the owner this and waits for
+/// the reply, which the voice may hand over as `Work.reply`; without it, a permission prompt
+/// waits, which the voice only reports. `text`, with `approval`: what Claude wrote in the step
+/// that pauses. `turn`: the main-loop turn it belongs to; absent between turns, and from a released
+/// mod, which reports only its voice turns and never a `turn`.
 public struct ActivityBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var state: SessionActivity
   public var question: String?
   public var text: String?
+  public var turn: TurnRef?
 }
 
 /// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`.

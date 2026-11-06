@@ -24,12 +24,14 @@
   <a href="#contribuer">Contribuer</a>
 </p>
 
-LiveBridge est une application de barre des menus macOS qui garde une ligne vocale GPT-Live
-prête à l'emploi via `codex app-server`, avec votre connexion ChatGPT (sans clé d'API). La voix
-fait office d'accueil : elle discute, demande ce que vous voulez dire, et confie le vrai travail
-à votre session Claude Code par l'intermédiaire d'un petit mod Claude Code, `livebridge`. Claude
-fait le travail avec son propre modèle, ses propres outils et son propre mode de permissions, et
-la voix vous annonce le résultat.
+LiveBridge est une application de barre des menus macOS qui garde une ligne vocale GPT-Live prête à
+l'emploi via `codex app-server`, avec votre connexion ChatGPT (sans clé d'API). La voix fait office
+d'accueil : elle discute, demande ce que vous voulez dire, et confie le vrai travail à votre session
+Claude Code par l'intermédiaire d'un petit mod Claude Code, `livebridge`. Claude fait le travail
+avec son propre modèle, ses propres outils et son propre mode de permissions, et la voix vous
+annonce le résultat. Inutile de garder la ligne ouverte pendant que Claude travaille : sa réponse
+rouvre la ligne fermée et passe à la voix pour qu'elle la dise. La voix suit aussi ce que vous tapez
+dans la session et ce que Claude répond, vous pouvez donc passer de la parole au clavier.
 
 *Le texte anglais fait foi ([README.md](README.md)) ; cette traduction peut avoir du retard.*
 
@@ -39,7 +41,7 @@ la voix vous annonce le résultat.
 votre Mac entre votre propre codex et votre propre Claude Code. L'application et le mod
 communiquent uniquement par un socket Unix que seul votre utilisateur peut ouvrir, et
 l'application n'écoute sur aucun port réseau. En dehors de ce que ces deux outils envoient déjà
-(la ligne vocale vers OpenAI via votre codex, uniquement tant qu'elle est ouverte, et le travail
+(la ligne vocale vers OpenAI via votre codex, uniquement tant qu'elle est ouverte, avec ce que vous tapez dans une session rejointe, et le travail
 de Claude vers Anthropic via votre session Claude Code), le seul trafic propre à l'application
 est un codex éphémère qui, à l'ouverture du menu, demande à OpenAI vos chiffres d'utilisation de
 Codex, même quand l'appel est coupé, et celui des [mises à jour](#mises-à-jour) : une demande automatique à GitHub pour savoir s'il existe
@@ -58,8 +60,8 @@ et ce que cela ne protège pas.
 ## Démarrage rapide
 
 Il vous faut macOS 14+ sur Apple Silicon, Claude Code 2.1.301+, et
-[codex](https://github.com/openai/codex) connecté (`codex login`) à une offre ChatGPT incluant la
-voix en temps réel ; pour compiler l'application vous-même, il faut aussi Xcode avec Swift 6.0+.
+[codex](https://github.com/openai/codex) connecté (`codex login`) à une offre ChatGPT dont le Codex
+inclut la voix ; pour compiler l'application vous-même, il faut aussi Xcode avec Swift 6.0+.
 Le détail se trouve sous [Prérequis](#prérequis).
 
 ```sh
@@ -93,7 +95,8 @@ sous [Installation](#installation).
 - [Codex CLI](https://github.com/openai/codex) (`codex`, testé avec 0.166.0), installé avec
   Homebrew (`brew install --cask codex`) ou npm (`npm install -g @openai/codex`), présent dans le
   `PATH` que votre shell définit dans une fenêtre Terminal, et connecté avec `codex login` à une
-  offre ChatGPT incluant la voix en temps réel. LiveBridge refuse un codex dont il ne peut pas
+  offre ChatGPT dont le Codex inclut la voix (Plus, Pro, Business, Enterprise ou Education, selon
+  les [tarifs de Codex d'OpenAI](https://learn.chatgpt.com/docs/pricing)). LiveBridge refuse un codex dont il ne peut pas
   lire le `codex features list`, donc une autre version peut ne pas démarrer tant que LiveBridge
   n'a pas été mis à jour.
 - Pour compiler l'application : Xcode avec une chaîne d'outils Swift 6.0 ou ultérieure. Les
@@ -221,6 +224,10 @@ qu'une mise à jour interrompue en pleine installation peut laisser. L'applicati
 copies à son lancement suivant ; après une désinstallation, supprimez-la à la main si elle
 existe.
 
+`claude plugin uninstall` peut laisser l'instantané du mod,
+`~/.claude/plugins/store/livebridge_*.json` : la documentation de Claude Code sur ce qu'il supprime
+ne nomme pas ce fichier, et cela n'a pas été exécuté. Supprimez-le à la main s'il est là.
+
 ## Utilisation
 
 ### Commandes
@@ -236,8 +243,8 @@ Dans la session Claude Code à laquelle vous voulez parler :
 | `/live context` | Envoie à la voix un nouveau résumé de cette session, rédigé par le modèle de la session. |
 
 La commande est `/live`, et non `/voice`, car `/voice` est le mode vocal propre à Claude Code.
-Charger ou non le résumé d'une session chaque fois qu'une ligne s'ouvre n'est pas une
-commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
+Garder ou non hors de la voix ce que vous tapez dans une session tant que l'appel est arrêté n'est
+pas une commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 [Settings](#réglages) de LiveBridge.
 
 ### La bande et le menu
@@ -245,32 +252,46 @@ commande : c'est un réglage unique pour toutes les sessions, dans la fenêtre
 Appuyez sur **Start**, dans la bande au-dessus du prompt ou dans le menu de la barre des menus, et
 parlez.
 
-- **Le Start de la bande** fait de sa session la cible et démarre l'appel ; avec
-  **Load context automatically when a line opens** activé, la ligne qu'il ouvre charge le résumé de la session
-  ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à une autre
-  session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session rejointe,
-  `/live on` la fait revenir.
+- **Le Start de la bande** fait de sa session la cible et démarre l'appel ; la ligne qu'il ouvre
+  reçoit la conversation de la session, et charge en plus un résumé quand il manquerait à la voix
+  une partie d'elle (voir **Load context** ci-dessous), mais jamais avec **Pause sync** activé ni
+  après une pause ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à
+  une autre session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session
+  rejointe, `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
-  la conserve, les limites d'utilisation, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt), **Settings…** et
+  la conserve (avec une ligne **Task** pour chaque demande que la voix a transmise à Claude), les
+  limites d'utilisation, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt),
+  **Settings…** et
   **Quit LiveBridge**.
 - **Mute** (à côté de **Stop**, dans la bande et dans la carte d'appel du menu ; **Unmute** quand le
   micro est coupé) libère votre microphone pendant que l'appel continue : une réponse de Claude
-  ouvre toujours la ligne et la voix la dit. La bande garde la phase et ajoute `· muted` ; le menu
-  affiche « Muted — line closed » tant qu'aucune ligne n'est ouverte. Mute ne ferme pas la ligne :
-  une ligne ouverte se ferme après le silence habituel, compté à partir de Mute si vous parliez, et
-  quand elle l'aurait fait sans Mute si la ligne était déjà silencieuse ; elle est facturée comme
-  n'importe quel silence, donc Mute n'économise pas de minutes temps réel. **Unmute** reprend le
-  microphone et, s'il n'y parvient pas (refusé, occupé, absent), l'appel se termine avec la raison.
-  **Stop** termine l'appel et la coupure ; le **Start** suivant commence micro actif. Mute n'est pas
-  un verrou : tout processus qui s'exécute sous votre compte peut le lever
-  ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+  ouvre toujours la ligne et passe à la voix pour qu'elle la dise. La bande garde la phase et ajoute
+  `· muted` ; le menu affiche « Muted — line closed » tant qu'aucune ligne n'est ouverte. Mute ne
+  ferme pas la ligne : une ligne ouverte se ferme après le silence habituel, compté à partir de Mute
+  si vous parliez, et quand elle l'aurait fait sans Mute si la ligne était déjà silencieuse ; elle
+  est facturée comme n'importe quel silence, donc Mute n'économise pas de minutes temps réel.
+  **Unmute** reprend le microphone et, s'il n'y parvient pas (refusé, occupé, absent), l'appel se
+  termine avec la raison. **Stop** termine l'appel et la coupure ; le **Start** suivant commence
+  micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
+  lever ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+- **Load context** n'est activé que lorsqu'il manque à la voix une partie de la cible : pas de
+  résumé, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
+  tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
+  voix peut porter (une longue conversation le dépasse), la session a été mise en pause, ou son mod
+  ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
+  déjà la conversation. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
+  reste activé, et `/live context` peut échouer, ramener ce qui a été oublié ou lever la marque de
+  pause ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
-  repart de zéro à la prochaine ouverture de la ligne, sauf si **Load context automatically when
-  a line opens** est activé : cette ligne recharge un résumé de la même transcription de la
-  session, donc désactivez le réglage ou faites `/clear` dans la session avant. `/live on` dans
-  une session retirée la rejoint de nouveau.
+  repart de zéro à la prochaine ouverture de la ligne. Les résultats qu'elle n'a pas encore dits
+  restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude en attente
+  suivent d'autres règles ([détails](SECURITY.md#residual-risk-by-design)). Avec **Pause sync**
+  désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
+  transcription de la session, qui contient ce que la session a lu ; pour l'éviter, faites d'abord
+  `/clear` dans la session, puis appuyez sur **New conversation**. `/live on` dans une session
+  retirée la rejoint de nouveau.
 
 ### Réglages
 
@@ -282,10 +303,18 @@ parlez.
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
   ouverture de la ligne.
-- **Load context automatically when a line opens** (activé par défaut) : chaque
-  ligne que l'application ouvre (un Start, une ligne rouverte après un silence, la ligne après un
-  changement de cible) demande son résumé à la cible sans l'attendre ; un réglage unique pour
-  toutes les sessions, conservé par l'application.
+- **Pause sync while the call is stopped** (désactivé par défaut) : par défaut, ce que vous tapez
+  dans une session rejointe et la réponse finale de Claude sont gardés dans la conversation de cette
+  session avec la voix même quand l'appel est arrêté, et la voix les a quand la ligne suivante
+  s'ouvre. Rien ne quitte le Mac avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
+  voir arriver chez OpenAI, activez le réglage, appuyez sur Stop, puis tapez : rien de ce que vous
+  tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
+  aucune ligne ne charge de résumé d'elle-même, ni après une pause : seuls **Load context** ou
+  `/live context` le font, et ce résumé est écrit à partir de toute la transcription, donc il porte
+  ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
+  réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
+  enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
+  fait et ne fait pas est dans [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
   chaque demande que la voix transmet à Claude ([pourquoi](#limitations-connues)).
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
@@ -306,11 +335,39 @@ parlez.
   [SECURITY.md](SECURITY.md) explique ce qui en est une.
 - Elle relit les résultats en une phrase ou deux, avec le nom de la session. Les blocs de code et
   les tableaux restent dans la session, et les identifiants qu'elle reconnaît sont masqués.
-- Quand Claude pose une question, la voix vous la pose et renvoie votre réponse à cette session.
-  Le travail que Claude termine plus tard en arrière-plan est signalé comme une mise à jour.
-- Quand Claude attend une demande de permission, la voix le dit, sauf
-  [là où une organisation administre Claude Code](#limitations-connues). Vous répondez à la
-  demande dans Claude Code ; LiveBridge n'y répond jamais à votre place.
+- Elle revient quand Claude a fini. Inutile de garder la ligne ouverte : elle se ferme quand la
+  conversation retombe, et la réponse de Claude à votre demande la rouvre et est donnée à la voix
+  pour qu'elle la dise, vous pouvez donc vous éloigner pendant que Claude travaille. Cela vaut pour
+  la session à laquelle vous parlez ; un résultat d'une autre session joue un carillon et attend
+  ([comment c'est facturé](#facturation-maîtrisée-par-conception)). Si la voix reste muette sur la
+  ligne rouverte, la réponse joue aussi un carillon et attend, elle n'est donc pas perdue. Une
+  question que Claude vous pose ou une demande de permission qu'il attend ouvre la ligne de la même
+  façon, mais la voix peut ne pas la dire : n'y comptez pas quand vous êtes loin du Mac
+  ([limitations connues](#limitations-connues)).
+- Quand Claude pose une question, elle est donnée à la voix pour qu'elle vous la pose, et votre
+  réponse repart vers cette session. Il en va de même d'une question que Claude pose pendant qu'il
+  travaille (la boîte de dialogue à options) : la voix la reçoit pour vous en parler, expliquer les
+  options avec ses propres mots et en discuter avec vous aussi longtemps que vous voulez, sans
+  interroger Claude. Ce que vous décidez, une option ou une question en retour à Claude, répond à la
+  boîte de dialogue ; vous pouvez toujours y répondre au clavier. Le travail que Claude termine plus
+  tard en arrière-plan passe à la voix comme une mise à jour.
+- Quand Claude attend une demande de permission, la voix reçoit un avis et peut le dire, sauf [là où
+  une organisation administre Claude Code](#limitations-connues). Vous répondez à la demande dans
+  Claude Code ; LiveBridge n'y répond jamais à votre place.
+- Elle reçoit ce que vous tapez. Tant qu'une session est rejointe, ce que vous y tapez et la réponse
+  finale de Claude à chaque tour qui n'était pas une demande vocale vont dans la conversation de
+  cette session avec la voix, comme contexte : ils ne font pas sonner de carillon et n'ouvrent pas
+  une ligne fermée ([les limites de ceci](#limitations-connues)). Une ligne ouverte les reçoit
+  aussitôt ; une ligne ouverte plus tard en est alimentée. Une réponse vocale qu'une demande plus
+  récente a supplantée n'est pas dite, mais elle est gardée et ajoutée de la même façon. Le texte de
+  Claude en milieu de tour n'est pas synchronisé, sauf ce qu'il a écrit juste avant une question ou
+  une demande de permission, qui l'accompagne ; les sous-agents et la sortie des outils ne le sont
+  pas non plus. Une question ou une demande de permission dans la cible est donnée à la voix, quel
+  que soit le tour qui l'a provoquée ; dans une autre session, elle va comme irait un résultat venu
+  d'elle, sauf que celle d'un tour qui n'était pas une demande vocale n'est qu'enregistrée. Un tour
+  que la pause tient dehors n'a rien de tout cela. Quand une question ou une demande est réglée sans
+  la voix, ou qu'un tour se termine sans réponse, la voix reçoit une ligne qui le dit ([quelles
+  lignes](SECURITY.md#what-session-text-can-do)).
 
 ## Facturation maîtrisée par conception
 
@@ -326,24 +383,29 @@ attend votre autorisation :
   sont conservées et envoyées en premier, afin que vos premiers mots ne soient pas perdus.
 - La ligne se ferme après 20 secondes de silence. Un son sans paroles (musique, télévision) la
   ferme après 90 secondes.
-- Quand la voix transmet une demande à Claude (un transfert), la ligne reste ouverte jusqu'à
-  2 minutes après ce transfert, facturée comme n'importe quelle ligne ouverte, et la voix annonce
-  la réponse de Claude dès que plus personne ne parle. Un transfert ultérieur relance les
-  2 minutes ; un échange qui n'envoie rien à Claude se ferme après les 20 secondes de silence
-  habituelles.
-- La réponse de Claude à une demande confiée à la session à laquelle vous parlez, une question
-  que Claude vous y pose ou une demande d'autorisation qu'il attend rouvre la ligne si elle arrive
-  alors que la ligne est fermée, et la voix la dit, facturée comme toute ligne ouverte. Tout le
-  reste de ce qui arrive ligne fermée (tout ce qui vient d'une session que vous avez quittée, une
-  mise à jour ultérieure) joue un carillon et attend : la bande et le menu l'affichent comme non
-  entendu, et la voix vous le dit la prochaine fois que vous parlez
-  ([quand il compte comme entendu](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
+- Quand la voix transmet une demande à Claude (un transfert), la ligne reste ouverte jusqu'à 2
+  minutes après ce transfert, facturée comme n'importe quelle ligne ouverte, et la réponse de Claude
+  passe à la voix pour qu'elle la dise dès que plus personne ne parle. Un transfert ultérieur
+  relance les 2 minutes ; un échange qui n'envoie rien à Claude se ferme après les 20 secondes de
+  silence habituelles.
+- La réponse de Claude à une demande confiée à la session à laquelle vous parlez, une question que
+  Claude vous y pose ou une demande d'autorisation qu'il attend rouvre la ligne si elle arrive alors
+  que la ligne est fermée, et elle est donnée à la voix pour qu'elle la dise, facturée comme toute
+  ligne ouverte. Tout le reste de ce qui arrive ligne fermée (tout ce qui vient d'une session que
+  vous avez quittée, une mise à jour ultérieure) joue un carillon et attend : la bande et le menu
+  l'affichent comme non entendu, et il passe à la voix la prochaine fois que vous parlez ([quand il
+  compte comme entendu](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Chaque session Claude Code a sa propre conversation avec la voix. Elle est reportée sur la
   session temps réel suivante, et d'un Stop à un Start, de sorte que la voix se souvient de ce que
   vous avez dit il y a une minute. Une nouvelle cible change de conversation : une ligne ouverte
   se ferme, et vos prochains mots l'ouvrent avec la conversation de la nouvelle cible.
-- Le menu affiche les minutes pendant lesquelles la ligne a été ouverte, mesurées par
-  l'application ; la manière dont votre offre mesure la voix en temps réel n'est pas publiée.
+- Le menu affiche les minutes pendant lesquelles la ligne a été ouverte, comptées par l'application
+  à partir du moment où la voix se connecte, donc votre offre peut compter un peu plus. OpenAI
+  facture la voix sur ordinateur à la minute de votre budget d'usage Codex, et sur son API la même
+  famille de modèles facture aussi le silence
+  ([détails](docs/research/2026-11-04-gpt-live-billing.md),
+  [limites](docs/research/2026-11-05-gpt-live-limits.md)) ; la page d'usage de votre offre fait
+  autorité.
 - Le menu indique quelle part de votre usage de Codex et de Claude est consommée, une ligne chacun,
   en pourcentage utilisé de chaque fenêtre que l'offre signale (jusqu'à trois par ligne, par
   exemple `7% of 5 h · 19% of week`), en orange à partir de 90 % ; survolez une ligne pour voir
@@ -370,27 +432,41 @@ OpenAI, via la session temps réel de codex :
   se connecter, peut quand même partir) ;
 - les instructions de la voix : les règles propres de LiveBridge, puis le **Prompt** de vos
   Settings si vous en avez écrit un ;
-- la conversation récente de la session cible (jusqu'aux 24 dernières lignes) pour la poursuivre
-  dans une nouvelle session temps réel ;
+- la conversation récente de la session cible (jusqu'aux 64 dernières lignes, et pas plus que ce que
+  codex accepte : 128 éléments et environ 8 192 jetons avec le contexte et les tâches ouvertes) pour
+  la poursuivre dans une nouvelle session temps réel. Elle contient ce que vous avez tapé dans cette
+  session et la réponse finale de Claude à chaque tour qui n'était pas une demande vocale, quelle
+  qu'en soit l'origine (un tour que vous avez tapé, une tâche planifiée, un autre agent, une tâche
+  d'arrière-plan), en plus des notes du mod, de votre voix et de celle de la voix : taper dans une
+  session l'envoie donc à OpenAI quand une ligne s'ouvre avec elle. Tant qu'une ligne est ouverte,
+  chaque nouvelle ligne de la cible y entre aussitôt. Les lignes synchronisées d'une autre session
+  ne partent que lorsqu'une ligne s'ouvre avec elle comme cible ; ses résultats, questions et avis
+  d'approbation entrent dans la ligne ouverte, quelle que soit la session ;
 - les demandes encore ouvertes de la session cible, sous forme de résumés d'une ligne ;
-- chaque résultat, question, mise à jour et avis d'approbation, en une ligne d'au plus
-  2 000 caractères, blocs de code et tableaux retirés. Une question que Claude pose en cours de
-  tour, et l'avis d'approbation d'une permission que demande la boucle principale de Claude (pas
-  un sous-agent), portent aussi ce que Claude a écrit juste avant de demander. Une mise à jour
+- chaque résultat, question, mise à jour, avis d'approbation, texte tapé, réponse à un tour qui
+  n'était pas une demande vocale, réponse vocale supplantée par une demande plus récente et note du
+  mod, en une ligne d'au plus 2 000 caractères, blocs de code et tableaux retirés (un texte tapé qui
+  n'est que du code ou un tableau est remplacé par une phrase disant que du code a été tapé). Les
+  notes du mod nomment l'outil d'une demande de permission autorisée ou réglée, et disent qu'une
+  question a été fermée ou qu'un tour s'est terminé sans réponse. Une question que Claude pose en
+  cours de tour, et l'avis d'approbation d'une permission que demande la boucle principale de Claude
+  (pas un sous-agent), portent aussi ce que Claude a écrit juste avant de demander. Une mise à jour
   est la réponse de Claude dans un tour ultérieur déclenché par la notification d'une tâche
-  d'arrière-plan, pendant au plus 10 minutes après une demande vocale et jusqu'à ce qu'un autre
-  tour démarre dans la session ;
+  d'arrière-plan, pendant au plus 10 minutes après une demande vocale et jusqu'à ce qu'un autre tour
+  démarre dans la session ;
 - le résumé de contexte de la session cible, en une ligne d'au plus 1 500 caractères. Il est
   enregistré quand il est chargé et envoyé à chaque ouverture de la ligne tant que cette session
   est la cible, d'un Stop à un Start et d'un redémarrage de l'application à l'autre. Le
   sous-menu Conversation du menu affiche cette ligne exactement telle qu'elle est envoyée ;
-- avec chacune des lignes ci-dessus, le libellé de sa session : le titre de la session Claude
-  Code, ou le nom du dossier de la session si elle n'en a pas ;
+- avec chacune des lignes ci-dessus, le libellé de sa session : le titre de la session Claude Code
+  (jusqu'à 80 caractères), ou le nom du dossier de la session si elle n'en a pas. Le libellé n'est
+  pas masqué et la pause n'y touche pas, donc un titre écrit à partir d'un texte mis en pause part
+  sur chaque ligne ;
 - l'offre WebRTC, qui liste les adresses réseau locales du Mac comme candidats de connexion.
 
-Les résultats, questions, mises à jour et résumés passent d'abord par un masqueur de formes
+Les résultats, questions, mises à jour, résumés et lignes des tours tapés passent d'abord par un masqueur de formes
 connues d'identifiants (clés privées, JWT, jetons d'API courants, mots de passe dans les URL,
-champs de type `password=`). C'est une liste de motifs, pas une garantie.
+champs de type `password=`). C'est une liste de motifs, pas une garantie : tout le reste de ce que vous tapez part tel quel.
 
 Le thread codex qui porte la voix est éphémère et en lecture seule, avec toutes les
 fonctionnalités de codex désactivées sauf celles qui conservent votre connexion et gèrent
@@ -417,13 +493,14 @@ liste chaque requête.
 
 Sur votre Mac, l'application conserve ses réglages, le compteur d'utilisation, la date de sa
 dernière recherche de mise à jour et les versions qu'elle a annoncées, ce qu'a fait la dernière
-mise à jour et, pour chacune des 20 dernières sessions utilisées, sa conversation récente et la
-ligne de contexte chargée en dernier depuis elle, dans
-`~/Library/Application Support/LiveBridge`. Les lignes d'une session disparaissent quand vous
+mise à jour et, pour chacune des 20 dernières sessions utilisées, sa conversation récente
+(jusqu'à 64 lignes, avec ce que vous y avez tapé ; enregistrée sans appel sauf si vous activez
+**Pause sync**) et la ligne de contexte chargée en dernier depuis elle, dans `~/Library/Application Support/LiveBridge`, un dossier que seul votre utilisateur peut ouvrir
+([comment il est conservé](SECURITY.md#residual-risk-by-design)). Les lignes d'une session disparaissent quand vous
 appuyez sur **New conversation** avec elle comme cible ou que vous la retirez avec ×. Une session
 qui est partie les conserve jusqu'à ce que 20 sessions utilisées ensuite les évincent ; pour les
 effacer plus tôt, exécutez de nouveau `/live on` dans cette session et appuyez sur **New
-conversation**. La désinstallation les supprime toutes.
+conversation**. La désinstallation les supprime toutes. Le mod garde un instantané à lui dans le magasin de plugins de Claude Code ([ce qu'il contient](SECURITY.md#residual-risk-by-design)).
 
 [SECURITY.md](SECURITY.md) contient le modèle de menace : en bref, tout ce que votre microphone
 peut entendre peut devenir une demande que Claude exécute avec le mode de permissions propre à la
@@ -431,24 +508,61 @@ session.
 
 ## Limitations connues
 
-- La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande,
-  si bien que rien n'arrive à Claude : environ une demande sur cinq lors des
-  [tests](docs/bugs/BR-001.md), alors que la règle de la voix l'interdit. L'application joue un
-  son bref quand elle met une demande en file pour Claude ; si la voix dit qu'elle regarde et
-  qu'aucun son ne suit, répétez la demande. L'application ne peut pas distinguer une telle
-  promesse d'une réponse par ses mots, car la voix parle votre langue.
-- Un résultat qui arrive pendant que la ligne l'attend est transmis à la voix sous forme de texte
-  à dire ; codex n'a aucun appel qui fasse parler la voix immédiatement, c'est donc le modèle qui
+- La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande, si
+  bien que rien n'arrive à Claude : environ une demande sur cinq avec la règle telle qu'écrite au
+  départ, et 0 sur 20 avec la règle actuelle, trop peu pour distinguer cela du hasard
+  ([BR-001](docs/bugs/BR-001.md)). Elle peut aussi prétendre à un travail qu'elle n'a pas fait,
+  comme « I'll take a look. », y compris à partir de lignes qu'elle n'a que comme contexte ([ADR
+  0001 (n), (o)](docs/adr/0001-platform-findings.md)). L'application joue un son bref quand elle met
+  une demande en file pour Claude ; si la voix dit qu'elle regarde et qu'aucun son ne suit, répétez
+  la demande. L'application ne peut pas distinguer une telle promesse d'une réponse par ses mots,
+  car la voix parle votre langue.
+- Une question de Claude, ou une demande de permission qu'il attend, est seulement donnée à la voix,
+  et la voix peut ne pas la dire ; rien ne l'y oblige. Ne comptez donc pas sur la voix pour annoncer
+  une demande de permission quand vous êtes loin du Mac : Claude peut attendre sans que rien ne
+  l'annonce. Cette demande attend toujours dans Claude Code, et c'est le seul contrôle ; la voix
+  n'est pas un contrôle, et LiveBridge ne répond jamais à la demande. Lors des vérifications, l'avis
+  de permission d'un tour tapé, ligne ouverte, a été dit avant la réponse au clavier dans 0 essai
+  sur 3, un compte et non un taux ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). Une ligne
+  fermée ne s'ouvre pour elles que si la conversation de la cible contient un tour de vous ; sinon
+  l'application joue un carillon, et appel éteint elles ne sont qu'enregistrées.
+- Ce que l'application de bureau Claude indique comme origine d'un prompt tapé n'a pas été observé
+  ([ADR 0001 (m)](docs/adr/0001-platform-findings.md)). Le mod n'enregistre un prompt comme vôtre
+  que si son origine est `composer`. Si un prompt tapé là-bas arrive autrement, rien de ce qui y est
+  tapé n'est enregistré, aucun trou n'est noté, le menu affiche **Context up to date**, et la pause
+  va moins loin ([détails](SECURITY.md#what-session-text-can-do)).
+- Un résultat qui arrive pendant que la ligne l'attend est transmis à la voix sous forme de texte à
+  dire ; codex n'a aucun appel qui fasse parler la voix immédiatement, c'est donc le modèle qui
   décide du moment. Lors des tests, elle a parlé en quelques secondes. Si ce n'est pas le cas, le
-  résultat reste non entendu : la voix le dit après vos prochains mots, ou un carillon retentit
+  résultat reste non entendu : il repasse à la voix avec vos prochains mots, ou un carillon retentit
   à la fermeture de la ligne.
-- Quand la réponse de Claude rouvre la ligne, la voix reste parfois muette
-  ([mesuré](docs/adr/0001-platform-findings.md)). La ligne se ferme alors au bout de 5 secondes,
-  et la réponse joue un carillon et attend, comme ci-dessous.
+- Quand la réponse de Claude rouvre la ligne, la voix peut rester muette : c'est arrivé dans 4 des
+  14 essais mesurés, un petit échantillon ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). La
+  ligne se ferme alors 5 secondes après sa connexion, et la réponse joue un carillon et attend,
+  comme ci-dessous. Quand la voix a parlé, elle a commencé dans les 2 secondes environ après la
+  connexion ; une voix qui commencerait après ces 5 secondes est coupée.
 - Quand vos prochains mots rouvrent la ligne, la voix répond parfois uniquement à ceux-ci sans
   dire le résultat en attente. Le résultat n'est pas perdu : il reste en attente, déclenche un
   carillon et publie une notification à la fermeture de la ligne, et il est de nouveau transmis à
   la voix à la prochaine ouverture de la ligne.
+- À la limite d'utilisation de votre offre ChatGPT, la voix s'arrête jusqu'à ce que la limite se
+  réinitialise. Le menu et la bande le disent, dans la phrase de codex avec son heure de
+  réinitialisation quand codex la donne, et l'appel se termine, pour que la parole n'ouvre pas de
+  lignes qui échouent. Claude Code continue de travailler, les réponses continuent d'attendre, et
+  Start réessaie une fois. L'application ne reconnaît une limite qu'à la formulation de codex ou au
+  code d'erreur du service, car rien d'autre ne la signale
+  ([détails](docs/research/2026-11-05-gpt-live-limits.md)). Un refus qu'elle ne reconnaît pas, comme
+  une ligne qui tombe sans raison donnée (« The voice session closed (transport_closed). »), laisse
+  l'appel actif, et vos prochains mots réessaient ; appuyez sur **Stop** jusqu'à la réinitialisation
+  de la limite.
+- Un prompt qui n'est pas tapé dans le compositeur (le message d'un hôte, une tâche planifiée, un
+  autre agent et sans doute Remote Control) n'est pas enregistré dans la conversation de la voix
+  comme vos mots, mais la réponse de Claude l'est, et il ne refuse pas un tour en cours sous la
+  pause ([SECURITY.md](SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les
+  vôtres).
+- Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
+  synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, et aucune
+  pause ne refuse ses lignes ([ce qui change d'autre](CHANGELOG.md)).
 - Une session Claude Code déjà ouverte avant le chargement du mod peut devoir être rouverte pour
   que `/live` y fonctionne.
 - Dans l'application de bureau Claude, `/live` saisi dans une session dont le processus Claude

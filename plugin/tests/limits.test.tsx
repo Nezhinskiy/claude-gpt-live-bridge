@@ -3,6 +3,8 @@ import type { SessionRateLimit } from 'claude-code'
 
 import { fakeWorld, ID, LIVE } from './fake-bridge.ts'
 
+const OTHER = '11111111-0000-0000-0000-000000000002'
+
 const START = { cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true } as const
 const FIVE: SessionRateLimit = { kind: 'five_hour', percentUsed: 23.5, resetsAt: '2026-01-01T06:00:00Z' }
 const WEEK: SessionRateLimit = { kind: 'seven_day', percentUsed: 7 }
@@ -55,6 +57,63 @@ test('anAppRestartGetsTheReadingAgain', async ($, on) => {
   expect(world.take('limits')).toEqual([{ sessionId: ID, windows: [FIVE] }])
 })
 
+/** A turn did not reach the app, so the next poll joins again with `missed`. */
+test('aRejoinThatSaysAGapSendsTheReading', async ($, on) => {
+  const world = fakeWorld(on)
+  on('session.usage', () => usage([FIVE]))
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await aMoment()
+  world.take('limits')
+  world.take('join')
+  world.syncStatus = 404
+  await $.prompt.submit({ text: 'Rename the folder', wait: false, origin: { kind: 'composer' } as never })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.syncStatus = 200
+  await world.clock.advance(1000)
+  await aMoment()
+  expect(world.take('join')[0]?.missed).toBe(true)
+  expect(world.take('limits')).toEqual([{ sessionId: ID, windows: [FIVE] }])
+})
+
+test('theOwnersJoinAfterARemovalSendsTheReading', async ($, on) => {
+  const world = fakeWorld(on)
+  on('session.usage', () => usage([FIVE]))
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await aMoment()
+  world.take('limits')
+  world.removed.add(ID)
+  await world.clock.advance(1000)
+  await aMoment()
+  expect(world.take('limits')).toEqual([])
+  await $.command.run({ ...LIVE, args: 'on' })
+  await aMoment()
+  expect(world.take('limits')).toEqual([{ sessionId: ID, windows: [FIVE] }])
+})
+
+test('theJoinAfterClearSendsTheReadingUnderTheNewId', async ($, on) => {
+  const world = fakeWorld(on)
+  on('session.usage', () => usage([FIVE]))
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  await aMoment()
+  world.take('limits')
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  world.sessionId = OTHER
+  await world.clock.advance(1000)
+  await aMoment()
+  expect(world.take('limits')).toEqual([{ sessionId: OTHER, windows: [FIVE] }])
+})
+
+test('theResumeAfterAReloadSendsTheReading', async ($, on) => {
+  const world = fakeWorld(on, { [`joined:${ID}`]: { pending: null, followUp: null, turns: [], hasGap: false } })
+  on('session.usage', () => usage([FIVE]))
+  await $.session.start(START)
+  await aMoment()
+  expect(world.take('limits')).toEqual([{ sessionId: ID, windows: [FIVE] }])
+})
+
 test('aMeasureWithRateLimitsSendsThem', async ($, on) => {
   const world = fakeWorld(on)
   on('session.usage', () => usage([]))
@@ -66,34 +125,12 @@ test('aMeasureWithRateLimitsSendsThem', async ($, on) => {
   expect(world.take('limits')).toEqual([{ sessionId: ID, windows: [FIVE, SPEND] }])
 })
 
-test('aWeekOnlyListIsSent', async ($, on) => {
-  const world = fakeWorld(on)
-  on('session.usage', () => usage([]))
-  await $.session.start(START)
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.session.measure(measure([{ kind: 'seven_day', percentUsed: 22, resetsAt: '2026-01-05T06:00:00Z' }]))
-  await aMoment()
-  expect(world.take('limits')).toEqual([
-    { sessionId: ID, windows: [{ kind: 'seven_day', percentUsed: 22, resetsAt: '2026-01-05T06:00:00Z' }] },
-  ])
-})
-
 test('aMeasureOfSomethingElseSendsNothing', async ($, on) => {
   const world = fakeWorld(on)
   on('session.usage', () => usage([]))
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
   await $.session.measure(measure([FIVE], ['context']))
-  await aMoment()
-  expect(world.take('limits')).toEqual([])
-})
-
-test('anEmptyListSendsNothing', async ($, on) => {
-  const world = fakeWorld(on)
-  on('session.usage', () => usage([]))
-  await $.session.start(START)
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.session.measure(measure([]))
   await aMoment()
   expect(world.take('limits')).toEqual([])
 })

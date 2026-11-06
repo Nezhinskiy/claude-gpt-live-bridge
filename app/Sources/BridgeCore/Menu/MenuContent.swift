@@ -137,10 +137,9 @@ public struct MenuContent: Sendable, Equatable {
       if !talk.isEmpty { talk.append(.separator) }
       talk += [.header("What was sent"), .sent(Self.capped(sent))]
     }
+    let load = target == nil ? contextLoad : contextLoad.shown(needsContext: update.needsContext)
     let context: [Item] = [
-      .command(
-        .loadContext, title: contextLoad.title, isEnabled: target != nil && contextLoad.isEnabled
-      ),
+      .command(.loadContext, title: load.title, isEnabled: target != nil && load.isEnabled),
       .command(.newConversation, title: "New conversation…", isEnabled: target != nil),
       .submenu("Conversation", isEnabled: !talk.isEmpty, items: talk),
     ]

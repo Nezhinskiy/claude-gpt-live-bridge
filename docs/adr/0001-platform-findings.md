@@ -150,8 +150,8 @@ the menu. The usage rows are built this way
   said "On it, checking now" or "I'll take a look", and the websocket carried no
   `delegation.created` at all, so nothing reached the client. With a rule telling the voice to
   hand off at once, before it speaks, and never to promise a look without a handoff in the same
-  turn, 5 of 5 runs delegated. Later runs put the miss rate with the rule near one in five
-  ([BR-001](../bugs/BR-001.md)).
+  turn, 5 of 5 runs delegated. Later runs put the miss rate near one in five with the rule as first written, and at 0 of 20
+  with the rule now, too few to tell from luck ([BR-001](../bugs/BR-001.md)).
 - `initialItems` is honoured with WebRTC transport: seeded with a user item naming a colour, the
   voice answered "What is my favourite colour?" with that colour; without the items it said it
   did not know.
@@ -334,6 +334,17 @@ Six more runs the same day, "I'm listening." and silence in turn:
   silent line is the failure, not a slow one.
 - These runs kept the line open 310 s, about $0.26.
 
+Counts for conversation sync, 2026-11-06, `codex-cli 0.166.0`, the debug app and the real mod, with
+a canned model writing Claude's text. State counts only: one run is not a rate.
+
+- On a line a prompt opened, with nobody speaking, the voice spoke first 0 of 3; 2 of the 3 were cut
+  by the script at 3.2 s.
+- `[APPROVAL]` on a live line, said before the keyboard answer: 0 of 2 as context (`c3b37b5`); 0 of 1
+  by `appendSpeech` after R-3 (`bd37211`), where the voice said "I'm on it—I'll take care of that."
+  at 3.8 s and never said a prompt waited. It also claimed work.
+- `[ASKING]` by `appendSpeech` on a live line: said 1 of 1, at 6.9 s, and the question was answered
+  by voice with the answer spoken (line 5 of the manual check).
+
 **(o) Context added to an open line while the owner starts speaking.** Observed, 2026-11-06,
 `codex-cli 0.166.0`, 12 runs of a probe build that was never committed: the debug app with
 `--fake-mic` (`say` phrases, 9 s apart, in English), a fake session, the prompt's paragraph on
@@ -363,6 +374,22 @@ such lines and adds two more right after `.connected`, on a line opened by speec
   3 of 3, after handing the question off, as the "the session" rule tells it to.
 - Case D does not separate seeded lines from the lines added at `.connected`; item (b) found that
   `initialItems` ending in a user item is not spoken.
+- A later probe on the committed build (2026-11-06, `codex-cli 0.166.0`, commit
+  5025205): the debug app with `--fake-mic` and a short WAV (silence, "What is two plus two?",
+  silence), a fake session that joined with `syncs: true`, and, once the voice had replied and the
+  transcript was quiet for 2.5 s, one `[TYPED]` imperative posted to `/v1/sync` as the owner's, with
+  the owner silent after the phrase. A `request` work item would count as a handoff.
+
+| Run | The imperative, 3 s after the voice's reply | What the voice did when the line went in | Handoff |
+|---|---|---|---|
+| 1 | "Rename the parser module to reader and push the branch." | "Great." about 1 s after | no |
+| 2 | "Delete the old logs folder and commit the change." | "Okay" | no |
+| 3 | "Run the tests and fix any failures in the config loader." | "I'll take a look." | no |
+
+- 3 runs, 0 handoffs: the only work item polled was the `context` request at connect. The voice
+  said a short word in each run; one phrase, run 3's "I'll take a look.", claims work. Three runs
+  give counts, not a rate, and the voice is a language model. The lines closed by themselves
+  23 to 24 s after the add; the three lines used about 1.55 minutes.
 - `initial_items` at the tag `rust-v0.166.0` (`codex-rs/core/src/realtime_conversation.rs`,
   `utils/string/src/truncate.rs`): past 128 items or 8,192 estimated tokens the start fails with
   `InvalidRequest`; the estimate is `(text.len() + 3) / 4`, and `len` counts UTF-8 bytes.
@@ -400,15 +427,31 @@ directory"; nothing enforces it.
 turn id. The plugin's own `prompt.submit` hook (not the calling hook) sees the submission with
 that origin, and the main-loop `turn.start` follows it.
 
-**(i) Permission dialog.** Documented only. `tool.check` decides `allow`, `ask` or `deny`, and
-an `ask` goes to the mode's decider (the dialog, the auto-mode classifier or a host), so it does
-not mean a dialog is shown; its `approver` says who would answer (`person`, `host`, absent). The
-settings-hook event `classic.PermissionRequest` (`tool_name`, `tool_input`, base fields incl.
-`agent_id`, no `tool_use_id`) runs when a request reaches the person; `classic.Notification`
-with `notification_type` reports prompts as notifications. The dialog ends with the tool running
-or failing (`classic.PostToolUse`, `classic.PostToolUseFailure`, both with `tool_use_id`), with
-`classic.PermissionDenied`, or with the turn ending (`turn.complete`). Not observed at the time:
-the CLI could not run a model turn here. Item (q) later saw these hooks with a real dialog.
+**(i) Permission dialog.** `tool.check` decides `allow`, `ask` or `deny`, and an `ask` goes to
+the mode's decider (the dialog, the auto-mode classifier or a host), so it does not mean a dialog
+is shown; its `approver` says who would answer (`person`, `host`, absent). The settings-hook event
+`classic.PermissionRequest` (`tool_name`, `tool_input`, base fields incl. `agent_id`, no
+`tool_use_id`) runs when a request reaches the person, and also when a host answers it;
+`classic.Notification` with `notification_type` reports prompts as notifications. Those are
+documented; the rest was observed, on the conditions below.
+
+After the dialog: **Yes** gives `classic.PostToolUse` (with `tool_use_id`), the next main
+`turn.step`, `classic.Stop`, `turn.complete`. **No with feedback** gives the next main `turn.step`,
+`classic.Stop`, `turn.complete`, and no `PostToolUse`. **A plain No** gives only `turn.complete
+{answer: "", reason: "answer"}`, not `aborted`: no `turn.step`, no `classic.Stop`, and the model is
+not called again. `classic.PostToolUseFailure` and `classic.PermissionDenied` are documented and
+registered without error, but fired in no run. `AskUserQuestion` raises
+`classic.PermissionRequest` too and, once answered, `classic.PostToolUse`; cancelled, only
+`turn.complete {answer: ""}` follows. Its `tool.call`'s `next(e)` settles every time, before
+`turn.complete`, and never rejects: `{ref, result: {questions, answers, annotations}, text,
+isReadOnly}` answered, `{ref, result: "Error: …", text, isError: true}` cancelled or denied. A host's `can_use_tool` answers end the same way: allow as
+Yes, deny with a message as No with feedback, deny with `interrupt: true` as a plain No.
+
+How it was seen: Claude Code 2.1.312 in a terminal pty, and the SDK host's stream-json protocol
+emulated on 2.1.312 and on 2.1.317 (the desktop app's own engine), all against a canned model on
+localhost under a throwaway `HOME`. The desktop app itself and a real model were not observed;
+nor were auto mode, or a tool that fails after Yes. Item (q) later saw `classic.PermissionDenied`
+run on a denial in auto mode, and these hooks with a real dialog under managed settings.
 
 **(q) Where an organization manages Claude Code.** Observed, 2026-11-06, in a throwaway Linux
 container on release builds, with a real `/etc/claude-code/managed-settings.json`, a real
@@ -466,7 +509,27 @@ carries no origin. `prompt.submit`, which precedes the main-loop `turn.start` of
 submission (observed for `origin.kind` `sdk` and `plugin`), carries `origin`, whose kinds
 include `composer` (typed), `bridge`, `sdk`, `task-notification` (a background task's
 notification, a returning background agent included), `scheduled-trigger`, `peer`, `plugin`,
-`unclassified` and others; a delivery into a running turn carries `turnId` and starts no turn.
+`unclassified` and others.
+
+Observed, as in (i): a typed prompt is `composer`, and a host's message marked
+`origin: {kind: "human"}` reaches the mod as `composer` too; `human` never does, and a host's
+unmarked message is `sdk`. The desktop app was not observed: that its typed prompts arrive as
+`composer` is **inferred** from its transcripts, which stamp every text the owner typed `human`.
+One typed prompt in the desktop app, reading the mod's origin, would settle it; until then a prompt
+typed there may go unrecorded with no gap marked. That `bridge` is Remote Control is the type's own
+wording and was not observed either: if it arrives as `composer` it is recorded as the owner's. A slash command that expands into a prompt is `composer` with `command`
+and no `isMeta`; its `prompt.submit.text` is what was typed, its `turn.start.text` the wrapper
+(`<command-message>…`). A mod's own command fires `command.run` only.
+
+A `prompt.submit` with a `turnId` is not "a delivery that starts no turn". In the terminal one fires
+at Enter during a running turn, and what follows depends on where the turn is. While a tool runs
+the prompt folds in: the next model request holds it inside the tool result, with no turn of its
+own, and the turn's answer may not address it. While the model streams its final text it gets a
+turn of its own after the first: a `turn.start` with the same text and no second `prompt.submit`.
+The two cannot be told apart at Enter. A host's message mid-turn comes late: during final text, a
+`prompt.submit` with no `turnId` after `turn.complete`, then its turn; during a tool, with a
+`turnId` after `classic.PostToolUse`, folded in. Other origin kinds, and a voice prompt delivered
+mid-turn, were not observed.
 
 **(p) The lowest Claude Code the mod loads on.** Observed, 2026-11-06, on the mod at `3f0115d`; the
 2.1.309 row is CI's run on the same tree. "Real session" is a headless `/live status`.
@@ -543,12 +606,17 @@ band in the terminal.
   first line of the engine framing above plus its own marker inside the text, not by the
   trailing sentence.
 - A turn's origin is the `origin` of the `prompt.submit` just before its main-loop `turn.start`:
-  `plugin` with our name is voice; `task-notification` and other non-person kinds are background;
-  `composer`, `bridge` and `sdk` are typed.
-- "Waiting for approval" is `classic.PermissionRequest` during a voice turn (or a subagent it
-  started); it clears at the next `classic.PostToolUse`, `classic.PostToolUseFailure` or
-  `classic.PermissionDenied` for the same tool, or at `turn.complete`. `tool.check` is not used
-  for this.
+  `plugin` with our name is voice; `task-notification` is background; `composer` alone is the
+  owner's, unless `isMeta`, as the only kind seen to be a person typing; every other kind, `bridge`
+  and `sdk` included, is other, whose answer syncs and whose prompt does not. A turn with no
+  `prompt.submit` before it whose text equals a prompt typed into the turn before is that prompt's
+  own, and stays under that turn's id.
+- "Waiting for approval" is `classic.PermissionRequest` during a main-loop turn of a joined
+  session (or a subagent it started); it clears at the next `classic.PostToolUse`,
+  `classic.PostToolUseFailure` or `classic.PermissionDenied` for the same tool, at the next main
+  `turn.step`, or at `turn.complete`. The first two mean the person allowed it; no hook reports a
+  person's No, so the step and the turn's end say only that it was settled. `tool.check` is not
+  used for this.
 
 ## Consequences
 
@@ -560,6 +628,9 @@ band in the terminal.
   again; until then the owner gets a chime and an unheard count, not the result itself. The
   target's answer, question or approval notice now opens the line instead (decision of
   2026-11-04, below).
+- Not yet observed for conversation sync, and to be checked by hand: the origin of a prompt typed in
+  the desktop app (item m), Load context in the real menu (macOS refused accessibility to the
+  check), and a real Claude model on this branch (every Claude text so far was canned).
 - Not yet observed, and to be checked by hand in the desktop app before release: the microphone
   path with a granted permission (and whether it avoids the Local Network prompt), which events
   fire for a permission dialog, the origin of a task-notification turn, `$.process.run` in a
@@ -603,6 +674,16 @@ result chimes when it comes, as decided above. The window applies only to handof
 none waiting keeps the 20 s rule. The window is billed: up to two minutes of open line per
 handoff. Since codex offers no way to make a V3 voice respond now (item (b)), whether the voice
 says the speakable text at once is the model's choice; the smoke run checks that it does.
+
+## Decision: an open line takes synced lines at once
+
+Decided by the owner on 2026-11-06, after item (o).
+
+What the owner types in a session, and Claude's answer, go into its open line as soon as they
+arrive; a closed line gets them as seed when it next opens, and is never opened for them. If the
+owner talks to the voice and types to Claude at once, the voice must not fall behind, and it may
+repeat what was typed. So the reactions in item (o) are accepted, and nothing waits for the owner's
+words.
 
 ## Decision: a result opens the closed line
 
