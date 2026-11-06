@@ -1,21 +1,26 @@
 # Review: a loaded summary in the conversation (PR 47)
 
-Reviewed: `feat/context-in-conversation` at `fa0fcb0`, against `dev` at `f4ec846`. Report only;
-nothing in the PR was changed.
+Reviewed: `feat/context-in-conversation` at `8248100` (two commits, `fa0fcb0` and `8248100`),
+against `dev` at `f4ec846`. Report only; nothing in the PR was changed.
 
 ## Verdict
 
-**Fix first, docs only.** The code is correct and needs no change. One sentence in `SECURITY.md`
-is now false, and `docs/architecture/overview.md` describes the seed wrongly. Both are one commit
-of a few lines, and neither needs another code review.
+**Fix first, docs only.** No code defect blocks the release, and the second commit adds no blocker.
+One sentence in `SECURITY.md` is false since the first commit, and
+`docs/architecture/overview.md` describes the seed wrongly. The second commit left both as they
+were. Together they are one commit of a few lines, and neither needs another code review.
+
+One decision is the owner's, not a defect: finding 8, an open line with no summary.
 
 ## How it was checked
 
 - The three skills, scaled to a small change: `superpowers:requesting-code-review`, `simplify`
   (its four angles) and `security-review` all ran in this one session, not as separate agents.
-- `swift test` on a scratch copy of `fa0fcb0`: 606 tests passed, the PR's 601 and 5 throwaway
-  probes. `scripts/check.sh` was not run here. CI's `check` job was still pending when this was
-  written.
+- `swift test` on a scratch copy of `8248100`: 616 tests passed, the PR's 605 and 11 throwaway
+  probes. `scripts/check.sh` was not run here. CI's `check` job passed; CodeQL's Swift analysis was
+  still pending when this was written.
+- Two mutations of the second commit, run against the PR's own 605 tests (findings 9 and "Asked of
+  the second commit").
 - `LineView` and `TranscriptView`, copied unchanged into a scratch program, rendered to a PNG at
   the menu's 320 points with a long summary between ordinary lines. The layout is right: the mark
   sits above, the text wraps, all of it muted, and the other rows are unchanged. That is not the
@@ -58,7 +63,7 @@ should say "less those briefs and summaries", and the list should name them.
 
 ## Does not block
 
-### 3. `README.md:444-445` and its six translations
+### 3. `README.md:445-446` and its six translations
 
 "its recent conversation (up to 64 lines …) and the context line last loaded from it" is still
 literally true, as earlier summaries count among the 64 lines, but a reader will take it to mean
@@ -89,8 +94,46 @@ would end the class; that is its own change.
 
 ### 7. One look at the real menu
 
-The PR says the layout was not seen, and the render above covers `LineView` only. Opening the
-Conversation submenu once on the release build is enough.
+The PR says the layout and the new title were not seen, and the render above covers `LineView`
+only. Opening the menu and the Conversation submenu once on the release build is enough.
+
+### 8. An open line with no summary leaves Load context disabled (owner's decision)
+
+`.withTheLine` does not look at whether a line is already open. If the line asked and the summary
+never came (the model failed, or `Conversation.askLife` passed), the item stays disabled and says
+**Context loads with the line** for as long as that line lasts, though that line will not load it.
+In 0.4.0 the item was enabled, so this is a narrow step back. The same happens when **Pause sync**
+is on as a line opens and is turned off during it: that line never asked (probes
+`probeOpenLineWithNoSummaryStaysDisabled` and `probePauseOffMidLine`).
+
+It is not a hole: the next line asks, and `/live context` in the session or Stop and Start reach it
+now. It does not block. A press could not have helped a session the model cannot summarise either.
+
+If the owner wants the press back, adding `&& !isLineOpen` to the return in `Bridge.contextNeed` is
+the whole fix. The cost is that the item reads **Load context** for the seconds a summary is on its
+way at the start of every first line; a press then joins the same ask, harmlessly.
+
+### 9. The "too many lines" branch has no test
+
+Removing `!conversation.isOverSeed` from `lostNothing` (`Bridge.swift:387`) leaves all 605 tests
+passing, yet the CHANGELOG names that case. The code is right: `probeLinesButNoSummary` passes,
+with 1 line reading `.withTheLine` and 71 reading `.load`. That probe is the test to add.
+
+### 10. `ContextNeed.load`'s comment says more than is true
+
+`ContextLoads.swift:9` says "Only a press would". For a `missed` gap, a mod that does not sync and
+too many lines, `openLine` asks by itself as well; only the pause setting and a `paused` mark leave
+it to a press. The item staying enabled there is right, as a press helps before the next line, but
+the comment and the PR body's heading ("only when a press is what it takes") overstate it. The test
+comment "A gap is the owner's to load" has the same slip.
+
+### 11. "Loads" is a small promise
+
+The title and the READMEs say the next line loads a summary. It asks. A session with no prompt yet
+gets none (the mod writes none), and a summary can fail, so the title can stay through a whole line.
+With no prompt there is nothing to lose, and README's next sentence already says a summary can
+fail. The wording was left as the owner's call; "the next line asks for one" would be exact in the
+READMEs.
 
 ## What was asked, answered
 
@@ -116,7 +159,7 @@ Conversation submenu once on the release build is enough.
   file of 0.4.0's shape).
 - **`LineView`?** Sound. `Text(String)` is verbatim, so a summary cannot inject markdown or a link.
   The `[CONTEXT] Alpha:` prefix stays under the **Loaded context** mark; that is what keeps
-  `README.md:411`'s "exactly as it is sent" true, so it should stay.
+  `README.md:411-412`'s "exactly as it is sent" true, so it should stay.
 - **CHANGELOG and the English README?** Accurate. "Shown whole" means the whole stored line, which
   `Bridge.maxContext` caps at 1,500 characters. "Where it was loaded" has the two exceptions above,
   too small to spell out.
@@ -124,6 +167,28 @@ Conversation submenu once on the release build is enough.
   English as the menu shows it. Finding 4 is the only slip.
 - **Leftovers?** No `What was sent`, `SentView`, `sentCharacters` or `.sent(` outside the
   CHANGELOG entry that retires it.
+
+## Asked of the second commit
+
+- **Can a session end up with Load context disabled and the voice missing something no line will
+  load?** No. Each condition of `.withTheLine` (no pause setting, no `paused` mark, and
+  `needsContext`, true with no summary) is a condition of the ask in `openLine`, so that state always
+  makes the next line ask. `.none` is `needsContext` being false, which is unchanged. The states no
+  line loads, the pause setting and a `paused` mark, both read `.load` and stay enabled. Probes cover
+  a new session and New conversation. The gap that remains is the line already open (finding 8).
+  One edge heals itself: New conversation within 120 s of an ask leaves it stale, so the next line's
+  summary is ignored, and the line after that gets one. A press would have been ignored too.
+- **Does `isOverSeed` keep `isCurrent` identical when a context exists?** Yes. With a context the
+  subtraction is 1 as before and `!(a > b)` is `a <= b`, so the new expression is the old one. With no
+  context `isCurrent` is false both ways. Mutating the subtraction to always be 1 fails the PR's own
+  test, so the no-summary arm is covered. `needsContext` and `openLine` did not change, so the PR
+  body's "what opens a line and asks for a summary does not change" holds.
+- **Is the menu ever stale?** `contextNeed` now reads the pause setting, which publishes no change
+  of its own, but `sweep` republishes every second, so the item catches up within a second.
+- **README claims?** Accurate. "No summary while **Pause sync** is on", the list of gaps and the two
+  disabled titles match `contextNeed`. All seven READMEs carry the new sentence, and the Ukrainian
+  one says `резюме` there. The CHANGELOG entry matches. Findings 8 and 11 are the only limits on
+  "the next line loads one". `docs/specs/` is left as the record, as the PR body says.
 
 ## Is the architecture elegant enough? Is anything redundant?
 
@@ -138,10 +203,18 @@ that is required: the voice needs `context` after the line rolls off. `line != c
 return the answer would save one line and is not worth a change now. The `BridgeUpdate.context`
 helper in `Support.swift` keeps over a dozen existing assertions readable, and it is test-only.
 
+The second commit is sound too. `ContextNeed` and `ContextLoadState` overlap, three cases mapping
+one to one in `shown(_:)`, but what the voice needs and what the press is doing are separate facts,
+so the four lines of mapping are fair. `contextNeed` asks `registry.syncs` a second time after
+`needsContext` has, which costs nothing. `isOverSeed`'s `(context == nil ? 0 : 1)` is the one
+clever spot, and a mutation shows it is tested.
+
 ## Security
 
-No finding. No new input, wire field or file: the text was already redacted and saved. The
-retention change is finding 1, a documentation defect and not a vulnerability.
+No finding in either commit. No new input, wire field or file: the text was already redacted and
+saved. The retention change is finding 1, a documentation defect and not a vulnerability. The second
+commit adds no ask and no way around the pause: `openLine` is unchanged, and only a menu item's
+state moved.
 
 ## Efficiency
 
