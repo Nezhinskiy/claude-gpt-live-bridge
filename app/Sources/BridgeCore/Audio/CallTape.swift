@@ -3,7 +3,10 @@
 
   /// The audio of a call in a stereo WAV, the microphone on the left and the voice on the right,
   /// and beside it a JSON-lines file of marks timed on that tape (`--record-call`, debug builds
-  /// only). Both stay valid after every write, so a take that dies keeps what it had.
+  /// only). Both stay valid after every write, so a take that dies keeps what it had. A mark's
+  /// `at` counts the audio already written, so it can lead its sound by a chunk or two; `began`
+  /// comes with the first chunk, so it need not be first; `voiceFinished` is the end of the
+  /// voice's transcript, not of its sound.
   public final class CallTape {
     public static let sampleRate = 48000
     private static let headerSize = 44
@@ -42,7 +45,7 @@
     public func append(_ chunk: String) {
       guard let audio, let data = Data(base64Encoded: chunk) else { return }
       let isFirst = bytes == 0
-      try? audio.seekToEnd()
+      _ = try? audio.seekToEnd()
       try? audio.write(contentsOf: data)
       bytes += data.count
       try? audio.seek(toOffset: 0)
