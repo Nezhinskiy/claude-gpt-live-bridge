@@ -202,9 +202,12 @@ is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text
 owner (local voice detection) nor the voice is speaking; when either was, the bridge waits until
 both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
 line. A window that passes with no result closes the line once it is silent; when the result comes,
-it opens the line again, as below. A line with no handoff waiting keeps the plain silence rule, so
-an exchange that sends nothing to Claude costs no more than before. codex has no request that makes
-the v3 voice respond, so whether it says the speakable text at once is the model's choice
+it opens the line again, as below. A question or an approval notice of the session the open line is
+about goes the same way, whoever started the turn, and ends no wait for a result; another session's
+is added as context unless that session was handed a request. A line with no handoff waiting keeps
+the plain silence rule, so an exchange that sends nothing to Claude costs no more than before. codex
+has no request that makes the v3 voice respond, so whether it says the speakable text at once is the
+model's choice
 ([ADR 0001](../adr/0001-platform-findings.md) (b)).
 
 ```mermaid

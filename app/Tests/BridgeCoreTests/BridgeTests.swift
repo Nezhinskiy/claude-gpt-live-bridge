@@ -534,12 +534,13 @@ struct BridgeTests {
     try await registry.enqueue(request(1), for: a)
     #expect(try await registry.poll(a) == .request(request(1)))
     await live()
+    await bridge.audioEvent(.speechEnded)
     let question = "Which name? Options: out."
     let text = "Two folders.\n```\nrm -rf build\n```\n| a | b |\nPick one."
     try await post(
       "/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question, text: text))
     let said = "Which name? Options: out. Claude wrote just before asking: Two folders. Pick one."
-    #expect(await voice.added == ["[ASKING] Alpha: \(said)"])
+    #expect(await voice.spoken == ["[ASKING] Alpha: \(said)"])
   }
 
   /// What Claude wrote in the step that asked for a permission follows the approval notice,
@@ -547,20 +548,22 @@ struct BridgeTests {
   @Test func anApprovalsLineCarriesTheStepsProse() async throws {
     try await join(a, "Alpha")
     await live()
+    await bridge.audioEvent(.speechEnded)
     let text = "Deleting build.\n```\nrm -rf build\n```\n| a | b |\nThen test."
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
     let notice = "Claude is waiting for your approval"
     let said = "\(notice). Claude wrote just before asking: Deleting build. Then test."
-    #expect(await voice.added == ["[APPROVAL] Alpha: \(said)"])
+    #expect(await voice.spoken == ["[APPROVAL] Alpha: \(said)"])
   }
 
   /// A step that wrote only code or a table adds nothing to the notice.
   @Test func anApprovalAfterACodeOnlyStepIsTheNoticeAlone() async throws {
     try await join(a, "Alpha")
     await live()
+    await bridge.audioEvent(.speechEnded)
     let text = "```\nrm -rf build\n```\n| a | b |"
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
-    #expect(await voice.added == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
+    #expect(await voice.spoken == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
   }
 
   /// What the app shows lists the joined sessions whose mod is older than the app.
@@ -578,13 +581,27 @@ struct BridgeTests {
     #expect(await test.bridge.current.labelsOnAnOlderMod == [])
   }
 
+  /// On a live line a typed turn's question is given to say, as a voice turn's is.
+  @Test func aTypedTurnsQuestionIsSaidOnItsOwnLine() async throws {
+    try await join(a, "Alpha")
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await sync(a, "Rename it.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    #expect(await voice.spoken == ["[ASKING] Alpha: Which name?"])
+  }
+
   /// A step's text longer than a line is cut, and the notice before it stays whole.
   @Test func aLongStepTextNeverCutsTheNotice() async throws {
     try await join(a, "Alpha")
     await live()
+    await bridge.audioEvent(.speechEnded)
     let text = String(repeating: "Deleting build. ", count: 200)
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
-    let line = try #require(await voice.added.first)
+    let line = try #require(await voice.spoken.first)
     #expect(line.hasPrefix("[APPROVAL] Alpha: Claude is waiting for your approval. Claude wrote"))
     #expect(line.count <= AnswerShaper.maxCharacters)
   }
@@ -2324,7 +2341,7 @@ struct BridgeTests {
       "/v1/answer",
       AnswerBody(sessionId: a, id: request(1).id, status: .ok, text: "Renamed.", reason: nil))
     #expect(answered.status == 200)
-    #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Renamed."] })
+    #expect(await eventually { await voice.spoken.last == "[RESULT] Alpha: Renamed." })
   }
 
   // MARK: Synced lines in a call paused at the plan's limit

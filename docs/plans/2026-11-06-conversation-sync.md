@@ -65,7 +65,7 @@ run in order, because D's engine tests are worth more against a settled wire.
   | pause on, typed turn | dropped, *paused* | recorded | recorded | recorded |
   | pause on, typed into a running turn | dropped, turn refused | recorded | recorded | recorded |
   | pause on, no context or *missed* | no summary | no summary | no summary | no summary |
-  | typed question, target | recorded only | opens the line | given on connect | added now |
+  | typed question, target | recorded only | opens the line | given on connect | given to say now |
   | typed question, other session | recorded only | recorded only | recorded only | recorded only |
   | `/clear` mid-turn | decision moves with the conversation | same | same | same |
   | New conversation | lines go; *paused* and the decision stay | same | line closes | line closes |

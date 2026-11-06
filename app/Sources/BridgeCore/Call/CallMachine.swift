@@ -57,7 +57,9 @@ public enum CallEvent: Equatable, Sendable {
   case assistantSpeaking, userTranscribed
   /// `opensLine`: the bridge found that the line opens a closed line (the target's answer,
   /// question or approval notice, while the target's conversation holds a turn of the owner's).
-  case deliver(VoiceLine, opensLine: Bool = false)
+  /// `onOwnLine`: the open line is about the line's session, so its question or approval notice is
+  /// given to say, whoever started the turn.
+  case deliver(VoiceLine, opensLine: Bool = false, onOwnLine: Bool = false)
   case remoteClosed(Problem)
   case audioFailed(Problem)
   /// The open line carries a conversation that is not the target's any more: another session
@@ -173,7 +175,7 @@ public struct CallMachine: Sendable {
   }
 
   public mutating func handle(_ event: CallEvent) -> [CallEffect] {
-    if case .deliver(let line, _) = event, line.asks, keepsLines, let session = line.session {
+    if case .deliver(let line, _, _) = event, line.asks, keepsLines, let session = line.session {
       questionRoutes.removeAll { $0 == session }
       questionRoutes.append(session)
     }
@@ -187,7 +189,7 @@ public struct CallMachine: Sendable {
       isPaused = false
       // the problem first: listening waits on macOS's prompt, whose refusal is a new problem
       return [.problem(nil), .startLocalVAD]
-    case (.off, .deliver(let line, _)) where isPaused:
+    case (.off, .deliver(let line, _, _)) where isPaused:
       unheard.append(Unheard(line: line))
       return [.chime]
     case (.off, _):
@@ -212,13 +214,13 @@ public struct CallMachine: Sendable {
       isSoundOn = true
       phase = .connecting
       return [.openRealtime]
-    case (.listening, .deliver(let result, let opensLine)):
+    case (.listening, .deliver(let result, let opensLine, _)):
       unheard.append(Unheard(line: result))
       guard opensLine else { return [.chime] }
       phase = .connecting
       isAwaitingFirstWord = true
       return [.openRealtimeForResult]
-    case (.connecting, .deliver(let result, _)):
+    case (.connecting, .deliver(let result, _, _)):
       unheard.append(Unheard(line: result))
       return []
     case (.connecting, .synced(let line)):
@@ -238,12 +240,14 @@ public struct CallMachine: Sendable {
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return reason.pausesCall ? pause(for: reason) : [.problem(reason)] + hangUp()
-    case (.live, .deliver(let result, _)):  // a result the voice never speaks still hangs up
-      guard let session = result.session, awaited.contains(session) else {
+    case (.live, .deliver(let result, _, let onOwnLine)):
+      // a result the voice never speaks still hangs up
+      let isAwaited = result.session.map(awaited.contains) ?? false
+      guard isAwaited || (onOwnLine && [.asking, .approval].contains(result.kind)) else {
         unheard.append(Unheard(line: result))
         return [.addContext(result), armSilence()]
       }
-      if result.kind.answers { awaited.remove(session) }
+      if result.kind.answers, let session = result.session { awaited.remove(session) }
       let isHeld = isSoundOn || isVoiceSpeaking
       unheard.append(Unheard(line: result, isHeld: isHeld))
       return isHeld ? [armSilence()] : [.speak(result), armSilence()]

@@ -43,6 +43,8 @@ struct CallMachineTests {
   static func deliver(_ line: VoiceLine) -> CallEvent { .deliver(line) }
   /// A line the bridge says opens a closed line: the target's answer or question.
   static func opening(_ line: VoiceLine) -> CallEvent { .deliver(line, opensLine: true) }
+  /// A line of the session the open line is about.
+  static func onItsLine(_ line: VoiceLine) -> CallEvent { .deliver(line, onOwnLine: true) }
   static let asking = alphas(.asking, "Which branch?")
   /// A line from Alpha, the session the request was handed to.
   static let fromAlpha = deliver(result)
@@ -287,6 +289,30 @@ struct CallMachineTests {
     row(
       "anApprovalIsSaidAtOnce", waiting, deliver(approval), .live, [.speak(approval), arm],
       pending: [approval]),
+    row(
+      "aQuestionOnItsOwnLineIsSaid", live, onItsLine(asking), .live, [.speak(asking), arm],
+      pending: [asking]),
+    row(
+      "anApprovalOnItsOwnLineIsSaid", live, onItsLine(approval), .live, [.speak(approval), arm],
+      pending: [approval]),
+    row(
+      "aQuestionOnAnotherSessionsLineIsContext", live, deliver(asking), .live,
+      [.addContext(asking), arm], pending: [asking]),
+    row(
+      "aResultNobodyWaitsForOnItsOwnLineIsContext", live, onItsLine(result), .live,
+      [.addContext(result), arm], pending: [result]),
+    row(
+      "aQuestionOnItsOwnLineWaitsWhileTheOwnerSpeaks", live + [.speechStarted], onItsLine(asking),
+      .live, [cap], pending: [asking]),
+    row(
+      "aQuestionOnItsOwnLineWaitsWhileTheVoiceSpeaks", live + [.assistantSpeaking],
+      onItsLine(asking), .live, [arm], pending: [asking]),
+    row(
+      "aHeldQuestionIsSaidAfterTheGrace", live + [.speechStarted, onItsLine(asking), .speechEnded],
+      .graceElapsed, .live, [.speak(asking), arm], pending: [asking]),
+    row(
+      "aQuestionOnItsOwnLineEndsNoWait", waiting + [onItsLine(asking)], .silenceElapsed, .live, [],
+      pending: [asking]),
     row(
       "anApprovalLeavesTheLineWaiting", waiting + [deliver(approval)], .silenceElapsed, .live, [],
       pending: [approval]),

@@ -493,7 +493,10 @@ public actor Bridge: Router {
   /// the open line is about, and spoken in the line as it is.
   private func say(_ line: VoiceLine) async {
     record(.claude, line.text, in: line.session)
-    await send(.deliver(line, opensLine: await opensLine(line)))
+    await send(
+      .deliver(
+        line, opensLine: await opensLine(line),
+        onOwnLine: lineKnowsSession && lineSession == line.session))
   }
 
   /// Whether `line` opens a closed line: an answer, a question or an approval notice from the
