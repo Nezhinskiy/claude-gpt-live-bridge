@@ -494,7 +494,7 @@ only if it is still the one it bound.
   start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
   session closing, the menu's ×, or no poll for 5 s) stops a call that is on, a Start still
   launching codex included, as Stop does, and reports the same sentence. Any session that leaves
-  takes its waiting question, its approval notice and its question's route with it; both stay
+  takes its waiting question, its approval notice and its question's route with it; the lines stay
   recorded.
 - **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or

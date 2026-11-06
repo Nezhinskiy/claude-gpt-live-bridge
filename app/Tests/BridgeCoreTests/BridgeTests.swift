@@ -2564,6 +2564,27 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
   }
 
+  /// Beta's question took the route from Alpha's. Once Beta's closes, the route is Alpha's again:
+  /// its question is still open, and the reply must not land in Beta as a request.
+  @Test func aQuestionThatClosesGivesTheRouteBack() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.setTarget(b)
+    await live()
+    try await registry.enqueue(request(1), for: a)
+    #expect(try await registry.poll(a) == .request(request(1)))
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await sync(b, "Rename it.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .working))
+    voice.emit(.handoff(request(2)))
+    let reply = Work.reply(request(2), forRequest: request(1).id)
+    #expect(try await eventually { try await registry.poll(a) == reply })
+  }
+
   /// In another session a typed turn's question is only recorded, whatever the call is doing.
   @Test func aTypedQuestionInAnotherSessionDuringAPausedCallIsOnlyRecorded() async throws {
     try await join(a, "Alpha")

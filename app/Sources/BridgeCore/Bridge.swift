@@ -189,7 +189,7 @@ public actor Bridge: Router {
     let isChange = await registry.target != id
     try await registry.setTarget(id)
     if isChange { await withdraw { $0.asks && $0.session != id } }
-    machine.endSaidQuestionRoute()
+    machine.endSaidQuestionRoutes()
   }
 
   /// The menu's ×: forgets the session and its conversation. Its open request fails as
