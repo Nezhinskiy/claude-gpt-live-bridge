@@ -1,5 +1,6 @@
 # Runs scripts/check.sh on every push and pull request. Claude Code is installed first, so the
 # mod's engine-facing half is type-checked against its API types and run by `claude plugin test`.
+# Then scripts/check-floor.sh runs that half again on the lowest version the README promises.
 name: CI
 
 on:
@@ -40,3 +41,6 @@ jobs:
           claude --version
       - name: Check
         run: scripts/check.sh
+      - name: Check the mod on the lowest Claude Code the README promises
+        # The version comes from README.md, so the two cannot differ.
+        run: scripts/check-floor.sh
