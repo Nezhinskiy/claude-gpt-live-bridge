@@ -792,6 +792,51 @@ test('aQuestionWhileAPromptIsOpenIsAsked', async ($, on) => {
   await asked
 })
 
+/** A question's hook can run inside this hook's save; a bare `approval` landing after it takes the question back. */
+test('aPromptSavingWhileAQuestionOpensLeavesItAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await world.clock.advance(1000)
+  world.take('activity')
+  let release = () => {}
+  world.holdStore = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onStoreHeld = resolve })
+  const prompt = $.classic.PermissionRequest({ tool_name: 'Read', tool_input: { file_path: '/Users/example/a' } })
+  await held
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  release()
+  await prompt
+  await aMoment()
+  expect(world.take('activity').at(-1)).toEqual({ sessionId: ID, state: 'approval', question: PLAIN, turn: TYPED })
+  world.answerDialog('out')
+  await asked
+})
+
+/** The same inside a settled prompt's save, whose `working` would take the question back. */
+test('aPromptSettlingWhileAQuestionOpensLeavesItAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await world.clock.advance(1000)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  world.take('activity')
+  let release = () => {}
+  world.holdStore = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onStoreHeld = resolve })
+  const ran = $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' }, tool_response: {}, tool_use_id: 'u1', agent_id: 'a1' })
+  await held
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  release()
+  await ran
+  await aMoment()
+  expect(world.take('activity').at(-1)).toEqual({ sessionId: ID, state: 'approval', question: PLAIN, turn: TYPED })
+  world.answerDialog('out')
+  await asked
+})
+
 test('aQuestionClosedWithAPromptOpenLeavesTheNotice', async ($, on) => {
   const world = fakeWorld(on)
   const { asked } = await atAQuestion($, world)
