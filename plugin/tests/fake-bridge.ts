@@ -285,3 +285,9 @@ export async function step($: Engine, world: ReturnType<typeof fakeWorld>, turnI
   for await (const chunk of stream) void chunk
   return stream.result
 }
+
+/** The session starts and `/live on` joins it. */
+export async function liveOn($: Engine) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+}

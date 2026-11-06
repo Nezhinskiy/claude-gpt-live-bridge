@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { BAND, fakeWorld, ID, LIVE } from './fake-bridge.ts'
+import { BAND, fakeWorld, ID, LIVE, liveOn } from './fake-bridge.ts'
 
 declare const setTimeout: (fn: () => void, ms: number) => unknown
 /** Lets whatever is not held run as far as it can. */
@@ -39,8 +39,7 @@ test('aFailedPostMeansAMissedJoin', async ($, on) => {
   // The app is down for a turn; the join after it says so, once.
   const world = fakeWorld(on)
   world.turns = 0
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   world.take('join')
   world.isAppUp = false
   await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
@@ -57,8 +56,7 @@ test('aFailedPostMeansAMissedJoin', async ($, on) => {
 test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
   const world = fakeWorld(on)
   world.turns = 0
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   world.take('join')
   await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
   world.joined.delete(ID)
@@ -71,8 +69,7 @@ test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
 /** The voice never hears of the question or the prompt, so its picture of the turn has a hole. */
 test('aPromptTheAppDidNotGetMeansAMissedJoin', async ($, on) => {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
   world.take('join')
   world.isAppUp = false
@@ -84,8 +81,7 @@ test('aPromptTheAppDidNotGetMeansAMissedJoin', async ($, on) => {
 
 test('aQuestionTheAppDidNotGetMeansAMissedJoin', async ($, on) => {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
   world.take('join')
   world.isAppUp = false
@@ -110,8 +106,7 @@ test('aFailedJoinKeepsTheGapForTheNextOne', async ($, on) => {
 
 test('anOlderAppWithNoSyncRouteTakesTheTurnAsBefore', async ($, on) => {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   world.syncStatus = 404
   await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
   await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
@@ -122,8 +117,7 @@ test('joiningAgainOpensTheAppAgain', async ($, on) => {
   // Off, then install or quit the app, then on: the next join tries to open it afresh.
   const world = fakeWorld(on)
   world.isAppUp = false
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   await world.clock.advance(11_000)
   const opened = world.launches.length
   await $.command.run({ ...LIVE, args: 'off' })
@@ -139,8 +133,7 @@ test('anInstalledAppIsOpenedByItsPath', async ($, on) => {
   const world = fakeWorld(on)
   world.isAppUp = false
   world.isAppInstalled = true
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   await world.clock.advance(1000)
   expect(world.launches).toEqual([['open', '-g', '/Applications/LiveBridge.app']])
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })

@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
 import type { StatusReply } from '../hooks/wire.ts'
-import { BAND, fakeWorld, ID, LIVE } from './fake-bridge.ts'
+import { BAND, fakeWorld, ID, LIVE, liveOn } from './fake-bridge.ts'
 
 type Node = { type: string; props: Record<string, unknown>; children?: unknown[] }
 const kids = (node: Node) =>
@@ -14,8 +14,7 @@ const SURFACES = ['terminal', 'desktop'] as const
 
 async function joined(...[$, on]: Parameters<TestBody>) {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   world.status = {
     ...world.status, call: 'listening', unheard: 2,
     sessions: [{ sessionId: ID, label: 'Example session', activity: 'idle', isTarget: true }],
@@ -60,8 +59,7 @@ test('aProblemSitsOnARowOfItsOwn', async ($, on) => {
 
 test('beforeTheFirstReplyTheBandSaysItIsJoining', async ($, on) => {
   fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
     expect(await band.find({ type: 'Text', text: /joining/ })).toBeDefined()

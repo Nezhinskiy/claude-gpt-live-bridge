@@ -5,7 +5,7 @@ import type { Engine, TestBody } from 'claude-code/testing'
 
 import { voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { BAND, fakeWorld, framed, ID, LIVE } from './fake-bridge.ts'
+import { BAND, fakeWorld, framed, ID, LIVE, liveOn } from './fake-bridge.ts'
 
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
 const SUMMARY = { sessionId: ID, summary: 'Goal: tidy the example project.' }
@@ -16,8 +16,7 @@ const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
 /** Joined, the call off, this session the target. */
 async function joined(...[$, on]: Parameters<TestBody>) {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   world.status = {
     ...world.status, call: 'off',
     sessions: [{ sessionId: ID, label: 'Example session', activity: 'idle', isTarget: true }],

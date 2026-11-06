@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Work } from '../hooks/wire.ts'
-import { fakeWorld, framed, ID, LIVE, SOCKET } from './fake-bridge.ts'
+import { fakeWorld, framed, ID, LIVE, liveOn, SOCKET } from './fake-bridge.ts'
 
 const START = { cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true } as const
 const OTHER = '22222222-0000-0000-0000-000000000003'
@@ -499,8 +499,7 @@ test('aRemovalALineMeetsTurnsTheSessionOff', async ($, on) => {
 test('theJoinNamesTheModsVersion', async ($, on) => {
   const world = fakeWorld(on)
   world.modVersion = '0.3.1'
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, modVersion: '0.3.1', syncs: true, missed: true }])
 })
 
