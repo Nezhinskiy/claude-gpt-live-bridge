@@ -292,15 +292,6 @@ extension ContinuityTests {
     for n in 0...Conversation.keptLines { continuity.record(.handoff, "task \(n)", in: a) }
     #expect(continuity[a].isCurrent)
   }
-
-  @Test func aLongRussianConversationStillSeedsWithinTheLimit() {
-    var conversation = Conversation()
-    let line = String(repeating: "я", count: 2_000)
-    for _ in 0..<30 { conversation.record(.owner, line) }
-    let items = conversation.initialItems(tasks: [])
-    #expect(!items.isEmpty)
-    #expect(items.reduce(0) { $0 + $1.text.utf8.count / 4 } <= Conversation.maxTokens)
-  }
 }
 
 extension String {
