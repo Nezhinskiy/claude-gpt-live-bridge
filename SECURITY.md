@@ -206,7 +206,7 @@ those shapes goes to OpenAI as typed, personal text included.
   an answer a newer voice request superseded (kept unsaid and added to the open line as context),
   the voice's and your spoken lines, the briefs of the requests the voice handed off, the lines the
   session sent the voice (results, questions, updates, approval notices), and the session's
-  `[CONTEXT]` line. It holds at most 64 lines for each of the 20 sessions used last
+  `[CONTEXT]` line with the summaries loaded before it. It holds at most 64 lines for each of the 20 sessions used last
   (`Conversation.keptLines`, `Continuity.keptConversations`), longer for none of them. A session
   that has left keeps its lines until 20 others have been used since; to erase them sooner, [join it
   again and press **New conversation**](README.md#privacy). The folder is `0700`; whether Time
@@ -273,8 +273,8 @@ those shapes goes to OpenAI as typed, personal text included.
     explicit command.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
   conversation** with the session as the target, or remove it with ×, or when 20 sessions used since
-  push them out (which also loses a paused mark); a load of a new summary replaces the old one but
-  keeps the lines. Neither **New conversation** nor × withdraws a result the voice has not said yet:
+  push them out (which also loses a paused mark); a load of a new summary replaces the old one for
+  the voice and keeps the lines, the old summary among them, until it rolls off. Neither **New conversation** nor × withdraws a result the voice has not said yet:
   a hang-up keeps it and the next connect adds it again, and only **Stop** clears those. That is
   true of results. A waiting question of another session leaves the queue and its route ends when
   you change the target; a session that leaves or is removed with × takes its waiting question and
