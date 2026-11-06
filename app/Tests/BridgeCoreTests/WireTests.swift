@@ -12,7 +12,8 @@ struct WireTests {
   static let roundTrips: [String: @Sendable (Data) throws -> Data] = [
     "join": roundTrip(JoinBody.self), "join-replaces": roundTrip(JoinBody.self),
     "join-version": roundTrip(JoinBody.self), "join-syncs": roundTrip(JoinBody.self),
-    "sync-typed": roundTrip(SyncBody.self), "sync-claude": roundTrip(SyncBody.self),
+    "sync-start": roundTrip(SyncBody.self), "sync-typed": roundTrip(SyncBody.self),
+    "sync-answer": roundTrip(SyncBody.self), "sync-report": roundTrip(SyncBody.self),
     "leave": roundTrip(LeaveBody.self),
     "target": roundTrip(TargetBody.self), "call": roundTrip(CallBody.self),
     "call-mute": roundTrip(CallBody.self),

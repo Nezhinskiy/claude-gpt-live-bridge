@@ -93,15 +93,26 @@ public struct JoinBody: Codable, Sendable, Equatable {
   public var missed: Bool?
 }
 
-public enum SyncSource: String, Codable, Sendable { case owner, claude }
+/// What a line of a turn is. Only `typed` refuses a turn and only `start` has no text; who said a
+/// line and its tag follow from this.
+public enum SyncKind: String, Codable, Sendable {
+  /// A turn's first word: it takes the turn's decision and records nothing.
+  case start
+  /// The owner's words: a prompt, text typed into a running turn, a keyboard answer.
+  case typed
+  /// Claude's final answer.
+  case answer
+  /// The mod's own line: a settled prompt, or a question closed with no answer. It goes as
+  /// Claude's.
+  case report
+}
 
-/// `POST /v1/sync`: a line of a turn that is not a voice request. Empty `text`, at a turn's
-/// start, takes the turn's decision and records nothing.
+/// `POST /v1/sync`: a line of a turn. `text` is absent from `start` alone.
 public struct SyncBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var turnId: String
-  public var from: SyncSource
-  public var text: String
+  public var kind: SyncKind
+  public var text: String?
 }
 
 /// `POST /v1/leave`.

@@ -123,10 +123,10 @@ struct ContinuityTests {
 
 extension ContinuityTests {
   func admit(
-    _ continuity: inout Continuity, _ turn: String, _ from: SyncSource, _ id: SessionID,
+    _ continuity: inout Continuity, _ turn: String, _ kind: SyncKind, _ id: SessionID,
     pausing: Bool
   ) -> Bool {
-    continuity.admits(turn: turn, from: from, in: id, pausing: pausing)
+    continuity.admits(turn: turn, kind: kind, in: id, pausing: pausing)
   }
 
   @Test func aFileFromBeforeSyncStillDecodes() throws {
@@ -143,42 +143,42 @@ extension ContinuityTests {
 
   @Test func aRefusedTurnStaysRefusedAfterThePauseEnds() {
     var continuity = Continuity()
-    #expect(!admit(&continuity, "t1", .owner, a, pausing: true))
-    #expect(!admit(&continuity, "t1", .claude, a, pausing: false))
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
   }
 
   @Test func aTurnFromBeforeThePauseKeepsClaudesAnswer() {
     var continuity = Continuity()
-    #expect(admit(&continuity, "t1", .owner, a, pausing: false))
-    #expect(admit(&continuity, "t1", .claude, a, pausing: true))
+    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
+    #expect(admit(&continuity, "t1", .answer, a, pausing: true))
   }
 
   /// Press Stop with the pause on and type into a turn that started synced: nothing of the turn
   /// is recorded from there on, and the answer stays out.
   @Test func theOwnerTypingAfterStopRefusesTheTurn() {
     var continuity = Continuity()
-    #expect(admit(&continuity, "t1", .owner, a, pausing: false))
-    #expect(!admit(&continuity, "t1", .owner, a, pausing: true))
-    #expect(!admit(&continuity, "t1", .claude, a, pausing: false))
+    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
     #expect(continuity[a].outOfSync == .paused)
   }
 
   @Test func aNewTurnDecidesAgain() {
     var continuity = Continuity()
-    #expect(!admit(&continuity, "t1", .owner, a, pausing: true))
-    #expect(admit(&continuity, "t2", .claude, a, pausing: false))
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
+    #expect(admit(&continuity, "t2", .answer, a, pausing: false))
     #expect(continuity[a].outOfSync == .paused)
-    #expect(!admit(&continuity, "t3", .claude, a, pausing: true))
+    #expect(!admit(&continuity, "t3", .answer, a, pausing: true))
     continuity.setContext("[CONTEXT] Alpha: x", for: a)
     #expect(continuity[a].outOfSync == nil)
   }
 
   @Test func everyRefusedLineMarksPaused() {
     var continuity = Continuity()
-    #expect(!admit(&continuity, "t1", .owner, a, pausing: true))
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
     continuity.setContext("[CONTEXT] Alpha: x", for: a)
     #expect(continuity[a].outOfSync == nil)
-    #expect(!admit(&continuity, "t1", .claude, a, pausing: false))
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
     #expect(continuity[a].outOfSync == .paused)
   }
 
@@ -211,10 +211,10 @@ extension ContinuityTests {
   /// After `/clear` the state and the turn's decision go with the conversation.
   @Test func moveCarriesTheStateAndTheTurn() {
     var continuity = Continuity()
-    #expect(!admit(&continuity, "t1", .owner, a, pausing: true))
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
     continuity.move(a, to: b)
     #expect(continuity[b].outOfSync == .paused)
-    #expect(!admit(&continuity, "t1", .claude, b, pausing: false))
+    #expect(!admit(&continuity, "t1", .answer, b, pausing: false))
     #expect(continuity[a].outOfSync == nil)
   }
 
@@ -222,14 +222,14 @@ extension ContinuityTests {
   @Test func forgetKeepsAPauseAndItsDecision() {
     var continuity = Continuity()
     continuity.record(.owner, "hi", in: a)
-    #expect(!admit(&continuity, "t1", .owner, a, pausing: true))
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
     continuity.setContext("[CONTEXT] Alpha: x", for: a)
-    #expect(!admit(&continuity, "t1", .claude, a, pausing: false))
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
     continuity.forget(a)
     #expect(continuity[a].lines.isEmpty)
     #expect(continuity[a].context == nil)
     #expect(continuity[a].outOfSync == .paused)
-    #expect(!admit(&continuity, "t1", .claude, a, pausing: false))
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
 
     continuity.record(.owner, "hi", in: b)
     continuity.markMissed(b, asPaused: false)
@@ -240,9 +240,9 @@ extension ContinuityTests {
 
   @Test func forgetKeepsAnAdmittedDecisionToo() {
     var continuity = Continuity()
-    #expect(admit(&continuity, "t1", .owner, a, pausing: false))
+    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
     continuity.forget(a)
-    #expect(admit(&continuity, "t1", .claude, a, pausing: true))
+    #expect(admit(&continuity, "t1", .answer, a, pausing: true))
   }
 
   @Test func noContextIsNotCurrent() {

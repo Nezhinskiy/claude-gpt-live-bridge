@@ -70,7 +70,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     isPausing: false,
     /** The last turn the app decided on, its one slot per conversation (`Continuity.admits`). */
     decision: null as { turnId: string; isAdmitted: boolean } | null,
-    /** The non-empty sync lines the app admitted, in order. */
+    /** The sync lines with text the app admitted, in order. */
     kept: [] as string[],
     /** The status the app answers a usage reading with (404: it refuses it). */
     limitsStatus: 200,
@@ -200,9 +200,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     }
     if (route === 'sync') {
       const held = world.decision?.turnId === body.turnId ? world.decision : null
-      const isAdmitted = held ? held.isAdmitted && !(body.from === 'owner' && world.isPausing) : !world.isPausing
+      const isAdmitted = held ? held.isAdmitted && !(body.kind === 'typed' && world.isPausing) : !world.isPausing
       world.decision = { turnId: body.turnId, isAdmitted }
-      if (isAdmitted && body.text !== '') world.kept.push(body.text)
+      if (isAdmitted && body.text !== undefined) world.kept.push(body.text)
       if (world.holdSync !== null) await world.holdSync
     }
     const reply = route !== 'next'

@@ -50,9 +50,13 @@ export type JoinBody = {
   sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string;
   syncs?: boolean; missed?: boolean;
 };
-/** `from`: the owner's typed line or Claude's text. Empty `text`, at a turn's start, takes the turn's decision and records nothing. */
-export type SyncSource = 'owner' | 'claude';
-export type SyncBody = { sessionId: SessionId; turnId: string; from: SyncSource; text: string };
+/**
+ * `start`: a turn's first word, which takes the turn's decision and records nothing; the only kind
+ * with no `text`. `typed`: the owner's words, the only kind that refuses a turn. `answer`: Claude's
+ * final answer. `report`: the mod's own line, which goes as Claude's.
+ */
+export type SyncKind = 'start' | 'typed' | 'answer' | 'report';
+export type SyncBody = { sessionId: SessionId; turnId: string; kind: SyncKind; text?: string };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 

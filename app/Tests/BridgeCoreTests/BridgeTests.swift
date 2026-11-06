@@ -175,12 +175,12 @@ struct BridgeTests {
 
   func setPause(_ on: Bool) { pause.withLock { $0 = on } }
 
-  /// A line of a turn that is not a voice request, as the mod posts it.
+  /// A line of a turn, as the mod posts it.
   @discardableResult
   func sync(
-    _ id: SessionID, turn: String = "turn-1", from: SyncSource = .owner, _ text: String
+    _ id: SessionID, turn: String = "turn-1", kind: SyncKind = .typed, _ text: String? = nil
   ) async throws -> HTTPResponse {
-    try await post("/v1/sync", SyncBody(sessionId: id, turnId: turn, from: from, text: text))
+    try await post("/v1/sync", SyncBody(sessionId: id, turnId: turn, kind: kind, text: text))
   }
 
   /// The conversations as saved, which a restarted app reads.
@@ -1689,13 +1689,13 @@ struct BridgeTests {
     #expect(await test.lines() == ["Claude: [RESULT] Alpha: Done."])
   }
 
-  /// A claude line refused under the pause says nothing of the owner's: no answer is withheld.
-  @Test func aRefusedClaudeLineWithholdsNoAnswer() async throws {
+  /// A `start` refused under the pause says nothing of the owner's: no answer is withheld.
+  @Test func aRefusedStartWithholdsNoAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
     try await test.registry.enqueue(test.request(1), for: test.a)
     _ = try await test.registry.poll(test.a)
-    try await test.sync(test.a, from: .claude, "")
+    try await test.sync(test.a, kind: .start)
     try await test.voiceAnswer()
     #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
   }
@@ -1859,7 +1859,7 @@ struct BridgeTests {
   @Test func aSyncedLineSurvivesARestart() async throws {
     try await join(a, "Alpha")
     try await sync(a, "Fix the build.")
-    try await sync(a, from: .claude, "The build is fixed.")
+    try await sync(a, kind: .answer, "The build is fixed.")
     let restarted = try restart()
     try await restarted.join(restarted.a, "Alpha")
     #expect(
@@ -1881,7 +1881,7 @@ struct BridgeTests {
   @Test func aSyncedLineIsSeededToTheNextLine() async throws {
     try await join(a, "Alpha")
     try await sync(a, "Fix the build.")
-    try await sync(a, from: .claude, "The build is fixed.")
+    try await sync(a, kind: .answer, "The build is fixed.")
     await live()
     let items = try #require(await voice.opens.last)
     #expect(
@@ -1937,10 +1937,10 @@ struct BridgeTests {
     await live()
     try await sync(a, "My password: hunter2\n```\nlet secret = 1\n```\nthanks")
     try await sync(
-      a, from: .claude,
+      a, kind: .answer,
       "Done. key sk-abcdefghijklmnopqrst\n```\nlet code = 1\n```\n| a | b |\n"
         + String(repeating: "More detail here. ", count: 300))
-    try await sync(a, from: .claude, "```\nlet only = 1\n```")
+    try await sync(a, kind: .answer, "```\nlet only = 1\n```")
     let added = await voice.added
     #expect(added.count == 3)
     for line in added {
@@ -1969,7 +1969,7 @@ struct BridgeTests {
     try await test.join(test.a, "Alpha")
     try await test.sync(test.a, "Private thing.")
     await test.bridge.perform(.start)
-    try await test.sync(test.a, from: .claude, "I did the private thing.")
+    try await test.sync(test.a, kind: .answer, "I did the private thing.")
     #expect(await test.lines().isEmpty)
   }
 
@@ -1981,7 +1981,7 @@ struct BridgeTests {
     let restarted = try BridgeTests(dir: test.dir, time: test.time, pausesSync: true)
     try await restarted.join(restarted.a, "Alpha")
     await restarted.bridge.perform(.start)
-    try await restarted.sync(restarted.a, from: .claude, "I did the private thing.")
+    try await restarted.sync(restarted.a, kind: .answer, "I did the private thing.")
     #expect(await restarted.lines().isEmpty)
   }
 
@@ -1991,7 +1991,7 @@ struct BridgeTests {
     await test.bridge.perform(.start)
     try await test.sync(test.a, "Fix the build.")
     await test.bridge.perform(.stop)
-    try await test.sync(test.a, from: .claude, "The build is fixed.")
+    try await test.sync(test.a, kind: .answer, "The build is fixed.")
     #expect(
       await test.lines() == [
         "You: [TYPED] Alpha: Fix the build.", "Claude: [CLAUDE] Alpha: The build is fixed.",
@@ -2008,28 +2008,28 @@ struct BridgeTests {
     try await test.sync(test.a, "Fix the build.")
     await test.bridge.perform(.stop)
     try await test.sync(test.a, "Also, the private thing.")
-    try await test.sync(test.a, from: .claude, "Both are done.")
+    try await test.sync(test.a, kind: .answer, "Both are done.")
     #expect(await test.lines() == ["You: [TYPED] Alpha: Fix the build."])
     #expect(try test.saved()[test.a].outOfSync == .paused)
   }
 
-  /// A turn's start posts an empty line to take the decision; under the pause it is refused, and
-  /// the turn's answer stays out after Start.
-  @Test func anEmptyLineTakesTheDecisionAndRecordsNothing() async throws {
+  /// A turn's `start` takes the decision; under the pause it is refused, and the turn's answer
+  /// stays out after Start.
+  @Test func aStartTakesTheDecisionAndRecordsNothing() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
-    try await test.sync(test.a, "")
+    try await test.sync(test.a, kind: .start)
     #expect(try test.saved()[test.a].outOfSync == .paused)
     await test.bridge.perform(.start)
-    try await test.sync(test.a, from: .claude, "An answer.")
+    try await test.sync(test.a, kind: .answer, "An answer.")
     #expect(await test.lines().isEmpty)
   }
 
-  @Test func anEmptyLineWithoutThePauseAdmitsItsTurn() async throws {
+  @Test func aStartWithoutThePauseAdmitsItsTurn() async throws {
     try await join(a, "Alpha")
-    try await sync(a, "")
+    try await sync(a, kind: .start)
     #expect(await lines().isEmpty)
-    try await sync(a, from: .claude, "An answer.")
+    try await sync(a, kind: .answer, "An answer.")
     #expect(await lines() == ["Claude: [CLAUDE] Alpha: An answer."])
     #expect(try saved()[a].outOfSync == nil)
   }
@@ -2358,7 +2358,7 @@ struct BridgeTests {
     await test.live()
     try await test.sync(test.a, "Rename the folder.")
     await test.pausedAtTheLimit()
-    try await test.sync(test.a, from: .claude, "Renamed.")
+    try await test.sync(test.a, kind: .answer, "Renamed.")
     #expect(await test.lines().contains("Claude: [CLAUDE] Alpha: Renamed."))
   }
 

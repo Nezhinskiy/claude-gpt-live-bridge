@@ -628,7 +628,7 @@ public actor Bridge: Router {
     var body = body
     var isRefused = false
     if let turn = body.typedTurn {
-      isRefused = !continuity.admits(turn: turn, from: .claude, in: id, pausing: pausing)
+      isRefused = !continuity.admits(turn: turn, kind: .report, in: id, pausing: pausing)
       save()
     }
     // A voice turn's activity names no turn; `working` still has to settle what was said before.
@@ -702,13 +702,14 @@ public actor Bridge: Router {
   private func sync(_ body: SyncBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
-    let admitted = continuity.admits(turn: body.turnId, from: body.from, in: id, pausing: pausing)
-    save()  // the turn's decision persists, an empty line's included
-    if !admitted, body.from == .owner { await registry.withholdAnswer(of: id) }
+    let admitted = continuity.admits(turn: body.turnId, kind: body.kind, in: id, pausing: pausing)
+    save()  // the turn's decision persists, a `start`'s included
+    if !admitted, body.kind == .typed { await registry.withholdAnswer(of: id) }
     guard admitted,
-      let line = AnswerShaper.synced(body.text, from: body.from, label: row.label, session: id)
+      let line = AnswerShaper.synced(
+        body.text ?? "", kind: body.kind, label: row.label, session: id)
     else { return }
-    await addSynced(line, as: body.from == .owner ? .owner : .claude)
+    await addSynced(line, as: body.kind == .typed ? .owner : .claude)
   }
 
   /// A newer request superseded this answer, so it is not said, and the mod, told 200, notes no
@@ -717,7 +718,7 @@ public actor Bridge: Router {
   private func keepSuperseded(_ body: AnswerBody) async {
     let id = body.sessionId
     guard body.status != .failed, let row = try? await label(of: id),
-      let line = AnswerShaper.synced(body.text, from: .claude, label: row.label, session: id)
+      let line = AnswerShaper.synced(body.text, kind: .answer, label: row.label, session: id)
     else { return }
     await addSynced(line, as: .claude)
   }

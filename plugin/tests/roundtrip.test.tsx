@@ -602,7 +602,7 @@ test('anAllowedPromptIsSynced', async ($, on) => {
   await atAPrompt($, world)
   await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
   const [line] = world.take('sync')
-  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'claude' })
+  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', kind: 'report' })
   expect(line?.text).toContain('allowed')
   expect(line?.text).toContain('Bash')
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
@@ -643,7 +643,7 @@ test('aNoAtTheDialogSettlesAtTheNextStep', async ($, on) => {
   await atAPrompt($, world)
   await step($, world, 't1', 'Another way, then.')
   const [line] = world.take('sync')
-  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'claude' })
+  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', kind: 'report' })
   expect(line?.text).toContain('Bash')
   expect(line?.text).not.toContain('allowed')
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
@@ -677,7 +677,7 @@ test('aPromptOpenAtTheTurnsEndIsSettled', async ($, on) => {
   await $.turn.complete({ ...DONE, turnId: 't1', answer: '' })
   const lines = world.take('sync')
   expect(lines).toHaveLength(1)
-  expect(lines[0]).toMatchObject({ sessionId: ID, turnId: 't1', from: 'claude' })
+  expect(lines[0]).toMatchObject({ sessionId: ID, turnId: 't1', kind: 'report' })
   expect(lines[0]?.text).toContain('Bash')
   expect(lines[0]?.text).not.toContain('allowed')
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
@@ -693,7 +693,7 @@ test('aSubagentsPromptOpenAtTheTurnsEndIsNotSaid', async ($, on) => {
   world.take('activity')
   world.take('sync')
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Done.' })
-  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'claude', text: 'Done.' }])
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', kind: 'answer', text: 'Done.' }])
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle' }])
 })
 
@@ -713,8 +713,9 @@ async function joined($: Engine, world: ReturnType<typeof fakeWorld>) {
   world.take('join')
 }
 
-const owner = (turnId: string, text: string) => ({ sessionId: ID, turnId, from: 'owner', text })
-const claude = (turnId: string, text: string) => ({ sessionId: ID, turnId, from: 'claude', text })
+const owner = (turnId: string, text: string) => ({ sessionId: ID, turnId, kind: 'typed', text })
+const claude = (turnId: string, text: string) => ({ sessionId: ID, turnId, kind: 'answer', text })
+const start = (turnId: string) => ({ sessionId: ID, turnId, kind: 'start' })
 
 test('anOwnerTurnIsSynced', async ($, on) => {
   const world = fakeWorld(on)
@@ -745,7 +746,7 @@ test('anOtherTurnPostsNoOwnerLine', async ($, on) => {
   await $.prompt.submit({ text: 'A peer session wrote.', wait: false, origin: { kind: 'peer' } as never })
   await $.turn.start({ text: 'A peer session wrote.', turnId: 't1' })
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Noted.' })
-  expect(world.take('sync')).toEqual([claude('t1', ''), claude('t1', 'Noted.')])
+  expect(world.take('sync')).toEqual([start('t1'), claude('t1', 'Noted.')])
 })
 
 test('textTypedIntoARunningTurnIsSynced', async ($, on) => {
@@ -843,7 +844,7 @@ test('aBlockedPromptIsNotTheNextTurnsOwnerLine', async ($, on) => {
   world.isPromptDropped = true
   await $.prompt.submit(composer('private'))
   await $.turn.start({ text: 'Something else.', turnId: 't1' })
-  expect(world.take('sync')).toEqual([claude('t1', '')])
+  expect(world.take('sync')).toEqual([start('t1')])
 })
 
 test('aVoicePromptIntoARunningTurnIsNotSynced', async ($, on) => {

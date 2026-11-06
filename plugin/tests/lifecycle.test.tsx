@@ -143,7 +143,7 @@ test('aTurnRunningThroughClearKeepsItsTurn', async ($, on) => {
   world.sessionId = OTHER
   await world.clock.advance(1000)
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
-  expect(world.take('sync')).toEqual([{ sessionId: OTHER, turnId: 't1', from: 'claude', text: 'Nothing.' }])
+  expect(world.take('sync')).toEqual([{ sessionId: OTHER, turnId: 't1', kind: 'answer', text: 'Nothing.' }])
 })
 
 test('aTurnRunningThroughAReloadKeepsItsLines', async ($, on) => {
@@ -154,7 +154,7 @@ test('aTurnRunningThroughAReloadKeepsItsLines', async ($, on) => {
   await $.session.start(START)
   world.take('sync')
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
-  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'claude', text: 'Nothing.' }])
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', kind: 'answer', text: 'Nothing.' }])
 })
 
 /** It started while the mod was away, so neither its prompt nor its answer went to the app. */

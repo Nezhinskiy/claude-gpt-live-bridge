@@ -2,7 +2,7 @@
 // the other main-loop turns the app is sent. Pure: the hooks feed it `prompt.submit` origins and
 // the main loop's turn starts and ends.
 import { voiceRequestId } from './prompt.ts'
-import type { AnswerStatus, RequestId, SyncSource } from './wire.ts'
+import type { AnswerStatus, RequestId, SyncBody } from './wire.ts'
 
 /**
  * In characters: under the app's 131,072-byte body limit even at four UTF-8 bytes each; the app
@@ -15,8 +15,8 @@ export const FOLLOW_UP_MS = 10 * 60_000
 export type TurnOrigin = 'voice' | 'owner' | 'other' | 'background'
 export type TurnOutcome = 'answer' | 'aborted' | 'refusal' | 'error'
 export type Post = { id: RequestId; status: AnswerStatus; text: string; reason?: string }
-/** A line for the app's conversation with the voice. Empty `text` takes the turn's decision and records nothing. */
-export type SyncLine = { turnId: string; from: SyncSource; text: string }
+/** A line of a turn for the app. */
+export type SyncLine = Omit<SyncBody, 'sessionId'>
 
 /** What the tracker keeps across a reload of the mod (JSON data). */
 export type TurnSnapshot = {
@@ -166,12 +166,12 @@ export class TurnTracker {
   typedInto(turnId: string, text: string, entered = text): SyncLine {
     const lines = this.#turns.get(turnId)?.linesUnder ?? turnId
     this.#typed.push({ text: entered, turnId: lines })
-    return { turnId: lines, from: 'owner', text }
+    return { turnId: lines, kind: 'typed', text }
   }
 
   /**
    * A main-loop turn started at `now` (ms): the line it opens with, if any. An owner's turn opens
-   * with its prompt; any other turn that is not a voice request's answer with an empty line, which
+   * with its prompt; any other turn that is not a voice request's answer with a `start`, which
    * takes the turn's decision. `text` is `turn.start`'s, which names the voice request; `prompt`
    * is `prompt.submit`'s, what was typed. `origin` is null when no `prompt.submit` came first: so
    * starts the turn of a prompt typed into the turn before it, whose lines stay under that id.
@@ -202,7 +202,7 @@ export class TurnTracker {
     }
     this.#turns.set(turnId, { id: null, isVoice: false })
     this.#followUp = null
-    return origin === 'owner' ? { turnId, from: 'owner', text: prompt } : { turnId, from: 'claude', text: '' }
+    return origin === 'owner' ? { turnId, kind: 'typed', text: prompt } : { turnId, kind: 'start' }
   }
 
   /**
@@ -229,7 +229,7 @@ export class TurnTracker {
     const text = answer.trim()
     const isAnswered = outcome === 'answer' && text !== ''
     if (turn.id === null) {
-      return { post: null, sync: isAnswered ? { turnId: turn.linesUnder ?? turnId, from: 'claude', text } : null }
+      return { post: null, sync: isAnswered ? { turnId: turn.linesUnder ?? turnId, kind: 'answer', text } : null }
     }
     if (!turn.isVoice) return { post: isAnswered ? { id: turn.id, status: 'update', text } : null, sync: null }
     if (outcome !== 'answer' || text === '') return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }

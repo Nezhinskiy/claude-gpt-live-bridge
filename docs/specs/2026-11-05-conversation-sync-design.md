@@ -163,9 +163,9 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
 - When the keyboard wins the AskUserQuestion race, the mod posts the answer as a synced line.
   When a permission prompt settles, it posts that it was settled: allowed when the tool ran, and
   otherwise only settled, once the next model step or the turn's end shows the dialog is gone.
-  That line is the mod's report, not the owner's typing, so it goes as Claude's and never refuses
-  a turn under the pause. So does a question closed with no answer; a keyboard answer to Claude's
-  question is the owner's.
+  That line is the mod's report (`report`), not the owner's typing, so it goes as Claude's and
+  never refuses a turn under the pause. So does a question closed with no answer; a keyboard answer
+  to Claude's question is the owner's (`typed`).
 - The mod tracks whether every turn since the last delivered summary reached the app. When one did
   not (no link, a refused post, a lost voice answer, a turn before joining), its next join says the
   session is *missed*.
@@ -174,8 +174,11 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
 
 ### Wire
 
-One new route, mod to app, for a synced line: the session, its turn, who it is from (the owner, or
-Claude), and its text; and on join, whether the session syncs at all and whether it missed a turn.
+One new route, mod to app, for a synced line: the session, its turn, its `kind`, and its text; and
+on join, whether the session syncs at all and whether it missed a turn. `kind` is what the line is:
+`start`, a turn's first word, which takes its decision and is the only kind with no text; `typed`,
+the owner's words, the only kind that refuses a turn; `answer`, Claude's final answer; `report`, the
+mod's own line. Speaker and tag follow from it: `[TYPED]` as the owner's, or `[CLAUDE]` as Claude's.
 A reply work item names the request its turn's answer belongs to. New fixtures for each shape, `/Users/example`, `Example session`,
 `00000000-…` ids. `Wire.swift`, `plugin/hooks/wire.ts` and `wire/fixtures/` change together.
 `StatusReply` tells the mod nothing new, unless the builder needs the target's out-of-sync state

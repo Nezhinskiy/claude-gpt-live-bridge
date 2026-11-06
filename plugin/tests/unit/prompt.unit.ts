@@ -104,15 +104,15 @@ test('aKeyboardAnswerHoldsTheFreeText', () => {
   assert.match(keyboardAnswer({ answers: {}, response: 'neither, ask me later' }).text, /neither, ask me later/)
 })
 
-test('aKeyboardAnswerIsTheOwners', () => {
-  assert.equal(keyboardAnswer({ answers: { 'Which name?': 'out' } }).from, 'owner')
-  assert.equal(keyboardAnswer({ answers: {}, response: 'neither' }).from, 'owner')
+test('aKeyboardAnswerIsTyped', () => {
+  assert.equal(keyboardAnswer({ answers: { 'Which name?': 'out' } }).kind, 'typed')
+  assert.equal(keyboardAnswer({ answers: {}, response: 'neither' }).kind, 'typed')
 })
 
 /** The owner wrote nothing: under the pause an owner's line would refuse the turn. */
-test('aQuestionClosedWithNoAnswerIsClaudes', () => {
+test('aQuestionClosedWithNoAnswerIsAReport', () => {
   const closed = keyboardAnswer(undefined)
-  assert.equal(closed.from, 'claude')
+  assert.equal(closed.kind, 'report')
   assert.notEqual(closed.text, '')
   assert.deepEqual(keyboardAnswer({ answers: {} }), closed)
   assert.deepEqual(keyboardAnswer({ answers: { 'Which name?': ' ' }, response: '' }), closed)

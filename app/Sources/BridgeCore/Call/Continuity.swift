@@ -153,15 +153,15 @@ public struct Continuity: Codable, Sendable, Equatable {
   }
 
   /// Whether a line of `turn` goes in. A turn's first line decides, and later lines keep that
-  /// decision, except that an owner's line while `pausing` refuses the turn from there on.
+  /// decision, except that a `typed` line while `pausing` refuses the turn from there on.
   /// `pausing`: the pause setting is on and the call is off. Every refused line marks `paused`.
   public mutating func admits(
-    turn: String, from: SyncSource, in id: SessionID, pausing: Bool
+    turn: String, kind: SyncKind, in id: SessionID, pausing: Bool
   ) -> Bool {
     use(id) { conversation in
       var admitted = !pausing
       if let decision = conversation.turn, decision.id == turn {
-        admitted = decision.admitted && !(from == .owner && pausing)
+        admitted = decision.admitted && !(kind == .typed && pausing)
       }
       conversation.turn = Conversation.TurnDecision(id: turn, admitted: admitted)
       if !admitted { conversation.markPaused() }

@@ -92,9 +92,10 @@ function noteLostTurn(): void {
  */
 const trySave = ($: EngineInterface) => save($).catch(() => {})
 
-/** Posts a line of a turn; one the app did not take is a gap, which the next join says. */
+/** Posts a line of a turn, cut to `ANSWER_LIMIT`; one the app did not take is a gap, which the next join says. */
 async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
-  if ((await link?.sync({ ...line, text: clip(line.text, ANSWER_LIMIT) })) === true) return
+  const body = line.text === undefined ? line : { ...line, text: clip(line.text, ANSWER_LIMIT) }
+  if ((await link?.sync(body)) === true) return
   link?.noteGap()
   await trySave($)
 }
@@ -463,11 +464,11 @@ function settles(e: { tool_name: string; agent_id?: string }): boolean {
 
 /**
  * A settled prompt: a line for the running turn, and the session works on. It is the mod's report,
- * not the owner's typing, so it goes as Claude's: under the pause an owner's line refuses the turn.
+ * not the owner's typing, so it refuses nothing.
  */
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
   const turn = tracker.current
-  if (turn) await postSync($, { turnId: turn.turnId, from: 'claude', text })
+  if (turn) await postSync($, { turnId: turn.turnId, kind: 'report', text })
   await link?.activity('working')
 }
 
