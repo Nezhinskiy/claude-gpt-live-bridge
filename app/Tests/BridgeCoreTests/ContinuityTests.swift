@@ -263,6 +263,79 @@ extension ContinuityTests {
   }
 
   /// New conversation drops lines and context; a pause and the turn's decision stay.
+  /// The ask came after the gap, so its summary covers it.
+  @Test func aSummaryAskedForAfterAGapCoversIt() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.markMissed(a, asPaused: false)
+    continuity.noteSummaryAsk(of: a, at: now)
+    let taken = continuity.takeSummaryAsk(of: a, at: now)
+    #expect(taken)
+  }
+
+  @Test func aSummaryNobodyAskedForIsTaken() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: false)
+    let taken = continuity.takeSummaryAsk(of: a, at: Date())
+    #expect(taken)
+  }
+
+  /// A gap the join reports after the ask makes it stale, as a refused line does.
+  @Test func aMissedTurnAfterTheAskRefusesItsSummary() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    let taken = continuity.takeSummaryAsk(of: a, at: now)
+    #expect(!taken)
+  }
+
+  /// The mod joins a second ask to the summary on its way, which is the first ask's.
+  @Test func aSecondAskDoesNotFreshenTheFirst() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    continuity.noteSummaryAsk(of: a, at: now + 1)
+    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
+    #expect(!taken)
+  }
+
+  /// A summary refused closes its ask: the owner's next press stands on its own.
+  @Test func aRefusedSummaryClosesItsAsk() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    _ = continuity.takeSummaryAsk(of: a, at: now)
+    continuity.noteSummaryAsk(of: a, at: now + 1)
+    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
+    #expect(taken)
+  }
+
+  /// A summary that never came (nothing to summarise, or a failure) does not hold back a later one.
+  @Test func anAskPastItsLifeRefusesNothing() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    let later = now + Conversation.askLife
+    continuity.noteSummaryAsk(of: a, at: later)
+    let taken = continuity.takeSummaryAsk(of: a, at: later)
+    #expect(taken)
+  }
+
+  /// `/clear` moves the conversation, and the ask with it.
+  @Test func anAskMovesWithItsConversation() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    continuity.move(a, to: b)
+    let taken = continuity.takeSummaryAsk(of: b, at: now)
+    #expect(!taken)
+  }
+
   @Test func forgetKeepsAPauseAndItsDecision() {
     var continuity = Continuity()
     continuity.record(.owner, "hi", in: a)

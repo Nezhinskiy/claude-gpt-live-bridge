@@ -145,7 +145,10 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
     a post failed, the mod predates sync). A line may load a summary itself.
   - *paused*: the owner's pause setting dropped a turn, or a turn was missed while the setting was
     on. Only Load context, or `/live context`, loads one.
-  A loaded summary clears both. The flag persists with the conversation across app restarts.
+  A loaded summary clears both, unless the app asked for it before the latest gap or New
+  conversation: that one is ignored, as it does not cover the gap and may hold what was forgotten.
+  A summary nobody asked for (`/live context`) cannot be dated, and is taken. The flag persists
+  with the conversation across app restarts.
 - **Redacted and clipped.** Each synced line goes through the existing redactor
   (`Text/Redaction.swift`), loses its code and tables as an answer does, and is clipped to at most
   2,000 characters (my call; the builder may tune it against codex's `initialItems` limits in

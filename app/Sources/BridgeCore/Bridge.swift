@@ -53,8 +53,8 @@ public actor Bridge: Router {
   private var changes = 0
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
-  /// The sessions whose summary just arrived (`POST /v1/context`), so the menu's Load
-  /// context stops waiting for it.
+  /// The sessions whose summary was just taken (`POST /v1/context`), so the menu's Load context
+  /// stops waiting for it.
   public nonisolated let contextArrivals: AsyncStream<SessionID>
   private let announceContext: AsyncStream<SessionID>.Continuation
   /// The running app's version; sessions on an older mod are listed against it.
@@ -172,7 +172,12 @@ public actor Bridge: Router {
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
   public func loadContext() async {
     guard let target = await registry.target else { return }
-    await registry.requestContext(for: target)
+    await askForContext(of: target)
+  }
+
+  private func askForContext(of id: SessionID) async {
+    continuity.noteSummaryAsk(of: id, at: time.now)
+    await registry.requestContext(for: id)
   }
 
   /// The menu's choice of target; a session that left is ignored.
@@ -389,7 +394,7 @@ public actor Bridge: Router {
     if let session, !pausesSync(), continuity[session].outOfSync != .paused,
       await needsContext(session)
     {
-      await registry.requestContext(for: session)
+      await askForContext(of: session)
     }
     do {
       let voice = try await controller()
@@ -666,14 +671,17 @@ public actor Bridge: Router {
   }
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
-  /// it is and kept in the session's conversation. An empty one keeps the stored line: the mod
-  /// never sends one, so this guards only against another socket peer, and it is not a control.
+  /// it is and kept in the session's conversation. One asked for before the latest gap or forget
+  /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
+  /// the menu's press stays pending. An empty one keeps the stored line: the mod never sends one,
+  /// so this guards only against another socket peer, and it is not a control.
   /// A live line about that session gets the summary at once, and one still connecting gets it
   /// when connected; it does not hold the line open. A summary equal to the stored one is not
   /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
+    guard continuity.takeSummaryAsk(of: id, at: time.now) else { return }
     let line =
       body.summary.allSatisfy(\.isWhitespace)
       ? nil

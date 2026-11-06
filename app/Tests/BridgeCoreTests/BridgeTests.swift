@@ -1148,6 +1148,46 @@ struct BridgeTests {
       await eventually { await notifier.posted.last?.body.contains("start the call") == true })
   }
 
+  /// A summary asked for before a refused turn does not hold that turn, so the session stays out
+  /// of sync and the voice keeps what it had.
+  @Test func aSummaryAskedForBeforeAPausedTurnClearsNothing() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(a, "Alpha")
+    try await test.post("/v1/context", ContextBody(sessionId: a, summary: "Old."))
+    await test.live()
+    await test.bridge.loadContext()
+    #expect(try await test.registry.poll(a) == .context)
+    await test.bridge.perform(.stop)
+    try await test.sync(a, turn: "turn-2", "Private thing.")
+    try await test.post("/v1/context", ContextBody(sessionId: a, summary: "From before."))
+    #expect(try test.saved()[a].outOfSync == .paused)
+    #expect(await test.bridge.current.needsContext)
+    #expect(await test.bridge.current.context == "[CONTEXT] Alpha: Old.")
+  }
+
+  /// A summary on its way when the owner presses New conversation does not bring back what was
+  /// just forgotten.
+  @Test func aSummaryAskedForBeforeNewConversationIsIgnored() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context)
+    await bridge.newConversation()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    #expect(await bridge.current.context == nil)
+  }
+
+  /// The menu's press stays pending for an ignored summary: nothing loaded.
+  @Test func anIgnoredSummaryIsNotAnnounced() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    var arrivals = bridge.contextArrivals.makeAsyncIterator()
+    await bridge.loadContext()
+    await bridge.newConversation()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    #expect(await arrivals.next() == b)
+  }
+
   /// The context line is shown exactly as the voice gets it, also after the app restarts.
   @Test func contextIsRedactedCappedAndShown() async throws {
     try await join(a, "Alpha")
