@@ -462,6 +462,66 @@ test('onlyARunningVoiceTurnIsRunning', () => {
   assert.equal(tracker.running, null)
 })
 
+test('a tool run settles only the prompt for its own input', () => {
+  const tracker = new TurnTracker()
+  tracker.promptOpened('Read', { file_path: '/etc/hosts' })
+  assert.equal(tracker.promptRan('Read', { file_path: './a' }), false)
+  assert.equal(tracker.promptRan('Read', { file_path: '/etc/hosts' }), true)
+  assert.equal(tracker.promptRan('Read', { file_path: '/etc/hosts' }), false, 'once')
+})
+
+test('a tool run settles only its own agent\'s prompt', () => {
+  const tracker = new TurnTracker()
+  tracker.promptOpened('Bash', { command: 'ls' }, 'a1')
+  assert.equal(tracker.promptRan('Bash', { command: 'ls' }), false)
+  assert.equal(tracker.promptRan('Bash', { command: 'ls' }, 'a2'), false)
+  assert.equal(tracker.promptRan('Bash', { command: 'ls' }, 'a1'), true)
+})
+
+test('a step ends only its own agent\'s prompts', () => {
+  const tracker = new TurnTracker()
+  tracker.promptOpened('Bash', { command: 'ls' }, 'a1')
+  tracker.promptOpened('Read', { file_path: './a' })
+  assert.equal(tracker.promptGone(), 'Read')
+  assert.equal(tracker.promptGone(), null)
+  assert.equal(tracker.promptGone('a1'), 'Bash')
+  assert.equal(tracker.promptGone('a1'), null)
+})
+
+test('two prompts for one tool are told apart', () => {
+  const tracker = new TurnTracker()
+  tracker.promptOpened('Read', { file_path: '/etc/hosts' })
+  tracker.promptOpened('Read', { file_path: '/etc/passwd' })
+  assert.equal(tracker.promptRan('Read', { file_path: '/etc/passwd' }), true)
+  assert.equal(tracker.promptGone(), 'Read')
+  assert.equal(tracker.promptGone(), null)
+})
+
+test('an open prompt survives a reload', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'first', 'owner', 0)
+  tracker.promptOpened('Bash', { command: 'ls' }, 'a1')
+  const restored = new TurnTracker(JSON.parse(JSON.stringify(tracker.snapshot())))
+  assert.equal(restored.promptRan('Bash', { command: 'ls' }, 'a1'), true)
+})
+
+test('a turn\'s end forgets its prompts', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'first', 'owner', 0)
+  tracker.promptOpened('Bash', { command: 'ls' }, 'a1')
+  tracker.turnCompleted('t1', 'Done.', 'answer')
+  assert.equal(tracker.promptGone('a1'), null)
+})
+
+/** Crash, then --resume: no dialog outlives the turn it was asked in. */
+test('the next turn\'s start forgets a lost turn\'s prompts', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'first', 'owner', 0)
+  tracker.promptOpened('Bash', { command: 'ls' })
+  tracker.turnStarted('t2', 'second', 'owner', 1000)
+  assert.equal(tracker.promptGone(), null)
+})
+
 test('clipCutsWholeCharactersOnly', () => {
   // Cut by UTF-16 units, an emoji would leave a lone surrogate the app's JSON decoder may refuse.
   assert.equal(clip('ab😀cd', 3), 'ab😀')

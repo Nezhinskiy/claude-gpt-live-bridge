@@ -87,7 +87,7 @@ test('approvalIsReported', async ($, on) => {
   expect(world.take('activity')).toEqual([])
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' } })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', turn: VOICE }])
-  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_response: {}, tool_use_id: 'u1' })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: VOICE }])
 })
 
@@ -604,7 +604,7 @@ async function atAPrompt($: Engine, world: ReturnType<typeof fakeWorld>) {
 test('anAllowedPromptIsSynced', async ($, on) => {
   const world = fakeWorld(on)
   await atAPrompt($, world)
-  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_response: {}, tool_use_id: 'u1' })
   const [line] = world.take('sync')
   expect(line).toMatchObject({ sessionId: ID, turn: { id: 't1' }, kind: 'report' })
   expect(line?.text).toContain('allowed')
@@ -619,7 +619,7 @@ test('anAllowedPromptDoesNotRefuseASyncedTurn', async ($, on) => {
   const world = fakeWorld(on)
   await atAPrompt($, world)
   world.isPausing = true
-  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_response: {}, tool_use_id: 'u1' })
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Removed.' })
   expect(world.kept).toContain('Removed.')
 })
@@ -637,6 +637,20 @@ test('anotherToolsRunSettlesNothing', async ($, on) => {
   const world = fakeWorld(on)
   await atAPrompt($, world)
   await $.classic.PostToolUse({ tool_name: 'Read', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  expect(world.take('sync')).toEqual([])
+  expect(world.take('activity')).toEqual([])
+})
+
+/** One step reads two files, and only one of them asks: the dialog stays open while the other runs. */
+test('aParallelRunOfTheSameToolLeavesTheNoticeStanding', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Compare the two', turnId: 't1' })
+  await $.classic.PermissionRequest({ tool_name: 'Read', tool_input: { file_path: '/etc/hosts' } })
+  world.take('activity')
+  world.take('sync')
+  await $.classic.PostToolUse({ tool_name: 'Read', tool_input: { file_path: './a' }, tool_response: {}, tool_use_id: 'u1' })
   expect(world.take('sync')).toEqual([])
   expect(world.take('activity')).toEqual([])
 })
@@ -672,6 +686,57 @@ test('aSubagentsStepSettlesNoPrompt', async ($, on) => {
   await step($, world, 't1', 'A subagent report.', 'a1')
   expect(world.take('sync')).toEqual([])
   expect(world.take('activity')).toEqual([])
+})
+
+/** No hook reports the No, and a rule lets the subagent's next run of the tool through with no dialog. */
+test('aSubagentsNoDoesNotEndInYouAllowed', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Clean up', turnId: 't1' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
+  world.take('sync')
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' }, tool_response: {}, tool_use_id: 'u1', agent_id: 'a1' })
+  expect(world.take('sync')).toEqual([])
+})
+
+test('aSubagentsNextStepSettlesItsPrompt', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Clean up', turnId: 't1' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
+  world.take('activity')
+  world.take('sync')
+  await step($, world, 't1', 'Not allowed; listing instead.', 'a1')
+  const [line] = world.take('sync')
+  expect(line).toMatchObject({ sessionId: ID, turn: { id: 't1' }, kind: 'report' })
+  expect(line?.text).not.toContain('allowed')
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
+})
+
+test('aSubagentsEndSettlesItsPrompt', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Clean up', turnId: 't1' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
+  world.take('activity')
+  await $.turn.complete({ ...DONE, turnId: 't2', agentId: 'a1', answer: '' })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
+})
+
+/** The tracker's snapshot holds the prompt, so a reload at an open dialog still reports how it ended. */
+test('aPromptOpenThroughAReloadIsStillSettled', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  const held = world.stored.get(`joined:${ID}`)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  world.take('activity')
+  world.take('sync')
+  expect(held).toMatchObject({ prompts: [{ tool: 'Bash' }] })
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_response: {}, tool_use_id: 'u1' })
+  expect(world.take('sync')).toHaveLength(1)
 })
 
 /** A plain No: only the turn's end comes (ADR 0001, item i). */

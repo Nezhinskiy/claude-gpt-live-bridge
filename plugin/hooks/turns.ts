@@ -25,6 +25,8 @@ export type TurnSnapshot = {
   turns: [string, Tracked][]
   /** Absent from a snapshot written before sync. */
   typed?: TypedPrompt[]
+  /** Absent from a snapshot written before sync. */
+  prompts?: OpenPrompt[]
 }
 type FollowUp = { id: RequestId; until: number }
 /**
@@ -34,6 +36,12 @@ type FollowUp = { id: RequestId; until: number }
 type Tracked = ({ id: RequestId; isVoice: boolean } | { id: null; isVoice: false }) & { linesUnder?: string }
 /** A prompt posted with a running turn's id, until a turn turns out to be its own, or none will. */
 type TypedPrompt = { text: string; turnId: string }
+/**
+ * A permission prompt reported and not settled, in the agent that asked (absent: the main loop). A
+ * tool's name is not enough to tell its prompt from its other runs, and the hooks share no id, so
+ * `input` holds the tool's input as JSON.
+ */
+type OpenPrompt = { tool: string; input: string; agent?: string }
 
 /**
  * Background work a voice request may have started (a background task's notification, a
@@ -93,6 +101,7 @@ export class TurnTracker {
   #followUp: FollowUp | null
   #turns: Map<string, Tracked>
   #typed: TypedPrompt[]
+  #prompts: OpenPrompt[]
   #isTurnLost = false
   /** The visible text of the main loop's model step so far, until a question or an approval takes it. */
   #stepText = ''
@@ -102,6 +111,7 @@ export class TurnTracker {
     this.#followUp = saved?.followUp ?? null
     this.#turns = new Map(saved?.turns ?? [])
     this.#typed = saved?.typed ?? []
+    this.#prompts = saved?.prompts ?? []
   }
 
   /**
@@ -157,6 +167,30 @@ export class TurnTracker {
     return text
   }
 
+  /** A permission prompt in `agent` (absent: the main loop) is open for the tool's run on `input`. */
+  promptOpened(tool: string, input: unknown, agent?: string): void {
+    this.#prompts.push({ tool, input: JSON.stringify(input), ...(agent !== undefined && { agent }) })
+  }
+
+  /** A tool ran, or failed: whether that settles an open prompt, which is then over. */
+  promptRan(tool: string, input: unknown, agent?: string): boolean {
+    const json = JSON.stringify(input)
+    return this.#takePrompt(one => one.tool === tool && one.input === json && one.agent === agent) !== null
+  }
+
+  /**
+   * `agent`'s next model step or its end shows its dialogs are gone, with no tool run: the tool of
+   * one of its prompts, which is then over, or null when none is left.
+   */
+  promptGone(agent?: string): string | null {
+    return this.#takePrompt(one => one.agent === agent)?.tool ?? null
+  }
+
+  #takePrompt(isIt: (prompt: OpenPrompt) => boolean): OpenPrompt | null {
+    const at = this.#prompts.findIndex(isIt)
+    return at < 0 ? null : (this.#prompts.splice(at, 1)[0] ?? null)
+  }
+
   /** A voice request was submitted; its turn starts once the session is idle. */
   submitted(id: RequestId): void {
     this.#pending = id
@@ -194,6 +228,7 @@ export class TurnTracker {
     // Main-loop turns run one at a time: one still held never reported its end.
     if (this.#turns.size > 0) this.#isTurnLost = true
     this.#turns.clear()
+    this.#prompts = []
     const id = voiceRequestId(text)
     const at = id === null && origin !== 'owner' ? this.#typed.findIndex(one => one.text === text) : -1
     const claimed = this.#typed[at]
@@ -232,6 +267,7 @@ export class TurnTracker {
 
   /** A main-loop turn ended: what to post for it, as an answer to the voice request or a line. */
   turnCompleted(turnId: string, answer: string, outcome: TurnOutcome): { post: Post | null; sync: SyncLine | null } {
+    this.#prompts = []
     const turn = this.#turns.get(turnId)
     if (turn === undefined) {
       this.#isTurnLost = true
@@ -251,6 +287,6 @@ export class TurnTracker {
   }
 
   snapshot(): TurnSnapshot {
-    return { pending: this.#pending, followUp: this.#followUp, turns: [...this.#turns], typed: this.#typed }
+    return { pending: this.#pending, followUp: this.#followUp, turns: [...this.#turns], typed: this.#typed, prompts: this.#prompts }
   }
 }

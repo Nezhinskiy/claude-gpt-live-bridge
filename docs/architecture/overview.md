@@ -141,7 +141,7 @@ as the owner's line, and as Claude's lines the mod's own reports: a question clo
 answer, a permission prompt that was settled, and a turn that ended without an answer. A question Claude asks, or a permission prompt
 it waits on, in any main-loop turn of a joined session goes to the app; the app says it for the
 target, and for another session says it unless the turn was typed, when it only records it (a
-subagent's approval has no turn and is said). A voice request that waits for the
+subagent's approval carries the turn it ran in). A voice request that waits for the
 running turn to end waits as before. It
 draws a band above the prompt with the call's phase, the target, the unheard count and the
 buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries `isMuted`, with a

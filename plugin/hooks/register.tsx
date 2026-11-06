@@ -50,7 +50,6 @@ let lastOrigin: TurnOrigin | null = null
 let lastPrompt: string | undefined
 /** When a surface last asked for the band while this session was joined. */
 let drawnAt = 0
-let approval: { tool: string; agent: string | undefined } | null = null
 /** Answers the question Claude asked in the running turn with the owner's spoken reply, while it is open. */
 let answerQuestion: ((reply: Reply) => void) | null = null
 let offlineSince: number | null = null
@@ -465,37 +464,30 @@ const wrote = (text: string) => (text === '' ? {} : { text })
 /** Names the main-loop turn an activity belongs to, for the app; none between turns. */
 const under = (turn: TurnRef | null) => (turn === null ? {} : { turn })
 
-/** Whether a tool's run, failure or denial settles the permission request being reported. */
-function settles(e: { tool_name: string; agent_id?: string }): boolean {
-  if (approval?.tool !== e.tool_name || approval.agent !== e.agent_id) return false
-  approval = null
-  return true
-}
-
 /**
  * A settled prompt: a line for the running turn, and the session works on. It is the mod's report,
  * not the owner's typing, so it refuses nothing.
  */
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
+  await trySave($)
   const turn = tracker.current
   if (turn) await postSync($, { turn, kind: 'report', text })
   await link?.activity('working', under(turn))
 }
 
-/** The tool ran, or failed, so the prompt was allowed. */
-async function toolRan($: EngineInterface, e: { tool_name: string; agent_id?: string }): Promise<void> {
-  if (settles(e)) await promptSettled($, `You allowed ${e.tool_name} at the keyboard.`)
+/** The tool ran, or failed, so the prompt for that very run was allowed. */
+async function toolRan($: EngineInterface, e: { tool_name: string; tool_input: unknown; agent_id?: string }): Promise<void> {
+  if (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id)) await promptSettled($, `You allowed ${e.tool_name} at the keyboard.`)
 }
 
 /**
- * The next main step, or the turn's end, with the main loop's prompt still open: no tool ran and
- * the dialog is gone. No hook reports a person's No (ADR 0001, item i), so it is only settled.
+ * The next step of the loop that asked, or its end, with its prompt still open: no tool ran and the
+ * dialog is gone. No hook reports a person's No (ADR 0001, item i), so it is only settled.
  */
-async function promptGone($: EngineInterface): Promise<void> {
-  if (approval === null || approval.agent !== undefined) return
-  const { tool } = approval
-  approval = null
-  await promptSettled($, `The permission prompt for ${tool} was settled at the keyboard.`)
+async function promptGone($: EngineInterface, agent?: string): Promise<void> {
+  for (let tool = tracker.promptGone(agent); tool !== null; tool = tracker.promptGone(agent)) {
+    await promptSettled($, `The permission prompt for ${tool} was settled at the keyboard.`)
+  }
 }
 
 /**
@@ -600,9 +592,9 @@ export const register: Register = on => {
   // prompt only itself: what Claude wrote in the step that asks would reach the voice in neither.
   // Kept as it streams, since the engine may run the step's tools before the step ends.
   on('turn.step', async function* ($, e, next) {
+    await promptGone($, e.agentId)
     if (e.agentId !== undefined) return yield* next(e)
     tracker.stepStarted()
-    await promptGone($)
     const stream = next(e)
     let block: number | undefined
     for await (const chunk of stream) {
@@ -616,13 +608,12 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    await promptGone($, e.agentId)
     if (e.agentId === undefined) {
-      await promptGone($)
       const turn = tracker.current
       const { post, sync } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
       noteLostTurn()
       staleSummary()
-      approval = null
       await trySave($)
       if (sync) await postSync($, sync)
       const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
@@ -666,7 +657,8 @@ export const register: Register = on => {
   on('classic.PermissionRequest', async ($, e, next) => {
     const turn = tracker.current
     if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
-      approval = { tool: e.tool_name, agent: e.agent_id }
+      tracker.promptOpened(e.tool_name, e.tool_input, e.agent_id)
+      await trySave($)
       await link.activity('approval', { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })
     }
     return next(e)
@@ -676,7 +668,7 @@ export const register: Register = on => {
   on('classic.PostToolUseFailure', async ($, e, next) => (await toolRan($, e), next(e)))
     .catch(($, e, next) => next(e))
   // Auto mode's refusal, not the person's: nothing to tell the voice but that it goes on.
-  on('classic.PermissionDenied', async ($, e, next) => (settles(e) && (await link?.activity('working', under(tracker.current))), next(e)))
+  on('classic.PermissionDenied', async ($, e, next) => (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id) && (await link?.activity('working', under(tracker.current))), next(e)))
     .catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {
