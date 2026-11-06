@@ -15,12 +15,13 @@
 #                                                 nothing installed (the release guards' copy)
 #
 # --fake-mic (debug builds only) plays WAV as the microphone; given more than once, each next WAV
-# plays when the voice has finished speaking. --record-call (debug builds only) records each call
+# plays when the voice has finished speaking. --record-call (debug builds only) records a call
 # to WAV, the microphone on the left and the voice on the right, with its marks beside it in
-# WAV's name with .marks.jsonl. --voice-instructions (debug builds only) tells the voice FILE's
-# text instead of its rules. If CFFIXED_USER_HOME is set, the app keeps its files under that directory instead of your home folder. The disk image is
-# dragged to /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS
-# names another folder for it (the uninstall test's scratch one).
+# WAV's name with .marks.jsonl; each call starts the tape over. --voice-instructions (debug builds
+# only) tells the voice FILE's text instead of its rules. If CFFIXED_USER_HOME is set, the app
+# keeps its files under that directory instead of your home folder. The disk image is dragged to
+# /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS names another
+# folder for it (the uninstall test's scratch one).
 set -eu
 : "${HOME:?HOME is not set}" # an empty HOME would aim every path below at the system's folders
 cd "$(dirname "$0")/.."
@@ -91,31 +92,31 @@ quit() {
 }
 
 debug() {
+  run=${1:-}
+  [ "$run" != --run ] || shift
+  # `open` runs the app elsewhere, so a flag's relative path becomes absolute; a path that cannot,
+  # or a flag with none, stops here, before anything is built or quit.
+  path_next=
+  for arg do
+    shift
+    if [ -n "$path_next" ]; then
+      [ -n "$arg" ] || usage
+      dir=$(cd "$(dirname -- "$arg")" 2>/dev/null && pwd) || usage
+      arg="$dir/$(basename -- "$arg")"
+    fi
+    case "$arg" in
+      --fake-mic | --record-call | --voice-instructions) path_next=1 ;;
+      *) path_next= ;;
+    esac
+    set -- "$@" "$arg"
+  done
+  [ -z "$path_next" ] || usage
   app="$PWD/app/.build/app/LiveBridge.app"
   assemble debug "$app"
   sign "$app" -
   echo "built $app"
-  [ "${1:-}" = --run ] || return 0
-  shift
+  [ "$run" = --run ] || return 0
   quit "$app"
-  # `open` runs the app elsewhere, so a relative WAV path becomes absolute.
-  count=$#
-  while [ "$count" -gt 0 ]; do
-    case "$1" in
-      --fake-mic | --record-call | --voice-instructions)
-        [ "$count" -ge 2 ] || usage
-        flag=$1 wav=$2
-        shift 2
-        set -- "$@" "$flag" "$(cd "$(dirname "$wav")" && pwd)/$(basename "$wav")"
-        count=$((count - 2))
-        ;;
-      *)
-        set -- "$@" "$1"
-        shift
-        count=$((count - 1))
-        ;;
-    esac
-  done
   if [ -n "${CFFIXED_USER_HOME:-}" ]; then
     open -n --env "CFFIXED_USER_HOME=$CFFIXED_USER_HOME" "$app" --args "$@"
   else
@@ -199,6 +200,10 @@ package() {
     sign "$src/stage/LiveBridge.app" -
     ln -s /Applications "$src/stage/Applications"
   )
+  if [ -n "$(find "$src/stage/LiveBridge.app" -name 'debug-*')" ]; then
+    echo "the image would carry the debug tools; nothing packaged" >&2
+    exit 1
+  fi
   if grep -a -q -e "$HOME" "$src/stage/LiveBridge.app/Contents/MacOS/LiveBridge"; then
     echo "the binary still names $HOME; nothing packaged" >&2
     return 1
@@ -236,8 +241,10 @@ case "${1:-}" in
   --uninstall) uninstall ;;
   --package) package ;;
   --stage)
-    [ -n "${2:-}" ] || usage
-    assemble release "$2"
+    case "${2:-}" in
+      *.app) assemble release "$2" ;;
+      *) usage ;;
+    esac
     ;;
   *) usage ;;
 esac

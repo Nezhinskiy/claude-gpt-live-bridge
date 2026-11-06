@@ -7,6 +7,8 @@ swift format lint --strict -r app
 (cd app && swift build && swift test)
 # build-app.sh --uninstall removes exactly what the app keeps.
 sh scripts/tests/uninstall.test.sh
+# build-app.sh refuses a debug flag's bad path and a --stage that is not an .app.
+sh scripts/tests/build-args.test.sh
 # The marketplace pins the mod to the app's release tag; a release binary has no test-only switch.
 sh scripts/tests/release-guards.test.sh
 # Every copy of the lowest Claude Code the README promises agrees with its Requirements line.
