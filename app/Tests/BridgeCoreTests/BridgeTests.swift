@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 
 @testable import BridgeCore
 
@@ -128,6 +129,8 @@ struct BridgeTests {
   let registry: SessionRegistry
   let bridge: Bridge
   let dir: URL
+  /// Settings' pause, which a test may flip.
+  let pause: OSAllocatedUnfairLock<Bool>
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
@@ -135,10 +138,12 @@ struct BridgeTests {
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
     time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, autoContext: Bool = false,
-    pausesSync: Bool = false, appVersion: AppVersion? = nil
+    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
+    appVersion: AppVersion? = nil
   ) throws {
     self.time = time
+    let pause = OSAllocatedUnfairLock(initialState: pausesSync)
+    self.pause = pause
     self.dir = try dir ?? temporaryDirectory()
     registry = SessionRegistry(time: time)
     audio = FakeAudio(time: time)
@@ -147,7 +152,7 @@ struct BridgeTests {
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs,
-      autoContext: { autoContext }, pausesSync: { pausesSync }, appVersion: appVersion)
+      pausesSync: { pause.withLock { $0 } }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -158,12 +163,17 @@ struct BridgeTests {
   }
 
   func join(
-    _ id: SessionID, _ title: String, modVersion: String? = nil, missed: Bool? = nil
+    _ id: SessionID, _ title: String, modVersion: String? = nil, owner: Bool? = nil,
+    syncs: Bool? = true, missed: Bool? = nil
   ) async throws {
     try await post(
       "/v1/join",
-      JoinBody(sessionId: id, title: title, modVersion: modVersion, syncs: true, missed: missed))
+      JoinBody(
+        sessionId: id, title: title, owner: owner, modVersion: modVersion, syncs: syncs,
+        missed: missed))
   }
+
+  func setPause(_ on: Bool) { pause.withLock { $0 = on } }
 
   /// A line of a turn that is not a voice request, as the mod posts it.
   @discardableResult
@@ -1017,9 +1027,9 @@ struct BridgeTests {
     #expect(await voice.added.isEmpty)
   }
 
-  /// The first line a Start opens asks the target for its context; Claude gets no request.
-  @Test func openingALineAsksForContext() async throws {
-    let test = try BridgeTests(autoContext: true)
+  /// The first line a Start opens asks a target with no context for one; Claude gets no request.
+  @Test func aLineWithNoContextAsksForASummary() async throws {
+    let test = try BridgeTests()
     await test.live()
     #expect(try await test.registry.poll(test.a) == .context)
     #expect(try await test.registry.poll(test.a) == nil)
@@ -1027,7 +1037,7 @@ struct BridgeTests {
 
   /// A line reopened after the voice closed it asks again.
   @Test func reopeningALineAsksForContext() async throws {
-    let test = try BridgeTests(autoContext: true)
+    let test = try BridgeTests()
     await test.live()
     _ = try await test.registry.poll(test.a)
     test.voice.emit(.closed(.other("The voice session closed (example).")))
@@ -1038,7 +1048,7 @@ struct BridgeTests {
 
   /// The line after a target switch asks the new target, and the old target is not asked.
   @Test func theLineAfterATargetSwitchAsksTheNewTarget() async throws {
-    let test = try BridgeTests(autoContext: true)
+    let test = try BridgeTests()
     try await test.join(test.a, "Alpha")
     try await test.join(test.b, "Beta")
     await test.live()
@@ -1050,10 +1060,104 @@ struct BridgeTests {
     #expect(try await test.registry.poll(test.a) == nil)
   }
 
-  /// With Load context automatically off, a line opens without asking.
-  @Test func openingALineWithTheSettingOffAsksForNothing() async throws {
+  /// A session whose summary the voice holds in full is asked for nothing.
+  @Test func aCurrentLineAsksForNothing() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", context())
+    try await sync(a, "Fix the build.")
     await live()
     #expect(try await registry.poll(a) == nil)
+  }
+
+  @Test func aMissedLineAsksForASummary() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", context())
+    try await join(a, "Alpha", missed: true)
+    await live()
+    #expect(try await registry.poll(a) == .context)
+  }
+
+  /// A paused mark outlasts the setting: the owner decides with Load context. Also with no
+  /// context at all.
+  @Test func aPausedLineAsksForNothing() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    test.setPause(false)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// With the setting on no line asks, whatever the reason it would: no context, a missed turn,
+  /// a mod that does not sync. Load context still asks.
+  @Test(arguments: [(false, true), (true, true), (false, false)])
+  func thePauseSettingStopsEverySummary(missed: Bool, syncs: Bool) async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha", syncs: syncs, missed: missed ? true : nil)
+    if missed || !syncs { try await test.post("/v1/context", test.context()) }
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+    await test.bridge.loadContext()
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  /// Review Focus 3: New conversation keeps the mark, so the next line asks for no summary of
+  /// the transcript the paused text is in.
+  @Test func aPauseSurvivesNewConversation() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    await test.bridge.newConversation()
+    test.setPause(false)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  @Test func aPauseSurvivesRemovingTheSession() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    await test.bridge.remove(test.a)
+    test.setPause(false)
+    try await test.join(test.a, "Alpha", owner: true)  // /live on
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// A mod that does not sync leaves its session out of sync for good: every line asks, as it
+  /// did before sync.
+  @Test func aModBeforeSyncAlwaysAsks() async throws {
+    try await join(a, "Alpha", syncs: nil)
+    try await post("/v1/context", context())
+    await live()
+    #expect(try await registry.poll(a) == .context)
+    try await post("/v1/context", context())
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await bridge.audioEvent(.speechStarted)
+    #expect(try await registry.poll(a) == .context)
+  }
+
+  /// A summary the same as the stored one still means the voice is current again.
+  @Test func anEqualSummaryStillClearsOutOfSync() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", context())
+    try await join(a, "Alpha", missed: true)
+    #expect(await bridge.current.needsContext)
+    await live()
+    try await post("/v1/context", context())
+    #expect(await !bridge.current.needsContext)
+    #expect(try saved()[a].outOfSync == nil)
+    #expect(await voice.added.isEmpty)
+  }
+
+  @Test func aSummaryClearsPaused() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    try await test.post("/v1/context", test.context())
+    #expect(try test.saved()[test.a].outOfSync == nil)
   }
 
   /// A summary that comes while the line connects is added once the line is connected.

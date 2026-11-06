@@ -6,11 +6,8 @@ import os
 public struct Settings: Codable, Sendable, Equatable {
   /// The realtime voice; nil leaves the choice to codex.
   public var voice: String?
-  /// Ask the target for its context summary whenever a line opens: a Start, a line reopened
-  /// after silence, the line after a target switch.
-  public var autoContext: Bool
   /// Keep what the owner types while the call is stopped out of the voice's conversation, and
-  /// load no summary by itself.
+  /// load no summary by itself: only Load context or `/live context` does.
   public var pauseSyncWhileStopped: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
@@ -24,12 +21,11 @@ public struct Settings: Codable, Sendable, Equatable {
   public var checkUpdatesAutomatically: Bool?
 
   public init(
-    voice: String? = nil, autoContext: Bool = true, pauseSyncWhileStopped: Bool = false,
+    voice: String? = nil, pauseSyncWhileStopped: Bool = false,
     notifyResults: Bool = true, confirmHandoffs: Bool = true, prompt: String = "",
     checkUpdatesAutomatically: Bool? = nil
   ) {
     self.voice = voice
-    self.autoContext = autoContext
     self.pauseSyncWhileStopped = pauseSyncWhileStopped
     self.notifyResults = notifyResults
     self.confirmHandoffs = confirmHandoffs
@@ -37,13 +33,20 @@ public struct Settings: Codable, Sendable, Equatable {
     self.checkUpdatesAutomatically = checkUpdatesAutomatically
   }
 
+  /// The key of the setting this one replaced.
+  private enum LegacyKeys: String, CodingKey { case autoContext }
+
   /// A field the file lacks keeps its default, and one it no longer has (`model`) is ignored.
+  /// An old `autoContext: false`, the owner's choice to load summaries by hand, becomes the
+  /// pause when the file does not say.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     voice = try container.decodeIfPresent(String.self, forKey: .voice)
-    autoContext = try container.decodeIfPresent(Bool.self, forKey: .autoContext) ?? true
+    let optedOut =
+      try decoder.container(keyedBy: LegacyKeys.self)
+      .decodeIfPresent(Bool.self, forKey: .autoContext) == false
     pauseSyncWhileStopped =
-      try container.decodeIfPresent(Bool.self, forKey: .pauseSyncWhileStopped) ?? false
+      try container.decodeIfPresent(Bool.self, forKey: .pauseSyncWhileStopped) ?? optedOut
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     confirmHandoffs = try container.decodeIfPresent(Bool.self, forKey: .confirmHandoffs) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""

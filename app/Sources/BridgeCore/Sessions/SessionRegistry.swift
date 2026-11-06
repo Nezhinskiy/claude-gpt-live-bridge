@@ -51,6 +51,9 @@ public actor SessionRegistry {
     var title = ""
     /// The mod's version as its last join named it; nil when it named none, or none that reads.
     var modVersion: AppVersion?
+    /// The mod's last join said it posts sync lines; one that does not leaves the session
+    /// needing a summary at every line.
+    var syncs = false
     var lastPoll: Date
     var activity = SessionActivity.idle
     var queued: [VoiceRequest] = []
@@ -99,6 +102,7 @@ public actor SessionRegistry {
     joins += 1
     session.title = String(body.title.prefix(Self.maxTitle))
     session.modVersion = body.modVersion.flatMap { AppVersion($0) }
+    session.syncs = body.syncs == true
     session.lastPoll = time.now
     sessions[body.sessionId] = session
     if target == nil { retarget(body.sessionId) }
@@ -154,6 +158,10 @@ public actor SessionRegistry {
       return .context
     }
   }
+
+  /// Whether the session's mod posts sync lines; false for one that has not joined, or that
+  /// predates sync.
+  public func syncs(_ id: SessionID) -> Bool { sessions[id]?.syncs ?? false }
 
   /// Asks the session for its context summary at its next poll.
   public func requestContext(for id: SessionID) { sessions[id]?.wantsContext = true }

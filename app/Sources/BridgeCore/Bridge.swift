@@ -16,9 +16,8 @@ public actor Bridge: Router {
   private let notifies: @Sendable () -> Bool
   /// Settings' "Play a sound when a request is queued for Claude", read at each handoff.
   private let confirmsHandoffs: @Sendable () -> Bool
-  /// Settings' "Load context automatically", read each time a line opens.
-  private let autoContext: @Sendable () -> Bool
-  /// Settings' "Pause sync while the call is stopped", read at each synced line and join.
+  /// Settings' "Pause sync while the call is stopped", read at each synced line, join and line
+  /// that opens.
   private let pausesSync: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
@@ -66,14 +65,12 @@ public actor Bridge: Router {
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
-    autoContext: @escaping @Sendable () -> Bool = { false },
     pausesSync: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
     self.confirmsHandoffs = confirmsHandoffs
-    self.autoContext = autoContext
     self.pausesSync = pausesSync
     self.registry = registry
     makeRealtime = realtime
@@ -110,12 +107,14 @@ public actor Bridge: Router {
     get async {
       let status = await status
       let minutes = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
-      let shown = await registry.target.map { continuity[$0] } ?? Conversation()
+      let target = await registry.target
+      let shown = target.map { continuity[$0] } ?? Conversation()
+      let needsContext = if let target { await needsContext(target) } else { false }
       var olderMods: [String] = []
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes, context: shown.context,
-        conversation: shown.lines, labelsOnAnOlderMod: olderMods)
+        conversation: shown.lines, labelsOnAnOlderMod: olderMods, needsContext: needsContext)
     }
   }
 
@@ -343,8 +342,15 @@ public actor Bridge: Router {
     await send(timer.event)
   }
 
-  /// Opens the line with the target's conversation, and asks the target for its context with
-  /// Load context automatically on; the line does not wait for it. Cancelled, it does nothing
+  /// Whether the voice lacks part of the session: it has no summary, a turn is missing from its
+  /// conversation, or the session's mod does not post sync lines.
+  private func needsContext(_ id: SessionID) async -> Bool {
+    if !continuity[id].isCurrent { return true }
+    return await !registry.syncs(id)
+  }
+
+  /// Opens the line with the target's conversation, and asks the target for its context when it
+  /// needs one and may have one; the line does not wait for it. Cancelled, it does nothing
   /// more: whoever cancelled it closes what it opened. A line the voice closed itself
   /// (`CancellationError`) says why in its `closed` event.
   private func openLine(preroll: Bool) async {
@@ -354,7 +360,11 @@ public actor Bridge: Router {
     let session = await registry.target
     lineSession = session
     lineKnowsSession = true
-    if let session, autoContext() { await registry.requestContext(for: session) }
+    if let session, !pausesSync(), continuity[session].outOfSync != .paused,
+      await needsContext(session)
+    {
+      await registry.requestContext(for: session)
+    }
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer(preroll: preroll)
@@ -560,8 +570,8 @@ public actor Bridge: Router {
   /// it is and kept in the session's conversation. An empty one keeps the stored line: the mod
   /// never sends one, so this guards only against another socket peer, and it is not a control.
   /// A live line about that session gets the summary at once, and one still connecting gets it
-  /// when connected; it does not hold the line open. A summary equal to the stored one is neither
-  /// saved nor added again.
+  /// when connected; it does not hold the line open. A summary equal to the stored one is not
+  /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
@@ -570,14 +580,15 @@ public actor Bridge: Router {
       ? nil
       : AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
-    guard let line, line.text != continuity[id].context else {
+    guard let line else {
       announceContext.yield(id)
       return
     }
+    let isNew = line.text != continuity[id].context
     continuity.setContext(line.text, for: id)
     save()
     announceContext.yield(id)
-    guard lineSession == id else { return }
+    guard isNew, lineSession == id else { return }
     switch machine.phase {
     case .live: try? await realtime?.addContext(line.text)
     case .connecting: heldContext = line
@@ -651,4 +662,7 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let conversation: [Conversation.Line]
   /// The joined sessions whose mod is older than the app, or names no version, by label.
   public let labelsOnAnOlderMod: [String]
+  /// The target's voice lacks part of the session (no summary, a gap, or a mod that does not
+  /// sync): Load context has something to do.
+  public let needsContext: Bool
 }
