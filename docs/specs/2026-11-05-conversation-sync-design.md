@@ -1,6 +1,6 @@
 # Conversation sync
 
-Status: approved, 2026-11-06.
+Status: delivered, 2026-11-06. The real desktop app was not checked.
 
 ## Why
 
