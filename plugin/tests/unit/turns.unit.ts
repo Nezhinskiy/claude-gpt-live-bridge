@@ -159,6 +159,14 @@ test('a turn that ends with no answer posts no line', () => {
   assert.deepEqual(tracker.turnCompleted('t1', ' \n', 'answer'), { post: null, sync: null })
 })
 
+/** The same end in a voice turn: its request closes as failed, and the reason says what happened. */
+test('a voice turn that ends with no answer fails, with a reason', () => {
+  const { post } = voiceTurn(' \n')
+  assert.equal(post?.status, 'failed')
+  assert.equal(post?.text, '')
+  assert.ok(post?.reason)
+})
+
 test('replied makes the rest of the turn a voice turn', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)

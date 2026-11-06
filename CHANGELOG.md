@@ -65,6 +65,9 @@ All notable changes to this project are listed here. The format follows
   data channel, which codex does not report; those are not called a limit, as nothing shows one.
 - A long conversation in a language other than English could stop a line from opening: the app
   measured its seed in characters while codex counts bytes and refuses a start past its limit.
+- A voice request whose turn ends with no answer, as a plain **No** at a permission prompt or a
+  cancelled question does, now fails and says Claude ended the turn without an answer, instead of
+  saying the answer is code or a table only.
 - A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
   after the call has ended: the Start that was waiting on the prompt is cancelled.
 

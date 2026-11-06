@@ -43,7 +43,9 @@ type TypedPrompt = { text: string; turnId: string }
 const BACKGROUND = new Set(['task-notification'])
 /** The origins seen to be a person's own typing (ADR 0001, item m). */
 const OWNER = new Set(['composer'])
-const FAILURE: Record<Exclude<TurnOutcome, 'answer'>, string> = {
+const FAILURE: Record<TurnOutcome, string> = {
+  /** An empty answer: a plain No at a permission dialog, or a cancelled question (ADR 0001, item i). */
+  answer: 'Claude ended the turn without an answer',
   aborted: 'the turn was interrupted',
   refusal: 'the model refused the request',
   error: 'the turn ended with an error',
@@ -230,7 +232,7 @@ export class TurnTracker {
       return { post: null, sync: isAnswered ? { turnId: turn.linesUnder ?? turnId, from: 'claude', text } : null }
     }
     if (!turn.isVoice) return { post: isAnswered ? { id: turn.id, status: 'update', text } : null, sync: null }
-    if (outcome !== 'answer') return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }
+    if (outcome !== 'answer' || text === '') return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }
     return { post: { id: turn.id, status: /\?[*_`)"'”’\s]*$/u.test(text) ? 'question' : 'ok', text }, sync: null }
   }
 
