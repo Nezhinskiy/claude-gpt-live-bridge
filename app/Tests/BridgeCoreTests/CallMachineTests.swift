@@ -376,4 +376,66 @@ struct CallMachineTests {
     #expect(machine.handle(.graceElapsed) == [])
     #expect(machine.pending.isEmpty)
   }
+
+  /// A line of a turn that is not a voice request: what the voice is given, never what it says.
+  static let typed = alphas(.typed, "Rename the folder to out")
+  static let claude = alphas(.claude, "Renamed the folder to out.")
+
+  @Test func aSyncedLineGoesIntoALiveLineAtOnce() {
+    var machine = CallMachine()
+    for event in Self.live { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.typed)) == [.addContext(Self.typed)])
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aConnectingLineTakesSyncedLinesWhenConnected() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, .speechStarted] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    let effects = machine.handle(.connected)
+    #expect(effects.first == .flushPreroll)
+    #expect(effects.contains(.addContext(Self.typed)))
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aLineOpenedByAResultTakesThemTooWhenConnected() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.opening(Self.result)] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.claude)) == [])
+    let effects = machine.handle(.connected)
+    #expect(
+      effects.filter { $0 == .addContext(Self.result) || $0 == .addContext(Self.claude) }
+        == [.addContext(Self.result), .addContext(Self.claude)])
+  }
+
+  @Test func dropSyncedForgetsThem() {
+    var machine = CallMachine()
+    for event in Self.connecting + [.synced(Self.typed)] { _ = machine.handle(event) }
+    machine.dropSynced()
+    #expect(!machine.handle(.connected).contains(.addContext(Self.typed)))
+  }
+
+  /// The conversation has them, and seeds the next line.
+  @Test func aHangUpDropsThem() {
+    var machine = CallMachine()
+    for event in Self.connecting + [.synced(Self.typed)] { _ = machine.handle(event) }
+    _ = machine.handle(.connectFailed(Self.r))
+    _ = machine.handle(.speechStarted)
+    #expect(!machine.handle(.connected).contains(.addContext(Self.typed)))
+  }
+
+  @Test func aSyncedLineNeverChimesOrOpens() {
+    var machine = CallMachine()
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    _ = machine.handle(.start)
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    #expect(machine.phase == .listening)
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aMutedLineStillTakesSyncedLines() {
+    var machine = CallMachine()
+    for event in Self.live + [.mute] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.claude)) == [.addContext(Self.claude)])
+  }
 }

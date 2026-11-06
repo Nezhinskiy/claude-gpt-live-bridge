@@ -13,6 +13,10 @@ public struct VoiceLine: Equatable, Sendable {
     case asking = "ASKING"
     case context = "CONTEXT"
     case task = "TASK"
+    /// A line the owner typed into the session's own terminal.
+    case typed = "TYPED"
+    /// What Claude said in a turn that is not a voice request.
+    case claude = "CLAUDE"
 
     /// It ends a request, so the line stops waiting for that session: a result, a failure or a
     /// question. An update, an approval notice, a question Claude waits on or context leaves the
@@ -54,6 +58,9 @@ public enum CallEvent: Equatable, Sendable {
   /// The open line carries a conversation that is not the target's any more: another session
   /// became the target, or the target's conversation was erased.
   case conversationChanged
+  /// A line of a turn that is not a voice request (`.typed` or `.claude`): the voice is given it
+  /// to know, never to say. It chimes and opens nothing.
+  case synced(VoiceLine)
 }
 
 /// What the bridge does in reply, in order.
@@ -109,6 +116,8 @@ public struct CallMachine: Sendable {
   /// The sessions handed a request whose result the open line waits for; while any is, silence
   /// does not close it, until `resultWindowSeconds` after the latest handoff.
   public private(set) var awaited: Set<SessionID> = []
+  /// Synced lines that arrived while the line connects, given once it is live.
+  private var connectingSynced: [VoiceLine] = []
   /// The silence timer elapsed while the line waited for a result.
   private var isSilenceDue = false
   /// The voice is saying a reply: a transcript delta came and its reply has not finished.
@@ -185,11 +194,19 @@ public struct CallMachine: Sendable {
     case (.connecting, .deliver(let result, _)):
       unheard.append(Unheard(line: result))
       return []
+    case (.connecting, .synced(let line)):
+      connectingSynced.append(line)
+      return []
+    case (.live, .synced(let line)):
+      return [.addContext(line)]
     case (.listening, .handedOff(.some)), (.connecting, .handedOff(.some)):
       return [.confirmHandoff]  // queued all the same; no line waits for it
     case (.connecting, .connected):
       phase = .live
-      return [.flushPreroll] + pending.map { .addContext($0) } + [armSilence(), .problem(nil)]
+      let synced = connectingSynced
+      connectingSynced = []
+      return [.flushPreroll] + pending.map { .addContext($0) } + synced.map { .addContext($0) }
+        + [armSilence(), .problem(nil)]
     case (.connecting, .connectFailed(let reason)), (.connecting, .remoteClosed(let reason)),
       (.live, .remoteClosed(let reason)):
       return [.problem(reason)] + hangUp()
@@ -264,6 +281,10 @@ public struct CallMachine: Sendable {
     return [.closeRealtime] + hangUp()
   }
 
+  /// Forgets the synced lines a connecting line waits to give: the conversation they are in has
+  /// just seeded the line with them.
+  public mutating func dropSynced() { connectingSynced = [] }
+
   /// A session got a new id (`/clear`): the line waits for it, and its results stay its own,
   /// under the new id.
   public mutating func rename(_ old: SessionID, to new: SessionID) {
@@ -288,6 +309,7 @@ public struct CallMachine: Sendable {
       isVoiceSpeaking = false
       isAckUnfinished = false
       replyCanSay = nil
+      connectingSynced = []
     }
     return pending.isEmpty ? [] : [.chime]
   }
