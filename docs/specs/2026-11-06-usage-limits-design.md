@@ -97,7 +97,9 @@ or that row nothing, and a read that fails is a failed read.
 
 **Reading Codex.** A short-lived `codex app-server`, started for the read and closed after it, as
 Settings' voice list does (`offeredVoices` in `App.swift`), except that the search path, which
-costs a login shell, is kept for the run. Why not the voice's own codex: it runs
+costs a login shell, is kept for the run as soon as codex is found on it, before it is launched, so
+a signed-out user does not rerun the shell at each read. The sequence (launch, read, close on success
+and on failure) is `CodexLimits.readOnce` in `BridgeCore`, tested there. Why not the voice's own codex: it runs
 only from Start to Stop, and the owner looks at the limit before a call too. Its lifecycle and
 `RealtimeSession` do not change, so the voice path is untouched; a read during a call is a second
 process on the same lockdown argv.

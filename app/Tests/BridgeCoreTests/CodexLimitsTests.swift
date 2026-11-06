@@ -50,6 +50,29 @@ struct CodexLimitsTests {
     #expect(got.readAt == now && !got.isBlocked)
   }
 
+  @Test func aReadClosesCodex() async throws {
+    let rpc = try FakeRPC()
+    await rpc.set(method, [codex(primary: slot(7, 300))])
+    let got = try await CodexLimits.readOnce(launch: { rpc }, now: now)
+    #expect(got.windows.map(\.span) == [.minutes(300)])
+    #expect(await rpc.closes == 1)
+  }
+
+  @Test func aFailedReadClosesCodex() async throws {
+    let rpc = try FakeRPC()
+    await rpc.fail(method, with: .protocolMismatch("example"))
+    await #expect(throws: CodexProblem.self) {
+      try await CodexLimits.readOnce(launch: { rpc }, now: now)
+    }
+    #expect(await rpc.closes == 1)
+  }
+
+  @Test func aLaunchThatFailsIsAFailedRead() async throws {
+    await #expect(throws: CodexProblem.self) {
+      try await CodexLimits.readOnce(launch: { throw CodexProblem.notInstalled }, now: now)
+    }
+  }
+
   @Test func asksWithoutResetCreditDetails() async throws {
     let rpc = try FakeRPC()
     await rpc.set(method, [codex(primary: slot(7, 300))])

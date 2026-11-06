@@ -453,30 +453,31 @@ final class AppModel {
     guard let codexCwd, limitsPoll.begin(at: Date()) else { return }
     let known = limitsSearchPath
     Task {
-      let read = try? await Self.readLimits(cwd: codexCwd, searchPath: known)
-      if let read { limitsSearchPath = read.searchPath }
-      limitsPoll.finish(read?.limits)
+      // The login shell's search path is asked for once, as soon as codex is found on it.
+      let located = await Self.locateCodex(searchPath: known)
+      if let located { limitsSearchPath = located.searchPath }
+      var limits: UsageLimits?
+      if let located {
+        limits = try? await CodexLimits.readOnce(
+          launch: {
+            try await CodexLaunch.launch(
+              codex: located.codex, cwd: codexCwd, searchPath: located.searchPath)
+          }, now: Date())
+      }
+      limitsPoll.finish(limits)
     }
   }
 
   /// Codex's usage as last read, nil once it is stale.
   func codexLimits(at now: Date) -> UsageLimits? { limitsPoll.reading(at: now) }
 
-  /// The usage, from a codex app-server started for the question and ended after it. The login
-  /// shell's search path is asked for once, not at every menu open.
-  nonisolated private static func readLimits(cwd: URL, searchPath known: [String]?) async throws
-    -> (limits: UsageLimits, searchPath: [String])
+  /// codex on the search path `known`, else on the login shell's, which costs a shell start-up.
+  nonisolated private static func locateCodex(searchPath known: [String]?) async
+    -> (codex: URL, searchPath: [String])?
   {
-    var path = known ?? []
-    var codex = known.flatMap { CodexLaunch.locate(searchPath: $0) }
-    if codex == nil {
-      path = await CodexLaunch.defaultSearchPath()
-      codex = CodexLaunch.locate(searchPath: path)
-    }
-    guard let codex else { throw CodexProblem.notInstalled }
-    let client = try await CodexLaunch.launch(codex: codex, cwd: cwd, searchPath: path)
-    defer { Task { await client.close() } }
-    return (try await CodexLimits.read(client: client, now: Date()), path)
+    if let known, let codex = CodexLaunch.locate(searchPath: known) { return (codex, known) }
+    let path = await CodexLaunch.defaultSearchPath()
+    return CodexLaunch.locate(searchPath: path).map { ($0, path) }
   }
 
   /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed`

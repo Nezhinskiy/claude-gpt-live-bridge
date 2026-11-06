@@ -34,6 +34,22 @@ public enum CodexLimits {
     return UsageLimits(windows: windows, isBlocked: blocked, readAt: now)
   }
 
+  /// The usage from a codex that `launch` starts for this one question: it is closed after the
+  /// read, whether the read worked or not. A launch that fails is a failed read.
+  public static func readOnce(
+    launch: @Sendable () async throws -> any RPCClient, now: Date
+  ) async throws -> UsageLimits {
+    let client = try await launch()
+    do {
+      let limits = try await read(client: client, now: now)
+      await client.close()
+      return limits
+    } catch {
+      await client.close()
+      throw error
+    }
+  }
+
   /// `rateLimitsByLimitId.codex`, else the single-bucket `rateLimits` when its `limitId` is
   /// `codex` or absent. Other buckets are per-model quotas and are not ordinary Codex usage.
   private static func codexBucket(_ reply: JSONValue) -> JSONValue? {
