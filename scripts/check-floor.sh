@@ -1,10 +1,10 @@
 #!/bin/sh
-# Runs the mod's engine-facing checks on the lowest Claude Code the README promises, so raising
-# what the mod needs fails here and not on the machine of someone on that version. A mod cannot
-# declare a minimum (ADR 0001, item p), so this run is what keeps the number true. README.md's
-# Requirements line is the number's home: change it there and this run follows. CI runs this after
-# check.sh, which installs plugin/node_modules. It downloads that Claude Code, so check.sh does not
-# run it. --print prints the number and stops.
+# Runs the mod's engine-facing checks on the lowest Claude Code the README promises, so the type
+# check, validation and tests must pass on that version; a need none of them reach still passes.
+# A mod cannot declare a minimum (ADR 0001, item p), so this run is what holds the number to the
+# code. README.md's Requirements line is the number's home: change it there and this run follows.
+# CI runs this after check.sh, which installs plugin/node_modules. It downloads that Claude Code,
+# so check.sh does not run it. --print prints the number and stops.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -22,12 +22,8 @@ if [ "${1:-}" = --print ]; then
   exit 0
 fi
 
-# Types already laid by another version would be kept, and the type check would run against them.
-# Taken away after the run as well, for the check.sh that comes next.
-types=plugin/.claude-plugin/types
 dir=$(mktemp -d "${TMPDIR:-/tmp}/livebridge-floor.XXXXXX")
-trap 'rm -rf "$dir" "$types"' EXIT
-rm -rf "$types"
+trap 'rm -rf "$dir"' EXIT
 
 npm install --prefix "$dir" --no-audit --no-fund "@anthropic-ai/claude-code@$floor"
 PATH="$dir/node_modules/.bin:$PATH"

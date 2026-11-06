@@ -1,8 +1,9 @@
 #!/bin/sh
 # The lowest Claude Code the README promises is one fact, and it can fail. Every copy of it agrees
-# with the Requirements line in README.md, CI runs the floor, and the floor run fails when the mod
-# does not pass on that version. The run goes in a scratch copy with a stand-in npm and claude, so
-# nothing is downloaded and the tree's own types stay.
+# with the Requirements line in README.md, ci.yml has the step that runs it, check.sh still runs
+# the mod's checks, and the floor run fails when the mod does not pass on that version. The run
+# goes in a scratch copy with a stand-in npm and claude, so nothing is downloaded and the tree's
+# own types stay.
 set -eu
 cd "$(dirname "$0")/../.."
 
@@ -29,14 +30,15 @@ done
 
 grep -Eq '^ +run: scripts/check-floor\.sh$' .github/workflows/ci.yml ||
   problem "ci.yml does not run scripts/check-floor.sh"
+grep -q '^sh scripts/check-mod\.sh$' scripts/check.sh ||
+  problem "check.sh does not run scripts/check-mod.sh"
 
-# The scratch copy: the two scripts, the README, and types left behind by a higher version.
+# The scratch copy: the two scripts and the README. Each run finds types left by a higher version.
 repo="$tmp/repo"
 types=plugin/.claude-plugin/types/claude-code/index.d.ts
 mkdir -p "$repo/scripts" "$repo/$(dirname "$types")" "$tmp/bin"
 cp scripts/check-floor.sh scripts/check-mod.sh "$repo/scripts/"
 cp README.md "$repo/"
-printf '// Written by Claude Code 9.9.9.\n' >"$repo/$types"
 
 # What `npm install` lays: a claude that reports $FAKE_CLAUDE_VERSION, or the version asked for.
 cat >"$tmp/claude" <<'STUB'
@@ -44,12 +46,14 @@ cat >"$tmp/claude" <<'STUB'
 case "$1 ${2:-} ${3:-}" in
   "--version  ") echo "${FAKE_CLAUDE_VERSION:-$FAKE_REQUESTED} (Claude Code)" ;;
   "plugin validate plugin") [ "${FAKE_FAILS:-}" != validate ] ;;
-  "plugin validate .") ;;
+  "plugin validate .") [ "${FAKE_FAILS:-}" != validate-root ] ;;
   "plugin test plugin") [ "${FAKE_FAILS:-}" != test ] ;;
   *) # The headless session that lays the types.
-    mkdir -p plugin/.claude-plugin/types/claude-code
+    echo "what the session printed"
+    [ "${FAKE_FAILS:-}" != no-types ] || exit 0
     printf '// Written by Claude Code %s.\n' "${FAKE_CLAUDE_VERSION:-$FAKE_REQUESTED}" \
       >plugin/.claude-plugin/types/claude-code/index.d.ts
+    [ "${FAKE_FAILS:-}" != session ]
     ;;
 esac
 STUB
@@ -71,28 +75,32 @@ STUB
 chmod +x "$tmp/bin/npm"
 
 run_floor() {
+  printf '// Written by Claude Code 9.9.9.\n' >"$repo/$types"
   (cd "$repo" && env PATH="$tmp/bin:/usr/bin:/bin" FAKE_STUBS="$tmp" "$@" \
-    sh scripts/check-floor.sh) >/dev/null 2>&1
+    sh scripts/check-floor.sh) >"$tmp/output" 2>&1
 }
 
-run_floor true=1 || problem "the floor run failed with a mod that passes"
+run_floor || problem "the floor run failed with a mod that passes"
 if [ "$(cat "$tmp/typechecked" 2>/dev/null)" != "// Written by Claude Code $floor." ]; then
   problem "the floor run type-checked against types that are not the floor's"
 fi
-[ ! -e "$repo/$types" ] || problem "the floor run left the floor's types in the tree"
 
-for failing in validate typecheck test; do
+for failing in session no-types typecheck validate-root validate test; do
   if run_floor FAKE_FAILS="$failing"; then
     problem "the floor run passed though $failing failed on the floor"
   fi
 done
+
+run_floor FAKE_FAILS=session || true
+grep -q "what the session printed" "$tmp/output" ||
+  problem "a failed session said nothing about why"
 
 if run_floor FAKE_CLAUDE_VERSION=9.9.9; then
   problem "the floor run passed on a claude that is not the floor"
 fi
 
 sed -i '' '/^- Claude Code /d' "$repo/README.md"
-if run_floor true=1; then
+if run_floor; then
   problem "the floor run passed with no floor in README.md"
 fi
 
