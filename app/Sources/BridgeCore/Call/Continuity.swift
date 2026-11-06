@@ -155,8 +155,8 @@ public struct Conversation: Codable, Sendable, Equatable {
   /// The context and the open task lines, then the newest lines that fit codex's limits. Notes
   /// and the session's lines go in as `user` lines, data with the rank of the owner's words and
   /// no more, like every line the app adds while a session is open. A session's line still in
-  /// `unheard` is left out: the line is given it again once it opens. A handoff line is the
-  /// menu's only, so seeding sends nothing it did not send before; an open request still goes in
+  /// `unheard` is left out: the line is given it again once it opens. A handoff or summary line is
+  /// the menu's only, so seeding sends nothing it did not send before; an open request still goes in
   /// as its task line.
   public func initialItems(tasks: [String], unheard: Set<String> = []) -> [InitialItem] {
     let notes = ([context].compactMap { $0 } + tasks).map { InitialItem(role: .user, text: $0) }

@@ -1356,7 +1356,16 @@ struct BridgeTests {
     #expect(await test.bridge.current.contextNeed == .load)
   }
 
-  /// A gap is the owner's to load, even with no summary yet.
+  /// More lines than the seed carries are lost to the voice, summary or none.
+  @Test func linesTheSeedCannotCarryNeedAPress() async throws {
+    try await join(a, "Alpha")
+    try await sync(a, "Hello.")
+    #expect(await bridge.current.contextNeed == .withTheLine)
+    for n in 0..<70 { try await sync(a, turn: "t\(n)", "Line \(n).") }
+    #expect(await bridge.current.contextNeed == .load)
+  }
+
+  /// A gap keeps the item enabled, even with no summary yet: a press need not wait for a line.
   @Test func aGapWithNoSummaryNeedsAPress() async throws {
     try await join(a, "Alpha", missed: true)
     #expect(await bridge.current.contextNeed == .load)

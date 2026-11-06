@@ -379,8 +379,8 @@ public actor Bridge: Router {
     return await !registry.syncs(id)
   }
 
-  /// What the menu says of it: a session that has no summary and has lost nothing gets one with
-  /// its next line, so only the pause setting, under which no line loads one, leaves it to a press.
+  /// What the menu says of it: a session that has no summary and has lost nothing has one asked
+  /// for by its next line, so it is offered no press, unless the pause setting stops that line.
   private func contextNeed(_ id: SessionID) async -> ContextNeed {
     guard await needsContext(id) else { return .none }
     let conversation = continuity[id]
@@ -794,7 +794,8 @@ public struct BridgeUpdate: Sendable, Equatable {
   /// The status's problem, with its kind.
   public let problem: Problem?
   public let minutesThisCall: Double
-  /// The target's whole conversation, oldest first: every line the app keeps.
+  /// The target's whole conversation, oldest first: every line the app keeps, and a summary no
+  /// kept line holds.
   public let conversation: [Conversation.Line]
   /// The joined sessions whose mod is older than the app, or names no version, by label.
   public let labelsOnAnOlderMod: [String]

@@ -254,7 +254,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   conversation outgrows that), the session was paused, or its mod does not sync. Otherwise the item
   reads **Context up to date** and is disabled, because the voice already has the conversation. With
   no summary yet and nothing lost it reads **Context loads with the line** and is disabled, because
-  the next line loads one by itself. A summary carries no date, so one can be ignored while the item stays enabled, and `/live context`
+  the next line asks for one by itself. A summary carries no date, so one can be ignored while the item stays enabled, and `/live context`
   can fail, bring back what was forgotten or clear the paused mark ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×
   removes it and erases its own; both ask first. The voice starts afresh from the next time the line

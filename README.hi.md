@@ -257,7 +257,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे बढ़
   जाती है), session paused रहा है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
   date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर सारांश अभी नहीं है और कुछ खोया नहीं है, तो यह
-  **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद load करती है। सारांश पर कोई तारीख
+  **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। सारांश पर कोई तारीख
   नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है, और `/live context` विफल हो सकता है,
   भूली हुई बात वापस ला सकता है या paused का निशान हटा सकता है ([BR-002](docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session

@@ -267,7 +267,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   conversación larga lo supera), la sesión estuvo en pausa o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
   Sin resumen aún y sin nada perdido dice **Context loads with the line** y está deshabilitado, porque
-  la siguiente línea lo carga sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado, y `/live
+  la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado, y `/live
   context` puede fallar, devolver lo olvidado o quitar la marca de pausa
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
