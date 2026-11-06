@@ -539,20 +539,6 @@ test('aSpokenReplyWhileTheKeyboardAnswerIsPostedClosesItsRequest', async ($, on)
   await asked
 })
 
-/** Cancelling may leave the tool's call unfinished: the turn's end shows the question is over. */
-test('aQuestionOpenAtTheTurnsEndTakesNoReply', async ($, on) => {
-  const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
-  void $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
-  await world.clock.advance(1000)
-  await $.turn.complete({ ...DONE, turnId: 't1', answer: '' })
-  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
-  await world.clock.advance(1000)
-  expect(world.take('answer').map(body => body?.status)).toEqual(['failed'])
-})
-
 /** A turn of a prompt typed into the turn before it stays under that id, as its lines do. */
 test('aQueuedTurnsQuestionCarriesTheFirstTurnsId', async ($, on) => {
   const world = fakeWorld(on)

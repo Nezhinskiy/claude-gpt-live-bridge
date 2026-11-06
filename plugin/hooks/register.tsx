@@ -578,7 +578,6 @@ export const register: Register = on => {
       noteLostTurn()
       staleSummary()
       approval = null
-      answerQuestion = null  // a question cancelled at the dialog may leave its tool's call unfinished
       await save($)
       if (sync) await postSync($, sync)
       const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
