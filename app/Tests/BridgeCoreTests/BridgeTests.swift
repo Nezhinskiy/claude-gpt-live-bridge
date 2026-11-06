@@ -2129,6 +2129,28 @@ struct BridgeTests {
 
   // MARK: Questions and approvals from typed turns
 
+  /// R-18: a subagent's prompt carries the turn it ran in. Outside the target, in a typed turn,
+  /// it is context only.
+  @Test func aBareApprovalInATypedTurnOutsideTheTargetDoesNotChime() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: b, state: .approval, turn: TurnRef(id: "turn-1")))
+    #expect(await bridge.status.unheard == 0)
+    #expect(await !audio.calls.contains("chime"))
+  }
+
+  /// R-18: in a refused turn its notice is not recorded.
+  @Test func aBareApprovalInARefusedTurnIsNotRecorded() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(sessionId: test.a, state: .approval, turn: TurnRef(id: "turn-1")))
+    #expect(try test.saved()[test.a].lines.isEmpty)
+  }
+
   /// Claude's question in a turn the owner typed, on the target after an owner line, is said and
   /// opens the closed line.
   @Test func aTypedTurnsQuestionOpensTheTargetsLine() async throws {
