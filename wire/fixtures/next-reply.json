@@ -1,6 +1,7 @@
 {
   "status": {
     "call": "live",
+    "isMuted": true,
     "minutesToday": 12.25,
     "sessions": [
       {

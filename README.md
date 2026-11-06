@@ -227,6 +227,16 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
   for each request the voice handed to Claude), the minutes, **Star LiveBridge on GitHub**
   (opens the repository's page), **Settings…** and **Quit LiveBridge**.
+- **Mute** (beside **Stop**, in the band and in the menu's call card; **Unmute** while muted)
+  releases your microphone while the call goes on: an answer from Claude still opens the line and
+  the voice says it. The band keeps the phase and adds `· muted`; the menu says "Muted — line
+  closed" while no line is open. Mute does not close a line: an open line closes after the usual
+  silence, counted from Mute if you were speaking, and when it would have without Mute if the line
+  was already quiet; it is billed like any silence, so Mute does not save realtime minutes.
+  **Unmute** takes the microphone again, and the call ends with the reason if it cannot (denied,
+  busy, missing). **Stop** ends the call and the mute; the next **Start** begins unmuted. Mute is
+  not a lock: any process running as you can unmute
+  ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **New conversation…** erases the target's conversation and its loaded context, and a
   session's × removes it and erases its own; both ask first. The voice starts afresh from the
   next time the line opens, unless **Load context automatically when a line opens** is on: that
@@ -281,6 +291,7 @@ a question Claude asks you, or that Claude waits for your approval:
 
 - While a call is on and nobody is talking, the microphone feeds only a voice detector on your
   Mac. Nothing is sent anywhere.
+  While muted, LiveBridge holds no microphone, and macOS's microphone indicator shows that.
 - When you start speaking, the line opens. The 2 seconds before you started are kept and sent
   first, so your first words are not lost.
 - The line closes after 20 seconds of silence. Sound without words (music, a TV) closes it after
@@ -310,9 +321,10 @@ LiveBridge has no telemetry and listens on no network port; the mod talks to the
 socket in a folder only your user can open. What goes to OpenAI, through codex's realtime
 session:
 
-- microphone audio while the line is open, from 2 seconds before you started speaking (or, for
-  a line Claude's answer, question or approval notice opened, from when it opened) until it
-  closes;
+- microphone audio while the line is open, from 2 seconds before you started speaking (or, for a
+  line Claude's answer, question or approval notice opened, from when it opened) until it closes
+  (while muted LiveBridge captures nothing, so none goes; speech you said before pressing Mute, on a
+  line that was already connecting, may still go);
 - the voice's instructions: LiveBridge's own rules, then your Settings **Prompt** if you wrote
   one;
 - the target session's recent conversation (up to the last 24 lines) to continue it in a new

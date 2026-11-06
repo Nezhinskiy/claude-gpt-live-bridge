@@ -53,16 +53,36 @@ final class AudioHost: NSObject, AudioSide {
 
   // MARK: AudioSide
 
+  /// macOS's answer, asking it first if it never was (its prompt then shows); the fake
+  /// microphone needs no permission.
+  func microphoneProblem() async -> Problem? {
+    guard fakeMic == nil else { return nil }
+    var access: MicrophoneAccess =
+      switch AVCaptureDevice.authorizationStatus(for: .audio) {
+      case .authorized: .granted
+      case .notDetermined: .undetermined
+      case .restricted: .restricted
+      default: .denied
+      }
+    if access.mustAsk {
+      access = MicrophoneAccess(asked: await AVCaptureDevice.requestAccess(for: .audio))
+    }
+    return access.problem
+  }
+
   func startListening() async {
-    if fakeMic == nil, let problem = await Self.askForMicrophone() {
-      return onEvent(.failed(problem))
-    }
-    do { try await call("return await LB.listen(fake)", ["fake": fakeMic != nil]) } catch {
-      onEvent(.failed(.other("The audio page did not start: \(Self.message(error))")))
-    }
+    await run("return await LB.listen(fake)", ["fake": fakeMic != nil], failing: "start")
   }
 
   func stopListening() async { _ = try? await call("LB.stop()") }
+
+  /// Fails closed: a page that cannot confirm the release ends the call, whose `LB.stop`
+  /// releases the microphone, rather than showing Muted over an open microphone.
+  func muteMicrophone() async { await run("LB.mute()", failing: "mute") }
+
+  /// Waits for the microphone; the page reports a refusal itself, so only a page that cannot
+  /// be reached fails here.
+  func unmuteMicrophone() async { await run("return await LB.unmute()", failing: "unmute") }
 
   func makeOffer(preroll: Bool) async throws -> String {
     guard
@@ -86,23 +106,17 @@ final class AudioHost: NSObject, AudioSide {
 
   func confirmHandoff() async { handoffSound?.play() }
 
-  /// macOS's answer for the microphone, asking it first if it never was (its prompt then
-  /// shows); nil when the page may open the microphone.
-  private static func askForMicrophone() async -> Problem? {
-    var access: MicrophoneAccess =
-      switch AVCaptureDevice.authorizationStatus(for: .audio) {
-      case .authorized: .granted
-      case .notDetermined: .undetermined
-      case .restricted: .restricted
-      default: .denied
-      }
-    if access.mustAsk {
-      access = MicrophoneAccess(asked: await AVCaptureDevice.requestAccess(for: .audio))
-    }
-    return access.problem
-  }
-
   // MARK: The page
+
+  /// A page call the call cannot go on without: its failure ends the call, saying which
+  /// step the page did not do.
+  private func run(_ body: String, _ arguments: [String: Any] = [:], failing verb: String)
+    async
+  {
+    do { try await call(body, arguments) } catch {
+      onEvent(.failed(.other("The audio page did not \(verb): \(Self.message(error))")))
+    }
+  }
 
   /// Runs `body` as an async function in the page once it has loaded; a rejected promise
   /// throws its message, and a page that failed to load throws (and loads again next time).

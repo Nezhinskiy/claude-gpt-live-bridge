@@ -35,6 +35,8 @@ public enum CallEvent: Equatable, Sendable {
   /// The voice finished a reply; the text is its transcript.
   case assistantFinishedSpeaking(String)
   case silenceElapsed
+  /// The owner releases the microphone while the call goes on, or takes it again.
+  case mute, unmute
   /// The voice handed a request to this session; nil when none is joined, and the failure
   /// follows as a delivery.
   case handedOff(SessionID?)
@@ -57,6 +59,8 @@ public enum CallEvent: Equatable, Sendable {
 /// What the bridge does in reply, in order.
 public enum CallEffect: Equatable, Sendable {
   case openRealtime, closeRealtime, startLocalVAD, stopLocalVAD, flushPreroll
+  /// The audio page releases the microphone, or takes it again.
+  case muteMicrophone, unmuteMicrophone
   /// Opens the line for a line that arrived: without the pre-roll, as nobody spoke, and without
   /// holding up the delivery while it connects.
   case openRealtimeForResult
@@ -87,6 +91,8 @@ public struct CallMachine: Sendable {
   public static let noise = Problem.other(
     "The voice hung up: the microphone heard sound but no words for 90 seconds.")
   public private(set) var phase: CallPhase = .off
+  /// The owner released the microphone: no speech opens the line, but a line that arrived does.
+  public private(set) var isMuted = false
 
   private struct Unheard: Sendable {
     let line: VoiceLine
@@ -148,9 +154,21 @@ public struct CallMachine: Sendable {
       return end(with: [.closeRealtime, .stopLocalVAD, .problem(reason)])
     case (.off, .start):
       phase = .listening
-      return [.startLocalVAD, .problem(nil)]
+      // the problem first: listening waits on macOS's prompt, whose refusal is a new problem
+      return [.problem(nil), .startLocalVAD]
     case (.off, _):
       return []
+    case (_, .speechStarted) where isMuted:
+      return []
+    case (_, .mute):
+      guard !isMuted else { return [] }
+      isMuted = true
+      // speech ends at Mute; a quiet line keeps the silence it was counting
+      return [.muteMicrophone] + (isSoundOn ? handle(.speechEnded) : [])
+    case (_, .unmute):
+      guard isMuted else { return [] }
+      isMuted = false
+      return [.unmuteMicrophone]
     case (_, .speechEnded):
       isSoundOn = false
       return phase == .live ? [armSilence()] + graceIfQuiet : []

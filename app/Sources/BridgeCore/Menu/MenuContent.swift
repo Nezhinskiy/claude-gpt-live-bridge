@@ -34,7 +34,10 @@ public struct MenuContent: Sendable, Equatable {
     /// What the button does; nil while there is no bridge to ask.
     public let action: CallAction?
     public let canAct: Bool
-    /// "N unheard — speak to hear", when results wait.
+    /// Mute, or Unmute while muted; nil while the call is off or there is no bridge.
+    public let muteAction: CallAction?
+    /// "N unheard — speak to hear", when results wait; "N unheard — unmute and speak to hear"
+    /// while muted.
     public let unheard: String?
     public let problem: String?
     /// The problem is the microphone's refusal: the card offers to open that setting.
@@ -43,6 +46,7 @@ public struct MenuContent: Sendable, Equatable {
     public let codexHelp: CodexHelp?
 
     public var actionTitle: String? { action.map { $0 == .start ? "Start" : "Stop" } }
+    public var muteActionTitle: String? { muteAction.map { $0 == .mute ? "Mute" : "Unmute" } }
   }
 
   public indirect enum Item: Sendable, Equatable {
@@ -87,8 +91,11 @@ public struct MenuContent: Sendable, Equatable {
       headline: shown?.headline ?? (problem == nil ? "Starting…" : "Off"),
       detail: shown?.detail ?? "",
       tint: problem != nil ? .problem : shown?.tint ?? .quiet, action: shown?.action,
-      canAct: shown?.canAct ?? false,
-      unheard: shown.flatMap { $0.unheard > 0 ? "\($0.unheard) unheard — speak to hear" : nil },
+      canAct: shown?.canAct ?? false, muteAction: shown?.muteAction,
+      unheard: shown.flatMap {
+        $0.unheard > 0
+          ? "\($0.unheard) unheard — \($0.isMuted ? "unmute and speak" : "speak") to hear" : nil
+      },
       problem: problem?.sentence,
       opensMicrophoneSettings: problem?.opensMicrophoneSettings ?? false,
       codexHelp: problem?.help)
@@ -154,7 +161,8 @@ public struct MenuContent: Sendable, Equatable {
       switch item {
       case .call(let card):
         let button = card.actionTitle.map { " · \($0)" + (card.canAct ? "" : " (disabled)") }
-        return [indent + "[call] \(card.headline)" + (button ?? "")]
+        let mute = card.muteActionTitle.map { " · \($0)" }
+        return [indent + "[call] \(card.headline)" + (button ?? "") + (mute ?? "")]
       case .separator: return [indent + "---"]
       case .header(let title): return [indent + "# \(title)"]
       case .session(let row):

@@ -76,7 +76,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     joined: new Set<string>(),
     /** Sessions the owner removed in the menu; only the owner's join (`/live on`) clears the mark. */
     removed: new Set<string>(),
-    status: { call: 'off', sessions: [], minutesToday: 0, unheard: 0 } as StatusReply,
+    status: { call: 'off', sessions: [], minutesToday: 0, unheard: 0, isMuted: false } as StatusReply,
     work: [] as Work[],
     calls: [] as Call[],
     submitted: [] as string[],

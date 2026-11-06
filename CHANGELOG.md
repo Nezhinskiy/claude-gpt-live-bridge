@@ -10,6 +10,13 @@ All notable changes to this project are listed here. The format follows
 
 - **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
   want to support the project.
+- **Mute** beside Stop, in the band above the prompt and in the menu's call card (**Unmute**
+  while muted), releases the microphone while the call goes on: an answer from Claude still opens
+  the line and the voice says it. While muted LiveBridge holds no microphone, and macOS's
+  microphone indicator shows it. Mute does not close an open line: it closes as if you had
+  stopped speaking when you pressed Mute (the usual silence, counted from Mute if you were
+  speaking), so Mute does not save realtime minutes, and it is not a control against
+  other processes running as you ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 
 ### Changed
 
@@ -22,6 +29,11 @@ All notable changes to this project are listed here. The format follows
 - After an update, Settings lists the joined Claude Code sessions still on the old mod, by name,
   instead of always saying that open sessions keep it until they restart. A mod reports its
   version when it joins; one from before this release names none and counts as old.
+
+### Fixed
+
+- A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
+  after the call has ended: the Start that was waiting on the prompt is cancelled.
 
 ## [0.3.0]
 

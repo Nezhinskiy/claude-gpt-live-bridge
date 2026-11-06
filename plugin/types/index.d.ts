@@ -12,6 +12,8 @@ export type BandStatus = {
   minutesToday: number
   /** The app's problem sentence. */
   problem?: string
+  /** Whether the owner's microphone is released; absent from an app without Mute. */
+  isMuted?: boolean
 }
 
 /** What the band draws; null while this session has not joined LiveBridge. */

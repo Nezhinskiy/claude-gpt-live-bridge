@@ -14,6 +14,7 @@ struct WireTests {
     "join-version": roundTrip(JoinBody.self),
     "leave": roundTrip(LeaveBody.self),
     "target": roundTrip(TargetBody.self), "call": roundTrip(CallBody.self),
+    "call-mute": roundTrip(CallBody.self),
     "activity": roundTrip(ActivityBody.self), "activity-question": roundTrip(ActivityBody.self),
     "activity-approval": roundTrip(ActivityBody.self),
     "context": roundTrip(ContextBody.self),

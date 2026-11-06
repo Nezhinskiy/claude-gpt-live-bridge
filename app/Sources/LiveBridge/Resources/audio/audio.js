@@ -8,20 +8,16 @@
 // everything said while codex starts and the line connects queue up, and from `flushPreroll`
 // the queue plays into the peer's track, dropping silence until it has caught up (ADR 0001 (c)).
 // A timer or a promise outlives neither its peer nor its microphone: each checks it is still
-// the current one before it reports anything.
+// the current one before it reports anything. `microphone.js` owns the capture: Mute releases
+// it while the call goes on, so a result can still open the line and be said.
 
 import { createVad, dbfs, rms } from './vad.js';
-import { createCatchUp, createPreroll } from './preroll.js';
+import { createLineAudio } from './preroll.js';
 import { within } from './deadline.js';
+import { MIC_DEADLINE_MS, createMicrophone, microphoneFailure } from './microphone.js';
 
 const FRAME = 1024;
-/** A microphone request still pending after this fails, so the call never listens to nothing. */
-const MIC_DEADLINE_MS = 10000;
 const say = {
-  micTimeout:
-    'The microphone did not start within 10 seconds. Check System Settings > Privacy & Security > Microphone, then start again.',
-  noDevice: 'No microphone is connected.',
-  busy: 'The microphone could not be opened; another app may be using it.',
   lost: 'The microphone stopped and no other input was found.',
   localNetwork:
     'The voice line could not reach the network. Allow LiveBridge in System Settings > Privacy & Security > Local Network, then start again.',
@@ -31,12 +27,12 @@ const say = {
 const post = (message) => window.webkit.messageHandlers.bridge.postMessage(message);
 
 let ctx = null;
-let pump, input, stream, vad, preroll, catchUp;
+let fake = false; // the debug WAV stands in for the microphone (`--fake-mic`)
+let pump, vad, line;
 let pc = null;
 let channel = null;
 let remote = null;
 let out = null; // the peer's outgoing track
-let holding = false; // a connect is under way: frames queue instead of filling the pre-roll
 let sending = false; // the line is open: the queue plays into the peer's track
 let frames = 0;
 
@@ -46,108 +42,127 @@ function fail(reason) {
 }
 
 function process(event) {
+  const output = event.outputBuffer.getChannelData(0);
+  output.fill(0);
+  if (mic.muted) {
+    // No detection and no pre-roll: what is already held still plays into an open line.
+    if (sending) play(output);
+    return;
+  }
   const frame = new Float32Array(event.inputBuffer.getChannelData(0));
   const level = rms(frame);
   const decision = vad.push(level, ctx.currentTime * 1000);
-  if (decision === 'start') hold();
+  if (decision === 'start') line.hold();
   if (decision) post({ type: decision === 'start' ? 'speechStarted' : 'speechEnded' });
-  if (holding) catchUp.push(frame);
-  else preroll.write(frame);
-  const output = event.outputBuffer.getChannelData(0);
-  output.fill(0);
+  line.write(frame);
   if (!sending) return;
-  const next = catchUp.pull();
-  if (next) output.set(next);
+  play(output);
   if (++frames % 4 === 0) post({ type: 'level', value: Math.min(1, Math.max(0, (dbfs(level) + 60) / 50)) });
 }
 
-/** From the first word on, the pre-roll and what follows queue for the line; `keep` false drops
- * the pre-roll, for a line nobody spoke on. */
-function hold(keep = true) {
-  if (holding) return;
-  holding = true;
-  const kept = preroll.drain();
-  if (!keep) return;
-  for (let i = kept.length % FRAME; i < kept.length; i += FRAME) catchUp.push(kept.subarray(i, i + FRAME));
+function play(output) {
+  const next = line.pull();
+  if (next) output.set(next);
 }
 
-/** Connects the default input, or the debug WAV, to the processor; false when the microphone
- * was stopped meanwhile. */
-async function attachInput(fake) {
-  const mine = ctx;
-  let node;
+const stopTracks = (stream) => stream.getTracks().forEach((track) => track.stop());
+
+/** The default input, or the debug WAV, as a capture of the context it started with; null when
+ * the microphone was muted or stopped meanwhile, or before `listen`. */
+async function acquire(isCurrent) {
+  const context = ctx;
+  if (!context) return null;
   if (fake) {
     const data = await (await fetch('fake-mic.wav')).arrayBuffer();
-    if (ctx !== mine) return false;
-    node = ctx.createBufferSource();
-    node.buffer = await ctx.decodeAudioData(data);
-    if (ctx !== mine) return false;
+    if (!isCurrent()) return null;
+    const node = context.createBufferSource();
+    node.buffer = await context.decodeAudioData(data);
+    if (!isCurrent()) return null;
     node.start();
-  } else {
-    const asked = navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-    const next = await within(asked, MIC_DEADLINE_MS, micLate, (late) =>
-      late.getTracks().forEach((track) => track.stop()),
-    );
-    if (ctx !== mine) {
-      next.getTracks().forEach((track) => track.stop());
-      return false;
-    }
-    stream?.getTracks().forEach((track) => track.stop());
-    stream = next;
-    stream.getAudioTracks()[0].onended = reacquire;
-    node = ctx.createMediaStreamSource(stream);
+    return { node, stop: () => node.stop(), onEnded: () => {} };
   }
-  input?.disconnect();
-  input = node;
-  input.connect(pump);
-  return true;
+  const asked = navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+  const stream = await within(asked, MIC_DEADLINE_MS, micLate, stopTracks);
+  if (!isCurrent()) {
+    stopTracks(stream);
+    return null;
+  }
+  let node;
+  try {
+    node = context.createMediaStreamSource(stream);
+  } catch (error) {
+    stopTracks(stream); // not yet a capture, so nothing else would stop it
+    throw error;
+  }
+  const track = stream.getAudioTracks()[0];
+  return { node, stop: () => stopTracks(stream), onEnded: (handler) => (track.onended = handler) };
 }
 
+/** Named only: `microphoneFailure` says it by its name. */
 function micLate() {
-  const error = new Error(say.micTimeout);
-  error.name = 'MicTimeoutError';
-  return error;
+  return Object.assign(new Error(), { name: 'MicTimeoutError' });
 }
 
-/** The input device changed or went away: take the new default and keep the peer. */
-function reacquire() {
-  const mine = ctx;
-  if (ctx) attachInput(false).catch(() => ctx === mine && fail(say.lost));
+const mic = createMicrophone({
+  acquire,
+  connect: (node) => node.connect(pump),
+  disconnect: (node) => node.disconnect(),
+  watchDevices(handler) {
+    if (!fake && navigator.mediaDevices) navigator.mediaDevices.ondevicechange = handler;
+  },
+  onLost: () => fail(say.lost),
+});
+
+/** The microphone could not be taken: the call ends with the reason. */
+function failMicrophone(error) {
+  stop();
+  post(microphoneFailure(error));
 }
 
-async function listen(fake) {
+async function listen(wav) {
   if (ctx) return;
   const mine = (ctx = new AudioContext({ sampleRate: 48000 }));
+  fake = wav;
   vad = createVad();
-  preroll = createPreroll({ sampleRate: ctx.sampleRate });
-  catchUp = createCatchUp({ sampleRate: ctx.sampleRate });
+  line = createLineAudio({ sampleRate: ctx.sampleRate, frame: FRAME });
   pump = ctx.createScriptProcessor(FRAME, 1, 1);
   pump.onaudioprocess = process;
-  const mute = ctx.createGain();
-  mute.gain.value = 0;
-  pump.connect(mute).connect(ctx.destination);
+  const silent = ctx.createGain();
+  silent.gain.value = 0;
+  pump.connect(silent).connect(ctx.destination);
   try {
-    if (!(await attachInput(fake))) return;
+    // False when muted: the context still runs, so a result can open the line.
+    await mic.attach();
+    if (ctx !== mine) return;
     await ctx.resume();
   } catch (error) {
-    if (ctx !== mine) return;
-    stop();
-    if (error?.name === 'NotAllowedError') return post({ type: 'microphoneDenied' });
-    const reasons = { NotFoundError: say.noDevice, MicTimeoutError: say.micTimeout };
-    fail(reasons[error?.name] ?? say.busy);
-    return;
+    if (ctx === mine) failMicrophone(error);
   }
-  if (ctx === mine && !fake) navigator.mediaDevices.ondevicechange = reacquire;
+}
+
+/** Releases the microphone; the call, and an open line, go on. */
+function mute() {
+  if (mic.muted) return; // a second Mute changes nothing, and posts nothing
+  mic.mute();
+  if (!ctx) return;
+  vad = createVad();
+  if (!pc) line.reset();
+  post({ type: 'level', value: 0 });
+}
+
+/** Resolves, to nothing on every path, once the microphone is back or its failure was posted. */
+async function unmute() {
+  await mic.unmute().catch(failMicrophone);
 }
 
 function stop() {
   closePeer();
-  if (navigator.mediaDevices) navigator.mediaDevices.ondevicechange = null;
-  stream?.getTracks().forEach((track) => track.stop());
+  mic.release();
   ctx?.close();
-  ctx = stream = input = null;
+  ctx = null;
+  fake = false;
 }
 
 /** Resolves once ICE gathering is done, with whether any candidate came; none within 2 s
@@ -168,7 +183,7 @@ const closed = () => new Error('The voice line was closed.');
 
 async function makeOffer(keepPreroll = true) {
   dropPeer();
-  hold(keepPreroll);
+  line.hold(keepPreroll);
   out = ctx.createMediaStreamDestination();
   pump.connect(out);
   const peer = (pc = new RTCPeerConnection());
@@ -213,8 +228,8 @@ function flushPreroll() {
 
 /** Ends the line: the peer, and the queue held for it. */
 function closePeer() {
-  holding = sending = false;
-  catchUp?.clear();
+  sending = false;
+  line?.clear();
   dropPeer();
 }
 
@@ -226,4 +241,4 @@ function dropPeer() {
   pc = channel = remote = out = null;
 }
 
-window.LB = { listen, stop, makeOffer, applyAnswer, flushPreroll, closePeer };
+window.LB = { listen, stop, mute, unmute, makeOffer, applyAnswer, flushPreroll, closePeer };

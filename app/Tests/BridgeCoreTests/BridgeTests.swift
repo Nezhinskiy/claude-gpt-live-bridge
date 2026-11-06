@@ -71,6 +71,27 @@ actor FakeAudio: AudioSide {
   var answerFails = false
   init(time: TestTime) { self.time = time }
   func failAnswers() { answerFails = true }
+  /// macOS's answer for the microphone. While `holdsPrompt`, each ask waits for
+  /// `answerPrompt(_:)`, as macOS's first-run prompt waits for the owner.
+  var refusal: Problem?
+  var holdsPrompt = false
+  private var prompts: [CheckedContinuation<Problem?, Never>] = []
+  var promptWaiting: Int { prompts.count }
+  func refuse(_ problem: Problem) { refusal = problem }
+  func holdPrompt() { holdsPrompt = true }
+  func answerPrompt(_ problem: Problem? = nil) {
+    holdsPrompt = false
+    for prompt in prompts { prompt.resume(returning: problem) }
+    prompts = []
+  }
+  func microphoneProblem() async -> Problem? {
+    guard holdsPrompt else { return refusal }
+    return await withCheckedContinuation { prompts.append($0) }
+  }
+  /// The microphone calls, in order.
+  var microphone: [String] {
+    calls.filter { ["startListening", "muteMicrophone", "unmuteMicrophone"].contains($0) }
+  }
   func startListening() { calls.append("startListening") }
   func stopListening() { calls.append("stopListening") }
   /// Whether each offer carried the pre-roll.
@@ -88,6 +109,8 @@ actor FakeAudio: AudioSide {
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
   func confirmHandoff() { calls.append("confirmHandoff") }
+  func muteMicrophone() { calls.append("muteMicrophone") }
+  func unmuteMicrophone() { calls.append("unmuteMicrophone") }
 }
 
 /// Records the notices the bridge posts.
@@ -165,6 +188,144 @@ struct BridgeTests {
     if await registry.target == nil { try? await join(a, "Alpha") }
     await bridge.perform(.start)
     await bridge.audioEvent(.speechStarted)
+  }
+
+  @Test func muteReachesTheAudioSide() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.post("/v1/call", CallBody(action: .mute))
+    #expect(await test.audio.calls.last == "muteMicrophone")
+    #expect(await test.bridge.status.isMuted)
+  }
+
+  @Test func unmuteReachesTheAudioSide() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.post("/v1/call", CallBody(action: .mute))
+    try await test.post("/v1/call", CallBody(action: .unmute))
+    #expect(await test.audio.calls.last == "unmuteMicrophone")
+    #expect(await !test.bridge.status.isMuted)
+  }
+
+  @Test func stopWhileMutedThenStartListensUnmuted() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.post("/v1/call", CallBody(action: .mute))
+    await test.bridge.perform(.stop)
+    await test.bridge.perform(.start)
+    #expect(await test.audio.calls.last == "startListening")
+    #expect(await !test.bridge.status.isMuted)
+  }
+
+  /// macOS's first-run prompt can stay up while the owner presses Stop: the Start waiting on
+  /// it does not open the microphone after the call ended.
+  @Test func aStopDuringStartsPromptOpensNoMicrophone() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.audio.holdPrompt()
+    async let start: Void = test.bridge.perform(.start)
+    #expect(await eventually { await test.audio.promptWaiting == 1 })
+    await test.bridge.perform(.stop)
+    await test.audio.answerPrompt()
+    _ = await start
+    #expect(await test.audio.microphone == [])
+  }
+
+  /// A Mute while Start's prompt is up does not cancel the Start: the page records the mute
+  /// first, so the listen that follows takes nothing.
+  @Test func aMuteDuringStartsPromptListensAfterTheMute() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.audio.holdPrompt()
+    async let start: Void = test.bridge.perform(.start)
+    #expect(await eventually { await test.audio.promptWaiting == 1 })
+    await test.bridge.perform(.mute)
+    await test.audio.answerPrompt()
+    _ = await start
+    #expect(await test.audio.microphone == ["muteMicrophone", "startListening"])
+  }
+
+  /// A Mute while Unmute's prompt is up wins over the Unmute, which then takes nothing.
+  @Test func aMuteDuringUnmutesPromptTakesNoMicrophone() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.bridge.perform(.mute)
+    await test.audio.holdPrompt()
+    async let unmute: Void = test.bridge.perform(.unmute)
+    #expect(await eventually { await test.audio.promptWaiting == 1 })
+    await test.bridge.perform(.mute)
+    await test.audio.answerPrompt()
+    _ = await unmute
+    #expect(await !test.audio.microphone.contains("unmuteMicrophone"))
+  }
+
+  /// A Stop while Unmute's prompt is up wins over the Unmute, which then takes nothing.
+  @Test func aStopDuringUnmutesPromptTakesNoMicrophone() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.bridge.perform(.mute)
+    await test.audio.holdPrompt()
+    async let unmute: Void = test.bridge.perform(.unmute)
+    #expect(await eventually { await test.audio.promptWaiting == 1 })
+    await test.bridge.perform(.stop)
+    await test.audio.answerPrompt()
+    _ = await unmute
+    #expect(await !test.audio.microphone.contains("unmuteMicrophone"))
+  }
+
+  /// macOS refusing an Unmute the owner already undid with a Mute leaves the muted call as it
+  /// is: nothing was going to take the microphone.
+  @Test func aRefusalForAnUnmuteAMuteUndidIsNotReported() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.bridge.perform(.mute)
+    await test.audio.holdPrompt()
+    async let unmute: Void = test.bridge.perform(.unmute)
+    #expect(await eventually { await test.audio.promptWaiting == 1 })
+    await test.bridge.perform(.mute)
+    await test.audio.answerPrompt(.microphoneDenied)
+    _ = await unmute
+    #expect(await test.bridge.status.call == .listening)
+    #expect(await test.bridge.status.problem == nil)
+  }
+
+  /// macOS refusing a Start the owner already stopped shows nothing: the owner ended the call.
+  @Test func aRefusalForAStoppedStartIsNotReported() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.audio.holdPrompt()
+    async let start: Void = test.bridge.perform(.start)
+    #expect(await eventually { await test.audio.promptWaiting == 1 })
+    await test.bridge.perform(.stop)
+    await test.audio.answerPrompt(.microphoneDenied)
+    _ = await start
+    #expect(await test.bridge.status.problem == nil)
+  }
+
+  @Test func aRefusedStartEndsTheCallWithTheRefusal() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.audio.refuse(.microphoneDenied)
+    await test.bridge.perform(.start)
+    #expect(await test.bridge.status.call == .off)
+    #expect(await test.bridge.status.problem == Problem.microphoneDenied.sentence)
+  }
+
+  @Test func aRefusedUnmuteEndsTheCallWithTheRefusal() async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.bridge.perform(.mute)
+    await test.audio.refuse(.microphoneDenied)
+    await test.bridge.perform(.unmute)
+    #expect(await test.bridge.status.call == .off)
+    #expect(await test.bridge.status.problem == Problem.microphoneDenied.sentence)
   }
 
   /// A second Start while codex is still launching does not launch a second codex, and a
@@ -990,7 +1151,7 @@ struct BridgeTests {
       HTTPRequest(method: "GET", path: "/v1/next", query: ["sessionId": b.rawValue], body: Data()))
     let polled = try JSONSerialization.jsonObject(with: reply.body) as? [String: Any]
     let status = try #require(polled?["status"] as? [String: Any])
-    #expect(Set(status.keys) == ["call", "sessions", "minutesToday", "unheard"])
+    #expect(Set(status.keys) == ["call", "sessions", "minutesToday", "unheard", "isMuted"])
     await bridge.setTarget(b)
     #expect(await lines().isEmpty)
   }
