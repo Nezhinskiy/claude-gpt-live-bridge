@@ -280,7 +280,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   ही रहते हैं, और जो credentials वह पहचान लेता है उन्हें छिपा (redact) दिया जाता है।
 - जब Claude कोई सवाल पूछता है, तो voice उसे आपके सामने रखता है और आपका जवाब उसी session को वापस
   भेजता है। Claude जो काम बाद में background में पूरा करता है, उसकी रिपोर्ट update के रूप में दी जाती है।
-- जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice यह बताता है। Prompt का जवाब आप
+- जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice यह बताता है, सिवाय
+  [वहाँ जहाँ कोई organization Claude Code को manage करता है](#ज्ञात-सीमाएँ)। Prompt का जवाब आप
   Claude Code में देते हैं; LiveBridge उसका जवाब कभी आपकी जगह नहीं देता।
 
 ## बिलिंग का ध्यान रखने वाला डिज़ाइन
@@ -401,6 +402,23 @@ Uninstall करने से वे सब हट जाती हैं।
   अंग्रेज़ी और रूसी के आम शब्दों की सूची के साथ
   ([नियम](docs/architecture/overview.md#a-result-while-the-line-is-closed))। किसी दूसरी भाषा में, अगर
   voice ने नतीजे का सिर्फ़ ज़िक्र किया हो, तब भी वह सुना हुआ गिना जा सकता है।
+- जहाँ कोई organization Claude Code को manage करता है, वहाँ LiveBridge में कुछ भी आपको नहीं बताता
+  कि कोई permission prompt इंतज़ार कर रहा है। Claude Code का built-in guard managed settings वाली
+  machine पर और Team या Enterprise plan से sign in की गई session में load होता है, और वहाँ mod के
+  permission hooks नहीं चलते। Prompt फिर भी Claude Code में दिखता है और आपका इंतज़ार करता है,
+  लेकिन voice उसके बारे में कुछ नहीं कहता और menu bar दिखाता है कि Claude काम कर रहा है, इसलिए अगर
+  जवाब में देर लगे तो Claude Code देखें। `/plugin` उन hooks के नाम बताता है, और Claude Code के हाल
+  के versions एक line भी दिखाते हैं कि hook छोड़ दिया गया। Claude के सवाल फिर भी voice तक पहुँचते
+  हैं। Hooks को एक Linux container में [मापा गया](docs/adr/0001-platform-findings.md); voice और
+  menu bar क्या करते हैं, यह code से निकलता है, और कोई असली line नहीं चलाई गई। Team और Enterprise
+  का मामला Claude Code के documentation से लिया गया है।
+- Managed settings में `allowManagedHooksOnly`, `allowManagedModsOnly` या `disableAllHooks` होने
+  पर mod load नहीं होता और `/live` काम नहीं करता। Administrator [mod को organization के अपने mod
+  के रूप में install कर सकता
+  है](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods), हर
+  machine के एक folder से: तब permission hooks चलते हैं, पहली दो settings के साथ भी ([मापा
+  गया](docs/adr/0001-platform-findings.md))। Claude Code के documentation के अनुसार, managed
+  settings में marketplace की copy चालू करना काफ़ी नहीं है।
 
 ## यह कैसे काम करता है
 

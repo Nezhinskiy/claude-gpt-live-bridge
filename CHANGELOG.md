@@ -45,6 +45,15 @@ All notable changes to this project are listed here. The format follows
 - A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
   after the call has ended: the Start that was waiting on the prompt is cancelled.
 
+### Note
+
+- The README's [known limitations](README.md#known-limitations) now say what the mod loses where
+  an organization manages Claude Code: there the mod's hooks on `classic.PermissionRequest`,
+  `classic.PostToolUse`, `classic.PostToolUseFailure` and `classic.PermissionDenied` do not run,
+  so the voice does not say that a permission prompt is waiting, and three managed settings keep
+  a mod you installed from loading. Nothing about the prompt itself changes: it still appears in Claude Code
+  and only you can answer it. No code changed.
+
 ## [0.3.0]
 
 ### Added

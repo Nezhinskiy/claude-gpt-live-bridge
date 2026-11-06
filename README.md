@@ -280,7 +280,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   for as long as you like, without asking Claude. What you decide, an option or a question back
   to Claude, answers the dialog; you can still answer it at the keyboard instead. Work Claude
   finishes later in the background is reported as an update.
-- When Claude is waiting for a permission prompt, the voice says so. You answer the prompt in
+- When Claude is waiting for a permission prompt, the voice says so, except
+  [where an organization manages Claude Code](#known-limitations). You answer the prompt in
   Claude Code; LiveBridge never answers it for you.
 
 ## Billing-aware by design
@@ -404,6 +405,23 @@ can become a request that Claude runs under the session's own permission mode.
   in English and Russian only
   ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed)). In another
   language a result can count as heard when the voice only mentioned it.
+- Where an organization manages Claude Code, nothing in LiveBridge tells you that a permission
+  prompt is waiting. Claude Code's built-in guard loads on a machine with managed settings and in
+  a session signed in to a Team or Enterprise plan, and there the mod's permission hooks do not
+  run. The prompt still appears in Claude Code and still waits for you, but the voice says nothing
+  about it and the menu bar shows Claude working, so look at Claude Code if an answer seems late.
+  `/plugin` names the hooks, and recent versions of Claude Code also print a line saying a hook
+  was skipped. Claude's questions still reach the voice. The hooks were
+  [measured](docs/adr/0001-platform-findings.md) in a Linux container; what the voice and the menu
+  bar do follows from the code, and no real line was run. The Team and Enterprise case comes from
+  Claude Code's documentation.
+- With `allowManagedHooksOnly`, `allowManagedModsOnly` or `disableAllHooks` in managed settings,
+  the mod does not load and `/live` does not work. An administrator can [install the mod as the
+  organization's
+  own](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods), from a
+  folder on each machine: then the permission hooks run, also with the first two settings
+  ([measured](docs/adr/0001-platform-findings.md)). Claude Code's documentation says that turning
+  on the marketplace copy in managed settings is not enough.
 
 ## How it works
 

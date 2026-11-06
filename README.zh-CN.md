@@ -216,7 +216,7 @@ claude plugin uninstall livebridge@livebridge
   这是语音被要求遵守的习惯，而不是一道安全保障；哪些才算保障，见 [SECURITY.md](SECURITY.md)。
 - 它用一两句话念出结果，并带上会话名称。代码块和表格留在会话中，它能识别的凭据会被遮蔽。
 - 当 Claude 提出问题时，语音会向你转述，并把你的回答发回该会话。Claude 之后在后台完成的工作会作为更新播报。
-- 当 Claude 正在等待权限提示时，语音会告诉你。你需要在 Claude Code 中回应该提示；LiveBridge 绝不会替你回答。
+- 当 Claude 正在等待权限提示时，语音会告诉你，但[由组织管理 Claude Code 的环境](#已知限制)除外。你需要在 Claude Code 中回应该提示；LiveBridge 绝不会替你回答。
 
 ## 按需计费的设计
 
@@ -289,6 +289,14 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
 - 一条答复是否已经说出了等待中的结果，是根据其用词来判断的，所用的常用词表只涵盖英语和俄语
   （[规则](docs/architecture/overview.md#a-result-while-the-line-is-closed)）。在其他语言中，
   语音只是提到了结果，也可能被算作已听取。
+- 在由组织管理 Claude Code 的环境中，LiveBridge 不会告诉你有权限提示正在等待。Claude Code 的内置防护会在有托管设置的机器上，
+  以及用 Team 或 Enterprise 套餐登录的会话中加载，此时模组的权限 hooks 不会运行。提示仍会出现在 Claude Code 中并等待你回应，
+  但语音不会提到它，菜单栏也只显示 Claude 正在工作，所以如果答复迟迟不来，请查看 Claude Code。`/plugin` 会列出这些 hooks，
+  较新版本的 Claude Code 还会打印一行文字说明某个 hook 被跳过。Claude 提出的问题仍会传到语音。这些 hooks 是在 Linux 容器中[实测](docs/adr/0001-platform-findings.md)的；
+  语音和菜单栏的表现是从代码推断的，没有运行真实线路。Team 和 Enterprise 的情况来自 Claude Code 的文档。
+- 如果托管设置中有 `allowManagedHooksOnly`、`allowManagedModsOnly` 或 `disableAllHooks`，模组不会加载，`/live` 也无法使用。
+  管理员可以从每台机器上的一个文件夹[把模组安装为组织自己的模组](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods)，这样权限 hooks 就会运行，在前两项设置下也一样（[实测](docs/adr/0001-platform-findings.md)）。
+  根据 Claude Code 的文档，在托管设置中启用 marketplace 副本是不够的。
 
 ## 工作原理
 

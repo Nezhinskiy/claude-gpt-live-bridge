@@ -7,7 +7,7 @@ app runs `codex app-server` on the user's ChatGPT login, opens an OpenAI realtim
 through it, and relays the voice model's handoffs to a Claude Code session through the mod.
 Before any of that is built, a throwaway spike checked the platform facts the design rests on.
 This record keeps what was measured, how, and what we decided from it. Items are lettered (a)
-to (p) so later work can cite them.
+to (q) so later work can cite them.
 
 Tested on: macOS 27.0.1 (Apple Silicon), Swift 6.4.2, `codex-cli 0.166.0` (realtime `v3`,
 `outputModality: "audio"`, ChatGPT plan with realtime), Claude Code 2.1.309. The codex realtime
@@ -399,8 +399,47 @@ settings-hook event `classic.PermissionRequest` (`tool_name`, `tool_input`, base
 `agent_id`, no `tool_use_id`) runs when a request reaches the person; `classic.Notification`
 with `notification_type` reports prompts as notifications. The dialog ends with the tool running
 or failing (`classic.PostToolUse`, `classic.PostToolUseFailure`, both with `tool_use_id`), with
-`classic.PermissionDenied`, or with the turn ending (`turn.complete`). Not observed: the CLI could
-not run a model turn here.
+`classic.PermissionDenied`, or with the turn ending (`turn.complete`). Not observed at the time:
+the CLI could not run a model turn here. Item (q) later saw these hooks with a real dialog.
+
+**(q) Where an organization manages Claude Code.** Observed, 2026-11-06, in a throwaway Linux
+container on release builds, with a real `/etc/claude-code/managed-settings.json`, a real
+permission dialog in a terminal, a scripted local stand-in for the model and a probe mod that
+logged its hooks. `CLAUDE_CODE_MANAGED_SETTINGS_PATH` has no effect on 2.1.312, so this cannot be
+run on a Mac without a real policy file. Claude Code's built-in guard, `cc-plugin-sec-default`,
+[loads](https://code.claude.com/docs/en/plugins/mods/admin#know-what-happens-by-default) on a
+machine with managed settings or for a `/login` on a Team or Enterprise plan, unless managed
+`prependPlugins` leaves it out, and sends `classic.*` past the `user` tier. A mod from a marketplace
+copy or `--plugin-dir` sits in that tier.
+
+| Managed settings | Versions | Mod | Hooks that ran on the tool call |
+| --- | --- | --- | --- |
+| none | 2.1.301, 2.1.312, 2.1.318 | `user` tier | `tool.call`, `classic.PermissionRequest`, `classic.PostToolUse` |
+| one key about nothing here (`cleanupPeriodDays`) | 2.1.301, 2.1.312, 2.1.318 | `user` tier | `tool.call` |
+| `prependPlugins: []`, which leaves the guard out, with no dialog | 2.1.312 | `user` tier | `tool.call`, `classic.PostToolUse` |
+| a folder marketplace by absolute path, the mod by relative path, managed `enabledPlugins` | 2.1.312 | `prepend` tier | as with none, the guard loaded |
+| the same, with `allowManagedHooksOnly` or with the guard's `allowManagedModsOnly` | 2.1.312 | `prepend` tier | as with none, the guard loaded |
+| `allowManagedHooksOnly`, the guard's `allowManagedModsOnly`, or `disableAllHooks` | 2.1.312 | not loaded | none |
+
+All but the third and last rows answered a real dialog with Yes: it appeared and the tool ran. In
+the two `prepend` rows the probe logged the hooks, and the mod itself loaded beside it and answered
+`/live status`.
+The rest is 2.1.312 too, except where it says otherwise. Esc on the dialog gave the same result
+without `classic.PostToolUse`. On a denial in auto mode `classic.PermissionDenied` ran only without
+the guard. `tool.call` ran for `AskUserQuestion` under the guard, so the mod's spoken questions
+keep their hook. The mod itself, from the working tree, under the guard: `/live status` answers
+(2.1.312 and 2.1.318), and `/plugin` lists the four hooks (2.1.301, 2.1.312 and 2.1.318). On 2.1.312
+and 2.1.318 the guard also prints a line in the session for each skipped hook, naming
+`classic.PostToolUseFailure` on a tool that failed; 2.1.301 prints no such line, and its binary
+does not hold the sentence. With `allowManagedHooksOnly` and the mod in the `user` tier, Claude Code
+answers `/live` with an unknown command (2.1.312).
+
+Not observed: a Team or Enterprise sign-in (documented; a Max login's debug log says the guard is
+not seated), a managed `enabledPlugins` entry for a copied plugin (documented to count as a
+user's), and a real voice line. What the owner hears comes from reading `classic.PermissionRequest`
+in `register.tsx` and `activity` in `Bridge.swift`: the plain `approval` activity has no other
+sender, so no notice is said and the app keeps showing Claude working. `claude plugin validate`
+warns of this on 2.1.301 and not on 2.1.312, where it still holds.
 
 **(j) Framing of a plugin's prompt.** Observed: `turn.start` reports a plugin's
 `$.prompt.submit({ text })` (without `asUser`) as
