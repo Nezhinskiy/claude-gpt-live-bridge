@@ -252,7 +252,9 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   enabled, it may show "Loading context…" for the rest of its 60 seconds, and the voice keeps what
   it had. `/live context` works at any time, unless an ask from before such a gap is still open (up
   to 120 seconds); if the mod notes a gap while it writes, it answers that it could not summarise,
-  and you run it again.
+  and you run it again. A summary carries no date, so a `/live context` that crosses **New
+  conversation** brings back what was forgotten, and typing under the pause while it runs can clear
+  the paused mark ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×
   removes it and erases its own; both ask first. The voice starts afresh from the next time the line
   opens. Results it has not said yet stay and are added again; only **Stop** clears them. Claude's
@@ -281,9 +283,10 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   paused. While it is on, no line loads a summary by itself, and neither does one after a pause:
   only **Load context** or `/live context` does, and that summary is written from the whole
   transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
-  answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
-  later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
-  it does and does not do.
+  answer, with nothing of it recorded or said. Only the request that turn names fails: one that only
+  waits behind it keeps its answer, which can quote what you typed and goes into the conversation
+  with the call off. It removes nothing already recorded, and Claude's later answers may repeat
+  paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what it does and does not do.
 - **Play a sound when a request is queued for Claude** (on by default): a short sound for each
   request the voice hands off ([why](#known-limitations)).
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
@@ -516,7 +519,9 @@ can become a request that Claude runs under the session's own permission mode.
   it is recorded as yours.
 - A session still on a mod from before this release, until it restarts, is not synced: it loads a
   summary as a session with missing turns does, no pause refuses its lines, and an empty answer
-  still reads "the answer is code or a table only".
+  still reads "the answer is code or a table only". If a voice turn outlives its 10-minute request
+  and you answer Claude's question by voice, your reply opens no request, the turn's answer is
+  refused and does not reach the voice, and the mod says so in the session (traced, not run).
 - A Claude Code session that was already open before the mod loaded may need to be reopened
   before `/live` works in it.
 - In the Claude desktop app, `/live` typed in a session whose Claude Code process has not

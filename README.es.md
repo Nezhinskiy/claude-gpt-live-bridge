@@ -267,7 +267,9 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   ignora: el elemento sigue habilitado, puede mostrar "Loading context…" durante el resto de sus 60
   segundos y la voz se queda con lo que tenía. `/live context` funciona en cualquier momento, salvo
   que siga abierta una petición de antes de ese hueco (hasta 120 segundos); si el mod anota un hueco
-  mientras se escribe, responde que no pudo resumir, y lo ejecutas de nuevo.
+  mientras se escribe, responde que no pudo resumir, y lo ejecutas de nuevo. Un resumen no lleva
+  fecha, así que un `/live context` que cruza **New conversation** devuelve lo olvidado, y escribir
+  bajo la pausa mientras se ejecuta puede quitar la marca de pausa ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
   que se abre la línea. Los resultados que aún no ha dicho se quedan y se añaden de nuevo; solo
@@ -298,8 +300,10 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   resumen por sí sola, ni tampoco después de una pausa: solo lo hacen **Load context** o `/live
   context`, y ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
   pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
-  nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
-  de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
+  nada de ella se registre ni se diga. Solo falla la petición que ese turno nombra: una que solo
+  espera detrás conserva su respuesta, que puede citar lo que escribiste y entra en la conversación
+  con la llamada detenida. No elimina nada ya registrado, y las respuestas posteriores de Claude
+  pueden repetir el texto en pausa; qué hace y qué no hace lo explica
   [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Play a sound when a request is queued for Claude** (activado por defecto): un sonido breve por
   cada petición que la voz pasa a Claude ([por qué](#limitaciones-conocidas)).
@@ -553,7 +557,10 @@ sesión.
   `composer`, se registra como tuyo.
 - Una sesión que sigue con un mod anterior a esta versión, hasta que se reinicie, no se sincroniza:
   carga un resumen como una sesión a la que le faltan turnos, ninguna pausa rechaza sus líneas, y
-  una respuesta vacía todavía se lee como "the answer is code or a table only".
+  una respuesta vacía todavía se lee como "the answer is code or a table only". Si un turno por voz
+  dura más que los 10 minutos de su petición y respondes por voz a una pregunta de Claude, lo que
+  dices no abre ninguna petición, la respuesta del turno se rechaza y no llega a la voz, y el mod lo
+  dice en la sesión (trazado, no ejecutado).
 - Una sesión de Claude Code que ya estaba abierta antes de que se cargara el mod puede necesitar
   reabrirse para que `/live` funcione en ella.
 - En la aplicación de escritorio de Claude, `/live` escrito en una sesión cuyo proceso de Claude Code

@@ -280,7 +280,10 @@ parlez.
   conversation** est ignoré : l'élément reste activé, il peut afficher « Loading context… » pendant
   le reste de ses 60 secondes, et la voix garde ce qu'elle avait. `/live context` fonctionne à tout
   moment, sauf si une demande d'avant ce trou est encore ouverte (jusqu'à 120 secondes) ; si le mod
-  note un trou pendant l'écriture, il répond qu'il n'a pas pu résumer, et vous le relancez.
+  note un trou pendant l'écriture, il répond qu'il n'a pas pu résumer, et vous le relancez. Un
+  résumé ne porte pas de date : un `/live context` qui traverse **New conversation** ramène ce qui a
+  été oublié, et taper sous la pause pendant qu'il s'exécute peut lever la marque de pause
+  ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne. Les résultats qu'elle n'a pas encore dits
@@ -313,7 +316,9 @@ parlez.
   aucune ligne ne charge de résumé d'elle-même, ni après une pause : seuls **Load context** ou
   `/live context` le font, et ce résumé est écrit à partir de toute la transcription, donc il porte
   ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
-  réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
+  réponse, sans que rien en soit enregistré ni dit. Seule échoue la demande que ce tour nomme : une
+  demande qui attend seulement derrière lui garde sa réponse, qui peut citer ce que vous avez tapé
+  et entre dans la conversation appel arrêté. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
@@ -580,7 +585,9 @@ session.
 - Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
   synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, aucune
   pause ne refuse ses lignes, et une réponse vide se lit encore « the answer is code or a table only
-  ».
+  ». Si un tour vocal dépasse les 10 minutes de sa demande et que vous répondez de vive voix à une
+  question de Claude, votre réponse n'ouvre aucune demande, la réponse du tour est refusée et
+  n'arrive pas à la voix, et le mod le dit dans la session (suivi dans le code, non exécuté).
 - Une session Claude Code déjà ouverte avant le chargement du mod peut devoir être rouverte pour
   que `/live` y fonctionne.
 - Dans l'application de bureau Claude, `/live` saisi dans une session dont le processus Claude
