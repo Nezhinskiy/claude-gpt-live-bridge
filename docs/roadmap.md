@@ -6,7 +6,8 @@ prose above the trail marker.
 
 ## Now
 
-0.1.0, the first release. Closing it means tagging `v0.1.0` with a short demo recording.
+0.4.0 is out, with conversation sync and the usage limits in the menu. A short demo recording
+follows it.
 
 ## Next
 

@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0]
+
 ### Added
 
 - **Conversation sync.** What you type in a joined session and Claude's final answer to it now go
@@ -114,6 +116,11 @@ All notable changes to this project are listed here. The format follows
   so the voice does not say that a permission prompt is waiting, and three managed settings keep
   a mod you installed from loading. Nothing about the prompt itself changes: it still appears in Claude Code
   and only you can answer it. No code changed.
+- This release's end-to-end check was `scripts/smoke.sh` on the real voice with a stand-in Claude
+  Code session, and conversation sync's manual check, also on a canned model. Not run: sync with a
+  real model, or in the Claude desktop app. Not seen in the real menu on the final build: **Load
+  context**, and the colouring of the usage rows. The in-app update from 0.3.0 was read, and its
+  data files tested, but not run.
 
 ## [0.3.0]
 
