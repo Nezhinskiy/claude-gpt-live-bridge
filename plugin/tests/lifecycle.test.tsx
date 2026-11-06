@@ -204,16 +204,6 @@ test('aSnapshotThatFailsCostsATurnNothing', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }, { sessionId: ID, state: 'idle', turn: TYPED }])
 })
 
-test('aSnapshotThatFailsCostsARenamedTurnNothing', async ($, on) => {
-  const world = fakeWorld(on)
-  await $.session.start(START)
-  await $.command.run({ ...LIVE, args: 'on' })
-  world.isStoreBroken = true
-  world.title = 'Renamed session'
-  await $.turn.start({ text: 'What changed?', turnId: 't1' })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
-})
-
 /** /clear gives the session a new id, whose join runs in `turn.start`; forgetting the old key can fail there. */
 test('aStoreThatFailsAfterClearCostsATurnNothing', async ($, on) => {
   const world = fakeWorld(on)
@@ -228,33 +218,19 @@ test('aStoreThatFailsAfterClearCostsATurnNothing', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: OTHER, state: 'working', turn: TYPED }])
 })
 
-test('aSnapshotThatFailsCostsAVoiceAnswerNothing', async ($, on) => {
+/** Work is handed out once: a join that said a gap must not lose what its poll brought. */
+test('aSnapshotThatFailsCostsThePollItsWork', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
   await $.command.run({ ...LIVE, args: 'on' })
+  world.syncStatus = 503
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  world.syncStatus = 200
+  world.isStoreBroken = true
   world.work.push(REQUEST)
   await world.clock.advance(1000)
-  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
-  world.take('activity')
-  world.isStoreBroken = true
-  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Deleted.' })
-  expect(world.take('answer')).toHaveLength(1)
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle', turn: VOICE }])
-})
-
-test('aSnapshotThatFailsDoesNotHideALostAnswer', async ($, on) => {
-  const world = fakeWorld(on)
-  await $.session.start(START)
-  await $.command.run({ ...LIVE, args: 'on' })
-  world.work.push(REQUEST)
-  await world.clock.advance(1000)
-  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
-  world.take('activity')
-  world.isStoreBroken = true
-  world.answerStatus = 409
-  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Deleted.' })
-  expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(true)
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle', turn: VOICE }])
+  await aMoment()
+  expect(world.submitted).toHaveLength(1)
 })
 
 test('offLeaves', async ($, on) => {

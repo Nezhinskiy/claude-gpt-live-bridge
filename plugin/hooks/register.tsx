@@ -76,8 +76,13 @@ type ContextOutcome = 'sent' | 'empty' | 'failed'
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
 
+/**
+ * Keeps the tracker and the gap for a reload. A store that fails costs nothing else: what goes to
+ * the app matters more, and a hook past its `next` would have its `.catch` run the event again.
+ */
 async function save($: EngineInterface): Promise<void> {
-  if (link?.session) await $.store.set(joinedKey(link.session.sessionId), { ...tracker.snapshot(), hasGap: link.hasGap })
+  if (!link?.session) return
+  await $.store.set(joinedKey(link.session.sessionId), { ...tracker.snapshot(), hasGap: link.hasGap }).catch(() => {})
 }
 
 /**
@@ -90,18 +95,12 @@ function noteGap(): void {
   if (sending !== null) sendCount += 1
 }
 
-/**
- * A snapshot that may fail: for a hook with lines still to post, or past its `next`, whose
- * `.catch` would run the event again. What goes to the app matters more.
- */
-const trySave = ($: EngineInterface) => save($).catch(() => {})
-
 /** Posts a line of a turn, cut to `ANSWER_LIMIT`; one the app did not take is a gap, which the next join says. */
 async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
   const body = line.text === undefined ? line : { ...line, text: clip(line.text, ANSWER_LIMIT) }
   if ((await link?.sync(body)) === true) return
   noteGap()
-  await trySave($)
+  await save($)
 }
 
 /**
@@ -227,7 +226,7 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
     await $.store.delete(joinedKey(joined.sessionId)).catch(() => {})  // the join matters more
   }
   await link.rejoin({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
-  await trySave($)
+  await save($)
 }
 
 /**
@@ -288,7 +287,7 @@ async function tick($: EngineInterface): Promise<void> {
  */
 async function answerLost($: EngineInterface, status: AnswerStatus): Promise<void> {
   noteGap()
-  await trySave($)
+  await save($)
   if (status === 'update') return
   note = LOST_ANSWER
   $.ui.log(LOST_ANSWER)
@@ -329,7 +328,7 @@ async function removed($: EngineInterface, sessionId: string): Promise<void> {
 /** The prompt was refused: the request fails at once, and no later turn counts as its turn. */
 async function refused($: EngineInterface, id: string): Promise<void> {
   tracker.refused(id)
-  await trySave($)  // the answer matters more than the snapshot
+  await save($)
   await link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' })
 }
 
@@ -464,7 +463,7 @@ const under = (turn: TurnRef | null) => (turn === null ? {} : { turn })
  * not the owner's typing, so it refuses nothing.
  */
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
-  await trySave($)
+  await save($)
   const turn = tracker.current
   if (turn) await postSync($, { turn, kind: 'report', text })
   await worksOn($)
@@ -560,7 +559,7 @@ export const register: Register = on => {
     // Whether it folds in or gets a turn of its own, it goes to the app now, under the running turn.
     if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
       await postSync($, tracker.typedInto(e.turnId, e.text, entered.text))
-      await trySave($)
+      await save($)
     }
     return entered
   }).catch(($, e, next) => next(e))
@@ -581,7 +580,7 @@ export const register: Register = on => {
       lastOrigin = null
       lastPrompt = undefined
       await serial(() => follow($, false))  // /clear: the line goes under the session's new id
-      await trySave($)
+      await save($)
       for (const line of lines) await postSync($, line)
       await link?.activity('working', under(tracker.current))
     }
@@ -614,7 +613,7 @@ export const register: Register = on => {
       const { post, sync, isLost } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
       if (isLost) noteGap()
       staleSummary()
-      await trySave($)
+      await save($)
       if (sync) await postSync($, sync)
       const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
       if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
@@ -642,7 +641,7 @@ export const register: Register = on => {
       const first = await Promise.race([answered, spoken]).finally(() => { answerQuestion = null })
       if ('kind' in first) {
         tracker.replied(first.id, first.forRequest, await $.clock.now())
-        await trySave($)
+        await save($)
         return { result: { questions: e.questions, answers: {}, response: spokenReply(first) } }
       }
       const result = first.isError === true ? undefined : first.result
@@ -661,7 +660,7 @@ export const register: Register = on => {
     const turn = tracker.current
     if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
       tracker.promptOpened(e.tool_name, e.tool_input, e.agent_id)
-      await trySave($)
+      await save($)
       // A bare approval would take back the open question, and the app would say nothing for it.
       if (answerQuestion === null) {
         await link.activity('approval', { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })

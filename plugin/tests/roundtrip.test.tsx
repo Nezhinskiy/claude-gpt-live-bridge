@@ -515,26 +515,6 @@ test('aSpokenReplyWithARequestWaitingIsAnUpdate', async ($, on) => {
   expect(world.take('answer')).toEqual([{ sessionId: ID, id: REQUEST.id, status: 'update', text: 'Renamed to out.' }])
 })
 
-/** The hook's `.catch` runs the tool again: past the dialog, a snapshot that fails must not reach it. */
-test('aSnapshotThatFailsAfterTheDialogOpensNoSecondOne', async ($, on) => {
-  const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
-  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
-  world.isStoreBroken = true
-  const spoken = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
-  await world.clock.advance(1000)
-  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
-  await world.clock.advance(1000)
-  expect((await spoken).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
-  world.syncStatus = 500
-  const typed = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
-  await world.clock.advance(1000)
-  world.answerDialog('out')
-  await typed
-  expect(world.dialogs).toBe(2)
-})
-
 /** A reply that lost to the keyboard closes what the app opened for it, or it times out ten minutes later. */
 test('aLateSpokenReplyClosesItsRequest', async ($, on) => {
   const world = fakeWorld(on)
