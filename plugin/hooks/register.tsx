@@ -86,7 +86,10 @@ function noteLostTurn(): void {
   if (tracker.takeLostTurn()) link?.noteGap()
 }
 
-/** For a hook past its `next`, whose `.catch` would run the event again: the snapshot matters less. */
+/**
+ * A snapshot that may fail: for a hook with lines still to post, or past its `next`, whose
+ * `.catch` would run the event again. What goes to the app matters more.
+ */
 const trySave = ($: EngineInterface) => save($).catch(() => {})
 
 /** Posts a line of a turn; one the app did not take is a gap, which the next join says. */
@@ -219,7 +222,7 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
     await $.store.delete(joinedKey(joined.sessionId))
   }
   await link.rejoin({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
-  await save($)
+  await trySave($)
 }
 
 /**
@@ -280,7 +283,7 @@ async function tick($: EngineInterface): Promise<void> {
  */
 async function answerLost($: EngineInterface, status: AnswerStatus): Promise<void> {
   link?.noteGap()
-  await save($)
+  await trySave($)
   if (status === 'update') return
   note = LOST_ANSWER
   $.ui.log(LOST_ANSWER)
@@ -549,7 +552,7 @@ export const register: Register = on => {
       lastOrigin = null
       lastPrompt = undefined
       await serial(() => follow($, false))  // /clear: the line goes under the session's new id
-      await save($)
+      await trySave($)
       if (line) await postSync($, line)
       await link?.activity('working')
     }
@@ -582,7 +585,7 @@ export const register: Register = on => {
       noteLostTurn()
       staleSummary()
       approval = null
-      await save($)
+      await trySave($)
       if (sync) await postSync($, sync)
       const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
       if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)

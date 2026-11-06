@@ -190,6 +190,57 @@ test('aTurnNeverSeenIsAGapThoughASnapshotHoldsAnother', async ($, on) => {
   expect(world.take('join').map(body => body?.missed)).toEqual([true])
 })
 
+/** The answer matters more than the snapshot: a store that fails costs the turn none of its lines. */
+test('aSnapshotThatFailsCostsATurnNothing', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.isStoreBroken = true
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
+  expect(world.take('sync')).toHaveLength(2)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
+})
+
+test('aSnapshotThatFailsCostsARenamedTurnNothing', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.isStoreBroken = true
+  world.title = 'Renamed session'
+  await $.turn.start({ text: 'What changed?', turnId: 't1' })
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
+})
+
+test('aSnapshotThatFailsCostsAVoiceAnswerNothing', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.work.push(REQUEST)
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  world.take('activity')
+  world.isStoreBroken = true
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Deleted.' })
+  expect(world.take('answer')).toHaveLength(1)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle' }])
+})
+
+test('aSnapshotThatFailsDoesNotHideALostAnswer', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  await $.command.run({ ...LIVE, args: 'on' })
+  world.work.push(REQUEST)
+  await world.clock.advance(1000)
+  await $.turn.start({ text: framed(world.submitted[0]!), turnId: 't1' })
+  world.take('activity')
+  world.isStoreBroken = true
+  world.answerStatus = 409
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Deleted.' })
+  expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(true)
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'idle' }])
+})
+
 test('offLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
