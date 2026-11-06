@@ -15,10 +15,12 @@ public struct LimitsPoll: Sendable, Equatable {
   public init() {}
 
   /// True when a read should start now; it is then under way until `finish`. The cooldown counts
-  /// from the last start, whether that read succeeded or not.
+  /// from the last start, whether that read succeeded or not; a clock moved back allows a read.
   public mutating func begin(at now: Date) -> Bool {
     guard !isReading else { return false }
-    if let lastBegan, now.timeIntervalSince(lastBegan) < Self.readEvery { return false }
+    if let lastBegan, now >= lastBegan, now.timeIntervalSince(lastBegan) < Self.readEvery {
+      return false
+    }
     isReading = true
     lastBegan = now
     return true

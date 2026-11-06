@@ -100,7 +100,7 @@ only from Start to Stop, and the owner looks at the limit before a call too. Its
 `RealtimeSession` do not change, so the voice path is untouched; a read during a call is a second
 process on the same lockdown argv.
 
-- When: each time the menu opens, at most once a minute, one read at a time. The menu shows the last
+- When: each time the menu opens, at most once a minute (a clock moved back does not stop the reads), one read at a time. The menu shows the last
   reading at once and the new one replaces it when it arrives, a few seconds later at worst. No
   background reads (the owner chose the menu only).
 - A failed read leaves the last reading until it is 15 minutes old (codex's own staleness limit),
