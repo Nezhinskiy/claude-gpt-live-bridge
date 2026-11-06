@@ -30,6 +30,19 @@ struct UsageLimitsTests {
     #expect(reading(late).merging(reading(early)).windows == [late])
   }
 
+  @Test func resetsAMinuteApartAreOneWindow() {
+    let reset = now.addingTimeInterval(100)
+    let held = reading(window(five, 40, reset))
+    let near = window(five, 12, reset.addingTimeInterval(59))
+    #expect(held.merging(reading(near)).windows == [window(five, 40, reset)])
+    let nearAndHigher = window(five, 41, reset.addingTimeInterval(-59))
+    #expect(held.merging(reading(nearAndHigher)).windows == [nearAndHigher])
+    let later = window(five, 12, reset.addingTimeInterval(61))
+    #expect(held.merging(reading(later)).windows == [later])
+    let earlier = window(five, 90, reset.addingTimeInterval(-61))
+    #expect(held.merging(reading(earlier)).windows == [window(five, 40, reset)])
+  }
+
   @Test func onTheSameResetTheHigherPercentStays() {
     let reset = now.addingTimeInterval(100)
     let old = reading(window(five, 40, reset), readAt: now)

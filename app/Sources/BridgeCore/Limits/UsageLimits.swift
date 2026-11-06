@@ -141,8 +141,11 @@ public struct UsageLimits: Sendable, Equatable {
     return copy
   }
 
-  /// `newer` over this one, window by window: the later reset wins, on the same reset the higher
-  /// percent (use within a window only grows), and a window with no reset takes the newer, except
+  /// Resets this close are one reset: a source's time may jitter by a second or so.
+  static let sameReset: TimeInterval = 60
+
+  /// `newer` over this one, window by window: the later reset wins, on the same reset (within a
+  /// minute) the higher percent, kept whole (use within a window only grows), and a window with no reset takes the newer, except
   /// that a known reset is kept against an undated report (with the higher percent). A window
   /// `newer` lacks stays as held until its reset; one with no reset has none to wait for and goes.
   /// `readAt` moves to `newer`'s only when some window of it was taken or matches what is held:
@@ -154,7 +157,9 @@ public struct UsageLimits: Sendable, Equatable {
         return LimitWindow(
           span: new.span, usedPercent: max(old.usedPercent, new.usedPercent), resetsAt: oldReset)
       }
-      if newReset != oldReset { return newReset > oldReset ? new : old }
+      if abs(newReset.timeIntervalSince(oldReset)) > Self.sameReset {
+        return newReset > oldReset ? new : old
+      }
       return new.usedPercent >= old.usedPercent ? new : old
     }
     var all: [LimitWindow] = []

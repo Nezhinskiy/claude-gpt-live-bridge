@@ -117,8 +117,8 @@ process on the same lockdown argv.
   changed, only while joined. An empty list is not sent. A failed send is dropped; the next one
   corrects it.
 - Several sessions share one account as a rule, so they feed one reading, keyed by window: the
-  later `resetsAt` wins, and on the same `resetsAt` the higher percent wins, as use within a window
-  only grows. A window nobody reports any more goes at its reset; a Codex read replaces the whole
+  later `resetsAt` wins, and on the same `resetsAt` (resets within a minute count as one) the
+  higher percent wins and that window is kept whole, as use within a window only grows. A window nobody reports any more goes at its reset; a Codex read replaces the whole
   reading. A window with no `resetsAt` takes the newest, except that a known reset is kept against
   an undated report (the window keeps the old reset and the higher percent); a held window with no
   reset that a report does not mention is dropped, and one that stays is dropped 15 minutes after the
