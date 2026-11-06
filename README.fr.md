@@ -276,11 +276,12 @@ parlez.
   micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
   lever ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** n'est activé que lorsqu'il manque à la voix une partie de la cible : pas de
-  résumé, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
+  résumé alors que **Pause sync** est activé, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
   voix peut porter (une longue conversation le dépasse), la session a été mise en pause, ou son mod
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
-  déjà la conversation. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
+  déjà la conversation. Sans résumé encore et sans rien de perdu, il affiche **Context loads with the
+  line** et est désactivé, car la prochaine ligne le charge d'elle-même. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
   reste activé, et `/live context` peut échouer, ramener ce qui a été oublié ou lever la marque de
   pause ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une

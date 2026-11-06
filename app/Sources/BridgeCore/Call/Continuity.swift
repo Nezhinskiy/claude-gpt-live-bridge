@@ -95,9 +95,11 @@ public struct Conversation: Codable, Sendable, Equatable {
 
   /// The voice has everything: a context, no gap, and the seed carries every line since the
   /// summary (lines rolled off, or too many for codex's limits, are lost to it).
-  public var isCurrent: Bool {
-    guard context != nil, outOfSync == nil else { return false }
-    return seedLinesSinceContext <= initialItems(tasks: []).count - 1
+  public var isCurrent: Bool { context != nil && outOfSync == nil && !isOverSeed }
+
+  /// The seed no longer carries every line since the summary.
+  var isOverSeed: Bool {
+    seedLinesSinceContext > initialItems(tasks: []).count - (context == nil ? 0 : 1)
   }
 
   public mutating func record(_ speaker: Line.Speaker, _ text: String) {

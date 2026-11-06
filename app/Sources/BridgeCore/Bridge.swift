@@ -112,12 +112,12 @@ public actor Bridge: Router {
       let minutes = if let callStart { await meter.minutes(since: callStart) } else { 0.0 }
       let target = await registry.target
       let shown = target.map { continuity[$0] } ?? Conversation()
-      let needsContext = if let target { await needsContext(target) } else { false }
+      let contextNeed = if let target { await contextNeed(target) } else { ContextNeed.none }
       var olderMods: [String] = []
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes,
-        conversation: shown.shownLines, labelsOnAnOlderMod: olderMods, needsContext: needsContext,
+        conversation: shown.shownLines, labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
         claudeLimits: claudeLimits)
     }
   }
@@ -377,6 +377,17 @@ public actor Bridge: Router {
   private func needsContext(_ id: SessionID) async -> Bool {
     if !continuity[id].isCurrent { return true }
     return await !registry.syncs(id)
+  }
+
+  /// What the menu says of it: a session that has no summary and has lost nothing gets one with
+  /// its next line, so only the pause setting, under which no line loads one, leaves it to a press.
+  private func contextNeed(_ id: SessionID) async -> ContextNeed {
+    guard await needsContext(id) else { return .none }
+    let conversation = continuity[id]
+    let lostNothing = conversation.outOfSync == nil && !conversation.isOverSeed
+    let syncs = await registry.syncs(id)
+    return lostNothing && syncs && conversation.context == nil && !pausesSync()
+      ? .withTheLine : .load
   }
 
   /// Starts the attempt that opens the line, in the same turn as the machine's decision to open.
@@ -787,9 +798,8 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let conversation: [Conversation.Line]
   /// The joined sessions whose mod is older than the app, or names no version, by label.
   public let labelsOnAnOlderMod: [String]
-  /// The target's voice lacks part of the session (no summary, a gap, or a mod that does not
-  /// sync): Load context has something to do.
-  public let needsContext: Bool
+  /// Whether Load context has something to do for the target.
+  public let contextNeed: ContextNeed
   /// What Claude Code last said of Claude's usage windows; nil until a session has.
   public var claudeLimits: UsageLimits? = nil
 }

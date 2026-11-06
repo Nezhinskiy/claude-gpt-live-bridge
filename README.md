@@ -248,12 +248,13 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   busy, missing). **Stop** ends the call and the mute; the next **Start** begins unmuted. Mute is
   not a lock: any process running as you can unmute
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
-- **Load context** is enabled only when the voice lacks part of the target: it has no summary, a
-  turn did not arrive, a question or permission notice did not reach the app, turns ran while the
+- **Load context** is enabled only when the voice lacks part of the target: it has no summary
+  while **Pause sync** is on, a turn did not arrive, a question or permission notice did not reach the app, turns ran while the
   mod was off, the lines since the summary no longer all fit what the voice can carry (a long
   conversation outgrows that), the session was paused, or its mod does not sync. Otherwise the item
-  reads **Context up to date** and is disabled, because the voice already has the conversation. A
-  summary carries no date, so one can be ignored while the item stays enabled, and `/live context`
+  reads **Context up to date** and is disabled, because the voice already has the conversation. With
+  no summary yet and nothing lost it reads **Context loads with the line** and is disabled, because
+  the next line loads one by itself. A summary carries no date, so one can be ignored while the item stays enabled, and `/live context`
   can fail, bring back what was forgotten or clear the paused mark ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×
   removes it and erases its own; both ask first. The voice starts afresh from the next time the line

@@ -261,12 +261,13 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   llamada y **Mute**; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier
   proceso que se ejecute como tú puede quitarlo
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
-- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen,
+- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen con **Pause sync** activado,
   un turno no llegó, una pregunta o un aviso de permiso no llegó a la aplicación, hubo turnos con el
   mod apagado, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
   conversación larga lo supera), la sesión estuvo en pausa o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
-  Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado, y `/live
+  Sin resumen aún y sin nada perdido dice **Context loads with the line** y está deshabilitado, porque
+  la siguiente línea lo carga sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado, y `/live
   context` puede fallar, devolver lo olvidado o quitar la marca de pausa
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
