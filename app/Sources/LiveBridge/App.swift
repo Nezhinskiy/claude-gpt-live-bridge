@@ -105,7 +105,8 @@ final class AppModel {
   @ObservationIgnored private var server: UnixHTTPServer?
   @ObservationIgnored private var loads = ContextLoads()
   @ObservationIgnored private var loadsTimer: Task<Void, Never>?
-  @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
+  @ObservationIgnored private let audio = AudioHost(
+    fakeMic: AppModel.fakeMic, tapeFile: AppModel.tapeFile)
   /// The running app's `CFBundleShortVersionString`.
   let versionText: String
   /// That version, when it reads as `X.Y.Z`.
@@ -516,11 +517,24 @@ final class AppModel {
     return Release.latestURL
   }
 
-  /// `--fake-mic <wav>`: debug builds play the file as the microphone.
-  private static var fakeMic: URL? {
+  /// `--fake-mic <wav>`, once per line: debug builds play the files as the microphone, each next
+  /// one when the voice has finished speaking.
+  private static var fakeMic: [URL] {
     #if DEBUG
       let arguments = CommandLine.arguments
-      if let flag = arguments.firstIndex(of: "--fake-mic"), flag + 1 < arguments.count {
+      return arguments.indices.dropLast().filter { arguments[$0] == "--fake-mic" }.map {
+        URL(filePath: arguments[$0 + 1])
+      }
+    #else
+      return []
+    #endif
+  }
+
+  /// `--record-call <wav>`: debug builds record both sides of each call there.
+  private static var tapeFile: URL? {
+    #if DEBUG
+      let arguments = CommandLine.arguments
+      if let flag = arguments.firstIndex(of: "--record-call"), flag + 1 < arguments.count {
         return URL(filePath: arguments[flag + 1])
       }
     #endif

@@ -21,4 +21,11 @@ public enum AudioPage {
     guard parts.count == 2, parts[0].isEmpty, !parts[1].hasPrefix(".") else { return nil }
     return String(parts[1])
   }
+
+  /// The `--fake-mic` line a page request names: `fake-mic-2.wav` is the third.
+  public static func fakeLine(named name: String) -> Int? {
+    guard name.hasPrefix("fake-mic-"), name.hasSuffix(".wav") else { return nil }
+    let number = name.dropFirst("fake-mic-".count).dropLast(".wav".count)
+    return number.allSatisfy(\.isNumber) ? Int(number) : nil
+  }
 }

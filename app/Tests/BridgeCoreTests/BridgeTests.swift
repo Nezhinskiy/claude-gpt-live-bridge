@@ -109,6 +109,7 @@ actor FakeAudio: AudioSide {
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
   func confirmHandoff() { calls.append("confirmHandoff") }
+  func voiceFinished() { calls.append("voiceFinished") }
   func muteMicrophone() { calls.append("muteMicrophone") }
   func unmuteMicrophone() { calls.append("unmuteMicrophone") }
 }
@@ -662,6 +663,15 @@ struct BridgeTests {
     voice.emit(.assistantSpeaking)
     voice.emit(.assistantUtterance("Alpha is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
+  }
+
+  /// The fake microphone's next line waits for this.
+  @Test func aFinishedReplyReachesTheAudioSide() async throws {
+    await live()
+    voice.emit(.assistantSpeaking)
+    #expect(await audio.calls.contains("voiceFinished") == false)
+    voice.emit(.assistantUtterance("Hello."))
+    #expect(await eventually { await audio.calls.contains("voiceFinished") })
   }
 
   /// Each chime for a waiting result posts one notice, naming the sessions with results waiting.

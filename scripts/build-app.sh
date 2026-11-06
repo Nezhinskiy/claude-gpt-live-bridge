@@ -2,7 +2,8 @@
 # Builds, installs and removes LiveBridge.app (built from the SwiftPM package in app/).
 #
 #   scripts/build-app.sh                          debug build: app/.build/app/LiveBridge.app, ad hoc
-#   scripts/build-app.sh --run [--fake-mic WAV]   debug build, quit its running copy, open it
+#   scripts/build-app.sh --run [--fake-mic WAV]... [--record-call WAV]
+#                                                 debug build, quit its running copy, open it
 #   scripts/build-app.sh --release                release build, signed, installed in
 #                                                 /Applications and opened; run it again to upgrade
 #   scripts/build-app.sh --make-signing-identity  create a self-signed code-signing certificate,
@@ -10,9 +11,13 @@
 #   scripts/build-app.sh --uninstall              remove the app and every file it keeps
 #   scripts/build-app.sh --package                the download: dist/LiveBridge.dmg, built from
 #                                                 the committed HEAD, signed ad hoc, not notarized
+#   scripts/build-app.sh --stage APP              release build assembled at APP, unsigned,
+#                                                 nothing installed (the release guards' copy)
 #
-# --fake-mic (debug builds only) plays WAV as the microphone. If CFFIXED_USER_HOME is set, the
-# app keeps its files under that directory instead of your home folder. The disk image is
+# --fake-mic (debug builds only) plays WAV as the microphone; given more than once, each next WAV
+# plays when the voice has finished speaking. --record-call (debug builds only) records each call
+# to WAV, the microphone on the left and the voice on the right, with its marks beside it in
+# WAV's name with .marks.jsonl. If CFFIXED_USER_HOME is set, the app keeps its files under that directory instead of your home folder. The disk image is
 # dragged to /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS
 # names another folder for it (the uninstall test's scratch one).
 set -eu
@@ -24,7 +29,7 @@ IDENTITY="LiveBridge Local Signing"
 INSTALLED="${LIVEBRIDGE_APPLICATIONS:-/Applications}/LiveBridge.app"
 
 usage() {
-  sed -n '4,12s/^# \{0,1\}//p' "$0" >&2
+  sed -n '4,15s/^# \{0,1\}//p' "$0" >&2
   exit 2
 }
 
@@ -38,6 +43,9 @@ assemble() {
   cp "$bin/LiveBridge" "$2/Contents/MacOS/LiveBridge"
   cp app/Support/Info.plist "$2/Contents/Info.plist"
   cp -R "$bin/LiveBridge_LiveBridge.bundle" "$2/Contents/Resources/"
+  if [ "$1" = release ]; then
+    rm -f "$2/Contents/Resources/LiveBridge_LiveBridge.bundle/Contents/Resources/audio/"debug-*.js
+  fi
   cp app/Support/AppIcon.icns "$2/Contents/Resources/"
   compile_icon "$2"
 }
@@ -89,9 +97,24 @@ debug() {
   [ "${1:-}" = --run ] || return 0
   shift
   quit "$app"
-  if [ "${1:-}" = --fake-mic ] && [ -n "${2:-}" ]; then
-    set -- --fake-mic "$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
-  fi
+  # `open` runs the app elsewhere, so a relative WAV path becomes absolute.
+  count=$#
+  while [ "$count" -gt 0 ]; do
+    case "$1" in
+      --fake-mic | --record-call)
+        [ "$count" -ge 2 ] || usage
+        flag=$1 wav=$2
+        shift 2
+        set -- "$@" "$flag" "$(cd "$(dirname "$wav")" && pwd)/$(basename "$wav")"
+        count=$((count - 2))
+        ;;
+      *)
+        set -- "$@" "$1"
+        shift
+        count=$((count - 1))
+        ;;
+    esac
+  done
   if [ -n "${CFFIXED_USER_HOME:-}" ]; then
     open -n --env "CFFIXED_USER_HOME=$CFFIXED_USER_HOME" "$app" --args "$@"
   else
@@ -211,5 +234,9 @@ case "${1:-}" in
   --make-signing-identity) make_identity ;;
   --uninstall) uninstall ;;
   --package) package ;;
+  --stage)
+    [ -n "${2:-}" ] || usage
+    assemble release "$2"
+    ;;
   *) usage ;;
 esac

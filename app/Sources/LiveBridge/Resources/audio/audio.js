@@ -28,7 +28,8 @@ const say = {
 const post = (message) => window.webkit.messageHandlers.bridge.postMessage(message);
 
 let ctx = null;
-let fake = false; // the debug WAV stands in for the microphone (`--fake-mic`)
+let fake = false; // debug WAVs stand in for the microphone (`--fake-mic`)
+let tools = null; // debug builds only: `debug-tools.js`, for `--fake-mic` and `--record-call`
 let pump, vad, line;
 let pc = null;
 let channel = null;
@@ -68,20 +69,12 @@ function play(output) {
 
 const stopTracks = (stream) => stream.getTracks().forEach((track) => track.stop());
 
-/** The default input, or the debug WAV, as a capture of the context it started with; null when
+/** The default input, or the debug lines, as a capture of the context it started with; null when
  * the microphone was muted or stopped meanwhile, or before `listen`. */
 async function acquire(isCurrent) {
   const context = ctx;
   if (!context) return null;
-  if (fake) {
-    const data = await (await fetch('fake-mic.wav')).arrayBuffer();
-    if (!isCurrent()) return null;
-    const node = context.createBufferSource();
-    node.buffer = await context.decodeAudioData(data);
-    if (!isCurrent()) return null;
-    node.start();
-    return { node, stop: () => node.stop(), onEnded: () => {} };
-  }
+  if (fake) return tools.microphone();
   const asked = navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   });
@@ -108,7 +101,10 @@ function micLate() {
 
 const mic = createMicrophone({
   acquire,
-  connect: (node) => node.connect(pump),
+  connect(node) {
+    node.connect(pump);
+    tools?.tapMicrophone(node);
+  },
   disconnect: (node) => node.disconnect(),
   watchDevices(handler) {
     if (!fake && navigator.mediaDevices) navigator.mediaDevices.ondevicechange = handler;
@@ -122,10 +118,12 @@ function failMicrophone(error) {
   post(microphoneFailure(error));
 }
 
-async function listen(wav) {
+/** `lines`, the debug WAVs standing in for the microphone (0: the microphone itself), and
+ * `record`, the call tape, stay 0 and false outside a debug build. */
+async function listen(lines, record) {
   if (ctx) return;
   const mine = (ctx = new AudioContext({ sampleRate: 48000 }));
-  fake = wav;
+  fake = lines > 0;
   vad = createVad();
   line = createLineAudio({ sampleRate: ctx.sampleRate, frame: FRAME });
   pump = ctx.createScriptProcessor(FRAME, 1, 1);
@@ -134,6 +132,12 @@ async function listen(wav) {
   silent.gain.value = 0;
   pump.connect(silent).connect(ctx.destination);
   try {
+    if (fake || record) {
+      const { createCallTools } = await import('./debug-tools.js');
+      const made = await createCallTools({ context: mine, lines, record });
+      if (ctx !== mine) return;
+      tools = made;
+    }
     // False when muted: the context still runs, so a result can open the line.
     await mic.attach();
     if (ctx !== mine) return;
@@ -164,6 +168,7 @@ function stop() {
   ctx?.close();
   ctx = null;
   fake = false;
+  tools = null;
 }
 
 /** Resolves once ICE gathering is done, with whether any candidate came; none within 2 s
@@ -194,6 +199,7 @@ async function makeOffer(keepPreroll = true) {
     remote = new Audio();
     remote.srcObject = event.streams[0] ?? new MediaStream([event.track]);
     remote.play().catch(() => {});
+    tools?.tapVoice(remote.srcObject);
   };
   channel = peer.createDataChannel('oai-events');
   const ice = gathered(peer);
@@ -241,8 +247,21 @@ function dropPeer() {
   channel?.close();
   pc?.close();
   remote?.pause();
+  tools?.tapVoice(null);
   if (out) pump.disconnect(out);
   pc = channel = remote = out = null;
 }
 
-window.LB = { listen, stop, mute, unmute, makeOffer, applyAnswer, flushPreroll, closePeer };
+window.LB = {
+  listen,
+  stop,
+  mute,
+  unmute,
+  makeOffer,
+  applyAnswer,
+  flushPreroll,
+  closePeer,
+  get tools() {
+    return tools;
+  },
+};

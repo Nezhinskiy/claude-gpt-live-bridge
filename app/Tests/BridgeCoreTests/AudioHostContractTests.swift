@@ -37,4 +37,12 @@ struct AudioHostContractTests {
     #expect(AudioPage.resourceName(for: URL(string: "livebridge-audio://evil/vad.js")!) == nil)
     #expect(AudioPage.resourceName(for: URL(string: "livebridge-audio://app/a/b.js")!) == nil)
   }
+
+  @Test func aFakeLineIsNamedByItsPlace() {
+    #expect(AudioPage.fakeLine(named: "fake-mic-0.wav") == 0)
+    #expect(AudioPage.fakeLine(named: "fake-mic-12.wav") == 12)
+    for other in ["fake-mic.wav", "fake-mic-.wav", "fake-mic--1.wav", "fake-mic-a.wav", "vad.js"] {
+      #expect(AudioPage.fakeLine(named: other) == nil, "\(other)")
+    }
+  }
 }

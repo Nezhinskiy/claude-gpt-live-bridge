@@ -438,6 +438,7 @@ public actor Bridge: Router {
     case .assistantUtterance(let text):
       record(.voice, text, in: lineSession)
       await send(.assistantFinishedSpeaking(text))
+      await audio.voiceFinished()
     case .assistantSpeaking: await send(.assistantSpeaking)
     case .closed(let reason):
       connecting?.cancel()

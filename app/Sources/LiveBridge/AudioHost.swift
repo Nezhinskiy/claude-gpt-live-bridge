@@ -18,7 +18,10 @@ final class AudioHost: NSObject, AudioSide {
   private let window = NSWindow(
     contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: .borderless,
     backing: .buffered, defer: false)
-  private let fakeMic: URL?
+  private let fakeMic: [URL]
+  #if DEBUG
+    private let tape: CallTape?
+  #endif
   /// The page's own load; a navigation the lock cancels is not it.
   private var navigation: WKNavigation?
   private var loaded = false
@@ -28,9 +31,13 @@ final class AudioHost: NSObject, AudioSide {
     forResource: "handoff", withExtension: "wav", subdirectory: "audio"
   ).flatMap { NSSound(contentsOf: $0, byReference: true) }
 
-  /// `fakeMic` (debug builds only) replaces the microphone with a WAV file.
-  init(fakeMic: URL?) {
+  /// `fakeMic` (debug builds only) replaces the microphone with WAV files, played in order, and
+  /// `tapeFile` (debug builds only) records both sides of each call there.
+  init(fakeMic: [URL], tapeFile: URL?) {
     self.fakeMic = fakeMic
+    #if DEBUG
+      tape = tapeFile.map { CallTape(file: $0) }
+    #endif
     let config = WKWebViewConfiguration()
     config.preferences.inactiveSchedulingPolicy = .none  // a hidden page is not suspended
     config.mediaTypesRequiringUserActionForPlayback = []
@@ -38,6 +45,9 @@ final class AudioHost: NSObject, AudioSide {
     webView = WKWebView(frame: .zero, configuration: config)
     super.init()
     config.userContentController.add(self, name: "bridge")
+    #if DEBUG
+      if tape != nil { config.userContentController.add(self, name: "tape") }
+    #endif
     webView.navigationDelegate = self
     webView.uiDelegate = self
     window.contentView = webView
@@ -56,7 +66,7 @@ final class AudioHost: NSObject, AudioSide {
   /// macOS's answer, asking it first if it never was (its prompt then shows); the fake
   /// microphone needs no permission.
   func microphoneProblem() async -> Problem? {
-    guard fakeMic == nil else { return nil }
+    guard fakeMic.isEmpty else { return nil }
     var access: MicrophoneAccess =
       switch AVCaptureDevice.authorizationStatus(for: .audio) {
       case .authorized: .granted
@@ -71,7 +81,17 @@ final class AudioHost: NSObject, AudioSide {
   }
 
   func startListening() async {
-    await run("return await LB.listen(fake)", ["fake": fakeMic != nil], failing: "start")
+    await run(
+      "return await LB.listen(lines, record)", ["lines": fakeMic.count, "record": recordsCall],
+      failing: "start")
+  }
+
+  private var recordsCall: Bool {
+    #if DEBUG
+      tape != nil
+    #else
+      false
+    #endif
   }
 
   func stopListening() async { _ = try? await call("LB.stop()") }
@@ -104,7 +124,19 @@ final class AudioHost: NSObject, AudioSide {
 
   func chime() async { NSSound(named: "Glass")?.play() }
 
-  func confirmHandoff() async { handoffSound?.play() }
+  func confirmHandoff() async {
+    #if DEBUG
+      tape?.mark("handoff")
+    #endif
+    handoffSound?.play()
+  }
+
+  func voiceFinished() async {
+    #if DEBUG
+      tape?.mark("voiceFinished")
+      _ = try? await call("LB.tools?.voiceFinished()")
+    #endif
+  }
 
   // MARK: The page
 
@@ -149,12 +181,34 @@ extension AudioHost: WKScriptMessageHandler {
   func userContentController(
     _ controller: WKUserContentController, didReceive message: WKScriptMessage
   ) {
+    #if DEBUG
+      if message.name == "tape" {
+        if message.frameInfo.isMainFrame { recordTape(message.body) }
+        return
+      }
+    #endif
     guard message.frameInfo.isMainFrame, let event = AudioEvent(body: message.body) else {
       return
     }
     if case .level(let value) = event { onLevel(value) } else { onEvent(event) }
   }
 }
+
+#if DEBUG
+  extension AudioHost {
+    /// What the page's `debug-tools.js` sends: the tape begins, a chunk of it, or a mark.
+    fileprivate func recordTape(_ body: Any) {
+      guard let message = body as? [String: Any] else { return }
+      if let chunk = message["pcm"] as? String {
+        tape?.append(chunk)
+      } else if let mark = message["mark"] as? String {
+        tape?.mark(mark, index: message["index"] as? Int)
+      } else if message["start"] != nil {
+        tape?.start()
+      }
+    }
+  }
+#endif
 
 extension AudioHost: WKNavigationDelegate, WKUIDelegate {
   func webView(
@@ -203,17 +257,22 @@ extension AudioHost: WKNavigationDelegate, WKUIDelegate {
   }
 }
 
-/// Serves the page's own files from the app bundle, and in debug builds the `--fake-mic` WAV.
+/// Serves the page's own files from the app bundle, and in debug builds the `--fake-mic` WAVs.
 private final class PageFiles: NSObject, WKURLSchemeHandler {
   private let directory = Bundle.module.url(forResource: "audio", withExtension: nil)
-  private let fakeMic: URL?
+  private let fakeMic: [URL]
   private static let types = ["html": "text/html", "js": "text/javascript", "wav": "audio/wav"]
 
-  init(fakeMic: URL?) { self.fakeMic = fakeMic }
+  init(fakeMic: [URL]) { self.fakeMic = fakeMic }
+
+  /// The WAV behind `name`, when it names a line there is.
+  private func fakeLine(_ name: String) -> URL? {
+    AudioPage.fakeLine(named: name).flatMap { fakeMic.indices.contains($0) ? fakeMic[$0] : nil }
+  }
 
   func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
     guard let url = task.request.url, let name = AudioPage.resourceName(for: url),
-      let file = name == "fake-mic.wav" ? fakeMic : directory?.appending(path: name),
+      let file = fakeLine(name) ?? directory?.appending(path: name),
       let data = try? Data(contentsOf: file)
     else { return task.didFailWithError(URLError(.fileDoesNotExist)) }
     task.didReceive(
