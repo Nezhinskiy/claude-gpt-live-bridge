@@ -1961,6 +1961,19 @@ struct BridgeTests {
     #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
   }
 
+  /// Only the owner's words withhold: a line of the mod's refused with the turn says nothing typed.
+  @Test func aRefusedReportWithholdsNoAnswer() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    try await test.sync(test.a, kind: .start)  // refused, with no request named yet
+    try await test.sync(
+      test.a, request: test.request(1).id, kind: .report, "The turn was interrupted.")
+    try await test.voiceAnswer()
+    #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
+  }
+
   @Test func aWithheldSupersededAnswerStaysOut() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.typedIntoAVoiceTurn()

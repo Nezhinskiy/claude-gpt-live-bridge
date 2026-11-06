@@ -203,6 +203,20 @@ struct SessionRegistryTests {
     #expect(await !registry.hasOpenRequests)
   }
 
+  /// A spoken reply tied a typed turn to a request waiting behind it. The turn names that request,
+  /// so typing into it under the pause withholds it: what the turn holds may be in its own answer.
+  @Test func aRequestATurnNamesIsWithheldThoughItOnlyWaitedBehindIt() async throws {
+    await join(a, syncs: true)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    _ = try await registry.poll(a)
+    await registry.withholdAnswer(request(1).id, of: a)
+    #expect(try await registry.complete(answer(request(1), .update)) == .dropped)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .failed)
+  }
+
   /// A request queued after the reply is the newer one: only its answer is delivered.
   @Test func aReplyLeavesLatestToANewerQueuedRequest() async throws {
     await join(a, syncs: true)
