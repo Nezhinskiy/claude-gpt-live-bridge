@@ -41,7 +41,7 @@ dans la session et ce que Claude répond, vous pouvez donc passer de la parole a
 votre Mac entre votre propre codex et votre propre Claude Code. L'application et le mod
 communiquent uniquement par un socket Unix que seul votre utilisateur peut ouvrir, et
 l'application n'écoute sur aucun port réseau. En dehors de ce que ces deux outils envoient déjà
-(la ligne vocale vers OpenAI via votre codex, uniquement tant qu'elle est ouverte, et le travail
+(la ligne vocale vers OpenAI via votre codex, uniquement tant qu'elle est ouverte, avec ce que vous tapez dans une session rejointe, et le travail
 de Claude vers Anthropic via votre session Claude Code), le seul trafic propre à l'application
 est un codex éphémère qui, à l'ouverture du menu, demande à OpenAI vos chiffres d'utilisation de
 Codex, même quand l'appel est coupé, et celui des [mises à jour](#mises-à-jour) : une demande automatique à GitHub pour savoir s'il existe
@@ -224,6 +224,10 @@ qu'une mise à jour interrompue en pleine installation peut laisser. L'applicati
 copies à son lancement suivant ; après une désinstallation, supprimez-la à la main si elle
 existe.
 
+`claude plugin uninstall` peut laisser l'instantané du mod,
+`~/.claude/plugins/store/livebridge_*.json` : la documentation de Claude Code sur ce qu'il supprime
+ne nomme pas ce fichier, et cela n'a pas été exécuté. Supprimez-le à la main s'il est là.
+
 ## Utilisation
 
 ### Commandes
@@ -276,22 +280,14 @@ parlez.
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
   voix peut porter (une longue conversation le dépasse), la session a été mise en pause, ou son mod
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
-  déjà la conversation. Un résumé que l'application a demandé avant un trou ultérieur ou avant **New
-  conversation** est ignoré : l'élément reste activé, il peut afficher « Loading context… » pendant
-  le reste de ses 60 secondes, et la voix garde ce qu'elle avait. `/live context` fonctionne à tout
-  moment, sauf si une demande d'avant ce trou est encore ouverte (jusqu'à 120 secondes) ; si le mod
-  note un trou pendant l'écriture, il répond qu'il n'a pas pu résumer, et vous le relancez. Un
-  résumé ne porte pas de date : un `/live context` qui traverse **New conversation** ramène ce qui a
-  été oublié, et taper sous la pause pendant qu'il s'exécute peut lever la marque de pause
-  ([BR-002](docs/bugs/BR-002.md)).
+  déjà la conversation. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
+  reste activé, et `/live context` peut échouer, ramener ce qui a été oublié ou lever la marque de
+  pause ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne. Les résultats qu'elle n'a pas encore dits
-  restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude, c'est
-  autre chose : changer de cible retire de la file la question en attente d'une autre session, et
-  vos prochains mots vont à la nouvelle cible ; une session qui part ou que vous retirez avec ×
-  retire de la file sa question et son avis d'approbation en attente ; un microphone en panne met
-  fin à la route d'une question comme Stop. Ces lignes restent enregistrées. Avec **Pause sync**
+  restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude en attente
+  suivent d'autres règles ([détails](SECURITY.md#residual-risk-by-design)). Avec **Pause sync**
   désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
   transcription de la session, qui contient ce que la session a lu ; pour l'éviter, faites d'abord
   `/clear` dans la session, puis appuyez sur **New conversation**. `/live on` dans une session
@@ -316,9 +312,7 @@ parlez.
   aucune ligne ne charge de résumé d'elle-même, ni après une pause : seuls **Load context** ou
   `/live context` le font, et ce résumé est écrit à partir de toute la transcription, donc il porte
   ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
-  réponse, sans que rien en soit enregistré ni dit. Seule échoue la demande que ce tour nomme : une
-  demande qui attend seulement derrière lui garde sa réponse, qui peut citer ce que vous avez tapé
-  et entre dans la conversation appel arrêté. Le réglage ne supprime rien de ce qui est déjà
+  réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](SECURITY.md#residual-risk-by-design).
 - **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
@@ -369,16 +363,11 @@ parlez.
   Claude en milieu de tour n'est pas synchronisé, sauf ce qu'il a écrit juste avant une question ou
   une demande de permission, qui l'accompagne ; les sous-agents et la sortie des outils ne le sont
   pas non plus. Une question ou une demande de permission dans la cible est donnée à la voix, quel
-  que soit le tour qui l'a provoquée : une ligne ouverte sur cette session la reçoit comme texte à
-  dire, une ligne fermée s'ouvre pour elle si la conversation contient un tour de vous, sinon
-  l'application joue un carillon, et appel éteint elle n'est qu'enregistrée. Dans une autre session,
-  elle va comme irait un résultat venu d'elle, sauf que celle d'un tour qui n'était pas une demande
-  vocale n'est qu'enregistrée. Un tour que la pause tient dehors n'a rien de tout cela. Quand une
-  question ou une demande est réglée sans la voix, ou qu'un tour se termine sans réponse, la voix
-  reçoit une ligne qui le dit. Cette ligne dit « at the keyboard », bien que le mod ne puisse pas
-  distinguer votre clavier d'un hôte ou d'un autre hook ; « You allowed » ne part que pour
-  l'exécution exacte sur laquelle on vous a interrogé, et la demande d'un sous-agent se règle à son
-  étape suivante ou à sa fin, comme réglée.
+  que soit le tour qui l'a provoquée ; dans une autre session, elle va comme irait un résultat venu
+  d'elle, sauf que celle d'un tour qui n'était pas une demande vocale n'est qu'enregistrée. Un tour
+  que la pause tient dehors n'a rien de tout cela. Quand une question ou une demande est réglée sans
+  la voix, ou qu'un tour se termine sans réponse, la voix reçoit une ligne qui le dit ([quelles
+  lignes](SECURITY.md#what-session-text-can-do)).
 
 ## Facturation maîtrisée par conception
 
@@ -511,7 +500,7 @@ mise à jour et, pour chacune des 20 dernières sessions utilisées, sa conversa
 appuyez sur **New conversation** avec elle comme cible ou que vous la retirez avec ×. Une session
 qui est partie les conserve jusqu'à ce que 20 sessions utilisées ensuite les évincent ; pour les
 effacer plus tôt, exécutez de nouveau `/live on` dans cette session et appuyez sur **New
-conversation**. La désinstallation les supprime toutes.
+conversation**. La désinstallation les supprime toutes. Le mod garde un instantané à lui dans le magasin de plugins de Claude Code ([ce qu'il contient](SECURITY.md#residual-risk-by-design)).
 
 [SECURITY.md](SECURITY.md) contient le modèle de menace : en bref, tout ce que votre microphone
 peut entendre peut devenir une demande que Claude exécute avec le mode de permissions propre à la
@@ -519,31 +508,29 @@ session.
 
 ## Limitations connues
 
-- La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande,
-  si bien que rien n'arrive à Claude : environ une demande sur cinq lors des
-  [tests](docs/bugs/BR-001.md), alors que la règle de la voix l'interdit. L'application joue un
-  son bref quand elle met une demande en file pour Claude ; si la voix dit qu'elle regarde et
-  qu'aucun son ne suit, répétez la demande. L'application ne peut pas distinguer une telle
-  promesse d'une réponse par ses mots, car la voix parle votre langue.
+- La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande, si
+  bien que rien n'arrive à Claude : environ une demande sur cinq avec la règle telle qu'écrite au
+  départ, et 0 sur 20 avec la règle actuelle, trop peu pour distinguer cela du hasard
+  ([BR-001](docs/bugs/BR-001.md)). Elle peut aussi prétendre à un travail qu'elle n'a pas fait,
+  comme « I'll take a look. », y compris à partir de lignes qu'elle n'a que comme contexte ([ADR
+  0001 (n), (o)](docs/adr/0001-platform-findings.md)). L'application joue un son bref quand elle met
+  une demande en file pour Claude ; si la voix dit qu'elle regarde et qu'aucun son ne suit, répétez
+  la demande. L'application ne peut pas distinguer une telle promesse d'une réponse par ses mots,
+  car la voix parle votre langue.
 - Une question de Claude, ou une demande de permission qu'il attend, est seulement donnée à la voix,
   et la voix peut ne pas la dire ; rien ne l'y oblige. Ne comptez donc pas sur la voix pour annoncer
-  une demande quand vous êtes loin du Mac : Claude peut attendre sans que rien ne l'annonce. La
-  demande attend toujours dans Claude Code, et c'est le seul contrôle ; la voix n'est pas un
-  contrôle, et LiveBridge ne répond jamais à la demande. Lors des vérifications, l'avis de
-  permission d'un tour tapé, ligne ouverte, a été dit avant la réponse au clavier dans 0 essai sur
-  3, en deux séries (0 sur 2 comme contexte, puis 0 sur 1 comme texte à dire, où la voix a dit « I'm
-  on it—I'll take care of that. »). Sur une ligne qu'une demande a ouverte, personne ne parlant, la
-  voix a parlé la première 0 fois sur 3, dont 2 coupées par le script à 3,2 secondes. Une question
-  donnée comme texte à dire a été dite 1 fois sur 1, au bout de 6,9 secondes. Ce sont des comptes,
-  pas des taux, avec un modèle factice écrivant le texte de Claude ([ADR 0001
-  (n)](docs/adr/0001-platform-findings.md)). Une ligne fermée ne s'ouvre pour elles que si la
-  conversation de la cible contient un tour de vous ; sinon l'application joue un carillon, et appel
-  éteint elles ne sont qu'enregistrées.
-- La voix peut prétendre à un travail qu'elle n'a pas fait. Elle a dit « I'm on it—I'll take care of
-  that. » et « I'll take a look. » sans transmettre de demande ([ADR 0001 (n),
-  (o)](docs/adr/0001-platform-findings.md)), y compris à partir de lignes qu'elle n'a que comme
-  contexte. Aucun travail ne démarre alors : seul le son bref signifie qu'une demande a été mise en
-  file.
+  une demande de permission quand vous êtes loin du Mac : Claude peut attendre sans que rien ne
+  l'annonce. Cette demande attend toujours dans Claude Code, et c'est le seul contrôle ; la voix
+  n'est pas un contrôle, et LiveBridge ne répond jamais à la demande. Lors des vérifications, l'avis
+  de permission d'un tour tapé, ligne ouverte, a été dit avant la réponse au clavier dans 0 essai
+  sur 3, un compte et non un taux ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). Une ligne
+  fermée ne s'ouvre pour elles que si la conversation de la cible contient un tour de vous ; sinon
+  l'application joue un carillon, et appel éteint elles ne sont qu'enregistrées.
+- Ce que l'application de bureau Claude indique comme origine d'un prompt tapé n'a pas été observé
+  ([ADR 0001 (m)](docs/adr/0001-platform-findings.md)). Le mod n'enregistre un prompt comme vôtre
+  que si son origine est `composer`. Si un prompt tapé là-bas arrive autrement, rien de ce qui y est
+  tapé n'est enregistré, aucun trou n'est noté, le menu affiche **Context up to date**, et la pause
+  va moins loin ([détails](SECURITY.md#what-session-text-can-do)).
 - Un résultat qui arrive pendant que la ligne l'attend est transmis à la voix sous forme de texte à
   dire ; codex n'a aucun appel qui fasse parler la voix immédiatement, c'est donc le modèle qui
   décide du moment. Lors des tests, elle a parlé en quelques secondes. Si ce n'est pas le cas, le
@@ -568,26 +555,14 @@ session.
   une ligne qui tombe sans raison donnée (« The voice session closed (transport_closed). »), laisse
   l'appel actif, et vos prochains mots réessaient ; appuyez sur **Stop** jusqu'à la réinitialisation
   de la limite.
-- Ce que l'application de bureau Claude indique comme origine d'un prompt tapé n'a pas été observé.
-  Le mod n'enregistre un prompt comme vôtre que si son origine est `composer`, ce qui a été vu dans
-  un terminal et pour le message d'un hôte marqué `human` ; que les prompts tapés dans l'application
-  de bureau arrivent ainsi est déduit de ses transcriptions ([ADR 0001
-  (m)](docs/adr/0001-platform-findings.md)). S'ils arrivent comme `sdk`, rien de ce qui y est tapé
-  n'est enregistré, aucun trou n'est noté, le menu affiche **Context up to date**, et la pause va
-  moins loin, car un texte tapé dans un tour en cours ne le refuse pas. Un seul prompt tapé dans
-  l'application de bureau, en lisant l'origine dans le mod, tranche la question.
 - Un prompt qui n'est pas tapé dans le compositeur (le message d'un hôte, une tâche planifiée, un
-  autre agent ou Remote Control) n'est pas enregistré dans la conversation de la voix comme vos
-  mots, mais la réponse de Claude l'est, et il ne refuse pas un tour en cours sous la pause
-  ([SECURITY.md](SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les vôtres).
-  Que `bridge` soit Remote Control est la formulation du type et n'a pas été observé : s'il arrive
-  comme `composer`, il est enregistré comme vôtre.
+  autre agent et sans doute Remote Control) n'est pas enregistré dans la conversation de la voix
+  comme vos mots, mais la réponse de Claude l'est, et il ne refuse pas un tour en cours sous la
+  pause ([SECURITY.md](SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les
+  vôtres).
 - Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
-  synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, aucune
-  pause ne refuse ses lignes, et une réponse vide se lit encore « the answer is code or a table only
-  ». Si un tour vocal dépasse les 10 minutes de sa demande et que vous répondez de vive voix à une
-  question de Claude, votre réponse n'ouvre aucune demande, la réponse du tour est refusée et
-  n'arrive pas à la voix, et le mod le dit dans la session (suivi dans le code, non exécuté).
+  synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, et aucune
+  pause ne refuse ses lignes ([ce qui change d'autre](CHANGELOG.md)).
 - Une session Claude Code déjà ouverte avant le chargement du mod peut devoir être rouverte pour
   que `/live` y fonctionne.
 - Dans l'application de bureau Claude, `/live` saisi dans une session dont le processus Claude
