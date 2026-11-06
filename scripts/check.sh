@@ -9,7 +9,7 @@ swift format lint --strict -r app
 sh scripts/tests/uninstall.test.sh
 # The marketplace pins the mod to the app's release tag; a release binary has no test-only switch.
 sh scripts/tests/release-guards.test.sh
-# The lowest Claude Code the README promises is stated once and CI runs it.
+# Every copy of the lowest Claude Code the README promises agrees with its Requirements line.
 sh scripts/tests/claude-code-floor.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
 node --test 'app/Tests/AudioJSTests/*.test.mjs'

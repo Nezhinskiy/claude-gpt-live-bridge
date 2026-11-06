@@ -101,8 +101,9 @@ plugin test`. Without `claude` the script says that half was not checked and sti
 installs Claude Code (a pinned version) on the Xcode 27 macOS runner and runs the same script,
 which fails there if `claude` is missing.
 
-CI then runs the engine-facing half again on the lowest Claude Code the README promises, so a
-change that needs more than that version fails:
+CI then runs the engine-facing half again on the lowest Claude Code the README promises, so the
+mod's type check, validation and tests must pass on that version; a need none of them reach still
+passes. To run it yourself, after `check.sh` has installed the mod's dev dependencies:
 
 ```sh
 scripts/check-floor.sh
@@ -110,7 +111,7 @@ scripts/check-floor.sh
 
 It reads the version from the `Claude Code` line under Requirements in `README.md`, the number's
 home, and downloads that version to a temporary folder. To change the floor, change that line;
-`check.sh` then fails until the other READMEs and `site/index.html` say the same.
+`check.sh` then fails until every other copy says the same.
 
 The end-to-end smoke test drives the real codex and spends your ChatGPT plan's realtime voice;
 the header of `scripts/smoke.sh` says how much and what a pass is:
