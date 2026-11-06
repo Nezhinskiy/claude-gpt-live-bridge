@@ -547,7 +547,8 @@ public actor Bridge: Router {
 
   /// The span of a Claude window kind: `five_hour` and `seven_day` are the two lengths the app
   /// names, `spend_limit` is not a usage window, and any other kind shows by name. A kind comes
-  /// from the socket and reaches the menu, so only `[a-z0-9_]{1,32}` is accepted.
+  /// from the socket and reaches the menu, so only `[a-z0-9_]{1,32}` with a character other than
+  /// `_` is accepted.
   static func span(ofKind kind: String) -> LimitSpan? {
     switch kind {
     case "five_hour": return .minutes(LimitSpan.shortMinutes)
@@ -557,7 +558,9 @@ public actor Bridge: Router {
       let allowed = kind.utf8.allSatisfy {
         ($0 >= 97 && $0 <= 122) || ($0 >= 48 && $0 <= 57) || $0 == 95
       }
-      return allowed && (1...32).contains(kind.utf8.count) ? .kind(kind) : nil
+      // A kind of only underscores would show as blanks.
+      let named = kind.utf8.contains { $0 != 95 }
+      return allowed && named && kind.utf8.count <= 32 ? .kind(kind) : nil
     }
   }
 

@@ -128,12 +128,23 @@ struct UsageLimitsTests {
 
 struct LimitSpanTests {
   @Test func labelsFollowTheLength() {
-    let labels: [(Int, String)] = [
+    let labels: [(Double, String)] = [
       (300, "5 h"), (240, "4 h"), (45, "45 min"), (1440, "1 d"), (43200, "30 d"),
       (9576, "week"), (10080, "week"), (10584, "week"), (9575, "7 d"),
     ]
     for (minutes, label) in labels {
+      #expect(LimitSpan(minutes: minutes).label == label, "\(minutes)")
+    }
+  }
+
+  @Test func aLengthThatIsNotWholeHoursUnderADayShowsInMinutes() {
+    let labels: [(Int, String, String)] = [
+      (90, "90 min", "90-minute window"), (120, "2 h", "2-hour window"),
+      (1439, "1439 min", "1439-minute window"), (61, "61 min", "61-minute window"),
+    ]
+    for (minutes, label, name) in labels {
       #expect(LimitSpan.minutes(minutes).label == label, "\(minutes)")
+      #expect(LimitSpan.minutes(minutes).windowName == name, "\(minutes)")
     }
   }
 

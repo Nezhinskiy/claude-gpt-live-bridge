@@ -26,8 +26,9 @@ Claude  40% of 5 h · 22% of week
 - Each row is text only, with no icon: the product's name and one figure per window, percent
   **used**, rounded to a whole number. The owner tried icons and logos and chose none.
 - Windows are listed shortest first, up to three a row. Labels come from the window's length: `week`
-  within ±5 % of 10080 minutes, `N h` under a day (`5 h`, `4 h`), `N d` from a day up (`30 d`), `N
-  min` under an hour. With no length the label is `limit`. A Claude kind the app does not know shows
+  within ±5 % of 10080 minutes, `N h` for a whole number of hours under a day (`5 h`, `4 h`), `N d`
+  from a day up (`30 d`), `N min` for anything else under a day (`45 min`, and `90 min`, not
+  `2 h`). The tooltip's name follows (`90-minute window`). With no length the label is `limit`. A Claude kind the app does not know shows
   by name, underscores as spaces. Beyond three, the windows of known length stay first.
 - A window showing 90 % or more is drawn orange. The figure says it too, so status does not rest
   on colour alone.
@@ -112,7 +113,8 @@ process on the same lockdown argv.
   change touches `Wire.swift`, `plugin/hooks/wire.ts` and `wire/fixtures/` together.
 - `five_hour` is 300 minutes and `seven_day` is 10080. `spend_limit` stays out. Any other kind shows
   by name. A kind is a string from the socket that now reaches the menu, so only
-  `[a-z0-9_]{1,32}` is accepted and the rest are ignored.
+  `[a-z0-9_]{1,32}` with at least one character other than `_` is accepted and the rest are
+  ignored.
 - The mod sends once on joining (from `$.session.usage()`) and on `session.measure` when `rateLimits`
   changed, only while joined. An empty list is not sent. A failed send is dropped; the next one
   corrects it.

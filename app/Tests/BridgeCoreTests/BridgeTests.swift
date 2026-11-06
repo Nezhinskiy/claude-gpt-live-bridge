@@ -1513,7 +1513,7 @@ struct BridgeTests {
 
   @Test func aKindOutsideTheAlphabetIsIgnored() async throws {
     try await join(a, "Alpha")
-    for kind in ["Five", "a-b", String(repeating: "a", count: 33), ""] {
+    for kind in ["Five", "a-b", String(repeating: "a", count: 33), "", "_", "___"] {
       try await limits([LimitWindowBody(kind: kind, percentUsed: 90, resetsAt: nil)])
     }
     #expect(await bridge.current.claudeLimits == nil)

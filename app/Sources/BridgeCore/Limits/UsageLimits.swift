@@ -29,15 +29,13 @@ public enum LimitSpan: Hashable, Sendable {
     return minutes
   }
 
-  /// The figure's unit: "5 h", "week", "30 d", "45 min", "limit", or a kind with spaces.
+  /// The figure's unit: "5 h", "week", "30 d", "45 min", "90 min", "limit", or a kind with spaces.
   public var label: String {
     switch self {
-    case .minutes(let raw):
-      let minutes = Self.snapped(raw)
+    case .minutes(let minutes):
       if minutes == Self.aWeek { return "week" }
-      if minutes < 60 { return "\(minutes) min" }
-      if minutes < 1440 { return "\(Self.rounded(minutes, per: 60)) h" }
-      return "\(Self.rounded(minutes, per: 1440)) d"
+      let (count, unit) = Self.length(minutes)
+      return "\(count) \(unit.short)"
     case .kind(let name): return name.replacingOccurrences(of: "_", with: " ")
     case .unknown: return "limit"
     }
@@ -46,12 +44,10 @@ public enum LimitSpan: Hashable, Sendable {
   /// The tooltip's name for the window: "5-hour window", "Weekly window", "Limit".
   public var windowName: String {
     switch self {
-    case .minutes(let raw):
-      let minutes = Self.snapped(raw)
+    case .minutes(let minutes):
       if minutes == Self.aWeek { return "Weekly window" }
-      if minutes < 60 { return "\(minutes)-minute window" }
-      if minutes < 1440 { return "\(Self.rounded(minutes, per: 60))-hour window" }
-      return "\(Self.rounded(minutes, per: 1440))-day window"
+      let (count, unit) = Self.length(minutes)
+      return "\(count)-\(unit.long) window"
     case .kind:
       let text = label
       return text.prefix(1).uppercased() + text.dropFirst() + " window"
@@ -61,13 +57,36 @@ public enum LimitSpan: Hashable, Sendable {
 
   /// A length the app names: five hours or a week.
   public var isKnown: Bool {
-    guard case .minutes(let raw) = self else { return false }
-    let minutes = Self.snapped(raw)
+    guard case .minutes(let minutes) = self else { return false }
     return minutes == Self.shortMinutes || minutes == Self.aWeek
   }
 
-  private static func rounded(_ minutes: Int, per unit: Int) -> Int {
-    (minutes + unit / 2) / unit
+  private enum Unit {
+    case minute, hour, day
+
+    var short: String {
+      switch self {
+      case .minute: "min"
+      case .hour: "h"
+      case .day: "d"
+      }
+    }
+
+    var long: String {
+      switch self {
+      case .minute: "minute"
+      case .hour: "hour"
+      case .day: "day"
+      }
+    }
+  }
+
+  /// A length in minutes as a count and a unit: whole hours under a day in hours, anything else
+  /// under a day in minutes (90 stays 90 min, not 2 h), a day or more in days, rounded.
+  private static func length(_ minutes: Int) -> (count: Int, unit: Unit) {
+    if minutes >= 1440 { return ((minutes + 720) / 1440, .day) }
+    if minutes >= 60 && minutes % 60 == 0 { return (minutes / 60, .hour) }
+    return (minutes, .minute)
   }
 
   /// Shortest first: lengths ascending, then kinds by name, then no length.
