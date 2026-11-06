@@ -2,8 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax. **The wave is the dispatch unit, not the task:** one implementer per wave, and inside a wave every task keeps its own failing test, verification and commit. No per-wave reviews: one final review per PR.
 
-**Goal:** two text rows in the menu, Codex and Claude, showing percent used of the 5-hour and weekly
-windows, with reset times on hover.
+**Goal:** two text rows in the menu, Codex and Claude, showing percent used of each window the plan
+reports, with reset times on hover.
 
 **Architecture:** one value, `UsageLimits`, in `BridgeCore`. Codex fills it from
 `account/rateLimits/read` on a short-lived `codex app-server`, read when the menu opens. Claude
@@ -22,7 +22,7 @@ menu; warnings, voice changes and anything else are not admitted.
 ## Wave graph
 
 ```
-A (Tasks 1-2: value, Codex read) ──┬──> B (Tasks 3-4: rows, read rule) ──┬──> D (Tasks 7-9: app, docs, by hand)
+A (Tasks 1-2: value, Codex read) ──┬──> B (Tasks 3-4: rows, read rule) ──┬──> E (Task 10: any window) ──> D (Tasks 7-9: app, docs, by hand)
                                    └──> C (Tasks 5-6: route, mod)     ───┘
 ```
 
@@ -31,9 +31,10 @@ A (Tasks 1-2: value, Codex read) ──┬──> B (Tasks 3-4: rows, read rule)
 | A | 1-2 | nothing | the shape the rest uses |
 | B | 3-4 | `UsageLimits` | `MenuContent` takes both readings as arguments, so it needs nothing from C |
 | C | 5-6 | `UsageLimits`, `merging` | Bridge, wire and mod; shares no file with B |
+| E | 10 | A, B, C | the owner's later requirement: no window is special |
 | D | 7-9 | everything | the untested app target, docs, and the look at the real menu |
 
-B and C may run at once; each builds and passes `scripts/check.sh` on its own. D runs last.
+A, B and C landed with `fiveHour` and `week`; E replaces that shape before D uses it. D runs last.
 
 ## Global Constraints
 
@@ -330,6 +331,74 @@ export type LimitsBody = { sessionId: SessionId; windows: LimitWindowBody[] }
   validate plugin`. Expected: pass.
 - [ ] **Step 6: Commit** `feat(plugin): send Claude's usage windows to the app`.
 
+## Wave E: Task 10
+
+### Task 10: Any window, of any length
+
+The owner's requirement after Waves A and B: limits change, so a window of a new length shows. This
+replaces `fiveHour` and `week` everywhere; Tasks 1 to 5's tests that name them change with it.
+
+**Files:**
+- Modify: `app/Sources/BridgeCore/Limits/UsageLimits.swift`, `CodexLimits.swift`,
+  `app/Sources/BridgeCore/Menu/LimitRow.swift`, `app/Sources/BridgeCore/Bridge.swift`
+- Test: `UsageLimitsTests.swift`, `CodexLimitsTests.swift`, `MenuTests.swift`, `BridgeTests.swift`
+
+**Interfaces:**
+- Consumes: Tasks 1-5.
+- Produces:
+
+```swift
+public enum LimitSpan: Hashable, Sendable {
+  case minutes(Int)      // within ±5 % of 300 or 10080 it is normalised to exactly that
+  case kind(String)      // a Claude kind the app does not know
+  case unknown           // no duration
+  public var label: String       // "5 h", "week", "30 d", "45 min", "limit", or the kind with spaces
+  public var windowName: String  // "5-hour window", "Weekly window", "30-day window", "Limit"
+  public var isKnown: Bool       // 300 or 10080
+}
+public struct LimitWindow: Sendable, Equatable {
+  public var span: LimitSpan
+  public var usedPercent: Double
+  public var resetsAt: Date?
+}
+public struct UsageLimits: Sendable, Equatable {
+  public static let maxWindows = 3
+  public private(set) var windows: [LimitWindow]   // the init orders and caps them
+  public var isBlocked: Bool
+  public var readAt: Date
+  public init(windows: [LimitWindow] = [], isBlocked: Bool = false, readAt: Date)
+  public func current(at now: Date) -> UsageLimits
+  public func merging(_ newer: UsageLimits) -> UsageLimits
+}
+```
+
+- [ ] **Step 1: Rework the tests, failing first:**
+  - `UsageLimitsTests`: the merge tests keyed by span; `aWindowNobodyReportsGoesAtItsReset` (held
+    `.kind("x")`, a newer reading without it keeps it until `current(at:)` passes its reset);
+    `windowsAreShortestFirst` (`.minutes` ascending, then `.kind`, then `.unknown`);
+    `aRowHoldsThreeWithTheKnownFirst` (five windows of which 300 and 10080: both stay).
+  - `LimitSpanTests`: 300 `5 h`, 240 `4 h`, 45 `45 min`, 1440 `1 d`, 43200 `30 d`, 9576, 10080 and
+    10584 `week`, 9575 `7 d`; `windowName` `5-hour window`, `4-hour window`, `Weekly window`, `30-day
+    window`, `45-minute window`, `Limit` for unknown, and `.kind("five_minute")` label `five minute`,
+    `windowName` `Five minute window`.
+  - `CodexLimitsTests`: `aWindowOfAnotherLengthIsIgnored` becomes `aWindowOfAnotherLengthShows` (240
+    shows as `4 h`); `aWindowWithNoDurationShowsAsLimit`; `aWindowWithNoPercentIsLeftOut`;
+    `twoOfOneLengthKeepThePrimary`; `anUnknownExtraFieldChangesNothing`;
+    `noBucketMapIsTheSingleBucket` (key absent, not null).
+  - `MenuTests`: figures `22% of 4 h`, `22% of limit`; the tooltip's `4-hour window resets at …`; a
+    no-duration window's tooltip line `Limit resets at …`.
+  - `BridgeTests`: `anUnknownKindShowsByName`; `spendLimitStaysOut`; `aKindOutsideTheAlphabetIsIgnored`
+    (`Five`, `a-b`, 33 characters, empty); `aReadingHoldsAtMostThreeWindows`; `anIdleSessionDoesNotLowerTheFigures`
+    stays green.
+- [ ] **Step 2: Run:** `swift test --package-path app --filter 'UsageLimitsTests|LimitSpanTests|CodexLimitsTests|MenuTests|BridgeTests'`. Expected: fails to compile.
+- [ ] **Step 3: Implement.** Put `LimitSpan` in `UsageLimits.swift`. Hours and days round to the
+  nearest whole number. `UsageLimits.init` drops a later window of a span already held, sorts, and
+  caps, known spans kept first. `CodexLimits.read` takes every window of the bucket and still throws
+  only for a reply that is not an object. `Bridge` maps kinds: `five_hour`, `seven_day`, `spend_limit`
+  out, the alphabet check as a pure function with the tests above.
+- [ ] **Step 4: Run** `scripts/check.sh`. Expected: exit 0.
+- [ ] **Step 5: Commit** `feat(app): show every window the plan reports, whatever its length`.
+
 ## Wave D: Tasks 7-9
 
 ### Task 7: The app
@@ -378,12 +447,13 @@ This target has no tests (the repo's rule: `BridgeCore` holds every rule), so no
 - [ ] **Step 1:** README, the menu bullet: add the limits after "the minutes". New bullet after the
   billing bullet (`README.md:313-316`): the rows show percent used of the 5-hour and weekly windows
   as Codex and Claude report them, resets on hover; Codex's are read when the menu opens, by a
-  short-lived codex; Claude's need a joined session that has answered; each window shows only if
-  the plan has it; which limit stops the voice first is not documented. Link the research note only if it has merged; else the pricing page.
+  short-lived codex; Claude's need a joined session that has answered; which limit stops the voice
+  first is not documented. Name no window as a fact of the plans: the rows show what the plan reports. Link the research note only if it has merged; else the pricing page.
   The same in all six translations.
 - [ ] **Step 2:** `overview.md:136`: a row for `POST /v1/limits`, and a line on the short-lived read
   beside the voice list. `SECURITY.md`: add to the list at `:66-79` that a process running as the owner
-  can post false limits, including a far-future `resetsAt` that stands until the app quits. README's
+  can post false limits, including a far-future `resetsAt` that stands until the app quits, and
+  window names of `[a-z0-9_]{1,32}`, at most three a row. README's
   Privacy section and its six translations (`SECURITY.md:244` sends readers there for what goes to
   OpenAI): opening the menu makes codex read usage from OpenAI, also while the call is off.
   `README.md:293` "Nothing is sent anywhere" speaks of audio: read it, keep it true. `CHANGELOG.md`: Added, under the unreleased section.

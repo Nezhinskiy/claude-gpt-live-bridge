@@ -11,6 +11,10 @@ The owner wants to see how much of the Codex and Claude limits is left, so that 
 not come as a surprise. Codex comes first; Claude is the same glance, so it is built with it. This
 is a glance in the menu, nothing more: the app does not warn on its own (the owner chose this).
 
+OpenAI and Anthropic change their limits and have done so before, so nothing here is built around
+exactly a 5-hour and a weekly window (the owner's requirement). The rows show the windows the plan
+reports, whatever they are; a window of a new length shows rather than vanishes.
+
 ## What the owner sees
 
 A section of two rows above the minutes:
@@ -22,9 +26,14 @@ Claude  40% of 5 h · 22% of week
 
 - Each row is text only, with no icon: the product's name and one figure per window, percent
   **used**, rounded to a whole number. The owner tried icons and logos and chose none.
+- Windows are listed shortest first, up to three a row. Labels come from the window's length: `week`
+  within ±5 % of 10080 minutes, `N h` under a day (`5 h`, `4 h`), `N d` from a day up (`30 d`), `N
+  min` under an hour. With no length the label is `limit`. A Claude kind the app does not know shows
+  by name, underscores as spaces. Beyond three, the windows of known length stay first.
 - A window showing 90 % or more is drawn orange. The figure says it too, so status does not rest
   on colour alone.
-- Hovering a row shows when each window resets, then when the figures were read:
+- Hovering a row shows when each window resets, by the window's own length (`5-hour window`,
+  `Weekly window`, `4-hour window`, `30-day window`), then when the figures were read:
 
   ```
   5-hour window resets at 06:04
@@ -38,10 +47,10 @@ Claude  40% of 5 h · 22% of week
   row is orange, ends with the word `blocked`, and its tooltip opens with "Codex reports usage is
   blocked right now." The figures may be well under 100 % then: `account.rs` tells clients not to
   infer it from percentages. This row shows even with no window to show (`Codex  blocked`).
-- A window the source does not report is left out of its row (`Codex  19% of week`). A row with no
-  window and no block is not shown; with neither row the section is not shown. So a plan without a 5-hour window,
-  an API-key login, a missing codex, or a Claude session that has not answered yet shows no error
-  and no figure.
+- A window the source does not report is simply absent (`Codex  19% of week`). A row with no
+  window and no block is not shown; with neither row the section is not shown. So a plan without a 5-hour window
+  shows its other windows; an API-key login, a missing codex, a reply of a shape this version does
+  not understand, or a Claude session that has not answered yet shows no error and no figure.
 
 Nothing here says "voice limit". Which limit stops the voice first is not documented, so the rows
 name the product whose figures they are, and no doc may say more.
@@ -61,8 +70,9 @@ in about 0.5 s, about 2.2 s with `codex features list`, start and initialise.
 - Slots are not meanings. codex passes the backend's primary and secondary through and labels them
   by length, ±5 % (`codex-rs/tui/src/chatwidget/rate_limits.rs:109-145` at `rust-v0.166.0`). Either
   may be null. A Pro report shows a 10080 window on its limit
-  ([openai/codex#37619](https://github.com/openai/codex/issues/37619)). So windows are chosen **by
-  length**, never by slot. Pro's actual reply was not read; this rule is what makes that safe.
+  ([openai/codex#37619](https://github.com/openai/codex/issues/37619)). So every window of the bucket
+  with a usable `usedPercent` shows, labelled **by its length**, never by slot. Two of one label keep
+  `primary`. Pro's actual reply was not read; this rule is what makes that safe.
 - The reply also carries `accountId`, plan, and reset-credit ids. Only the window fields and
   `ordinaryUsageAllowed` are decoded; `excludeResetCreditDetails: true` skips the credit lookup.
 
@@ -78,9 +88,11 @@ row needs a joined session that has answered once.
 
 ## Design
 
-**The value.** `BridgeCore` gets one shape for both sources: an optional five-hour window and an
-optional week window, each `{usedPercent, resetsAt?}`, and when it was read. It is held in memory
-only and never written to disk or logs.
+**The value.** `BridgeCore` gets one shape for both sources: a list of windows, each with its span
+(a length in minutes, a kind by name, or unknown), `usedPercent` and `resetsAt?`, kept shortest
+first and at most three, and when it was read. It is held in memory only and never written to disk
+or logs. A reply of an unexpected shape never crashes: a missing or renamed field gives that window
+or that row nothing, and a read that fails is a failed read.
 
 **Reading Codex.** A short-lived `codex app-server`, started for the read and closed after it, as
 Settings' voice list does (`offeredVoices` in `App.swift`), except that the search path, which
@@ -98,14 +110,17 @@ process on the same lockdown argv.
 **Reading Claude.** The mod sends what the engine gives, the app keeps the latest:
 
 - New route `POST /v1/limits`: `{sessionId, windows: [{kind, percentUsed, resetsAt?}]}`. The wire
-  change touches `Wire.swift`, `plugin/hooks/wire.ts` and `wire/fixtures/` together. Unknown kinds
-  are ignored by the app.
+  change touches `Wire.swift`, `plugin/hooks/wire.ts` and `wire/fixtures/` together.
+- `five_hour` is 300 minutes and `seven_day` is 10080. `spend_limit` stays out. Any other kind shows
+  by name. A kind is a string from the socket that now reaches the menu, so only
+  `[a-z0-9_]{1,32}` is accepted and the rest are ignored.
 - The mod sends once on joining (from `$.session.usage()`) and on `session.measure` when `rateLimits`
   changed, only while joined. An empty list is not sent. A failed send is dropped; the next one
   corrects it.
-- Several sessions share one account as a rule, so they feed one reading, window by window: the
+- Several sessions share one account as a rule, so they feed one reading, keyed by window: the
   later `resetsAt` wins, and on the same `resetsAt` the higher percent wins, as use within a window
-  only grows. A window with no `resetsAt` takes the newest. `$.session.usage()` reports the last
+  only grows. A window nobody reports any more goes at its reset; a Codex read replaces the whole
+  reading. A window with no `resetsAt` takes the newest. `$.session.usage()` reports the last
   response and has no timestamp, so an idle session joining would otherwise put old, lower figures
   over fresh ones. "Read at" is when the held reading last changed or was confirmed by an arrival.
   A session on another account mixes with this one; accepted.
@@ -125,8 +140,9 @@ threshold is one constant, 90.
 
 ## Docs
 
-- README and its six translations: the rows, what each needs, that the figures are the plan's own
-  and which limit stops the voice is not documented. Fix the translations' outdated minutes bullet
+- README and its six translations: the rows show the windows the plan reports, what each row
+  needs, and that which limit stops the voice is not documented. No doc names the two windows as a
+  fact of the plans. Fix the translations' outdated minutes bullet
   only if this change touches that sentence.
 - `docs/architecture/overview.md`: the short-lived read and the new route. `SECURITY.md` if it lists
   routes or what codex is asked; say that opening the menu makes codex read usage from OpenAI, also
