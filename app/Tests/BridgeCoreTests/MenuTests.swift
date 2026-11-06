@@ -309,6 +309,12 @@ struct LimitRowTests {
     #expect(row?.figures.map(\.text) == ["100% of 5 h", "0% of week"])
   }
 
+  @Test func aNonFinitePercentIsZero() {
+    // Built directly: the wire refuses these, but the row must not trap on them.
+    let row = Self.row(Self.limits(five: .nan, week: .infinity))
+    #expect(row?.figures.map(\.text) == ["0% of 5 h", "0% of week"])
+  }
+
   @Test func aMissingWindowIsLeftOut() {
     #expect(Self.row(Self.limits(five: nil))?.figures.map(\.text) == ["19% of week"])
   }

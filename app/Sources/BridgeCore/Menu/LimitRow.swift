@@ -27,9 +27,11 @@ public struct LimitRow: Sendable, Equatable {
     guard let current = limits?.current(at: now) else { return nil }
     guard !current.windows.isEmpty || current.isBlocked else { return nil }
 
-    // The value comes from the socket, and `Int(_:)` traps on a huge double: clamp first.
+    // The value comes from the socket. `Int(_:)` traps on NaN and on infinity, which `min` and `max`
+    // let through, so a value that is not finite is 0; the rest is clamped to 0...100 here only.
     func figure(_ window: LimitWindow) -> Figure {
-      let percent = Int(min(max(window.usedPercent, 0), 100).rounded())
+      let value = window.usedPercent.isFinite ? window.usedPercent : 0
+      let percent = Int(min(max(value, 0), 100).rounded())
       return Figure(
         text: "\(percent)% of \(window.span.label)", isNear: percent >= Self.nearPercent)
     }
