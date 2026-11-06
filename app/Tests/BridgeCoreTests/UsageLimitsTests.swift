@@ -34,9 +34,23 @@ struct UsageLimitsTests {
     let reset = now.addingTimeInterval(100)
     let old = reading(window(five, 40, reset), readAt: now)
     let new = reading(window(five, 12, reset), readAt: now.addingTimeInterval(60))
-    let merged = old.merging(new)
-    #expect(merged.windows.first?.usedPercent == 40)
-    #expect(merged.readAt == new.readAt)
+    #expect(old.merging(new).windows.first?.usedPercent == 40)
+  }
+
+  @Test func aLosingArrivalDoesNotMoveReadAt() {
+    let reset = now.addingTimeInterval(100)
+    let old = reading(window(five, 40, reset), readAt: now)
+    let losing = reading(window(five, 12, reset), readAt: now.addingTimeInterval(3600))
+    #expect(old.merging(losing).readAt == now)
+  }
+
+  @Test func aConfirmingOrWinningArrivalMovesReadAt() {
+    let reset = now.addingTimeInterval(100)
+    let old = reading(window(five, 40, reset), readAt: now)
+    let later = now.addingTimeInterval(60)
+    #expect(old.merging(reading(window(five, 40, reset), readAt: later)).readAt == later)
+    #expect(old.merging(reading(window(five, 41, reset), readAt: later)).readAt == later)
+    #expect(old.merging(reading(window(week, 1, reset), readAt: later)).readAt == later)
   }
 
   @Test func aWindowWithNoResetTakesTheNewest() {

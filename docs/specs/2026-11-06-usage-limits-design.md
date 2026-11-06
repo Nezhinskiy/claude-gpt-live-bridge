@@ -124,7 +124,9 @@ process on the same lockdown argv.
   reset that a report does not mention is dropped, and one that stays is dropped 15 minutes after the
   reading, as it has no reset to wait for. `$.session.usage()` reports the last
   response and has no timestamp, so an idle session joining would otherwise put old, lower figures
-  over fresh ones. "Read at" is when the held reading last changed or was confirmed by an arrival.
+  over fresh ones. "Read at" is when the held reading last changed or was confirmed by an arrival: one of its windows
+  taken, or matching what is held in percent and reset. An arrival that lost everywhere confirms
+  nothing, so it does not move "Read at".
   A session on another account mixes with this one; accepted.
 - The reading outlives the sessions: when the last one leaves, the row stays until each window's
   reset, with "Read at" showing its age. Nothing needs clearing on leave, removal or the sweep. It

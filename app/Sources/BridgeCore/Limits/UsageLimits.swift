@@ -145,6 +145,8 @@ public struct UsageLimits: Sendable, Equatable {
   /// percent (use within a window only grows), and a window with no reset takes the newer, except
   /// that a known reset is kept against an undated report (with the higher percent). A window
   /// `newer` lacks stays as held until its reset; one with no reset has none to wait for and goes.
+  /// `readAt` moves to `newer`'s only when some window of it was taken or matches what is held:
+  /// an arrival that lost everywhere confirmed nothing.
   public func merging(_ newer: UsageLimits) -> UsageLimits {
     func merged(_ old: LimitWindow, _ new: LimitWindow) -> LimitWindow {
       guard let oldReset = old.resetsAt else { return new }
@@ -155,12 +157,26 @@ public struct UsageLimits: Sendable, Equatable {
       if newReset != oldReset { return newReset > oldReset ? new : old }
       return new.usedPercent >= old.usedPercent ? new : old
     }
-    var all = newer.windows.map { new in
-      windows.first { $0.span == new.span }.map { merged($0, new) } ?? new
+    var all: [LimitWindow] = []
+    var confirmed = false
+    for new in newer.windows {
+      guard let old = windows.first(where: { $0.span == new.span }) else {
+        all.append(new)
+        confirmed = true
+        continue
+      }
+      let kept = merged(old, new)
+      all.append(kept)
+      if kept.usedPercent == new.usedPercent
+        && (new.resetsAt == nil || kept.resetsAt == new.resetsAt)
+      {
+        confirmed = true
+      }
     }
     all += windows.filter { old in
       old.resetsAt != nil && !newer.windows.contains { $0.span == old.span }
     }
-    return UsageLimits(windows: all, isBlocked: newer.isBlocked, readAt: newer.readAt)
+    return UsageLimits(
+      windows: all, isBlocked: newer.isBlocked, readAt: confirmed ? newer.readAt : readAt)
   }
 }
