@@ -652,13 +652,12 @@ export const register: Register = on => {
 
   // ADR 0001 (i): a permission request that reaches the person during a main-loop turn, with what
   // the main loop wrote in the step that asks for it. Claude's question has its own report above.
-  // A subagent's is no step of the main loop's: it carries neither that text nor the turn.
+  // A subagent's is no step of the main loop's, so it carries none of that text, but it ran in the turn.
   on('classic.PermissionRequest', async ($, e, next) => {
     const turn = tracker.current
     if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
       approval = { tool: e.tool_name, agent: e.agent_id }
-      const said = e.agent_id === undefined ? { ...wrote(tracker.takeStepText()), turn } : {}
-      await link.activity('approval', said)
+      await link.activity('approval', { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })
     }
     return next(e)
   }).catch(($, e, next) => next(e))

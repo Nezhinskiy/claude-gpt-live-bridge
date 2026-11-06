@@ -126,7 +126,7 @@ test('aSubagentsApprovalGoesWithoutTheMainLoopsText', async ($, on) => {
   await inVoiceTurn($, world)
   await step($, world, 't1', 'Two folders hold build output.')
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', turn: VOICE }])
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r out' } })
   expect(world.take('activity')).toEqual([
     { sessionId: ID, state: 'approval', text: 'Two folders hold build output.', turn: VOICE },
@@ -164,8 +164,8 @@ test('aTypedTurnsApprovalIsReportedWhileAVoiceRequestWaits', async ($, on) => {
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', turn: TYPED }])
 })
 
-/** The app keeps no text of a turn it refused, and a subagent's prompt carries none to refuse. */
-test('aSubagentsApprovalInATypedTurnIsNotTheTurns', async ($, on) => {
+/** It carries no text of the main loop's, and the turn it ran in, so the app decides on it as on that turn. */
+test('aSubagentsApprovalCarriesItsTurn', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...LIVE, args: 'on' })
@@ -173,7 +173,7 @@ test('aSubagentsApprovalInATypedTurnIsNotTheTurns', async ($, on) => {
   world.take('activity')
   await step($, world, 't1', "I'm going to delete build/.")
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, agent_id: 'a1' })
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval' }])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', turn: TYPED }])
 })
 
 /** Between turns a prompt is a background subagent's, which no turn answers for. */
