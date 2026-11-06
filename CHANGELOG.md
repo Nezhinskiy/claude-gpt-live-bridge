@@ -68,6 +68,10 @@ All notable changes to this project are listed here. The format follows
   data channel, which codex does not report; those are not called a limit, as nothing shows one.
 - A long conversation in a language other than English could stop a line from opening: the app
   measured its seed in characters while codex counts bytes and refuses a start past its limit.
+- An answer, a question or a permission prompt from the target now opens the closed line every
+  time. When the last line had been about another session, the app could close the new line
+  before it started, so the voice said nothing and the line waited for you to speak or for a
+  second one.
 - A question waiting to be said keeps its route when you pick another session: your reply reaches
   the session that asked, instead of landing in the new target as a request of its own.
 - A voice request whose turn ends with no answer, as a plain **No** at a permission prompt or a

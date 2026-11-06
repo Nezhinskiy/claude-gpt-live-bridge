@@ -33,7 +33,9 @@ public actor Bridge: Router {
   /// The session whose conversation the line last opened with; its transcripts are kept there.
   private var lineSession: SessionID?
   /// Whether `lineSession` is set for the line opening now; until then a target change cannot
-  /// be told from the target it will open with.
+  /// be told from the target it will open with. It goes false with the decision to open, not
+  /// when the attempt starts: the `changed()` that follows that decision could otherwise take the
+  /// last line's session for this line's, and close it.
   private var lineKnowsSession = false
   /// The context line the opening line was seeded with.
   private var seededContext: String?
@@ -279,8 +281,8 @@ public actor Bridge: Router {
 
   private func run(_ effect: CallEffect) async {
     switch effect {
-    case .openRealtime: await attempt { await self.openLine(preroll: true) }
-    case .openRealtimeForResult: await attempt(waits: false) { await self.openLine(preroll: false) }
+    case .openRealtime: await startOpening(preroll: true)
+    case .openRealtimeForResult: await startOpening(preroll: false, waits: false)
     case .closeRealtime:
       connecting?.cancel()
       connecting = nil
@@ -370,12 +372,17 @@ public actor Bridge: Router {
     return await !registry.syncs(id)
   }
 
+  /// Starts the attempt that opens the line, in the same turn as the machine's decision to open.
+  private func startOpening(preroll: Bool, waits: Bool = true) async {
+    lineKnowsSession = false
+    await attempt(waits: waits) { await self.openLine(preroll: preroll) }
+  }
+
   /// Opens the line with the target's conversation, and asks the target for its context when it
   /// needs one and may have one; the line does not wait for it. Cancelled, it does nothing
   /// more: whoever cancelled it closes what it opened. A line the voice closed itself
   /// (`CancellationError`) says why in its `closed` event.
   private func openLine(preroll: Bool) async {
-    lineKnowsSession = false
     seededContext = nil
     heldContext = nil
     let session = await registry.target

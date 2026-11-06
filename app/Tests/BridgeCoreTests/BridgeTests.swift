@@ -2069,6 +2069,32 @@ struct BridgeTests {
       await voice.opens.last?.map(\.text).contains("[TYPED] Alpha: Rename the folder.") == true)
   }
 
+  /// The last line's session stays behind when that line closes; the first question from another
+  /// target still opens the line, with that target's conversation. Whether the opening line is
+  /// taken for the old one hangs on how two tasks interleave, so this repeats: without the fix
+  /// more than half the rounds fail. Mutation: clear `lineKnowsSession` in `openLine`.
+  @Test func aQuestionOpensAClosedLineAfterAnotherSessionsLine() async throws {
+    for _ in 0..<32 {
+      let test = try BridgeTests()
+      try await test.join(test.a, "Alpha")
+      try await test.join(test.b, "Beta")
+      await test.live()
+      test.voice.emit(.closed(.other("closed")))
+      #expect(await eventually { await test.bridge.status.call == .listening })
+      try await test.post("/v1/target", TargetBody(sessionId: test.b))
+      try await test.sync(test.b, "Rename the folder.")
+      try await test.post(
+        "/v1/activity",
+        ActivityBody(
+          sessionId: test.b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      try #require(await eventually { await test.voice.opens.count == 2 })
+      try #require(await eventually { await test.bridge.status.call == .live })
+      #expect(
+        await test.voice.opens.last?.map(\.text).contains("[TYPED] Beta: Rename the folder.")
+          == true)
+    }
+  }
+
   @Test func aTypedTurnsApprovalOpensTheTargetsLine() async throws {
     try await join(a, "Alpha")
     await bridge.perform(.start)
