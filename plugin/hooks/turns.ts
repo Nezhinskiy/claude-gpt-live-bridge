@@ -34,6 +34,8 @@ type FollowUp = { id: RequestId; until: number }
  * it. `linesUnder`: the turn id its lines go under, when that is not its own.
  */
 type Tracked = ({ id: RequestId; isVoice: boolean } | { id: null; isVoice: false }) & { linesUnder?: string }
+/** The turn running, with its id and, always, the id its lines go under. */
+type Running = Tracked & { turnId: string; linesUnder: string }
 /** A prompt posted with a running turn's id, until a turn turns out to be its own, or none will. */
 type TypedPrompt = { text: string; turnId: string }
 /**
@@ -66,8 +68,8 @@ function endedWithout(outcome: TurnOutcome): string {
 }
 
 /** How the wire names a turn: by the id its lines go under, with the request its answer belongs to. */
-const refOf = (turnId: string, turn: Tracked): TurnRef =>
-  ({ id: turn.linesUnder ?? turnId, ...(turn.id !== null && { request: turn.id }) })
+const refOf = (turn: Running): TurnRef =>
+  ({ id: turn.linesUnder, ...(turn.id !== null && { request: turn.id }) })
 
 /** The first `limit` characters of `text`, counted as code points, so no surrogate pair is cut. */
 export function clip(text: string, limit: number): string {
@@ -99,7 +101,8 @@ export function originOf(origin: { kind: string; name?: string }, self: string, 
 export class TurnTracker {
   #pending: RequestId | null
   #followUp: FollowUp | null
-  #turns: Map<string, Tracked>
+  /** Main-loop turns run one at a time. */
+  #turn: Running | null
   #typed: TypedPrompt[]
   #prompts: OpenPrompt[]
   #isTurnLost = false
@@ -109,21 +112,15 @@ export class TurnTracker {
   constructor(saved?: TurnSnapshot) {
     this.#pending = saved?.pending ?? null
     this.#followUp = saved?.followUp ?? null
-    this.#turns = new Map(saved?.turns ?? [])
+    const held = saved?.turns?.at(-1)
+    this.#turn = held === undefined ? null : { linesUnder: held[0], ...held[1], turnId: held[0] }
     this.#typed = saved?.typed ?? []
     this.#prompts = saved?.prompts ?? []
   }
 
   /** The main-loop turn running, as the wire names it; null between turns. */
   get current(): TurnRef | null {
-    const running = this.#latest
-    return running && refOf(running.turnId, running.turn)
-  }
-
-  /** The turn that started last: main-loop turns run one at a time. */
-  get #latest(): { turnId: string; turn: Tracked } | null {
-    const entry = [...this.#turns].at(-1)
-    return entry === undefined ? null : { turnId: entry[0], turn: entry[1] }
+    return this.#turn && refOf(this.#turn)
   }
 
   /**
@@ -204,7 +201,7 @@ export class TurnTracker {
    * turn claims it.
    */
   typedInto(turnId: string, text: string, entered = text): SyncLine {
-    const turn = refOf(turnId, this.#turns.get(turnId) ?? { id: null, isVoice: false })
+    const turn = refOf(this.#turn?.turnId === turnId ? this.#turn : { id: null, isVoice: false, turnId, linesUnder: turnId })
     this.#typed.push({ text: entered, turnId: turn.id })
     return { turn, kind: 'typed', text }
   }
@@ -218,12 +215,12 @@ export class TurnTracker {
    */
   turnStarted(turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt = text): SyncLine[] {
     const opened = (turn: Tracked): SyncLine[] => {
-      this.#turns.set(turnId, turn)
-      return [{ turn: refOf(turnId, turn), kind: 'start' }]
+      this.#turn = { ...turn, turnId, linesUnder: turnId }
+      return [{ turn: refOf(this.#turn), kind: 'start' }]
     }
-    // Main-loop turns run one at a time: one still held never reported its end.
-    if (this.#turns.size > 0) this.#isTurnLost = true
-    this.#turns.clear()
+    // One still held never reported its end.
+    if (this.#turn !== null) this.#isTurnLost = true
+    this.#turn = null
     this.#prompts = []
     const id = voiceRequestId(text)
     const at = id === null && origin !== 'owner' ? this.#typed.findIndex(one => one.text === text) : -1
@@ -236,7 +233,7 @@ export class TurnTracker {
       return opened({ id, isVoice: true })
     }
     if (claimed !== undefined) {
-      this.#turns.set(turnId, { id: null, isVoice: false, linesUnder: claimed.turnId })
+      this.#turn = { id: null, isVoice: false, turnId, linesUnder: claimed.turnId }
       this.#followUp = null
       return []
     }
@@ -254,35 +251,39 @@ export class TurnTracker {
    * the turn is a voice turn. Another one, already in flight: the answer is an update to it.
    */
   replied(replyId: RequestId, forRequest: RequestId | undefined, now: number): void {
-    const running = this.#latest
-    if (running === null || running.turn.isVoice || forRequest === undefined) return
+    const turn = this.#turn
+    if (turn === null || turn.isVoice || forRequest === undefined) return
     const isOwn = forRequest === replyId
-    this.#turns.set(running.turnId, { ...running.turn, id: forRequest, isVoice: isOwn })
+    this.#turn = { ...turn, id: forRequest, isVoice: isOwn }
     if (isOwn) this.#followUp = { id: forRequest, until: now + FOLLOW_UP_MS }
   }
 
   /** A main-loop turn ended: what to post for it, as an answer to the voice request or a line. */
   turnCompleted(turnId: string, answer: string, outcome: TurnOutcome): { post: Post | null; sync: SyncLine | null } {
     this.#prompts = []
-    const turn = this.#turns.get(turnId)
-    if (turn === undefined) {
+    const turn = this.#turn
+    if (turn?.turnId !== turnId) {
       this.#isTurnLost = true
       return { post: null, sync: null }
     }
-    this.#turns.delete(turnId)
+    this.#turn = null
     const text = answer.trim()
     const isAnswered = outcome === 'answer' && text !== ''
     if (turn.isVoice) {
       if (!isAnswered) return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }
       return { post: { id: turn.id, status: /\?[*_`)"'”’\s]*$/u.test(text) ? 'question' : 'ok', text }, sync: null }
     }
-    const under = refOf(turnId, turn)
+    const under = refOf(turn)
     if (!isAnswered) return { post: null, sync: { turn: under, kind: 'report', text: endedWithout(outcome) } }
     if (turn.id === null) return { post: null, sync: { turn: under, kind: 'answer', text } }
     return { post: { id: turn.id, status: 'update', text }, sync: null }
   }
 
   snapshot(): TurnSnapshot {
-    return { pending: this.#pending, followUp: this.#followUp, turns: [...this.#turns], typed: this.#typed, prompts: this.#prompts }
+    return {
+      pending: this.#pending, followUp: this.#followUp,
+      turns: this.#turn === null ? [] : [[this.#turn.turnId, this.#turn]],
+      typed: this.#typed, prompts: this.#prompts,
+    }
   }
 }
