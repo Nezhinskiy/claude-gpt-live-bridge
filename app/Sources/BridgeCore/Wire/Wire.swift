@@ -123,8 +123,10 @@ public struct ContextBody: Codable, Sendable, Equatable {
   public var summary: String
 }
 
-/// One usage window as the mod reads it from Claude Code: `kind` is `five_hour` or `seven_day`
-/// (others are ignored), `percentUsed` is 0 to 100 and `resetsAt` an ISO 8601 time, omitted when
+/// One usage window as the mod reads it from Claude Code. The app takes `five_hour` as a window of
+/// five hours and `seven_day` as a week, ignores `spend_limit`, and shows any other kind of
+/// `[a-z0-9_]{1,32}` by name; a kind outside that is ignored. `percentUsed` is usually 0 to 100
+/// but is not checked: it is clamped only when shown. `resetsAt` is an ISO 8601 time, omitted when
 /// the engine gave none.
 public struct LimitWindowBody: Codable, Sendable, Equatable {
   public var kind: String

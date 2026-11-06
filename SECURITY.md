@@ -77,9 +77,12 @@ voices.
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation;
   - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as
-    far ahead as it likes, which stands until the app quits because the later reset wins. Window
-    names are only accepted as `[a-z0-9_]{1,32}` and a row shows at most three windows, so this
-    can mislead the owner but not fill the menu.
+    far ahead as it likes, which stands until that time (or until the app quits) because the later
+    reset wins; a window with no `resetsAt` goes 15 minutes after the reading. The reading is one
+    value shared by every session, and it outlives the session that sent it. The percent is not
+    checked on the way in and is clamped to 0 to 100 only for display. Window names are only
+    accepted as `[a-z0-9_]{1,32}` with a character other than `_`, and a row shows at most three
+    windows, so this can mislead the owner but add no rows.
 
   It can also read the data folder itself, every kept conversation included. Such a process can
   already do worse without LiveBridge: for example, it can add hooks to
@@ -110,6 +113,9 @@ has **no tools**:
   long as `codex features list` reports it.
 - **Every MCP server is off.** The app turns off every server codex's configuration names when
   it starts the thread, then requires codex to report each one disabled before every session.
+  That check belongs to the voice's thread. The short-lived codex that reads your usage starts no
+  thread and is not covered by it: in the one run seen, with an empty home, it started no MCP
+  server, but LiveBridge does not enforce that.
 
 The rest only narrows what is left. The app interrupts every codex turn it sees start, declines
 every request codex sends (approvals, tool calls, input requests and the rest), and closes the
