@@ -426,16 +426,19 @@ sesión.
   ajustes administrados y en una sesión iniciada con un plan Team o Enterprise, y ahí los hooks de
   permisos del mod no se ejecutan. La solicitud sigue apareciendo en Claude Code y sigue
   esperándote, pero la voz no dice nada de ella y la barra de menús muestra a Claude trabajando,
-  así que mira Claude Code si una respuesta parece tardar. Claude Code imprime una línea que dice
-  que el hook se omitió, y `/plugin` nombra los hooks. Las preguntas de Claude siguen llegando a
-  la voz. Con `allowManagedHooksOnly`, `allowManagedModsOnly` o `disableAllHooks` en los ajustes
+  así que mira Claude Code si una respuesta parece tardar. `/plugin` nombra los hooks, y las
+  versiones recientes de Claude Code también imprimen una línea que dice que un hook se omitió.
+  Las preguntas de Claude siguen llegando a la voz. Los hooks se
+  [midieron](docs/adr/0001-platform-findings.md) en un contenedor Linux; lo que hacen la voz y la
+  barra de menús se deduce del código, y no se probó una línea real. El caso de Team y Enterprise
+  viene de la documentación de Claude Code.
+- Con `allowManagedHooksOnly`, `allowManagedModsOnly` o `disableAllHooks` en los ajustes
   administrados, el mod no se carga y `/live` no funciona. Un administrador puede [instalar el mod
   como propio de la
-  organización](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods-and-set-the-order),
-  desde una carpeta en cada equipo, y entonces esos hooks se ejecutan; activar la copia del
-  marketplace en los ajustes administrados no basta. Los casos con ajustes administrados están
-  [medidos](docs/adr/0001-platform-findings.md); el caso de Team y Enterprise y el de la copia del
-  marketplace vienen de la documentación de Claude Code.
+  organización](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods),
+  desde una carpeta en cada equipo: entonces los hooks de permisos se ejecutan, también con los
+  dos primeros ajustes ([medido](docs/adr/0001-platform-findings.md)). Según la documentación de
+  Claude Code, activar la copia del marketplace en los ajustes administrados no basta.
 
 ## Cómo funciona
 

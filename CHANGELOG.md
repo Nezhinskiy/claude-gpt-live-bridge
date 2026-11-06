@@ -51,7 +51,7 @@ All notable changes to this project are listed here. The format follows
   an organization manages Claude Code: there the mod's hooks on `classic.PermissionRequest`,
   `classic.PostToolUse`, `classic.PostToolUseFailure` and `classic.PermissionDenied` do not run,
   so the voice does not say that a permission prompt is waiting, and three managed settings keep
-  the mod from loading. Nothing about the prompt itself changes: it still appears in Claude Code
+  a mod you installed from loading. Nothing about the prompt itself changes: it still appears in Claude Code
   and only you can answer it. No code changed.
 
 ## [0.3.0]

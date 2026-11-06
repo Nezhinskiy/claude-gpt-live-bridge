@@ -323,8 +323,8 @@ sequenceDiagram
 
 ### Approval notice
 
-This notice is not sent where Claude Code's built-in guard loads
-([known limitations](../../README.md#known-limitations), [ADR 0001](../adr/0001-platform-findings.md)).
+This notice is not sent where Claude Code's built-in guard loads and the mod is not the
+organization's own ([known limitations](../../README.md#known-limitations), [ADR 0001](../adr/0001-platform-findings.md)).
 
 The bridge never answers a permission prompt. When a voice turn hits one, the voice says that
 Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and

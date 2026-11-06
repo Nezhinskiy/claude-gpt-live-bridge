@@ -410,15 +410,18 @@ can become a request that Claude runs under the session's own permission mode.
   a session signed in to a Team or Enterprise plan, and there the mod's permission hooks do not
   run. The prompt still appears in Claude Code and still waits for you, but the voice says nothing
   about it and the menu bar shows Claude working, so look at Claude Code if an answer seems late.
-  Claude Code prints a line saying the hook was skipped, and `/plugin` names the hooks. Claude's
-  questions still reach the voice. With `allowManagedHooksOnly`, `allowManagedModsOnly` or
-  `disableAllHooks` in managed settings, the mod does not load and `/live` does not work. An
-  administrator can [install the mod as the organization's
-  own](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods-and-set-the-order),
-  from a folder on each machine, and then those hooks run; turning on the marketplace copy in
-  managed settings is not enough. The cases with managed settings are
-  [measured](docs/adr/0001-platform-findings.md); the Team and Enterprise case and the marketplace
-  copy come from Claude Code's documentation.
+  `/plugin` names the hooks, and recent versions of Claude Code also print a line saying a hook
+  was skipped. Claude's questions still reach the voice. The hooks were
+  [measured](docs/adr/0001-platform-findings.md) in a Linux container; what the voice and the menu
+  bar do follows from the code, and no real line was run. The Team and Enterprise case comes from
+  Claude Code's documentation.
+- With `allowManagedHooksOnly`, `allowManagedModsOnly` or `disableAllHooks` in managed settings,
+  the mod does not load and `/live` does not work. An administrator can [install the mod as the
+  organization's
+  own](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods), from a
+  folder on each machine: then the permission hooks run, also with the first two settings
+  ([measured](docs/adr/0001-platform-findings.md)). Claude Code's documentation says that turning
+  on the marketplace copy in managed settings is not enough.
 
 ## How it works
 

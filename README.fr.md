@@ -449,16 +449,20 @@ session.
   réglages gérés et dans une session connectée à une offre Team ou Enterprise, et là, les hooks de
   permission du mod ne s'exécutent pas. La demande apparaît toujours dans Claude Code et vous
   attend toujours, mais la voix n'en dit rien et la barre de menus montre Claude au travail :
-  regardez donc Claude Code si une réponse semble tarder. Claude Code affiche une ligne indiquant
-  que le hook a été ignoré, et `/plugin` nomme les hooks. Les questions de Claude parviennent
-  toujours à la voix. Avec `allowManagedHooksOnly`, `allowManagedModsOnly` ou `disableAllHooks`
-  dans les réglages gérés, le mod ne se charge pas et `/live` ne fonctionne pas. Un administrateur
-  peut [installer le mod comme celui de
-  l'organisation](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods-and-set-the-order),
-  depuis un dossier sur chaque machine, et ces hooks s'exécutent alors ; activer la copie de la
-  marketplace dans les réglages gérés ne suffit pas. Les cas avec réglages gérés sont
-  [mesurés](docs/adr/0001-platform-findings.md) ; le cas Team et Enterprise et celui de la copie
-  de la marketplace viennent de la documentation de Claude Code.
+  regardez donc Claude Code si une réponse semble tarder. `/plugin` nomme les hooks, et les
+  versions récentes de Claude Code affichent aussi une ligne indiquant qu'un hook a été ignoré.
+  Les questions de Claude parviennent toujours à la voix. Les hooks ont été
+  [mesurés](docs/adr/0001-platform-findings.md) dans un conteneur Linux ; ce que font la voix et
+  la barre de menus découle du code, et aucune vraie ligne n'a été testée. Le cas Team et
+  Enterprise vient de la documentation de Claude Code.
+- Avec `allowManagedHooksOnly`, `allowManagedModsOnly` ou `disableAllHooks` dans les réglages
+  gérés, le mod ne se charge pas et `/live` ne fonctionne pas. Un administrateur peut [installer
+  le mod comme celui de
+  l'organisation](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods),
+  depuis un dossier sur chaque machine : les hooks de permission s'exécutent alors, y compris avec
+  les deux premiers réglages ([mesuré](docs/adr/0001-platform-findings.md)). D'après la
+  documentation de Claude Code, activer la copie de la marketplace dans les réglages gérés ne
+  suffit pas.
 
 ## Fonctionnement
 
