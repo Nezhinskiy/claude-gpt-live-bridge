@@ -87,9 +87,10 @@ const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
  * the app matters more, and a hook past its `next` would have its `.catch` run the event again.
  */
 async function save($: EngineInterface): Promise<void> {
+  // The count first: a `/live off` during it deletes the key, which this must not write back.
+  const sessionTurns = await turnCount($)
   if (!link?.session) return
   const key = joinedKey(link.session.sessionId)
-  const sessionTurns = await turnCount($)
   await $.store.set(key, { ...tracker.snapshot(), hasGap: link?.hasGap, sessionTurns }).catch(() => {})
 }
 
