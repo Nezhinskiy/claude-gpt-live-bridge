@@ -1092,13 +1092,35 @@ struct BridgeTests {
   /// a mod that does not sync. Load context still asks.
   @Test(arguments: [(false, true), (true, true), (false, false)])
   func thePauseSettingStopsEverySummary(missed: Bool, syncs: Bool) async throws {
-    let test = try BridgeTests(pausesSync: true)
-    try await test.join(test.a, "Alpha", syncs: syncs, missed: missed ? true : nil)
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha", syncs: syncs)
     if missed || !syncs { try await test.post("/v1/context", test.context()) }
+    // missed with the setting off: only the setting itself keeps the summary away
+    if missed { try await test.join(test.a, "Alpha", missed: true) }
+    test.setPause(true)
     await test.live()
     #expect(try await test.registry.poll(test.a) == nil)
     await test.bridge.loadContext()
     #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  /// The menu's Load context follows `needsContext`, for each cause and for a current voice.
+  @Test func needsContextHoldsForEachCause() async throws {
+    try await join(a, "Alpha")
+    #expect(await bridge.current.needsContext)  // no context
+    try await post("/v1/context", context())
+    #expect(await !bridge.current.needsContext)  // current
+    try await join(a, "Alpha", missed: true)
+    #expect(await bridge.current.needsContext)  // missed
+    try await post("/v1/context", context())
+    #expect(await !bridge.current.needsContext)
+    try await join(a, "Alpha", syncs: nil)
+    #expect(await bridge.current.needsContext)  // a mod that does not sync
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/context", test.context())
+    try await test.sync(test.a, "Private thing.")
+    #expect(await test.bridge.current.needsContext)  // paused
   }
 
   /// Review Focus 3: New conversation keeps the mark, so the next line asks for no summary of
@@ -1586,6 +1608,18 @@ struct BridgeTests {
     await test.bridge.perform(.start)
     try await test.sync(test.a, from: .claude, "I did the private thing.")
     #expect(await test.lines().isEmpty)
+  }
+
+  /// The app restarts after the refused turn: its decision was saved, so its answer stays out.
+  @Test func aPausedTurnsAnswerStaysOutAfterARestart() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    let restarted = try BridgeTests(dir: test.dir, time: test.time, pausesSync: true)
+    try await restarted.join(restarted.a, "Alpha")
+    await restarted.bridge.perform(.start)
+    try await restarted.sync(restarted.a, from: .claude, "I did the private thing.")
+    #expect(await restarted.lines().isEmpty)
   }
 
   @Test func aTurnFromBeforeStopKeepsItsAnswerInThePause() async throws {

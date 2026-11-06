@@ -18,7 +18,8 @@ public struct Conversation: Codable, Sendable, Equatable {
 
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
-    /// notice), as the voice got it. `handoff`: the brief of a request the session's queue took,
+    /// notice), as the voice got it, or Claude's final answer to a turn that was not a voice
+    /// request (synced, as context). `handoff`: the brief of a request the session's queue took,
     /// so the menu shows that it was handed on.
     public enum Speaker: String, Codable, Sendable {
       case owner, voice, claude, handoff

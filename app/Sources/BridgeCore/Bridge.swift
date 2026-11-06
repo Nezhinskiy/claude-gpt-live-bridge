@@ -502,6 +502,9 @@ public actor Bridge: Router {
     await send(.conversationChanged)
   }
 
+  /// The pause setting is on and the call is off: what the owner types now stays out.
+  private var pausing: Bool { pausesSync() && machine.phase == .off }
+
   private var isLineOpen: Bool { machine.phase == .connecting || machine.phase == .live }
 
   // MARK: Routing
@@ -548,10 +551,8 @@ public actor Bridge: Router {
     guard let row = try? await label(of: id) else { return }
     var body = body
     if let turn = body.typedTurn {
-      let before = continuity[id].turn
-      let pausing = pausesSync() && machine.phase == .off
       let admitted = continuity.admits(turn: turn, from: .claude, in: id, pausing: pausing)
-      if continuity[id].turn != before || !admitted { save() }
+      save()
       guard admitted else {
         body.question = nil
         await registry.setActivity(body)
@@ -622,9 +623,8 @@ public actor Bridge: Router {
   private func sync(_ body: SyncBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
-    let pausing = pausesSync() && machine.phase == .off
     let admitted = continuity.admits(turn: body.turnId, from: body.from, in: id, pausing: pausing)
-    defer { save() }  // the turn's decision persists, an empty line's included
+    save()  // the turn's decision persists, an empty line's included
     guard admitted,
       let line = AnswerShaper.synced(body.text, from: body.from, label: row.label, session: id)
     else { return }
