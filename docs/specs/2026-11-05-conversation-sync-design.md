@@ -186,6 +186,8 @@ for the band.
 - If its session is the open line's, it goes in with `addContext` at once on a `live` line, and on
   connect for a `connecting` one, which `CallMachine` keeps; `heldContext` stays the summary's one
   slot. A line opened later is seeded with it.
+- An answer under a request a newer one superseded is not said, and the mod is told it was taken,
+  so it is a synced line of Claude's, unless it failed.
 - With the pause setting on and the call `off`, a synced line is dropped and its session marked
   *paused*.
 - `openLine` requests a summary only when the session has no context or is *missed* (and not

@@ -1358,6 +1358,73 @@ struct BridgeTests {
     #expect(await voice.opens.last == [InitialItem(role: .user, text: "[RESULT] Beta: Done.")])
   }
 
+  /// An answer under a request a newer one superseded, posted as `status`. The mod is told 200,
+  /// so nothing else would say it reached nobody.
+  func superseded(_ status: AnswerStatus = .ok, _ text: String = "Done.") async throws {
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    try await registry.enqueue(request(2), for: a)
+    try await post(
+      "/v1/answer",
+      AnswerBody(sessionId: a, id: request(1).id, status: status, text: text, reason: nil))
+  }
+
+  /// Superseded, it is not said; the voice has it as context, and the conversation keeps it.
+  @Test func aSupersededAnswerGoesToTheOpenLineUnsaid() async throws {
+    await live()
+    try await superseded()
+    #expect(await lines() == ["Claude: [CLAUDE] Alpha: Done."])
+    #expect(await voice.added == ["[CLAUDE] Alpha: Done."])
+    #expect(await voice.spoken.isEmpty)
+    #expect(await bridge.status.unheard == 0)
+  }
+
+  /// With no line open, the next line is seeded with it.
+  @Test func aSupersededAnswerIsSeeded() async throws {
+    try await join(a, "Alpha")
+    try await superseded()
+    await bridge.perform(.start)
+    await bridge.audioEvent(.speechStarted)
+    let seed = await voice.opens.last ?? []
+    #expect(seed.contains(InitialItem(role: .user, text: "[CLAUDE] Alpha: Done.")))
+  }
+
+  /// An update under a request still in flight, with a newer one queued behind it.
+  @Test func aSupersededUpdateIsKept() async throws {
+    await live()
+    try await superseded(.update, "The build passed.")
+    #expect(await voice.added == ["[CLAUDE] Alpha: The build passed."])
+  }
+
+  /// A question ends a turn as an answer does: what it holds would reach nobody either.
+  @Test func aSupersededQuestionIsKept() async throws {
+    await live()
+    try await superseded(.question, "Which name?")
+    #expect(await lines() == ["Claude: [CLAUDE] Alpha: Which name?"])
+  }
+
+  @Test func aSupersededFailureRecordsNothing() async throws {
+    await live()
+    try await superseded(.failed, "the turn was interrupted")
+    #expect(await lines().isEmpty)
+    #expect(await voice.added.isEmpty)
+  }
+
+  @Test func aSupersededAnswerWithNoTextRecordsNothing() async throws {
+    await live()
+    try await superseded(.ok, "")
+    #expect(await lines().isEmpty)
+  }
+
+  /// With the pause on and the call off, it is a synced line like any other: dropped, and marked.
+  @Test func aSupersededAnswerStaysOutOfAPause() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.superseded()
+    #expect(await test.lines().isEmpty)
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+  }
+
   /// A result not heard yet is given to the line once it opens, so it is not seeded too.
   @Test func unheardResultIsNotSeededTwice() async throws {
     try await join(a, "Alpha")

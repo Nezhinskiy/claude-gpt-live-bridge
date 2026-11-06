@@ -241,7 +241,11 @@ public actor Bridge: Router {
         if let delivery { await deliver(delivery) }
       case ("POST", "/v1/answer"):
         let body = try req.decodeBody(AnswerBody.self)
-        if let delivery = try await registry.complete(body) { await deliver(delivery) }
+        if let delivery = try await registry.complete(body) {
+          await deliver(delivery)
+        } else {
+          await keepSuperseded(body)
+        }
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
       case ("POST", "/v1/sync"): try await sync(try req.decodeBody(SyncBody.self))
@@ -628,8 +632,31 @@ public actor Bridge: Router {
     guard admitted,
       let line = AnswerShaper.synced(body.text, from: body.from, label: row.label, session: id)
     else { return }
-    record(body.from == .owner ? .owner : .claude, line.text, in: id)  // saves
-    if lineKnowsSession, lineSession == id { await send(.synced(line)) }
+    await addSynced(line, as: body.from == .owner ? .owner : .claude)
+  }
+
+  /// A newer request superseded this answer, so it is not said, and the mod, told 200, notes no
+  /// gap. So it is kept as Claude's synced line, unless it is a failure, which holds no answer.
+  /// With the pause on and the call off it stays out as any synced line does; it has no turn of
+  /// its own, so the turn's decision is left to the turn.
+  private func keepSuperseded(_ body: AnswerBody) async {
+    let id = body.sessionId
+    guard body.status != .failed, let row = try? await label(of: id),
+      let line = AnswerShaper.synced(body.text, from: .claude, label: row.label, session: id)
+    else { return }
+    if pausing {
+      continuity.markMissed(id, asPaused: true)
+      save()
+    } else {
+      await addSynced(line, as: .claude)
+    }
+  }
+
+  /// Keeps a synced line in its session's conversation; the open line about that session is
+  /// given it at once, as context.
+  private func addSynced(_ line: VoiceLine, as speaker: Conversation.Line.Speaker) async {
+    record(speaker, line.text, in: line.session)  // saves
+    if lineKnowsSession, lineSession == line.session { await send(.synced(line)) }
   }
 
   private func sweep() async {
