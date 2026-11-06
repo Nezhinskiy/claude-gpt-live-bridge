@@ -1542,4 +1542,22 @@ struct BridgeTests {
     #expect(
       Set(try #require(json).keys) == ["call", "sessions", "minutesToday", "unheard", "isMuted"])
   }
+
+  @Test func aWeekOnlyReadingMakesAWeekOnlyRow() async throws {
+    try await join(a, "Alpha")
+    try await limits([LimitWindowBody(kind: "seven_day", percentUsed: 22, resetsAt: Self.reset)])
+    let update = await bridge.current
+    var utc = Calendar(identifier: .gregorian)
+    utc.timeZone = try #require(TimeZone(identifier: "UTC"))
+    let row = try #require(
+      LimitRow(
+        name: "Claude", limits: update.claudeLimits, now: time.now, calendar: utc,
+        locale: Locale(identifier: "en_GB")))
+    #expect(row.figures.map(\.text) == ["22% of week"])
+    #expect(update.claudeLimits?.fiveHour == nil)
+    let lines = row.tooltip.split(separator: "\n").map(String.init)
+    #expect(lines.count == 2)
+    #expect(lines.first?.hasPrefix("Weekly window resets ") == true)
+    #expect(lines.last?.hasPrefix("Read at ") == true)
+  }
 }

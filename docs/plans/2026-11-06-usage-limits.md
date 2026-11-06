@@ -378,8 +378,8 @@ This target has no tests (the repo's rule: `BridgeCore` holds every rule), so no
 - [ ] **Step 1:** README, the menu bullet: add the limits after "the minutes". New bullet after the
   billing bullet (`README.md:313-316`): the rows show percent used of the 5-hour and weekly windows
   as Codex and Claude report them, resets on hover; Codex's are read when the menu opens, by a
-  short-lived codex; Claude's need a joined session that has answered; which limit stops the voice
-  first is not documented. Link the research note only if it has merged; else the pricing page.
+  short-lived codex; Claude's need a joined session that has answered; each window shows only if
+  the plan has it; which limit stops the voice first is not documented. Link the research note only if it has merged; else the pricing page.
   The same in all six translations.
 - [ ] **Step 2:** `overview.md:136`: a row for `POST /v1/limits`, and a line on the short-lived read
   beside the voice list. `SECURITY.md`: add to the list at `:66-79` that a process running as the owner
