@@ -100,7 +100,7 @@ only. Opening the menu and the Conversation submenu once on the release build is
 ### 8. An open line with no summary leaves Load context disabled (owner's decision)
 
 `.withTheLine` does not look at whether a line is already open. If the line asked and the summary
-never came (the model failed, or `Conversation.askLife` passed), the item stays disabled and says
+never came (the model failed), the item stays disabled and says
 **Context loads with the line** for as long as that line lasts, though that line will not load it.
 In 0.4.0 the item was enabled, so this is a narrow step back. The same happens when **Pause sync**
 is on as a line opens and is turned off during it: that line never asked (probes
@@ -131,8 +131,8 @@ comment "A gap is the owner's to load" has the same slip.
 
 The title and the READMEs say the next line loads a summary. It asks. A session with no prompt yet
 gets none (the mod writes none), and a summary can fail, so the title can stay through a whole line.
-With no prompt there is nothing to lose, and README's next sentence already says a summary can
-fail. The wording was left as the owner's call; "the next line asks for one" would be exact in the
+With no prompt there is nothing to lose, and the README's next sentence already says `/live
+context` can fail, though not that a line's own ask can. The wording was left as the owner's call; "the next line asks for one" would be exact in the
 READMEs.
 
 ## What was asked, answered
