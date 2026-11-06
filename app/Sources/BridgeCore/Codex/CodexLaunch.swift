@@ -37,9 +37,29 @@ public enum CodexProblem: LocalizedError, Equatable, Sendable {
       status < 0
         ? "Codex stopped unexpectedly." : "Codex stopped unexpectedly (exit status \(status))."
     case .timedOut(let method): "Codex stopped answering (\(method)), so it is started again."
+    case .realtimeError(let message) where isUsageLimit:
+      "Your ChatGPT plan's usage limit is reached, so the voice is paused. Claude Code keeps "
+        + "working. \(message)"
+    case .realtimeError(let message) where isRefusal: Problem.lineRefused(message).sentence
     case .realtimeError(let message):
       "Realtime voice failed (codex said: \(message))." + Self.hint(for: message.lowercased())
     }
+  }
+
+  /// codex's words for a spent budget. This path carries no error code, so the wording is the
+  /// only signal; which limit stopped the voice is not known, so nothing calls it a voice limit.
+  var isUsageLimit: Bool {
+    guard case .realtimeError(let message) = self else { return false }
+    return message.lowercased().contains(
+      /you[’']ve hit your usage limit|you hit your spend cap|your workspace is out of credits|quota exceeded/
+    )
+  }
+
+  /// Any other answer that a new line would get too: codex's fallback for a 429 with no known
+  /// body, and a plan without voice. Nothing here shows a budget was spent.
+  var isRefusal: Bool {
+    guard case .realtimeError(let message) = self else { return false }
+    return message.lowercased().contains(/last status: 429|to use codex with your chatgpt plan/)
   }
 
   /// A guess at the cause from codex's wording; no plan-without-realtime error has been observed.
@@ -48,7 +68,7 @@ public enum CodexProblem: LocalizedError, Equatable, Sendable {
       return " Run `codex login` with your ChatGPT account."
     }
     if text.contains(/\bplan\b|realtime[^.]*\b(not available|unavailable|not enabled)\b/) {
-      return " Your ChatGPT plan may not include realtime voice in Codex."
+      return " Your ChatGPT plan's Codex may not include voice."
     }
     return ""
   }

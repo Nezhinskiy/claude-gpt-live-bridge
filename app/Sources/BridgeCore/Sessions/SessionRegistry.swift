@@ -8,6 +8,16 @@ public struct Delivery: Sendable, Equatable {
   public var text: String
 }
 
+/// What became of an answer the session posted.
+public enum Completion: Sendable, Equatable {
+  /// To be said.
+  case delivery(Delivery)
+  /// A newer request superseded its request: it is not said.
+  case superseded
+  /// Its request is withheld and nothing of it goes anywhere: an `update`, or a superseded answer.
+  case dropped
+}
+
 public enum RegistryError: Error, Equatable {
   case unknownSession(SessionID)
   /// The id is not this session's open request (or, for an `update`, its latest one).
@@ -41,18 +51,26 @@ public enum RegistryError: Error, Equatable {
 /// Each session has at most one request in flight: `poll` hands out the next queued request only
 /// after the previous one completed. While Claude waits on a question it asked the owner, the
 /// next request is that question's reply instead: it goes out at once, for the request in
-/// flight, and supersedes nothing. A newer request supersedes the answer of an older one,
-/// which is then not delivered. A session that stops polling for 5 s is dropped and its open
-/// request fails; a request in flight for 10 minutes fails too. Exactly one
-/// session is the target while any is joined.
+/// flight, and supersedes nothing; with none in flight (a turn the owner typed asked, or a voice
+/// turn outlived its request) the reply is the request in flight, and the turn's final answer
+/// closes it, unless the session's mod does not sync. A newer request supersedes
+/// the answer of an older one, which is then not delivered. A session that stops polling for
+/// 5 s is dropped and its open request fails; a request in flight for 10 minutes fails too.
+/// Exactly one session is the target while any is joined.
 public actor SessionRegistry {
   private struct Session {
     let joinOrder: Int
     var title = ""
+    /// The mod's version as its last join named it; nil when it named none, or none that reads.
+    var modVersion: AppVersion?
+    /// The mod's last join said it posts sync lines; one that does not leaves the session
+    /// needing a summary at every line.
+    var syncs = false
     var lastPoll: Date
     var activity = SessionActivity.idle
     var queued: [VoiceRequest] = []
-    var inFlight: (id: RequestID, brief: String, since: Date)?
+    /// `isWithheld`: its answer stays out (`withholdAnswer`).
+    var inFlight: (id: RequestID, brief: String, since: Date, isWithheld: Bool)?
     /// The newest request enqueued; only its answers are delivered.
     var latest: RequestID?
     /// Claude waits on a question it asked the owner in the request in flight.
@@ -70,10 +88,16 @@ public actor SessionRegistry {
   private var sessions: [SessionID: Session] = [:]
   /// Sessions the owner removed that the owner has not joined again since.
   private var removed: Set<SessionID> = []
+  /// Sessions gone since the last `takeDropped()`.
+  private var dropped: [SessionID] = []
   private var joins = 0
   private var lastSweep: Date?
   /// A longer gap between sweeps means the Mac slept, not that every mod went quiet.
   private static let sleepGap: TimeInterval = 3
+  /// Why a withheld request failed.
+  private static let withheldReason =
+    "the answer stays out because you typed into the turn while the sync was paused; "
+    + "it is in the session."
   /// The longest title kept; the label, the band and every voice line carry it.
   public static let maxTitle = 80
   public private(set) var target: SessionID?
@@ -96,6 +120,8 @@ public actor SessionRegistry {
       sessions[body.sessionId] ?? replaced ?? Session(joinOrder: joins, lastPoll: time.now)
     joins += 1
     session.title = String(body.title.prefix(Self.maxTitle))
+    session.modVersion = body.modVersion.flatMap { AppVersion($0) }
+    session.syncs = body.syncs == true
     session.lastPoll = time.now
     sessions[body.sessionId] = session
     if target == nil { retarget(body.sessionId) }
@@ -139,11 +165,19 @@ public actor SessionRegistry {
       if let reply = session.reply {
         session.reply = nil
         session.isAsking = false
-        return .reply(reply)
+        // Nothing in flight: a typed turn asked, or a voice turn outlived its request, so the reply
+        // is the request its turn's answer closes. A newer request queued behind it stays the
+        // latest. A mod that does not sync moves no turn onto the reply, so nothing would close
+        // it, and it opens nothing.
+        if session.inFlight == nil, session.syncs {
+          session.inFlight = (reply.id, reply.brief, now, false)
+          if session.queued.isEmpty { session.latest = reply.id }
+        }
+        return .reply(reply, forRequest: session.inFlight?.id ?? reply.id)
       }
       if session.inFlight == nil, !session.queued.isEmpty {
         let request = session.queued.removeFirst()
-        session.inFlight = (request.id, request.brief, now)
+        session.inFlight = (request.id, request.brief, now, false)
         return .request(request)
       }
       guard session.wantsContext else { return nil }
@@ -152,26 +186,56 @@ public actor SessionRegistry {
     }
   }
 
+  /// The sessions that left, were removed or stopped polling since the last call.
+  public func takeDropped() -> [SessionID] {
+    defer { dropped = [] }
+    return dropped
+  }
+
+  /// Whether the session's mod posts sync lines; false for one that has not joined, or that
+  /// predates sync.
+  public func syncs(_ id: SessionID) -> Bool { sessions[id]?.syncs ?? false }
+
   /// Asks the session for its context summary at its next poll.
   public func requestContext(for id: SessionID) { sessions[id]?.wantsContext = true }
 
+  /// The turn of `request` refused what the owner typed into it, so its answer may repeat that
+  /// text: it stays out. Closed already, the turn is a background one, whose answer would be an
+  /// update to the request: no update goes under it.
+  public func withholdAnswer(_ request: RequestID, of id: SessionID) {
+    if sessions[id]?.inFlight?.id == request {
+      sessions[id]?.inFlight?.isWithheld = true
+    } else if sessions[id]?.latest == request {
+      sessions[id]?.latest = nil
+    }
+  }
+
   /// Records an answer. `ok`, `failed` and `question` close the request in flight; `update`
-  /// closes nothing. Returns `nil` when a newer request superseded this one.
-  public func complete(_ answer: AnswerBody) throws -> Delivery? {
+  /// closes nothing. An answer under a withheld request closes it as failed, whatever its status,
+  /// and none of its text goes on.
+  public func complete(_ answer: AnswerBody) throws -> Completion {
     let label = labels()[answer.sessionId]
     return try update(answer.sessionId) { session in
       let isInFlight = session.inFlight?.id == answer.id
+      let isWithheld = isInFlight && session.inFlight?.isWithheld == true
       if answer.status == .update {
         guard isInFlight || session.latest == answer.id else {
           throw RegistryError.unknownRequest(answer.id)
         }
+        if isWithheld { return .dropped }
       } else {
         guard isInFlight else { throw RegistryError.unknownRequest(answer.id) }
         session.inFlight = nil
       }
-      guard session.latest == answer.id, let label else { return nil }
+      guard session.latest == answer.id, let label else {
+        return isWithheld ? .dropped : .superseded
+      }
+      if isWithheld { session.latest = nil }  // no later update goes under it
       let text = answer.text.isEmpty ? answer.reason ?? "" : answer.text
-      return Delivery(session: answer.sessionId, label: label, status: answer.status, text: text)
+      return .delivery(
+        Delivery(
+          session: answer.sessionId, label: label, status: isWithheld ? .failed : answer.status,
+          text: isWithheld ? Self.withheldReason : text))
     }
   }
 
@@ -212,6 +276,7 @@ public actor SessionRegistry {
         if session.latest == flight.id, let label = labels[id] {
           deliveries.append(
             Delivery(session: id, label: label, status: .failed, text: "timed out"))
+          if flight.isWithheld { sessions[id]?.latest = nil }
         }
       }
     }
@@ -235,12 +300,21 @@ public actor SessionRegistry {
 
   /// The sessions in the order they joined.
   public func rows() -> [SessionRow] {
-    let labels = labels()
-    return ordered().map { id, session in
-      SessionRow(
-        sessionId: id, label: labels[id] ?? session.title, activity: session.activity,
-        isTarget: id == target)
+    labeled().map { id, label, session in
+      SessionRow(sessionId: id, label: label, activity: session.activity, isTarget: id == target)
     }
+  }
+
+  /// The labels of the sessions whose mod is older than `app`, or names no version, in the order
+  /// they joined: they run the mod Claude Code loaded before the update, until they restart.
+  public func labelsOnAnOlderMod(than app: AppVersion) -> [String] {
+    labeled().filter { $0.session.modVersion.map { $0 < app } ?? true }.map(\.label)
+  }
+
+  /// The sessions in the order they joined, each with its label.
+  private func labeled() -> [(id: SessionID, label: String, session: Session)] {
+    let labels = labels()
+    return ordered().map { ($0.key, labels[$0.key] ?? $0.value.title, $0.value) }
   }
 
   private func ordered() -> [(key: SessionID, value: Session)] {
@@ -262,6 +336,7 @@ public actor SessionRegistry {
 
   private func drop(_ id: SessionID, labels: [SessionID: String], reason: String) -> Delivery? {
     guard let session = sessions.removeValue(forKey: id) else { return nil }
+    dropped.append(id)
     if target == id { retarget(ordered().last?.key) }
     guard session.hasOpenRequest, let label = labels[id] else { return nil }
     return Delivery(session: id, label: label, status: .failed, text: reason)

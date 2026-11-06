@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
 import type { StatusReply } from '../hooks/wire.ts'
-import { BAND, fakeWorld, ID, LIVE } from './fake-bridge.ts'
+import { BAND, fakeWorld, ID, LIVE, liveOn } from './fake-bridge.ts'
 
 type Node = { type: string; props: Record<string, unknown>; children?: unknown[] }
 const kids = (node: Node) =>
@@ -14,8 +14,7 @@ const SURFACES = ['terminal', 'desktop'] as const
 
 async function joined(...[$, on]: Parameters<TestBody>) {
   const world = fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   world.status = {
     ...world.status, call: 'listening', unheard: 2,
     sessions: [{ sessionId: ID, label: 'Example session', activity: 'idle', isTarget: true }],
@@ -36,7 +35,7 @@ test('theBandIsOneRowWithItsButtonsApart', async ($, on) => {
     const actions = holding(root, 'Button')!
     expect(actions).not.toBe(row)
     expect(actions.props.columnGap).toBeDefined()
-    expect(kids(actions).map(button => button.props.label)).toEqual(['Stop'])
+    expect(kids(actions).map(button => button.props.label)).toEqual(['Stop', 'Mute'])
     expect((await band.find({ key: 'call' }))?.props.variant).toBe('primary')
     await band.unmount()
   }
@@ -60,8 +59,7 @@ test('aProblemSitsOnARowOfItsOwn', async ($, on) => {
 
 test('beforeTheFirstReplyTheBandSaysItIsJoining', async ($, on) => {
   fakeWorld(on)
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await liveOn($)
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
     expect(await band.find({ type: 'Text', text: /joining/ })).toBeDefined()
@@ -112,7 +110,7 @@ test('aDrawnBandIsNotAskedForAgain', async ($, on) => {
 
 const OTHER = '11111111-0000-0000-0000-000000000002'
 const elsewhere = (call: 'off' | 'listening'): StatusReply => ({
-  call, unheard: 0, minutesToday: 0,
+  call, unheard: 0, minutesToday: 0, isMuted: false,
   sessions: [
     { sessionId: OTHER, label: 'Other session', activity: 'idle', isTarget: true },
     { sessionId: ID, label: 'Example session', activity: 'idle', isTarget: false },
@@ -145,10 +143,104 @@ test('talkHereShowsOnlyWhileTheCallTalksToAnotherSession', async ($, on) => {
   for (const surface of SURFACES) {
     const band = await $.ui.mount({ ...BAND, surface })
     const root = await band.drawn() as Node
-    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Stop', 'Talk here'])
+    expect(kids(holding(root, 'Button')!).map(button => button.props.label)).toEqual(['Stop', 'Mute', 'Talk here'])
     await band.press({ key: 'target' })
     expect(world.take('target')).toEqual([{ sessionId: ID }])
     expect(world.take('call')).toEqual([])
+    await band.unmount()
+  }
+})
+
+const buttons = async (band: { drawn(): Promise<unknown> }) =>
+  kids(holding(await band.drawn() as Node, 'Button')!).map(button => button.props.label)
+
+test('mutePostsMute', async ($, on) => {
+  const world = await joined($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    await band.press({ key: 'mute' })
+    expect(world.take('call')).toEqual([{ action: 'mute' }])
+    await band.unmount()
+  }
+})
+
+/** The band for a live call the owner muted. */
+async function mutedLive(...[$, on]: Parameters<TestBody>) {
+  const world = await joined($, on)
+  world.status = { ...world.status, call: 'live', isMuted: true }
+  await world.clock.advance(1000)
+  return world
+}
+
+test('aMutedCallOffersUnmuteInPlaceOfMute', async ($, on) => {
+  await mutedLive($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await buttons(band)).toEqual(['Stop', 'Unmute'])
+    await band.unmount()
+  }
+})
+
+test('aMutedCallKeepsItsPhase', async ($, on) => {
+  await mutedLive($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await band.find({ type: 'Text', text: 'Live' })).toBeDefined()
+    expect((await band.find({ type: 'Text', text: '●' }))?.props.color).toBe('error')
+    await band.unmount()
+  }
+})
+
+test('aMutedCallIsMarkedMuted', async ($, on) => {
+  await mutedLive($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await band.find({ type: 'Text', text: '· muted' })).toBeDefined()
+    await band.unmount()
+  }
+})
+
+test('unmutePostsUnmute', async ($, on) => {
+  const world = await mutedLive($, on)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    await band.press({ key: 'mute' })
+    expect(world.take('call')).toEqual([{ action: 'unmute' }])
+    await band.unmount()
+  }
+})
+
+test('aCallThatIsOffOffersNoMute', async ($, on) => {
+  const world = await joined($, on)
+  world.status = { ...world.status, call: 'off', isMuted: false }
+  await world.clock.advance(1000)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await buttons(band)).toEqual(['Start'])
+    await band.unmount()
+  }
+})
+
+test('anAppWithoutMuteDrawsNoMute', async ($, on) => {
+  const world = await joined($, on)
+  const { isMuted: _, ...older } = world.status
+  world.status = older
+  await world.clock.advance(1000)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await buttons(band)).toEqual(['Stop'])
+    await band.unmount()
+  }
+})
+
+test('anUnmutedLiveCallDrawsNoMutedMarker', async ($, on) => {
+  const world = await joined($, on)
+  world.status = { ...world.status, call: 'live', isMuted: false }
+  await world.clock.advance(1000)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await band.find({ type: 'Text', text: 'Live' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: /muted/i })).toBeUndefined()
     await band.unmount()
   }
 })

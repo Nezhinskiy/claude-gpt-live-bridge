@@ -1,6 +1,9 @@
 # The voice knows the Claude session
 
-Status: delivered in part, 2026-11-05. Line-open context and the rule that "the chat" is the
+Status: delivered in part, 2026-11-05. Superseded in part by the
+[conversation sync](2026-11-05-conversation-sync-design.md): the setting **Load context
+automatically** is gone, and typed turns now reach the voice; each passage this changes says so
+below. Line-open context and the rule that "the chat" is the
 Claude Code session shipped. The fetch (`refresh context`), the `[LAST]` line and the wire field
 `last` were taken out after six real smoke runs: the voice never sent `refresh context`, because
 on GPT-Live the handoff brief codex reports (`input_transcript`, from the server's
@@ -24,9 +27,10 @@ request, without making Claude do anything in the chat.
 
 ## What the owner sees
 
-- Every line the app opens (a Start's first line, a line reopened after silence, the line after a
-  target switch) gives the voice the target's context, unless **Load context automatically** is
-  off. The line does not wait for it.
+- Superseded: the setting is removed. A line gives the voice the target's context only when the
+  voice lacks part of the session (no summary, a missed turn, lines past the seed, a mod that
+  does not sync), and never after a pause or while the pause setting is on
+  (conversation sync, "What the owner sees"). The line does not wait for it.
 - Asked about "the chat", "the context", "what is there" or "have a look", the voice answers from
   what it has; if that does not cover it, it fetches the session's context itself and answers
   from that, in its next reply. Claude runs no turn. The band shows "Loading context…" while the
@@ -37,11 +41,12 @@ request, without making Claude do anything in the chat.
 
 - **When a summary is written.** When a line opens (Start, reopen, switch) and on the voice's
   fetch. The mod reuses its last summary until a turn completes whose answer did not go to the
-  voice (a typed turn, `/clear`): the voice already heard a voice turn's `[RESULT]`. So a line
+  voice (a typed turn, `/clear`; superseded: the summary cache now goes stale with every
+  completed turn, since the conversation sync says so): the voice already heard a voice turn's `[RESULT]`. So a line
   reopened after a voice turn costs no model call. No summary after every turn.
-- **Load context automatically stays, on by default.** It decides whether a line opening asks for
-  the summary; it is the owner's way to keep summaries off OpenAI unless asked. The fetch works
-  either way, since the owner's own question triggers it.
+- **Superseded: Load context automatically stays, on by default.** The setting is gone. The
+  owner's way to keep text off OpenAI is now **Pause sync while the call is stopped**, which also
+  stops lines loading a summary by themselves.
 - **How the voice asks.** `codex` declares no client tools to the realtime voice (checked against
   `codex app-server generate-json-schema --experimental`, codex-cli 0.166.0:
   `thread/realtime/start` takes no tools), so the voice asks with a handoff whose brief is exactly
@@ -53,10 +58,11 @@ request, without making Claude do anything in the chat.
   as a `[LAST]` line: shaped as results are (code blocks and tables removed, redacted, one line),
   its end kept within 2,000 characters, with Claude's open question and options when one is
   waiting. `[LAST]` goes only in answer to a fetch: it is spoken, and neither stored, seeded into
-  a later line, nor appended quietly. A typed turn's reply reaches OpenAI only this way, when the
-  owner asked.
-- **"The chat" is the Claude session.** The voice prompt says so, and says that a question from a
-  typed turn waits at the keyboard: a spoken reply cannot answer it.
+  a later line, nor appended quietly. Superseded: a typed turn's reply no longer reaches OpenAI
+  only this way; conversation sync gives it to the voice as context.
+- **"The chat" is the Claude session.** The voice prompt says so. Superseded: a question from a
+  typed turn no longer waits only at the keyboard; the voice says it, and a spoken reply answers
+  it in the target (conversation sync).
 
 ## Design
 
@@ -91,12 +97,12 @@ break before posting (the socket takes 131,072 bytes). `Wire.swift`, `plugin/hoo
   with `[FAILED] label: context not available`, spoken as the fetch's answer. A session that
   leaves, a target change, Stop and a closed line drop the fetch; context that comes after is
   routine.
-- **Routine context.** `openLine` asks the target for context when Load context automatically is
-  on. Context for the line's session that arrives while the line connects is added once it is
+- **Routine context.** Superseded: `openLine` asks the target for context only as the
+  conversation sync says. Context for the line's session that arrives while the line connects is added once it is
   connected; a context line equal to the stored one is not added or saved again.
 - **The voice prompt** (`VoicePrompt.swift`): the rule on "the chat"; to fetch, hand off exactly
   `refresh context`; `[LAST]` is Claude's last reply in the chat, said in answer to the fetch; a
-  typed turn's question waits at the keyboard.
+  typed turn's question waits at the keyboard (superseded, as above).
 
 ## Failures
 

@@ -7,21 +7,26 @@ public struct ResultNotice: Sendable, Equatable {
   public let identifier = Paths.bundleID + ".waiting-results"
 
   /// The notice for the results waiting, nil when none waits. `labels` names the joined
-  /// sessions; a line of LiveBridge's own or from a session that left names none.
-  public static func waiting(_ lines: [VoiceLine], labels: [SessionID: String]) -> ResultNotice? {
+  /// sessions; a line of LiveBridge's own or from a session that left names none. With the call
+  /// off the microphone is released, so speaking alone would hear nothing.
+  public static func waiting(
+    _ lines: [VoiceLine], labels: [SessionID: String], callIsOff: Bool = false
+  ) -> ResultNotice? {
     guard !lines.isEmpty else { return nil }
+    let speak = callIsOff ? "start the call and speak" : "speak"
     var sessions: [String] = []
     for label in lines.compactMap({ $0.session.flatMap { labels[$0] } })
     where !sessions.contains(label) {
       sessions.append(label)
     }
     switch sessions.count {
-    case 0: return ResultNotice(body: "A new result is waiting — speak to hear it.")
+    case 0: return ResultNotice(body: "A new result is waiting — \(speak) to hear it.")
     case 1 where lines.count(where: { $0.session.flatMap { labels[$0] } != nil }) == 1:
-      return ResultNotice(body: "\(sessions[0]) has a new result — speak to hear it.")
-    case 1: return ResultNotice(body: "\(sessions[0]) has new results — speak to hear them.")
+      return ResultNotice(body: "\(sessions[0]) has a new result — \(speak) to hear it.")
+    case 1: return ResultNotice(body: "\(sessions[0]) has new results — \(speak) to hear them.")
     default:
-      return ResultNotice(body: "\(sessions.count) sessions have new results — speak to hear them.")
+      return ResultNotice(
+        body: "\(sessions.count) sessions have new results — \(speak) to hear them.")
     }
   }
 }

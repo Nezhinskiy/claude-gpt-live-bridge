@@ -24,19 +24,22 @@
   <a href="#contributing">Contributing</a>
 </p>
 
-LiveBridge is a macOS menu bar app that keeps a GPT-Live voice line ready through
-`codex app-server` on your ChatGPT login (no API key). The voice is the front desk: it chats,
-asks what you mean, and hands real work to your Claude Code session through a small Claude Code
-mod, `livebridge`. Claude does the work with its own model, tools and permission mode, and the
-voice tells you the result.
+LiveBridge is a macOS menu bar app that keeps a GPT-Live voice line ready through `codex app-server`
+on your ChatGPT login (no API key). The voice is the front desk: it chats, asks what you mean, and
+hands real work to your Claude Code session through a small Claude Code mod, `livebridge`. Claude
+does the work with its own model, tools and permission mode, and the voice tells you the result. You
+do not have to hold the line open while Claude works: its answer opens the closed line again and
+goes to the voice to say. The voice also follows what you type in the session and what Claude
+answers, so you can switch between speaking and typing.
 
 <p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
 between your own codex and your own Claude Code. The app and the mod talk over a Unix socket
 only your user can open, and the app listens on no network port. Besides what those two tools
-already send (the voice line to OpenAI through your codex, only while it is open, and Claude's
-work to Anthropic through your Claude Code session), the app's only traffic of its own is for
+already send (the voice line to OpenAI through your codex, only while it is open, with what you type in a joined session, and Claude's
+work to Anthropic through your Claude Code session), the app's only traffic of its own is a short-lived codex that, when you open the menu, asks OpenAI
+for your Codex usage figures, also while the call is off, and the traffic for
 [updates](#updating): an automatic check with GitHub for a new release (daily, and at launch
 while one it announced is not installed), which you can turn off; the same check when you press
 **Check for update**; `gh auth status` when a new release is announced; and the download, its
@@ -49,9 +52,9 @@ says what this does and does not protect against.
 
 ## Quick start
 
-You need macOS 14+ on Apple Silicon, Claude Code 2.1.289+, and
-[codex](https://github.com/openai/codex) signed in (`codex login`) to a ChatGPT plan with
-realtime voice; to build the app yourself, also Xcode with Swift 6.0+. The details are under
+You need macOS 14+ on Apple Silicon, Claude Code 2.1.301+, and
+[codex](https://github.com/openai/codex) signed in (`codex login`) to a ChatGPT plan whose Codex
+includes voice; to build the app yourself, also Xcode with Swift 6.0+. The details are under
 [Requirements](#requirements).
 
 ```sh
@@ -80,12 +83,14 @@ rebuilds and uninstalling are under [Install](#install).
 ## Requirements
 
 - macOS 14 or later on Apple Silicon.
-- Claude Code 2.1.289 or later (mods).
+- Claude Code 2.1.301 or later.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, tested with 0.166.0), installed with
   Homebrew (`brew install --cask codex`) or npm (`npm install -g @openai/codex`), on the `PATH`
-  your shell sets in a Terminal window, and signed in with `codex login` to a ChatGPT plan that
-  includes realtime voice. LiveBridge refuses a codex whose `codex features list` it cannot
-  read, so another version may not start until LiveBridge is updated.
+  your shell sets in a Terminal window, and signed in with `codex login` to a ChatGPT plan whose
+  Codex includes voice (Plus, Pro, Business, Enterprise or Education, per
+  [OpenAI's Codex pricing](https://learn.chatgpt.com/docs/pricing)). LiveBridge refuses a codex
+  whose `codex features list` it cannot read, so another version may not start until LiveBridge
+  is updated.
 - To build the app: Xcode with a Swift 6.0 toolchain or later. The tested versions are in
   [CONTRIBUTING.md](CONTRIBUTING.md#toolchain). The built app runs on macOS 14 or later.
 
@@ -153,7 +158,7 @@ the copy at `/Applications/LiveBridge.app` updates; any other copy says so in Se
   step and opens it.
 - Afterwards Settings says which version it updated from. If the mod could not be updated, it
   shows those two commands for you to run. Claude Code sessions already open keep the old mod
-  until they restart.
+  until they restart; Settings lists the joined ones that still do.
 - The update's download sets no quarantine attribute, so macOS should not block the updated
   app's first launch as it blocked the first download; this follows from the code and has not
   yet been observed. The checks above are what stands in its place
@@ -196,6 +201,10 @@ Neither removes a copy named `/Applications/.LiveBridge-update-….app`, which a
 mid-install can leave behind. The app removes such copies at its next launch; after an
 uninstall, delete one by hand if it is there.
 
+`claude plugin uninstall` may leave the mod's snapshot, `~/.claude/plugins/store/livebridge_*.json`:
+Claude Code's documentation of what it deletes does not name that file, and this was not run. Delete
+it by hand if it is there.
+
 ## Use
 
 ### Commands
@@ -211,27 +220,47 @@ In the Claude Code session you want to talk to:
 | `/live context` | Sends the voice a new summary of this session, written by the session's model. |
 
 The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode. Whether a
-session's summary is also loaded whenever a line opens is not a command: it is one setting for
-every session, in LiveBridge's [Settings](#settings) window.
+session's typing is kept out of the voice while the call is stopped is not a command: it is one
+setting for every session, in LiveBridge's [Settings](#settings) window.
 
 ### The band and the menu
 
 Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
-- **The band's Start** makes its session the target and starts the call; with **Load context
-  automatically when a line opens** on, the line it opens loads the session's summary
-  ([details](docs/architecture/overview.md#components)). While the call talks to another
-  session, the band shows **Talk here**. If the band is not there in a joined session,
-  `/live on` brings it back.
+- **The band's Start** makes its session the target and starts the call; the line it opens is seeded
+  with the session's conversation, and loads a summary of the session as well when the voice would
+  lack part of it (see **Load context** below), but never while **Pause sync** is on or after a
+  pause ([details](docs/architecture/overview.md#components)). While the call talks to another
+  session, the band shows **Talk here**. If the band is not there in a joined session, `/live on`
+  brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
-  for each request the voice handed to Claude), the minutes, **Settings…** and
-  **Quit LiveBridge**.
-- **New conversation…** erases the target's conversation and its loaded context, and a
-  session's × removes it and erases its own; both ask first. The voice starts afresh from the
-  next time the line opens, unless **Load context automatically when a line opens** is on: that
-  line loads a summary of the same session's transcript again, so turn the setting off or
-  `/clear` the session first. `/live on` in a removed session joins it again.
+  for each request the voice handed to Claude), the usage limits, the minutes, **Star LiveBridge on GitHub**
+  (opens the repository's page), **Settings…** and **Quit LiveBridge**.
+- **Mute** (beside **Stop**, in the band and in the menu's call card; **Unmute** while muted)
+  releases your microphone while the call goes on: an answer from Claude still opens the line and
+  goes to the voice to say. The band keeps the phase and adds `· muted`; the menu says "Muted — line
+  closed" while no line is open. Mute does not close a line: an open line closes after the usual
+  silence, counted from Mute if you were speaking, and when it would have without Mute if the line
+  was already quiet; it is billed like any silence, so Mute does not save realtime minutes.
+  **Unmute** takes the microphone again, and the call ends with the reason if it cannot (denied,
+  busy, missing). **Stop** ends the call and the mute; the next **Start** begins unmuted. Mute is
+  not a lock: any process running as you can unmute
+  ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+- **Load context** is enabled only when the voice lacks part of the target: it has no summary, a
+  turn did not arrive, a question or permission notice did not reach the app, turns ran while the
+  mod was off, the lines since the summary no longer all fit what the voice can carry (a long
+  conversation outgrows that), the session was paused, or its mod does not sync. Otherwise the item
+  reads **Context up to date** and is disabled, because the voice already has the conversation. A
+  summary carries no date, so one can be ignored while the item stays enabled, and `/live context`
+  can fail, bring back what was forgotten or clear the paused mark ([BR-002](docs/bugs/BR-002.md)).
+- **New conversation…** erases the target's conversation and its loaded context, and a session's ×
+  removes it and erases its own; both ask first. The voice starts afresh from the next time the line
+  opens. Results it has not said yet stay and are added again; only **Stop** clears them. Claude's
+  waiting questions follow other rules ([details](SECURITY.md#residual-risk-by-design)). With
+  **Pause sync** off and the session not paused, the next line loads a summary of the same session's
+  transcript by itself, which holds the text the session read; `/clear` the session first to avoid
+  that, then press **New conversation**. `/live on` in a removed session joins it again.
 
 ### Settings
 
@@ -242,10 +271,17 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
-- **Load context automatically when a line opens** (on by default): every line the
-  app opens (a Start, a line reopened after silence, the line after a target switch) asks the
-  target for its summary and does not wait for it; one setting for every session, kept by the
-  app.
+- **Pause sync while the call is stopped** (off by default): by default, what you type in a joined
+  session and Claude's final answer to it are kept in that session's conversation with the voice
+  even while the call is stopped, and the voice has them when the next line opens. Nothing leaves
+  the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, press Stop,
+  then type: nothing you type while the call is stopped is recorded, and the session is marked as
+  paused. While it is on, no line loads a summary by itself, and neither does one after a pause:
+  only **Load context** or `/live context` does, and that summary is written from the whole
+  transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
+  answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
+  later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
+  it does and does not do.
 - **Play a sound when a request is queued for Claude** (on by default): a short sound for each
   request the voice hands off ([why](#known-limitations)).
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
@@ -264,14 +300,34 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   safeguard; [SECURITY.md](SECURITY.md) says what is one.
 - It reads results back in a sentence or two, with the session's name. Code blocks and tables
   stay in the session, and credentials it recognises are redacted.
-- When Claude asks a question, the voice puts it to you and sends your answer back to that
-  session. So it does with a question Claude asks while it works (the dialog with options): the
-  voice tells you about it, explains the options in its own words and talks them over with you
-  for as long as you like, without asking Claude. What you decide, an option or a question back
+- It comes back when Claude is done. You need not keep the line open: the line closes when the talk
+  goes quiet, and Claude's answer to your request opens it again and is given to the voice to say,
+  so you can walk away while Claude works. That holds for the session you are talking to; another
+  session's result chimes and waits ([how it is billed](#billing-aware-by-design)). If the voice
+  stays silent on the reopened line, the answer chimes and waits too, so it is not lost. A question
+  Claude asks you or a permission prompt it waits on opens the line the same way, but the voice may
+  not say it: do not rely on that when away from the Mac ([known limitations](#known-limitations)).
+- When Claude asks a question, it is given to the voice to put to you, and your answer goes back to
+  that session. So it is with a question Claude asks while it works (the dialog with options): the
+  voice is given it to tell you about, explain the options in its own words and talk them over with
+  you for as long as you like, without asking Claude. What you decide, an option or a question back
   to Claude, answers the dialog; you can still answer it at the keyboard instead. Work Claude
-  finishes later in the background is reported as an update.
-- When Claude is waiting for a permission prompt, the voice says so. You answer the prompt in
-  Claude Code; LiveBridge never answers it for you.
+  finishes later in the background goes to the voice as an update.
+- When Claude is waiting for a permission prompt, the voice is given a notice and may say so, except
+  [where an organization manages Claude Code](#known-limitations). You answer the prompt in Claude
+  Code; LiveBridge never answers it for you.
+- It is given what you type. While a session is joined, what you type in it and Claude's final
+  answer to each turn that was not a voice request go into that session's conversation with the
+  voice, as context: they never chime and do not open a closed line ([the limits on
+  this](#known-limitations)). A line that is open gets them at once; a line opened later is seeded
+  with them. A voice answer that a newer request superseded is not said but is kept and added the
+  same way. Claude's text in the middle of a turn is not synced, except what it wrote just before a
+  question or a permission prompt, which goes with that; subagents and tool output are not synced. A
+  question or a permission prompt in the target is given to the voice, whichever turn caused it; in
+  another session it goes as a result from that session would, except that one from a turn that was
+  not a voice request is only recorded. A turn the pause keeps out has none of this. When a question
+  or a prompt is settled without the voice, or a turn ends without an answer, the voice is given a
+  line saying so ([which lines](SECURITY.md#what-session-text-can-do)).
 
 ## Billing-aware by design
 
@@ -280,29 +336,43 @@ talking, while Claude's answer to a request you just made may still come, or to 
 a question Claude asks you, or that Claude waits for your approval:
 
 - While a call is on and nobody is talking, the microphone feeds only a voice detector on your
-  Mac. Nothing is sent anywhere.
+  Mac. No audio is sent anywhere.
+  While muted, LiveBridge holds no microphone, and macOS's microphone indicator shows that.
 - When you start speaking, the line opens. The 2 seconds before you started are kept and sent
   first, so your first words are not lost.
 - The line closes after 20 seconds of silence. Sound without words (music, a TV) closes it after
   90 seconds.
 - When the voice hands a request to Claude (a handoff), the line stays open for up to 2 minutes
-  after that handoff, billed like any open line, and the voice says Claude's answer once nobody
-  is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
+  after that handoff, billed like any open line, and Claude's answer goes to the voice to say once
+  nobody is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
   Claude closes after the usual 20 seconds of silence.
-- Claude's answer to a request you handed the session you are talking to, a question Claude asks
-  you there, or a permission prompt it waits on opens the line again when it comes after the line
-  closed, and the voice says it, billed like any open line. Anything else that arrives while the
-  line is closed (anything from a session you switched away from, a later update) plays a chime
-  and waits: the band and the menu show it as unheard, and the voice tells you when you next speak
-  ([when it counts as heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
+- Claude's answer to a request you handed the session you are talking to, a question Claude asks you
+  there, or a permission prompt it waits on opens the line again when it comes after the line
+  closed, and is given to the voice to say, billed like any open line. Anything else that arrives
+  while the line is closed (anything from a session you switched away from, a later update) plays a
+  chime and waits: the band and the menu show it as unheard, and it goes to the voice when you next
+  speak ([when it counts as
+  heard](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Each Claude Code session has its own conversation with the voice. It is carried over to the
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
   ago. A new target switches the conversation: an open line closes, and your next words open it
   with the new target's.
-- The menu shows the minutes the line was open, as measured by the app. OpenAI prices desktop
-  voice per minute of your Codex budget, and on its API the same model family bills silence too
-  ([details](docs/research/2026-11-04-gpt-live-billing.md)); your plan's own usage page is the
+- The menu shows the minutes the line was open, counted by the app from when the voice connects, so
+  your plan may count a little more. OpenAI prices desktop voice per minute of your Codex usage
+  budget, and on its API the same model family bills silence too
+  ([details](docs/research/2026-11-04-gpt-live-billing.md),
+  [limits](docs/research/2026-11-05-gpt-live-limits.md)); your plan's own usage page is the
   authority.
+- The menu shows how much of your Codex and Claude usage is used, a row each, as the percent used
+  of every window the plan reports (up to three a row, for example `7% of 5 h · 19% of week`),
+  orange from 90 %; hover a row for when each window resets. Codex's figures are read each time
+  the menu opens, at most once a minute, by a short-lived codex; Claude's come from a joined
+  session once it has answered. A row with nothing to show is left out, and the Codex row says
+  `blocked` when codex reports ordinary usage as not allowed. The last Codex reading shows at once and
+  a new one replaces it a few seconds later, so the figures can change with the menu open; right
+  after launch the row appears when the first read lands, and if reads fail a reading goes after
+  15 minutes. Which limit stops the voice first
+  is not documented ([details](docs/research/2026-11-05-gpt-live-limits.md)).
 
 ## Privacy
 
@@ -310,36 +380,54 @@ LiveBridge has no telemetry and listens on no network port; the mod talks to the
 socket in a folder only your user can open. What goes to OpenAI, through codex's realtime
 session:
 
-- microphone audio while the line is open, from 2 seconds before you started speaking (or, for
-  a line Claude's answer, question or approval notice opened, from when it opened) until it
-  closes;
+- microphone audio while the line is open, from 2 seconds before you started speaking (or, for a
+  line Claude's answer, question or approval notice opened, from when it opened) until it closes
+  (while muted LiveBridge captures nothing, so none goes; speech you said before pressing Mute, on a
+  line that was already connecting, may still go);
 - the voice's instructions: LiveBridge's own rules, then your Settings **Prompt** if you wrote
   one;
-- the target session's recent conversation (up to the last 24 lines) to continue it in a new
-  realtime session;
+- the target session's recent conversation (up to the last 64 lines, and no more than codex takes:
+  128 items and about 8,192 tokens with the context and open tasks) to continue it in a new realtime
+  session. It holds what you typed in that session and Claude's final answer to each turn that was
+  not a voice request, whatever started it (a turn you typed, a schedule, another agent, a
+  background task), as well as the mod's notes and your speech and the voice's, so typing in a
+  session sends it to OpenAI once a line opens with that session. While a line is open, each new
+  line of the target goes in at once. Another session's synced lines go only when a line opens with
+  it as the target; its results, questions and approval notices go into the open line whichever
+  session it is;
 - the target session's requests still open, as their one-line briefs;
-- each result, question, update and approval notice, as one line of at most 2,000 characters,
-  with code blocks and tables removed. A question Claude asks mid-turn, and the approval notice
-  for a permission prompt of Claude's main loop (not a subagent's), also carry what Claude wrote
-  just before asking. An update is Claude's answer in a later turn started by a background
-  task's notification, for up to 10 minutes after a voice request and until any other
-  turn starts in the session;
+- each result, question, update, approval notice, typed text, answer to a turn that was not a voice
+  request, voice answer a newer request superseded and note of the mod's, as one line of at most
+  2,000 characters, with code blocks and tables removed (typed text that is only code or a table is
+  replaced by a sentence saying that code was typed). The mod's notes name the tool of a permission
+  prompt that was allowed or settled, and say that a question was closed or that a turn ended
+  without an answer. A question Claude asks mid-turn, and the approval notice for a permission
+  prompt of Claude's main loop (not a subagent's), also carry what Claude wrote just before asking.
+  An update is Claude's answer in a later turn started by a background task's notification, for up
+  to 10 minutes after a voice request and until any other turn starts in the session;
 - the target session's context summary, as one line of at most 1,500 characters. It is saved
   when it is loaded and sent every time the line opens while that session is the target, across
   Stop and Start and app restarts. The menu's Conversation submenu shows that line exactly as it
   is sent;
-- with every line above, its session's label: the Claude Code session title, or the session
-  folder's name when it has none;
+- with every line above, its session's label: the Claude Code session title (up to 80 characters),
+  or the session folder's name when it has none. The label is not redacted and the pause does not
+  touch it, so a title written from text you paused goes out on every line;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
 
-Results, questions, updates and summaries pass through a redactor of known credential shapes
-first (private keys, JWTs, common API tokens, URL passwords, `password=`-style fields). It is a
-list of patterns, not a guarantee.
+Results, questions, updates, summaries and the lines of typed turns pass through a redactor of
+known credential shapes first (private keys, JWTs, common API tokens, URL passwords,
+`password=`-style fields). It is a list of patterns, not a guarantee: anything else you type
+goes as typed.
 
 The codex thread that carries the voice is ephemeral and read-only, with every codex feature
 turned off except where it keeps your login and how it uses your proxy, and every MCP server
 off; it is there only to talk. Claude's work goes to Anthropic as your Claude Code session
 always does.
+
+Opening the menu makes LiveBridge start a short-lived codex that asks OpenAI, with your ChatGPT
+login, how much of your Codex usage is used (each window's percent and reset time). It happens at
+most once a minute, also while the call is off, and sends no audio or text. Claude's figures reach
+the app from the mod over the socket and go nowhere else; the app keeps both only in memory.
 
 For updates the app talks to GitHub. With **Check for updates automatically** on, once a day
 (and at each launch while a release it announced is not installed) it asks GitHub's API, without
@@ -352,33 +440,67 @@ click **Install** does it download the image and run `gh attestation verify` and
 
 On your Mac the app keeps its settings, the usage meter, when it last checked for an update and
 which versions it announced, what the last update did and, for each of the 20 sessions used
-last, its recent conversation and the context line last loaded from it, in
-`~/Library/Application Support/LiveBridge`. A session's lines go when you press **New
+last, its recent conversation (up to 64 lines, what you typed in it included, recorded with no
+call running unless you turned on **Pause sync**) and the context line last loaded from it, in
+`~/Library/Application Support/LiveBridge`, a folder only your user can open
+([how it is kept](SECURITY.md#residual-risk-by-design)). A session's lines go when you press **New
 conversation** with it as the target or remove it with ×. A session that has left keeps them
 until 20 sessions used since push them out; to erase them sooner, run `/live on` in it again and
-press **New conversation**. Uninstalling removes them all.
+press **New conversation**. Uninstalling removes them all. The mod keeps a snapshot of its own in Claude Code's plugin store ([what it holds](SECURITY.md#residual-risk-by-design)).
 
 [SECURITY.md](SECURITY.md) has the threat model: in short, anything your microphone can hear
 can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
-- The voice sometimes says it is looking ("On it", "Looking now") without handing the request
-  off, so nothing reaches Claude: about one request in five in
-  [testing](docs/bugs/BR-001.md), with the voice's rule against it in place. The app plays a
-  short sound when it queues a request for Claude; if the voice says it is looking and no sound
-  follows, say the request again. The app cannot tell such a promise from an answer by its
-  words, since the voice speaks your language.
-- A result that arrives while the line waits for it goes to the voice as text to say; codex has
-  no call that makes the voice speak at once, so the model decides when. In testing it spoke
-  within a few seconds. If it does not, the result stays unheard: the voice says it after your
-  next words, or it chimes when the line closes.
-- When Claude's answer opens the line again, the voice sometimes stays silent
-  ([measured](docs/adr/0001-platform-findings.md)). The line then closes after 20 seconds and
-  the answer chimes and waits, as below.
+- The voice sometimes says it is looking ("On it", "Looking now") without handing the request off,
+  so nothing reaches Claude: about one request in five with the rule as first written, and 0 of 20
+  with the rule now, too few to tell from luck ([BR-001](docs/bugs/BR-001.md)). It can also claim
+  work it has not done, as in "I'll take a look.", also from lines it only has as context ([ADR 0001
+  (n), (o)](docs/adr/0001-platform-findings.md)). The app plays a short sound when it queues a
+  request for Claude; if the voice says it is looking and no sound follows, say the request again.
+  The app cannot tell such a promise from an answer by its words, since the voice speaks your
+  language.
+- A question Claude asks, or a permission prompt it waits on, is only given to the voice, and the
+  voice may not say it; nothing makes it. So do not rely on the voice to announce a prompt when you
+  are away from the Mac: Claude may be waiting unannounced. The prompt still waits in Claude Code,
+  and it is the one control; the voice is not a control, and LiveBridge never answers the prompt. In
+  the checks, a typed turn's permission notice on a live line was said before the keyboard answer in
+  0 of 3 runs, a count and not a rate ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). A closed
+  line opens for either only when the target's conversation holds a turn of yours; otherwise the app
+  chimes, and with the call off it is only recorded.
+- What the Claude desktop app reports as a typed prompt's origin was not observed ([ADR 0001
+  (m)](docs/adr/0001-platform-findings.md)). The mod records a prompt as yours only when its origin
+  is `composer`. If a prompt typed there arrives as anything else, nothing typed there is recorded,
+  no gap is marked, the menu says **Context up to date**, and the pause reaches less
+  ([details](SECURITY.md#what-session-text-can-do)).
+- A result that arrives while the line waits for it goes to the voice as text to say; codex has no
+  call that makes the voice speak at once, so the model decides when. In testing it spoke within a
+  few seconds. If it does not, the result stays unheard: it goes to the voice again with your next
+  words, or it chimes when the line closes.
+- When Claude's answer opens the line again, the voice can stay silent: it did in 4 of 14 measured
+  runs, a small sample ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). The line then closes 5
+  seconds after it connects, and the answer chimes and waits, as below. Where the voice spoke, it
+  started within about 2 seconds of the connect; one that would start after the 5 seconds is cut
+  off.
 - When your next words reopen the line, the voice sometimes answers only them and does not say
   the waiting result. The result is not lost: it stays waiting, chimes and posts a notification
   when the line closes, and goes to the voice again the next time the line opens.
+- At your ChatGPT plan's usage limit the voice stops until the limit resets. The menu and the band
+  say so, in codex's sentence with its reset time where codex gives one, and the call ends, so
+  speech does not open lines that fail. Claude Code keeps working, answers keep waiting, and Start
+  tries once more. The app recognises a limit only by codex's wording or the service's error code,
+  as nothing else reports it ([details](docs/research/2026-11-05-gpt-live-limits.md)). A refusal it
+  does not recognise, such as a line that drops with no reason given ("The voice session closed
+  (transport_closed)."), leaves the call on, so your next words try again; press **Stop** until the
+  limit resets.
+- A prompt not typed in the composer (a host's message, a schedule, another agent and presumably
+  Remote Control) is not recorded in the voice's conversation as your words, though Claude's answer
+  to it is, and it does not refuse a running turn under the pause
+  ([SECURITY.md](SECURITY.md#what-session-text-can-do) says which prompts count as yours).
+- A session still on a mod from before this release, until it restarts, is not synced: it loads a
+  summary as a session with missing turns does, and no pause refuses its lines ([what else
+  differs](CHANGELOG.md)).
 - A Claude Code session that was already open before the mod loaded may need to be reopened
   before `/live` works in it.
 - In the Claude desktop app, `/live` typed in a session whose Claude Code process has not
@@ -392,6 +514,23 @@ can become a request that Claude runs under the session's own permission mode.
   in English and Russian only
   ([the rule](docs/architecture/overview.md#a-result-while-the-line-is-closed)). In another
   language a result can count as heard when the voice only mentioned it.
+- Where an organization manages Claude Code, nothing in LiveBridge tells you that a permission
+  prompt is waiting. Claude Code's built-in guard loads on a machine with managed settings and in
+  a session signed in to a Team or Enterprise plan, and there the mod's permission hooks do not
+  run. The prompt still appears in Claude Code and still waits for you, but the voice says nothing
+  about it and the menu bar shows Claude working, so look at Claude Code if an answer seems late.
+  `/plugin` names the hooks, and recent versions of Claude Code also print a line saying a hook
+  was skipped. Claude's questions still reach the voice. The hooks were
+  [measured](docs/adr/0001-platform-findings.md) in a Linux container; what the voice and the menu
+  bar do follows from the code, and no real line was run. The Team and Enterprise case comes from
+  Claude Code's documentation.
+- With `allowManagedHooksOnly`, `allowManagedModsOnly` or `disableAllHooks` in managed settings,
+  the mod does not load and `/live` does not work. An administrator can [install the mod as the
+  organization's
+  own](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods), from a
+  folder on each machine: then the permission hooks run, also with the first two settings
+  ([measured](docs/adr/0001-platform-findings.md)). Claude Code's documentation says that turning
+  on the marketplace copy in managed settings is not enough.
 
 ## How it works
 

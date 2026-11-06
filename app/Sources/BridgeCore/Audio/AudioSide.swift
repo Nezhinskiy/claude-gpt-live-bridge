@@ -8,6 +8,8 @@ public enum AudioEvent: Sendable, Equatable {
   case level(Double)
   /// The microphone or the peer connection failed.
   case failed(Problem)
+  /// An `error` event on the line's data channel, in the service's words.
+  case lineError(code: String, message: String)
 
   public init?(body: Any) {
     guard let message = body as? [String: Any], let type = message["type"] as? String else {
@@ -22,6 +24,9 @@ public enum AudioEvent: Sendable, Equatable {
     case "microphoneDenied": self = .failed(.microphoneDenied)
     case "audioFailed":
       self = .failed(.other(message["reason"] as? String ?? "The audio stopped unexpectedly."))
+    case "lineError":
+      self = .lineError(
+        code: message["code"] as? String ?? "", message: message["message"] as? String ?? "")
     default: return nil
     }
   }
@@ -29,6 +34,9 @@ public enum AudioEvent: Sendable, Equatable {
 
 /// The audio page: microphone, voice detection, pre-roll and the WebRTC peer.
 public protocol AudioSide: Sendable {
+  /// macOS's answer for the microphone, asking the owner first if it never was (its prompt then
+  /// shows, for as long as the owner leaves it); nil when the page may open the microphone.
+  func microphoneProblem() async -> Problem?
   func startListening() async
   func stopListening() async
   /// `preroll`: the line starts with the 2 s before it opened; false for a line nobody spoke on.
@@ -42,4 +50,8 @@ public protocol AudioSide: Sendable {
   func chime() async
   /// The short sound that confirms a handoff was queued for a session (BR-001).
   func confirmHandoff() async
+  /// Releases the microphone; the call goes on.
+  func muteMicrophone() async
+  /// Takes the microphone again, once it is back.
+  func unmuteMicrophone() async
 }

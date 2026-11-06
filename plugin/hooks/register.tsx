@@ -1,18 +1,18 @@
 // Wiring only: engine events to the bridge link, the turn tracker and the band. A hooks module
 // passes `$` only to functions declared at its top level, so the session's state lives here too.
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 
 import type { Band } from '../types'
 import { bandStatus, drawBand, JOINING } from './band.tsx'
 import { summarize } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
-import { askedText, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
+import { askedText, keyboardAnswer, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
-import type { TurnOrigin, TurnSnapshot } from './turns.ts'
+import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
-import type { VoiceRequest } from './wire.ts'
+import type { ActivityBody, AnswerStatus, LimitWindowBody, TurnRef, VoiceRequest, Work } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
@@ -24,11 +24,17 @@ const CONTEXT_TIMEOUT_MS = 60_000
 const SENT_NOTE_MS = 3_000
 /** How long the polled band may go undrawn before every surface is asked for it again. */
 const UNDRAWN_MS = 3_000
+/** How long a hook waits for its posts to the app before it lets the engine go on. */
+const HOOK_HOLD_MS = 200
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
 const LATE_REPLY = 'LiveBridge: the reply said by voice came after the question was answered here; Claude did not get it.'
+const ANSWERED_HERE = 'the question was answered at the keyboard'
+const UNREAD_VERSION = 'LiveBridge: the mod could not read its version from its plugin.json; Settings will list this session as on the old mod.'
 const USAGE = 'Usage: /live on | off | target | status | context'
+
+type Reply = Extract<Work, { kind: 'reply' }>
 
 /** The store key that marks a session as joined; it holds the tracker, so a reload resumes. */
 const joinedKey = (sessionId: string) => `joined:${sessionId}`
@@ -38,13 +44,18 @@ const band = atom({ plugin: 'livebridge', key: 'band' } as const, null)
 
 let link: BridgeLink | null = null
 let home = ''
+/** This mod's version, from its own plugin.json at load, for the app's Settings; undefined if unread. */
+let modVersion: string | undefined
 let tracker = new TurnTracker()
-let lastOrigin: TurnOrigin | null = null
+/**
+ * The `prompt.submit` that will start the next turn: its origin, and what was typed, as a slash
+ * command's `turn.start` holds its expansion.
+ */
+let lastSubmit: { origin: TurnOrigin; text: string } | null = null
 /** When a surface last asked for the band while this session was joined. */
 let drawnAt = 0
-let approval: { tool: string; agent: string | undefined } | null = null
-/** Answers the question Claude asked in a voice turn with the owner's spoken reply, while it is open. */
-let answerQuestion: ((text: string) => void) | null = null
+/** Answers the question Claude asked in the running turn with the owner's spoken reply, while it is open. */
+let answerQuestion: ((reply: Reply) => void) | null = null
 let offlineSince: number | null = null
 /** The mod's own sentence while online; it lasts until the next voice request. */
 let note: string | null = null
@@ -52,19 +63,18 @@ let note: string | null = null
 let recordFile: string | null = null
 let lastScan = -Infinity
 /**
- * The last summary the model wrote, until a turn whose answer did not go to the voice completes,
- * or `/clear`: sending it again costs no model call. Kept in memory only, as the transcript it
- * summarises is the session's own.
+ * The last summary the model wrote, while nothing has happened since: until any main turn
+ * completes, a gap, or `/clear`. Sending it again costs no model call. Kept in memory only, as the
+ * transcript it summarises is the session's own.
  */
 let summary: string | null = null
-/**
- * Counts completed main turns whose answer did not go to the voice, so a summary written across
- * one is not kept as current: the voice already heard a voice turn's answer.
- */
+/** Counts what ends a summary's use, so a summary written across one is not kept as current. */
 let turnsDone = 0
 /** The summary on its way, which a second ask joins instead of asking the model again. */
 let sending: Promise<ContextOutcome> | null = null
-/** Counts sends; one that timed out is over, and what it wrote later is dropped. */
+/** The hooks' posts to the app, in the order the hooks ran. */
+let posts: Promise<unknown> = Promise.resolve()
+/** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
 let sendCount = 0
 
 type ContextOutcome = 'sent' | 'empty' | 'failed'
@@ -72,8 +82,49 @@ type ContextOutcome = 'sent' | 'empty' | 'failed'
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
 
+/**
+ * Keeps the tracker and the gap for a reload. A store that fails costs nothing else: what goes to
+ * the app matters more, and a hook past its `next` would have its `.catch` run the event again.
+ */
 async function save($: EngineInterface): Promise<void> {
-  if (link?.session) await $.store.set(joinedKey(link.session.sessionId), tracker.snapshot())
+  // The count first: a `/live off` during it deletes the key, which this must not write back.
+  const sessionTurns = await turnCount($)
+  if (!link?.session) return
+  const key = joinedKey(link.session.sessionId)
+  await $.store.set(key, { ...tracker.snapshot(), hasGap: link?.hasGap, sessionTurns }).catch(() => {})
+}
+
+/**
+ * A turn did not reach the app, which the next join says. No summary from before it covers it: the
+ * one kept goes, and the one being written is dropped, as nothing could date it once posted.
+ */
+function noteGap(): void {
+  link?.noteGap()
+  staleSummary()
+  if (sending !== null) sendCount += 1
+}
+
+/** Posts a line of a turn, cut to `ANSWER_LIMIT`; one the app did not take is a gap, which the next join says. */
+async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
+  const body = line.text === undefined ? line : { ...line, text: clip(line.text, ANSWER_LIMIT) }
+  if ((await link?.sync(body)) === true) return
+  noteGap()
+  await save($)
+}
+
+/**
+ * Runs a hook's `work` after the posts queued before it, and holds the hook no longer than
+ * `HOOK_HOLD_MS`: the app answers a line once the open line took it, up to 20 s with codex stuck,
+ * and typing must not wait for that. Its own queue, not `serial`: the app drops a session that
+ * stops polling after 5 s, so a held line must leave the poll running. What `work` needs of the
+ * hook's moment it takes before this call.
+ */
+async function inOrder($: EngineInterface, work: () => Promise<void>): Promise<void> {
+  const done = posts.then(work).catch((error: unknown) => $.ui.log(`LiveBridge: ${String(error)}`))
+  posts = done
+  let timer: { cancel(): void } | undefined
+  await Promise.race([done, new Promise<void>(resolve => { timer = $.clock.after(HOOK_HOLD_MS, resolve) })])
+  timer?.cancel()
 }
 
 /**
@@ -103,7 +154,7 @@ function enqueue($: EngineInterface, work: () => Promise<void>): void {
  */
 async function readTitle($: EngineInterface, sessionId: string, isPoll = false): Promise<string | null> {
   const dir = `${home}/.claude/sessions`
-  const read = (name: string) => $.fs.read(`${dir}/${name}`).then(text => parseRecord(String(text)), () => null)
+  const read = (name: string) => readJSON($, `${dir}/${name}`)
   let records: unknown[] = recordFile === null ? [] : [await read(recordFile)]
   if (recordIndex(records, sessionId) < 0) {
     recordFile = null
@@ -119,12 +170,30 @@ async function readTitle($: EngineInterface, sessionId: string, isPoll = false):
   return titleFromRegistry(records, sessionId) ?? fallbackTitle(await $.session.cwd())
 }
 
+/** The JSON in the file at `path`, or null when it cannot be read or parsed. */
+function readJSON($: EngineInterface, path: string): Promise<unknown> {
+  return $.fs.read(path).then(text => parseRecord(String(text)), () => null)
+}
+
 function parseRecord(text: string): unknown {
   try {
     return JSON.parse(text)
   } catch {
     return null
   }
+}
+
+/**
+ * The version in this mod's plugin.json, read when the module loads, so it is the version of the
+ * code that runs; undefined, and said, when it cannot be read: Settings then lists the session
+ * as on the old mod.
+ */
+async function ownVersion($: EngineInterface): Promise<string | undefined> {
+  const manifest = await readJSON($, `${$.plugin.root}/.claude-plugin/plugin.json`)
+  const version = (manifest as { version?: unknown } | null)?.version
+  if (typeof version === 'string') return version
+  $.ui.log(UNREAD_VERSION)
+  return undefined
 }
 
 /** Joins; `byOwner` when the owner typed /live on (a reload's resume is not their decision). */
@@ -134,8 +203,10 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   note = null
   const sessionId = await $.session.id()
   const title = (await readTitle($, sessionId)) ?? ''
+  // The app got no turn from before the owner's join; a reload's gap is in its snapshot.
+  if (byOwner && (await hasTurns($))) noteGap()
   // Only the owner's own join brings back a session they removed.
-  const isJoined = (await link?.join({ sessionId, title, ...(byOwner && { owner: true }) })) === true
+  const isJoined = (await link?.join({ sessionId, title, modVersion, syncs: true, ...(byOwner && { owner: true }) })) === true
   await save($)
   await setBand($, {})
   redrawBand($)
@@ -176,7 +247,7 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
   if (!isNewId && title === joined.title) return
   if (isNewId) {
     staleSummary()  // /clear: a new transcript
-    await $.store.delete(joinedKey(joined.sessionId))
+    await $.store.delete(joinedKey(joined.sessionId)).catch(() => {})  // the join matters more
   }
   await link.rejoin({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
   await save($)
@@ -189,8 +260,11 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
  */
 async function tick($: EngineInterface): Promise<void> {
   if (!link?.session) return  // it left, or was removed, while this poll waited its turn
+  const hadGap = link.hasGap
+  const asked = answerQuestion  // a reply this poll brings can only be to a question open now
   const reply = await link.next()
-  if (reply === REMOVED) return  // the link queued `removed`
+  if (reply === REMOVED || !link.session) return  // the link queued `removed`; a join may have met it
+  if (hadGap && !link.hasGap) await save($)  // a join said it: a reload must not say it again
   if (!reply) {
     const now = await $.clock.now()
     if (offlineSince === null) {
@@ -220,11 +294,28 @@ async function tick($: EngineInterface): Promise<void> {
     // Queued behind an off or a removal that came in while this poll ran: those fail it in the app.
     enqueue($, () => deliver($, work))
   } else if (work?.kind === 'reply') {
-    if (answerQuestion === null) $.ui.log(LATE_REPLY)
-    else answerQuestion(spokenReply(work))
+    if (asked !== null && asked === answerQuestion) {
+      asked(work)
+    } else {
+      $.ui.log(LATE_REPLY)
+      // The app opened a request for a reply to a typed turn; a voice turn's refuses this, harmlessly.
+      await link?.answer({ id: work.id, status: 'failed', text: '', reason: ANSWERED_HERE })
+    }
   } else if (work?.kind === 'context') {
     void contextAsked($)
   }
+}
+
+/**
+ * The app took neither a turn's answer nor, so, its place in the conversation. An update to a
+ * request a newer one replaced is refused by design, so only a result is said to be lost.
+ */
+async function answerLost($: EngineInterface, status: AnswerStatus): Promise<void> {
+  noteGap()
+  await save($)
+  if (status === 'update') return
+  note = LOST_ANSWER
+  $.ui.log(LOST_ANSWER)
 }
 
 /** A voice request into a prompt, unless the session left or was removed since the poll. */
@@ -234,6 +325,22 @@ async function deliver($: EngineInterface, request: VoiceRequest): Promise<void>
   // It resolves once the turn starts, which may be after the running one: do not hold the queue.
   void $.prompt.submit({ text: voicePrompt(request) }).catch(() => refused($, request.id))
   await save($)
+}
+
+/** Claude's usage windows as the wire carries them; `resetsAt` only where the engine gave one. */
+function windowsOf(limits: readonly SessionRateLimit[]): LimitWindowBody[] {
+  return limits.map(one => ({
+    kind: one.kind, percentUsed: one.percentUsed, ...(one.resetsAt !== undefined && { resetsAt: one.resetsAt }),
+  }))
+}
+
+/** Sends the windows the session has now. An engine that has none to give leaves the join as it was. */
+async function sendLimits($: EngineInterface): Promise<void> {
+  try {
+    await link?.limits(windowsOf((await $.session.usage()).rateLimits))
+  } catch {
+    // the windows are a courtesy to the menu: no reading is no harm
+  }
 }
 
 /** The owner removed this session in the app: off here too, with no leave and no rejoin. */
@@ -246,7 +353,7 @@ async function removed($: EngineInterface, sessionId: string): Promise<void> {
 /** The prompt was refused: the request fails at once, and no later turn counts as its turn. */
 async function refused($: EngineInterface, id: string): Promise<void> {
   tracker.refused(id)
-  await save($).catch(() => {})  // the answer matters more than the snapshot
+  await save($)
   await link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' })
 }
 
@@ -264,13 +371,14 @@ function showContext($: EngineInterface, context: Band['context']) {
   })
 }
 
+/** How many prompts the session has had; undefined when the engine does not say. */
+function turnCount($: EngineInterface): Promise<number | undefined> {
+  return $.session.turns().catch(() => undefined)
+}
+
 /** Whether the session has had a prompt: a new one has nothing to summarise. */
 async function hasTurns($: EngineInterface): Promise<boolean> {
-  try {
-    return (await $.session.turns()) > 0
-  } catch {
-    return true  // not known: the model says when there is nothing
-  }
+  return ((await turnCount($)) ?? 1) > 0  // not known: the model says when there is nothing
 }
 
 /**
@@ -370,14 +478,51 @@ async function startHere(): Promise<void> {
   await link?.call('start')
 }
 
-/** Whether a tool's run, failure or denial settles the permission request being reported. */
 /** What the step that pauses wrote, as the activity's `text`; none when it wrote nothing. */
 const wrote = (text: string) => (text === '' ? {} : { text })
 
-function settles(e: { tool_name: string; agent_id?: string }): boolean {
-  if (approval?.tool !== e.tool_name || approval.agent !== e.agent_id) return false
-  approval = null
-  return true
+/** Names the main-loop turn an activity belongs to, for the app; none between turns. */
+const under = (turn: TurnRef | null) => (turn === null ? {} : { turn })
+
+/** Tells the app what waits; one it did not take is a gap, as the voice never hears of it. */
+async function awaiting($: EngineInterface, said: Omit<ActivityBody, 'sessionId' | 'state'>): Promise<void> {
+  if ((await link?.activity('approval', said)) === true) return
+  noteGap()
+  await save($)
+}
+
+/**
+ * A settled prompt: a line for the running turn, and the session works on. It is the mod's report,
+ * not the owner's typing, so it refuses nothing.
+ */
+async function promptSettled($: EngineInterface, text: string): Promise<void> {
+  const turn = tracker.current
+  const isOver = nothingWaits()
+  // Its place in the queue first: a question's hook can run inside the save.
+  const posted = inOrder($, async () => {
+    if (turn) await postSync($, { turn, kind: 'report', text })
+    if (isOver) await link?.activity('working', under(turn))
+  })
+  await save($)
+  await posted
+}
+
+/** Whether the session works on: the app has one row for a prompt and for Claude's question. */
+const nothingWaits = () => !tracker.isPrompting && answerQuestion === null
+
+/** The tool ran, or failed, so the prompt for that very run was allowed. */
+async function toolRan($: EngineInterface, e: { tool_name: string; tool_input: unknown; agent_id?: string }): Promise<void> {
+  if (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id)) await promptSettled($, `You allowed ${e.tool_name} at the keyboard.`)
+}
+
+/**
+ * The next step of the loop that asked, or its end, with its prompt still open: no tool ran and the
+ * dialog is gone. No hook reports a person's No (ADR 0001, item i), so it is only settled.
+ */
+async function promptGone($: EngineInterface, agent?: string): Promise<void> {
+  for (let tool = tracker.promptGone(agent); tool !== null; tool = tracker.promptGone(agent)) {
+    await promptSettled($, `The permission prompt for ${tool} was settled at the keyboard.`)
+  }
 }
 
 /**
@@ -403,12 +548,14 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await declareCommand($)
     home = (await $.env.get('HOME')) ?? ''
+    modVersion = await ownVersion($)
     link = new BridgeLink({
       fetch: (url, init) => $.http.fetch(url, init),
       run: argv => $.process.run(argv),
       every: (ms, fn) => $.clock.every(ms, fn),
       log: text => $.ui.log(text),
       removed: sessionId => enqueue($, () => removed($, sessionId)),
+      joined: () => enqueue($, () => sendLimits($)),
     }, {
       socketPath: socketPath(home, await $.env.get('CFFIXED_USER_HOME')),
       appPath: '/Applications/LiveBridge.app',
@@ -417,6 +564,10 @@ export const register: Register = on => {
     const saved = await $.store.get(joinedKey(await $.session.id()))
     if (saved !== undefined) {
       tracker = new TurnTracker(saved as TurnSnapshot)
+      // A snapshot from before sync says nothing: none of its turns reached the app. More turns than
+      // the snapshot saw ran with the mod off: disabling it ends no session, so its key stayed.
+      const { hasGap, sessionTurns } = saved as { hasGap?: boolean; sessionTurns?: number }
+      if (hasGap !== false || (sessionTurns ?? Infinity) < ((await turnCount($)) ?? 0)) noteGap()
       await serial(() => turnOn($, false))
     }
     return next(e)
@@ -432,20 +583,41 @@ export const register: Register = on => {
   })
 
   // The hooks at sites that can refuse only observe: one that fails lets the event go on.
-  on('prompt.submit', ($, e, next) => {
-    // A delivery into a running turn starts no turn of its own.
-    if (e.turnId === undefined) lastOrigin = originOf(e.origin, PLUGIN_NAME)
+  on('prompt.submit', async ($, e, next) => {
+    const origin = originOf(e.origin, PLUGIN_NAME, e.isMeta)
+    if (e.turnId === undefined) lastSubmit = { origin, text: e.text }
+    const entered = await next(e)
+    if (e.turnId === undefined && entered.drop !== undefined) lastSubmit = null
+    // Whether it folds in or gets a turn of its own, it goes to the app now, under the running turn.
+    if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
+      const line = tracker.typedInto(e.turnId, e.text, entered.text)
+      await save($)
+      await inOrder($, () => postSync($, line))
+    }
+    return entered
+  }).catch(($, e, next) => next(e))
+
+  // A window moved: tell the app. Observes only, and queued so the engine is not held up.
+  on('session.measure', ($, e, next) => {
+    if (e.changed.includes('rateLimits')) {
+      const windows = windowsOf(e.rateLimits)
+      enqueue($, async () => { await link?.limits(windows) })
+    }
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      // A turn with no origin seen is treated as typed: its answer never reaches the voice.
-      tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'typed', await $.clock.now())
-      lastOrigin = null
-      await serial(() => follow($, false))
-      await save($)
-      await link?.activity('working')
+      const { lines, isLost } = tracker.turnStarted(e.turnId, e.text, lastSubmit?.origin ?? null, await $.clock.now(), lastSubmit?.text)
+      if (isLost) noteGap()
+      lastSubmit = null
+      const turn = tracker.current
+      await inOrder($, async () => {
+        await serial(() => follow($, false))  // /clear: the line goes under the session's new id
+        await save($)
+        for (const line of lines) await postSync($, line)
+        await link?.activity('working', under(turn))
+      })
     }
     return next(e)
   })
@@ -454,6 +626,7 @@ export const register: Register = on => {
   // prompt only itself: what Claude wrote in the step that asks would reach the voice in neither.
   // Kept as it streams, since the engine may run the step's tools before the step ends.
   on('turn.step', async function* ($, e, next) {
+    await promptGone($, e.agentId)
     if (e.agentId !== undefined) return yield* next(e)
     tracker.stepStarted()
     const stream = next(e)
@@ -469,55 +642,89 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    await promptGone($, e.agentId)
     if (e.agentId === undefined) {
-      const post = tracker.turnCompleted(e.turnId, e.answer, e.reason)
-      if (!post) staleSummary()  // a voice turn's answer went to the voice: the summary still holds
-      approval = null
+      const turn = tracker.current
+      const { post, sync, isLost } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
+      if (isLost) noteGap()
+      staleSummary()
       await save($)
-      const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
-      // An update to a request a newer one replaced is refused by design; a removal says so itself.
-      if (post && taken !== true && taken !== REMOVED && post.status !== 'update') {
-        note = LOST_ANSWER
-        $.ui.log(LOST_ANSWER)
-      }
-      await link?.activity('idle')
+      await inOrder($, async () => {
+        if (sync) await postSync($, sync)
+        const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
+        if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
+        await link?.activity('idle', under(turn))
+      })
     }
     return next(e)
   })
 
-  // A question Claude asks in a voice turn goes to the voice as well, and the dialog stays open
-  // for the keyboard: the reply that comes first answers it. A spoken reply is the dialog's
-  // free text, so the owner may ask back instead of choosing; returning before the dialog's
-  // own answer closes it.
+  // A question Claude asks in a main-loop turn goes to the voice as well, and the dialog stays
+  // open for the keyboard: the reply that comes first answers it. A spoken reply is the dialog's
+  // free text, so the owner may ask back instead of choosing; returning before the dialog's own
+  // answer closes it. It also tells the tracker whose answer the rest of the turn is.
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
-    if (e.agentId !== undefined || tracker.running === null || !link?.session) return next(e)
+    const turn = tracker.current
+    if (e.agentId !== undefined || turn === null || !link?.session) return next(e)
     const answered = next(e)
-    const spoken = new Promise<string>(resolve => { answerQuestion = resolve })
+    const spoken = new Promise<Reply>(resolve => { answerQuestion = resolve })
     try {
-      await link.activity('approval', { question: askedText(e.questions), ...wrote(tracker.takeStepText()) })
-      const first = await Promise.race([answered, spoken])
-      return typeof first === 'string' ? { result: { questions: e.questions, answers: {}, response: first } } : first
+      const isOverPrompt = tracker.isPrompting
+      const said = { question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn }
+      await inOrder($, async () => {
+        // The app says what waits only on a change to `approval`.
+        if (isOverPrompt) await link?.activity('working', { turn })
+        await awaiting($, said)
+      })
+      // Over at once: a reply from here on has no question, whatever posting the answer takes.
+      const first = await Promise.race([answered, spoken]).finally(() => { answerQuestion = null })
+      if ('kind' in first) {
+        tracker.replied(first.id, first.forRequest, await $.clock.now())
+        await save($)
+        return { result: { questions: e.questions, answers: {}, response: spokenReply(first) } }
+      }
+      const result = first.isError === true ? undefined : first.result
+      await inOrder($, () => postSync($, { turn, ...keyboardAnswer(result) }))
+      return first
     } finally {
-      answerQuestion = null
-      await link?.activity('working')
+      const after = under(tracker.current)
+      const isPrompting = tracker.isPrompting
+      await inOrder($, async () => {
+        await link?.activity('working', after)
+        if (isPrompting) await awaiting($, after)
+      })
     }
   }).catch(($, e, next) => next(e))
 
-  // ADR 0001 (i): a permission request that reaches the person during a voice turn, with what
+  // ADR 0001 (i): a permission request that reaches the person during a main-loop turn, with what
   // the main loop wrote in the step that asks for it. Claude's question has its own report above.
+  // A subagent's is no step of the main loop's, so it carries none of that text, but it ran in the turn.
   on('classic.PermissionRequest', async ($, e, next) => {
-    if (tracker.running !== null && e.tool_name !== 'AskUserQuestion') {
-      approval = { tool: e.tool_name, agent: e.agent_id }
-      await link?.activity('approval', e.agent_id === undefined ? wrote(tracker.takeStepText()) : {})
+    const turn = tracker.current
+    if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
+      tracker.promptOpened(e.tool_name, e.tool_input, e.agent_id)
+      // A bare approval would take back the open question, and the app would say nothing for it.
+      const isAsking = answerQuestion !== null
+      const said = { ...(!isAsking && e.agent_id === undefined && wrote(tracker.takeStepText())), turn }
+      // Its place in the queue first: a question's hook can run inside the save.
+      const posted = isAsking ? null : inOrder($, () => awaiting($, said))
+      await save($)
+      await posted
     }
     return next(e)
   }).catch(($, e, next) => next(e))
-  on('classic.PostToolUse', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+  on('classic.PostToolUse', async ($, e, next) => (await toolRan($, e), next(e)))
     .catch(($, e, next) => next(e))
-  on('classic.PostToolUseFailure', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
+  on('classic.PostToolUseFailure', async ($, e, next) => (await toolRan($, e), next(e)))
     .catch(($, e, next) => next(e))
-  on('classic.PermissionDenied', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
-    .catch(($, e, next) => next(e))
+  // Auto mode's refusal, not the person's: nothing to tell the voice but that it goes on.
+  on('classic.PermissionDenied', async ($, e, next) => {
+    if (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id) && nothingWaits()) {
+      const turn = tracker.current
+      await inOrder($, async () => { await link?.activity('working', under(turn)) })
+    }
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {
     // After /clear the session goes on under a new id: the next poll leaves the old one and joins.
@@ -533,6 +740,8 @@ export const register: Register = on => {
     return drawBand($, e, state, {
       start: () => void startHere(),
       stop: () => void link?.call('stop'),
+      mute: () => void link?.call('mute'),
+      unmute: () => void link?.call('unmute'),
       target: () => void link?.target(),
     })
   })

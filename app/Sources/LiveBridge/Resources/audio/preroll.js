@@ -1,6 +1,7 @@
 // The audio before and during a connect. `createPreroll` keeps the last seconds of the
 // microphone; `createCatchUp` queues what is said while the line connects and lets the line
-// catch up with the speaker by dropping silence while it lags (ADR 0001 (c)). Pure.
+// catch up with the speaker by dropping silence while it lags (ADR 0001 (c)); `createLineAudio`
+// holds the two for the line. Pure.
 
 import { THRESHOLD_DB, dbfs, rms } from './vad.js';
 
@@ -48,6 +49,41 @@ export function createCatchUp({ sampleRate = 48000, thresholdDb = THRESHOLD_DB, 
     clear() {
       queue.length = 0;
       silentRun = 0;
+    },
+  };
+}
+
+/** The line's audio: the pre-roll while nobody is speaking, and from the first word (`hold`)
+ * the queue the line plays from. */
+export function createLineAudio({ sampleRate = 48000, frame = 1024 } = {}) {
+  const preroll = createPreroll({ sampleRate });
+  const catchUp = createCatchUp({ sampleRate });
+  let holding = false; // a connect is under way: frames queue instead of filling the pre-roll
+  const clear = () => {
+    holding = false;
+    catchUp.clear();
+  };
+  return {
+    write(f32) {
+      if (holding) catchUp.push(f32);
+      else preroll.write(f32);
+    },
+    /** Queues the pre-roll and what follows for the line; `keep` false drops the pre-roll, for
+     * a line nobody spoke on. */
+    hold(keep = true) {
+      if (holding) return;
+      holding = true;
+      const kept = preroll.drain();
+      if (!keep) return;
+      for (let i = kept.length % frame; i < kept.length; i += frame) catchUp.push(kept.subarray(i, i + frame));
+    },
+    pull: () => catchUp.pull(),
+    /** The line ended: nothing held or queued. */
+    clear,
+    /** As `clear`, and the pre-roll emptied: nothing recorded so far can reach a line. */
+    reset() {
+      clear();
+      preroll.drain();
     },
   };
 }

@@ -1,8 +1,12 @@
 // The JSON messages between the mod and LiveBridge.app, mirroring
-// app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). Optional
+// app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). The routes:
+// `POST /v1/join|leave|answer|activity|context|sync|limits|target|call` and `GET /v1/next?sessionId=`,
+// which answers a PollReply. Optional
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
 // `removed`; also the reply to its join unless `owner` is true), 413 body over 131072 bytes.
+// `sync` and `context` look a session up among the joined, so a removed one gets their 404, and
+// `activity` and `limits` ignore it, 200.
 
 /** The socket path relative to the home folder Foundation reports. */
 const SOCKET_REL = 'Library/Application Support/LiveBridge/run/bridge.sock';
@@ -23,20 +27,44 @@ export type Utterance = { role: Role; text: string };
 
 /** brief: the voice model's self-contained request; transcript: the speech since the last one. */
 export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance[] };
-/** `reply`: the owner's reply to the question Claude is waiting on, for the request in flight. */
+/**
+ * `reply`: the owner's reply to the question Claude is waiting on. `forRequest` is the request
+ * the turn's answer belongs to: the one in flight once this reply goes out. Absent from an
+ * older app's reply.
+ */
 export type Work =
   | ({ kind: 'request' } & VoiceRequest)
-  | ({ kind: 'reply' } & VoiceRequest)
+  | ({ kind: 'reply'; forRequest?: RequestId } & VoiceRequest)
   | { kind: 'context' };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
  * session had before `/clear`: its place, target and requests move to the new id. `owner: true`
  * says the owner asked for it (`/live on`): only such a join brings back a session the owner
- * removed, any other is answered 410 `removed`; absent means false. Whether a new target is asked
- * for its summary is the app's own setting, not the join's.
+ * removed, any other is answered 410 `removed`; absent means false. `modVersion` is this mod's
+ * version, from its plugin.json; absent from a mod from before the field, or one that could not
+ * read it, and Settings then lists the session as on the old mod. `syncs: true` says this mod
+ * posts its turns as sync lines (POST /v1/sync), so the app may rely on what it has recorded of
+ * the session; absent, the app asks for a summary as before. `missed: true` says a turn of the
+ * session did not arrive, so the voice's picture of it has a gap.
  */
-export type JoinBody = { sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean };
+export type JoinBody = {
+  sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string;
+  syncs?: boolean; missed?: boolean;
+};
+/**
+ * The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
+ * answer belongs to; absent from a turn with none behind it. A spoken reply that makes a typed
+ * turn a voice turn adds it to the turn's later lines.
+ */
+export type TurnRef = { id: string; request?: RequestId };
+/**
+ * `start`: a turn's first word, which takes the turn's decision and records nothing; the only kind
+ * with no `text`. `typed`: the owner's words, the only kind that refuses a turn. `answer`: Claude's
+ * final answer. `report`: the mod's own line, which goes as Claude's.
+ */
+export type SyncKind = 'start' | 'typed' | 'answer' | 'report';
+export type SyncBody = { sessionId: SessionId; turn: TurnRef; kind: SyncKind; text?: string };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 
@@ -47,16 +75,26 @@ export type AnswerBody =
 
 export type SessionActivity = 'idle' | 'working' | 'approval';
 /**
- * `question`, with `approval`: Claude asked the owner this in a voice turn and waits for the
- * reply, which the voice may hand over as a `reply` work item; without it, a permission prompt
- * waits, which the voice only reports. `text`, with `approval`: what Claude wrote in the step
- * that pauses.
+ * `question`, with `approval`: Claude asked the owner this and waits for the reply, which the
+ * voice may hand over as a `reply` work item; without it, a permission prompt waits, which the
+ * voice only reports. `text`, with `approval`: what Claude wrote in the step that pauses.
+ * `turn`: the main-loop turn it belongs to; absent between turns.
  */
 export type ActivityBody =
-  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string };
+  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; turn?: TurnRef };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
-export type CallAction = 'start' | 'stop';
+/**
+ * One usage window as the engine reports it. The app takes `five_hour` as a window of five hours
+ * and `seven_day` as a week, ignores `spend_limit`, and shows any other kind of `[a-z0-9_]{1,32}`
+ * by name; a kind outside that is ignored. `percentUsed` is usually 0 to 100 but is not checked:
+ * it is clamped only when shown. `resetsAt` is an ISO 8601 time, omitted when absent.
+ */
+export type LimitWindowBody = { kind: string; percentUsed: number; resetsAt?: string };
+/** Claude's usage windows, as this session read them. */
+export type LimitsBody = { sessionId: SessionId; windows: LimitWindowBody[] };
+
+export type CallAction = 'start' | 'stop' | 'mute' | 'unmute';
 export type CallBody = { action: CallAction };
 
 export type CallPhase = 'off' | 'listening' | 'connecting' | 'live';
@@ -71,6 +109,8 @@ export type StatusReply = {
   problem?: string;
   /** Results the voice has not said yet. */
   unheard: number;
+  /** The microphone is released while the call goes on. */
+  isMuted?: boolean;
 };
 
 /** The reply to GET /v1/next; each poll also refreshes the session's liveness. */

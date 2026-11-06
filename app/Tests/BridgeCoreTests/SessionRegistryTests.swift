@@ -3,6 +3,13 @@ import Testing
 
 @testable import BridgeCore
 
+extension Completion {
+  /// What is to be said, if anything.
+  var delivery: Delivery? {
+    if case .delivery(let delivery) = self { delivery } else { nil }
+  }
+}
+
 struct SessionRegistryTests {
   let time = TestTime()
   let registry: SessionRegistry
@@ -12,8 +19,12 @@ struct SessionRegistryTests {
 
   init() { registry = SessionRegistry(time: time) }
 
-  func join(_ id: SessionID, _ title: String = "Example session") async {
-    try? await registry.join(JoinBody(sessionId: id, title: title))
+  func join(
+    _ id: SessionID, _ title: String = "Example session", modVersion: String? = nil,
+    syncs: Bool? = nil
+  ) async {
+    try? await registry.join(
+      JoinBody(sessionId: id, title: title, modVersion: modVersion, syncs: syncs))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -128,9 +139,9 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
     try await registry.enqueue(request(2), for: a)
-    #expect(try await registry.complete(answer(request(1))) == nil)
+    #expect(try await registry.complete(answer(request(1))) == .superseded)
     _ = try await registry.poll(a)
-    let delivery = try await registry.complete(answer(request(2)))
+    let delivery = try await registry.complete(answer(request(2))).delivery
     #expect(delivery == Delivery(session: a, label: "Example session", status: .ok, text: "done"))
   }
 
@@ -142,12 +153,80 @@ struct SessionRegistryTests {
     _ = try await registry.poll(a)
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
     try await registry.enqueue(request(2), for: a)
-    #expect(try await registry.poll(a) == .reply(request(2)))
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(1).id))
     #expect(try await registry.poll(a) == nil)
-    #expect(try await registry.complete(answer(request(1)))?.text == "done")
+    #expect(try await registry.complete(answer(request(1))).delivery?.text == "done")
     // the question was answered: the next handoff is a request again
     try await registry.enqueue(request(3), for: a)
     #expect(try await registry.poll(a) == .request(request(3)))
+  }
+
+  /// A reply to a question the request in flight did not ask (a typed turn's) is itself the
+  /// request in flight: its answer closes it.
+  @Test func aReplyWithNothingInFlightGoesInFlight() async throws {
+    await join(a, syncs: true)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
+    #expect(await registry.hasOpenRequests)
+    #expect(try await registry.complete(answer(request(2))).delivery?.text == "done")
+    #expect(await !registry.hasOpenRequests)
+  }
+
+  /// A released mod asks only in voice turns, and its answer goes under that turn's request, here
+  /// timed out: nothing would close the reply, which must not hold the queue for ten minutes.
+  @Test func aReplyToAModThatDoesNotSyncOpensNoRequest() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    _ = await run(600)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
+    #expect(await !registry.hasOpenRequests)
+    try await registry.enqueue(request(3), for: a)
+    #expect(try await registry.poll(a) == .request(request(3)))
+  }
+
+  /// With a request in flight the reply is for that request, which its answer still closes.
+  @Test func aReplyLeavesARequestInFlightAlone() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(1).id))
+    await #expect(throws: RegistryError.unknownRequest(request(2).id)) {
+      try await registry.complete(answer(request(2)))
+    }
+    #expect(try await registry.complete(answer(request(1))).delivery?.text == "done")
+    #expect(await !registry.hasOpenRequests)
+  }
+
+  /// A spoken reply tied a typed turn to a request waiting behind it. The turn names that request,
+  /// so typing into it under the pause withholds it: what the turn holds may be in its own answer.
+  @Test func aRequestATurnNamesIsWithheldThoughItOnlyWaitedBehindIt() async throws {
+    await join(a, syncs: true)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    _ = try await registry.poll(a)
+    await registry.withholdAnswer(request(1).id, of: a)
+    #expect(try await registry.complete(answer(request(1), .update)) == .dropped)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .failed)
+  }
+
+  /// A request queued after the reply is the newer one: only its answer is delivered.
+  @Test func aReplyLeavesLatestToANewerQueuedRequest() async throws {
+    await join(a, syncs: true)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    try await registry.enqueue(request(3), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
+    #expect(try await registry.complete(answer(request(2))) == .superseded)
+    #expect(try await registry.poll(a) == .request(request(3)))
+    #expect(try await registry.complete(answer(request(3))).delivery?.text == "done")
   }
 
   /// A question answered in Claude Code before the reply went out leaves that reply to go as a
@@ -160,7 +239,7 @@ struct SessionRegistryTests {
     try await registry.enqueue(request(2), for: a)
     await registry.setActivity(ActivityBody(sessionId: a, state: .working))
     #expect(try await registry.poll(a) == nil)
-    #expect(try await registry.complete(answer(request(1))) == nil)
+    #expect(try await registry.complete(answer(request(1))) == .superseded)
     #expect(try await registry.poll(a) == .request(request(2)))
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval))
     try await registry.enqueue(request(3), for: a)
@@ -171,10 +250,11 @@ struct SessionRegistryTests {
     await join(a)
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    #expect(try await registry.complete(answer(request(1), .update))?.status == .update)
-    #expect(try await registry.complete(answer(request(1), .question))?.status == .question)
+    #expect(try await registry.complete(answer(request(1), .update)).delivery?.status == .update)
+    let question = try await registry.complete(answer(request(1), .question))
+    #expect(question.delivery?.status == .question)
     // After the request closed, a later update is still tied to it.
-    #expect(try await registry.complete(answer(request(1), .update))?.status == .update)
+    #expect(try await registry.complete(answer(request(1), .update)).delivery?.status == .update)
     await #expect(throws: RegistryError.self) { try await registry.complete(answer(request(1))) }
   }
 
@@ -225,6 +305,24 @@ struct SessionRegistryTests {
     #expect(await run(1) == [timedOut])  // ten minutes awake in all
   }
 
+  /// A session whose mod is older than the app, or that names no version (a mod from before the
+  /// field), is listed by its label, in the order the sessions joined.
+  @Test func sessionsOnAnOlderModAreListed() async throws {
+    let app = try #require(AppVersion("0.3.1"))
+    await join(a, "Alpha", modVersion: "0.3.0")
+    await join(b, "Beta", modVersion: "0.3.1")
+    await join(c, "Gamma")
+    #expect(await registry.labelsOnAnOlderMod(than: app) == ["Alpha", "Gamma"])
+  }
+
+  /// A session that joins again with a mod as new as the app leaves the list.
+  @Test func aJoinWithACurrentModLeavesTheList() async throws {
+    let app = try #require(AppVersion("0.3.1"))
+    await join(a, "Alpha", modVersion: "0.3.0")
+    await join(a, "Alpha", modVersion: "0.3.1")
+    #expect(await registry.labelsOnAnOlderMod(than: app) == [])
+  }
+
   /// `/clear` gives the session a new id: it keeps its place, the target and its request.
   @Test func joinReplacingAnIdMovesTheSession() async throws {
     await join(a, "Alpha")
@@ -234,8 +332,95 @@ struct SessionRegistryTests {
     try await registry.join(JoinBody(sessionId: c, title: "Alpha", replaces: a))
     #expect(await registry.target == c)
     #expect(await registry.rows().map(\.sessionId) == [c, b])
-    let delivery = try await registry.complete(answer(request(1), from: c))
+    let delivery = try await registry.complete(answer(request(1), from: c)).delivery
     #expect(delivery == Delivery(session: c, label: "Alpha", status: .ok, text: "done"))
+  }
+
+  /// A request in flight whose answer is withheld.
+  func withheld() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.withholdAnswer(request(1).id, of: a)
+  }
+
+  /// Whatever the turn ended with, the request closes as failed and none of it goes on.
+  @Test(arguments: [AnswerStatus.ok, .question, .failed])
+  func aWithheldAnswerClosesAsFailed(status: AnswerStatus) async throws {
+    try await withheld()
+    let delivery = try #require(try await registry.complete(answer(request(1), status)).delivery)
+    #expect(delivery.status == .failed)
+    #expect(!delivery.text.contains("done"))
+    #expect(await !registry.hasOpenRequests)
+  }
+
+  @Test func aWithheldUpdateIsDroppedAndClosesNothing() async throws {
+    try await withheld()
+    #expect(try await registry.complete(answer(request(1), .update)) == .dropped)
+    #expect(await registry.hasOpenRequests)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .failed)
+  }
+
+  @Test func theMarkGoesWithItsRequest() async throws {
+    try await withheld()
+    _ = try await registry.complete(answer(request(1)))
+    try await registry.enqueue(request(2), for: a)
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
+  }
+
+  /// Only the request named: another in flight keeps its answer.
+  @Test func anotherRequestIsNotMarked() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    await registry.withholdAnswer(request(2).id, of: a)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
+  }
+
+  @Test func theMarkFollowsClear() async throws {
+    try await withheld()
+    try await registry.join(JoinBody(sessionId: c, title: "Alpha", replaces: a))
+    #expect(try await registry.complete(answer(request(1), from: c)).delivery?.status == .failed)
+  }
+
+  /// The same id joining again is a new session, with a new request.
+  @Test func theMarkDoesNotOutliveItsSession() async throws {
+    try await withheld()
+    await registry.leave(a)
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(1))).delivery?.status == .ok)
+  }
+
+  @Test func aWithheldRequestTimedOutTakesNoUpdate() async throws {
+    try await withheld()
+    #expect(await run(600).map(\.text) == ["timed out"])
+    await #expect(throws: RegistryError.unknownRequest(request(1).id)) {
+      try await registry.complete(answer(request(1), .update))
+    }
+  }
+
+  /// A request waiting to go out is still the one whose answer is said.
+  @Test func aQueuedRequestStaysTheLatest() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    _ = try await registry.complete(answer(request(1)))
+    try await registry.enqueue(request(2), for: a)
+    await registry.withholdAnswer(request(1).id, of: a)
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
+  }
+
+  /// A withheld request a newer one superseded leaves that newer one the latest.
+  @Test func aWithheldSupersededRequestLeavesTheNewerOneTheLatest() async throws {
+    try await withheld()
+    try await registry.enqueue(request(2), for: a)
+    _ = try await registry.complete(answer(request(1)))
+    _ = try await registry.poll(a)
+    #expect(try await registry.complete(answer(request(2))).delivery?.status == .ok)
   }
 
   @Test func leavingWithAnOpenRequestFailsIt() async throws {

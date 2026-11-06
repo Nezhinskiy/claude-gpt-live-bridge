@@ -17,8 +17,10 @@ public enum Redaction {
     // a credential has a digit or a symbol, so "Basic understanding" is kept
     (#"\b(Bearer|Basic)\s+(?=[A-Za-z]*[0-9._~+/=-])[A-Za-z0-9._~+/=-]{8,}"#, "$1 \(mask)"),
     (#"(://)[^/\s:@]+:[^/\s@]+@"#, "$1\(mask)@"),  // URL userinfo
+    // bounded, and with nothing before the keyword (it stays, outside the match): an open-ended
+    // run of these characters makes a long unbroken text quadratic
     (
-      #"(?i)([A-Za-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*["']?)[^\s"',;]+"#,
+      #"(?i)((?:password|passwd|secret|token|api[_-]?key)[A-Za-z0-9_-]{0,64}["']?\s*[:=]\s*["']?)[^\s"',;]+"#,
       "$1\(mask)"
     ),
   ].map { (try! NSRegularExpression(pattern: $0.0), $0.1) }

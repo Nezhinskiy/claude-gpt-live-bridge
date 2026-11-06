@@ -96,6 +96,10 @@ final class AppModel {
   @ObservationIgnored let settings: SettingsStore
   @ObservationIgnored private var settingsWindow: SettingsWindow?
   @ObservationIgnored private var codexCwd: URL?
+  /// When codex's usage is read, and the last reading.
+  private(set) var limitsPoll = LimitsPoll()
+  /// The search path of the first usage read; looked up again only if codex is not on it.
+  @ObservationIgnored private var limitsSearchPath: [String]?
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
@@ -104,6 +108,8 @@ final class AppModel {
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
   /// The running app's `CFBundleShortVersionString`.
   let versionText: String
+  /// That version, when it reads as `X.Y.Z`.
+  let appVersion: AppVersion?
   /// This is the copy in `/Applications`, the only one that checks for and installs updates.
   let isInstalledCopy: Bool
   /// Built from source with `build-app.sh --release` (`LBSourceBuild`).
@@ -133,6 +139,7 @@ final class AppModel {
   init() {
     let info = Bundle.main
     versionText = info.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    appVersion = AppVersion(versionText)
     isSourceBuild = info.object(forInfoDictionaryKey: "LBSourceBuild") as? Bool == true
     let installedIsLink =
       (try? FileManager.default.attributesOfItem(atPath: UpdatePolicy.installedPath)[.type])
@@ -157,14 +164,23 @@ final class AppModel {
         continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier,
         notifies: { settings.current.notifyResults },
         confirmsHandoffs: { settings.current.confirmHandoffs },
-        autoContext: { settings.current.autoContext })
+        pausesSync: { settings.current.pauseSyncWhileStopped }, appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge
       self.server = server
       let (events, sink) = AsyncStream.makeStream(of: AudioEvent.self)
       audio.onEvent = { sink.yield($0) }
       audio.onLevel = { [weak self] in self?.showLevel($0) }
-      Task { for await event in events { await bridge.audioEvent(event) } }
+      Task {
+        for await event in events {
+          // `.speechStarted` stays suspended while its line opens, and a refusal is about that line
+          if case .lineError = event {
+            Task { await bridge.audioEvent(event) }
+          } else {
+            await bridge.audioEvent(event)
+          }
+        }
+      }
       Task { [weak self] in
         for await update in bridge.updates { self?.show(update) }
       }
@@ -187,7 +203,7 @@ final class AppModel {
   /// update and posts its notice once, then checks when due on launch, every
   /// `UpdatePolicy.tick` and on wake. Other copies leave `updates/` to the installed one.
   private func startUpdates(dataDir: URL?) {
-    guard isInstalledCopy, let running = AppVersion(versionText), let dataDir else { return }
+    guard isInstalledCopy, let running = appVersion, let dataDir else { return }
     let paths = UpdatePaths(dataDir: dataDir)
     let bridge = bridge
     let updater = Updater(
@@ -231,7 +247,7 @@ final class AppModel {
       switch record.mod {
       case .updated:
         "Updated from \(record.from). Claude Code sessions already open keep the old mod until "
-          + "they restart."
+          + "they restart; Settings lists them."
       case .byHand:
         "Updated from \(record.from). Settings shows the commands that update the Claude Code mod."
       }
@@ -429,6 +445,39 @@ final class AppModel {
         voices = .failed("Codex did not list its voices: \(error.localizedDescription)")
       }
     }
+  }
+
+  /// Reads codex's usage in the background when `limitsPoll` says it is time; the menu follows
+  /// the poll when the reading lands. A failed read keeps the last reading.
+  func refreshLimits() {
+    guard let codexCwd, limitsPoll.begin(at: Date()) else { return }
+    let known = limitsSearchPath
+    Task {
+      // The login shell's search path is asked for once, as soon as codex is found on it.
+      let located = await Self.locateCodex(searchPath: known)
+      if let located { limitsSearchPath = located.searchPath }
+      var limits: UsageLimits?
+      if let located {
+        limits = try? await CodexLimits.readOnce(
+          launch: {
+            try await CodexLaunch.launch(
+              codex: located.codex, cwd: codexCwd, searchPath: located.searchPath)
+          }, now: Date())
+      }
+      limitsPoll.finish(limits)
+    }
+  }
+
+  /// Codex's usage as last read, nil once it is stale.
+  func codexLimits(at now: Date) -> UsageLimits? { limitsPoll.reading(at: now) }
+
+  /// codex on the search path `known`, else on the login shell's, which costs a shell start-up.
+  nonisolated private static func locateCodex(searchPath known: [String]?) async
+    -> (codex: URL, searchPath: [String])?
+  {
+    if let known, let codex = CodexLaunch.locate(searchPath: known) { return (codex, known) }
+    let path = await CodexLaunch.defaultSearchPath()
+    return CodexLaunch.locate(searchPath: path).map { ($0, path) }
   }
 
   /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed`

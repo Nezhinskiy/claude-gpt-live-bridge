@@ -1,6 +1,7 @@
 {
   "status": {
     "call": "live",
+    "isMuted": false,
     "minutesToday": 12.25,
     "problem": "Example problem sentence.",
     "sessions": [

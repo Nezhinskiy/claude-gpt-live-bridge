@@ -3,7 +3,10 @@
 // Each call answers what happened and never throws.
 import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-code'
 
-import type { ActivityBody, AnswerBody, CallAction, JoinBody, PollReply, SessionActivity } from './wire.ts'
+import type { SyncLine } from './turns.ts'
+import type {
+  ActivityBody, AnswerBody, CallAction, JoinBody, LimitWindowBody, PollReply, SessionActivity,
+} from './wire.ts'
 
 /** LiveBridge.app's bundle identifier. */
 export const BUNDLE_ID = 'com.getlivebridge.livebridge'
@@ -22,6 +25,8 @@ export type LinkPorts = {
   log(text: string): void
   /** The app answered 410: the owner removed the session, which the link has already forgotten. */
   removed(sessionId: string): void
+  /** The app took a join, the first or one after it restarted or appeared; it has no reading yet. */
+  joined(): void
 }
 
 export class BridgeLink {
@@ -31,6 +36,8 @@ export class BridgeLink {
   /** What this session last joined as, kept so that it can join again after the app restarts. */
   #joined: JoinBody | null = null
   #isKnown = false
+  /** A turn did not reach the app, and no join has said so yet. */
+  #hasGap = false
   #timer: Timer | null = null
   #isPolling = false
   #queue: Promise<unknown> = Promise.resolve()
@@ -44,6 +51,16 @@ export class BridgeLink {
 
   get session(): JoinBody | null {
     return this.#joined
+  }
+
+  get hasGap(): boolean {
+    return this.#hasGap
+  }
+
+  /** A turn did not reach the app: the next poll joins again with `missed`. */
+  noteGap(): void {
+    this.#hasGap = true
+    this.#isKnown = false
   }
 
   /**
@@ -62,8 +79,14 @@ export class BridgeLink {
     // owner's: it must not bring back a session the owner removed.
     const { replaces: _, owner: __, ...kept } = body
     this.#joined = kept
-    this.#isKnown = (await this.#send('join', body))?.ok === true
-    return this.#isKnown
+    // A gap noted while this join is on its way is one it did not say: only the one it said clears.
+    const saysGap = this.#hasGap
+    this.#hasGap = false
+    const isTaken = (await this.#send('join', { ...body, ...(saysGap && { missed: true }) }))?.ok === true
+    if (!isTaken) this.#hasGap ||= saysGap
+    this.#isKnown = isTaken && !this.#hasGap
+    if (isTaken) this.#ports.joined()
+    return isTaken
   }
 
   /** Joins again under a new id or title; false, with nothing sent, once the session left or was removed. */
@@ -103,14 +126,27 @@ export class BridgeLink {
     return reply?.status === 410 ? REMOVED : reply?.ok === true
   }
 
-  /** `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only). */
-  async activity(state: SessionActivity, said: Omit<ActivityBody, 'sessionId' | 'state'> = {}): Promise<void> {
-    await this.#forSession('activity', { state, ...said })
+  /**
+   * `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only), and
+   * the turn. False when the app did not take it.
+   */
+  async activity(state: SessionActivity, said: Omit<ActivityBody, 'sessionId' | 'state'> = {}): Promise<boolean> {
+    return (await this.#forSession('activity', { state, ...said }))?.ok === true
+  }
+
+  /** Posts a line of a turn; false when the app did not take it, which a session not joined never does. */
+  async sync(line: SyncLine): Promise<boolean> {
+    return (await this.#forSession('sync', line))?.ok === true
   }
 
   /** Posts the session's summary; false when the app did not take it. */
   async context(summary: string): Promise<boolean> {
     return (await this.#forSession('context', { summary }))?.ok === true
+  }
+
+  /** Posts Claude's usage windows; nothing for an empty list, and the app's reply changes nothing. */
+  async limits(windows: readonly LimitWindowBody[]): Promise<void> {
+    if (windows.length > 0) await this.#forSession('limits', { windows })
   }
 
   async target(): Promise<void> {

@@ -42,21 +42,44 @@ flowchart LR
 **`BridgeCore`** (Swift library, no UI) holds every rule, so it is tested without codex, a
 microphone or Claude:
 
-- `CallMachine`: the call's phase — `off`, `listening` (microphone and local voice detection
-  only), `connecting`, `live` (a realtime session is open) — and the effects of each event. It
-  is pure; `Bridge` runs the effects in order.
+- `CallMachine`: the call's phase — `off`, `listening` (microphone and local voice detection only),
+  `connecting`, `live` (a realtime session is open) — and the effects of each event. It also keeps
+  `isMuted`, orthogonal to the phase: while muted the microphone is released, speech is ignored, and
+  a result from Claude still opens the line. Mute closes no line. It ends the owner's speech only if
+  they were speaking; then an open line's silence is counted from Mute (20 s), as if they had
+  stopped speaking when they pressed it, and a line that was already quiet closes when it would have
+  without Mute. A handoff whose answer is still awaited can still keep a line open, up to 120 s
+  after the handoff, as without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs
+  the effects in order.
 - `SessionRegistry`: the joined sessions, the voice target, each session's queued and in-flight
   request, and their liveness. A session that has not polled for 5 s is dropped, and a request in
   flight for 10 minutes fails; either is reported to the voice as `[FAILED]`, unless the dropped
   session was the last one, which stops the call ([failure behaviour](#failure-behaviour)).
-- `Continuity`: one conversation per Claude Code session, by session id: its last 24 lines
-  (the owner's, the voice's, the lines the session sent the voice and the brief of each request
-  its queue took) and the context loaded from it. Each new realtime session is seeded with the
+- `Continuity`: one conversation per Claude Code session, by session id: its last 64 lines
+  (`keptLines`: the owner's speech and typing, the voice's, Claude's final answers to turns that
+  were not voice requests, an answer a newer request superseded, the lines the session sent the
+  voice and the brief of each request its queue took), the context loaded from it, and whether the voice is out of sync with the
+  session (`missed`: a turn did not arrive; `paused`: the pause setting kept text out) with the
+  decision on the turn last offered. A conversation written before these fields still decodes.
+  `isCurrent` is false when the lines since the summary are more than the seed can carry
+  (`initialItems`: 128 items, 8,192 estimated tokens, counted in UTF-8 bytes). Each new realtime session is seeded with the
   target's conversation, less those briefs (an open request goes in as its task), and only the
   target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
   mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
   own session's conversation. New conversation forgets the target's, removing a session forgets
-  its own, and only the 20 conversations used last are kept.
+  its own, and only the 20 conversations used last are kept; both forgets keep a
+  *paused* mark and the turn's decision, which the pause needs after it. A synced line (below) is
+  recorded by `Bridge.sync` once `Continuity.admits` takes it: with the pause setting on and the
+  call off the first line of a turn with no voice request behind it is refused and the session is
+  marked *paused*; a Claude line of a turn admitted before Stop still goes in, and a `typed` line
+  refuses the turn from there on, a voice turn's too. A Claude line with no decision for its turn
+  stays out while the session is *paused*. A refused `typed` line in a turn with a
+  voice request behind it (`turn.request`) also withholds exactly that request, whose answer then
+  closes as failed with nothing of it recorded or said (`SessionRegistry.withholdAnswer`); a request
+  that only waits behind the turn, unnamed, keeps its answer. A refused turn's later questions and
+  approval notices stay out with it (`Bridge.activity`). The open line about the
+  session is given an admitted line at once with `addContext`, a connecting one when it is
+  connected.
 - `RealtimeSession`: one ephemeral, read-only codex thread per realtime session; it refuses to go
   on unless codex reports every MCP server disabled, interrupts every codex turn and declines
   every request codex sends.
@@ -75,35 +98,68 @@ microphone or Claude:
 
 **`LiveBridge`** (the app target) wires `BridgeCore` to the menu bar, to `SMAppService` for Open at
 login, and to `AudioHost`: one `WKWebView` in an invisible window (one point, fully transparent,
-click-through, ordered in on every Space, because WebKit holds back the microphone of a page it
-does not consider visible), serving the bundled audio page under its own URL scheme. Before the
-page opens the microphone, the app asks macOS for it itself (WebKit's request never shows the
-prompt for this app). The page owns the microphone, a voice detector (−45 dBFS
-for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a connect it plays the
-queued audio into the peer, dropping silence until it has caught up. For updates,
+click-through, ordered in on every Space, because WebKit holds back the microphone of a page it does
+not consider visible), serving the bundled audio page under its own URL scheme. Before the page
+opens the microphone, the app asks macOS for it itself (WebKit's request never shows the prompt for
+this app); the prompt can stay up a while, so once macOS answers, `Bridge` looks at the call again:
+a Start goes ahead only while the call is on, an Unmute only while it is on and not muted, and a
+take no longer wanted does nothing and reports no refusal. The page owns the microphone, a voice
+detector (−45 dBFS for 250 ms starts speech), a 2-second pre-roll and the WebRTC peer; after a
+connect it plays the queued audio into the peer, dropping silence until it has caught up. Mute stops
+the capture's tracks in one rule where the page acquires the microphone (`microphone.js`), so
+nothing acquired after Mute survives it (no native check backs that release), and Unmute captures
+again with no permission prompt. For updates,
 `SystemUpdateEnvironment` is the real `UpdateEnvironment` (an ephemeral `URLSession`, `gh`,
 `diskutil`, `codesign`, `ditto`, `xattr`, `claude`, `renamex_np` and the relaunch), Settings'
 `UpdateSection` shows the version and the run, and the menu and `Notifier` offer an announced
 release's Install.
+
+**Usage limits.** The menu shows the windows each source reports, as `UsageLimits`
+(`BridgeCore/Limits/`), held in memory only and never written to disk or logs. Codex's are read
+each time the menu opens, at most once a minute and one read at a time, by a short-lived
+`codex app-server` on the voice's locked-down argv, started for the read and closed after it, as
+Settings' voice list is; it asks `account/rateLimits/read`, also while the call is off, and its
+lifecycle is separate from `RealtimeSession`'s. A failed read leaves the last reading until it is
+15 minutes old. Claude's arrive from the mod on `POST /v1/limits` and merge window by window (the
+later reset wins, on the same reset the higher percent), so sessions on one account feed one
+reading; a window whose reset has passed is left out until a new reading comes, and one with no
+reset is left out 15 minutes after its reading. `LimitRow` turns a
+reading into the menu's row and tooltip.
 
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
 desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
 and joins again when that title changes, polls it once a second, submits each voice request to
 the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
-origin. A voice turn is one that has started: while a voice request waits for the running turn
-to end, that turn's questions, and the notice of its permission prompts, stay in Claude Code. It
+origin. It posts every other main-loop turn to the app as synced lines (`POST /v1/sync`; a
+background turn inside the follow-up window posts its answer as an update instead): the
+owner's prompt at the turn's start, but only when its origin is `composer`, the only kind taken
+to be a person typing ([ADR 0001](../adr/0001-platform-findings.md), item m): observed in a
+terminal, **inferred and not observed in the desktop app**, so a prompt typed there may arrive as
+`sdk` and go unrecorded with no gap marked. Another kind is not the owner's, and its answer is
+Claude's; that `bridge` is Remote Control is the type's wording, not observed. Claude's final answer
+goes at the turn's end.
+Hooks post in the order they ran, in a queue of their own beside the poll's, and wait for it at
+most 200 ms. It also posts, under the running turn whatever its kind, a keyboard answer to Claude's question
+as the owner's line, and as Claude's lines the mod's own reports: a question closed with no
+answer, a permission prompt that was settled, and a turn that ended without an answer. A question Claude asks, or a permission prompt
+it waits on, in any main-loop turn of a joined session goes to the app; the app says it for the
+target, and for another session says it unless the turn was typed, when it only records it (a
+subagent's approval carries the turn it ran in). A voice request that waits for the
+running turn to end waits as before. It
 draws a band above the prompt with the call's phase, the target, the unheard count and the
-buttons Start/Stop and Talk here, with the problem sentence on a row of its own. A surface
-that has drawn no band for 3 s while the session is joined is asked for it again, and `/live on`
-in a joined session asks every surface for it. Start
-makes the session the target and starts the call; the line the app opens then asks the target
-for its summary (with Load context automatically on), which the mod writes (none for a session
-with no prompt yet; the last one again, with no model call, until a turn whose answer the voice
-did not get completes, or `/clear`), with a short note in the band while it goes. Talk here shows only while
-the call talks to another session, and moves it here. When the socket does not answer, it opens
-`/Applications/LiveBridge.app`, where both install routes put it, with `open -g`, and falls back
-to `open -g -b <bundle id>`.
+buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries `isMuted`, with a
+`· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own.
+A surface that has drawn no band for 3 s while the session is joined is asked for it again, and
+`/live on` in a joined session asks every surface for it. Start makes the session the target and
+starts the call; the line the app opens then asks the target for its summary when the voice would
+lack part of the session (it has none, a turn did not arrive, the lines since the summary no
+longer all fit the seed, or the mod does not sync), unless the pause setting is on or the session
+is *paused*. The mod writes it (none for a session with no prompt yet; the last one again, with
+no model call, until any main-loop turn completes, or `/clear`), with a
+short note in the band while it goes. Talk here shows only while the call talks to another session,
+and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
+both install routes put it, with `open -g`, and falls back to `open -g -b <bundle id>`.
 
 ## The wire
 
@@ -116,15 +172,17 @@ that both test suites parse.
 
 | Route | Body or reply |
 |---|---|
-| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`; an upsert that also refreshes liveness |
+| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`, `modVersion` from the mod's plugin.json, `syncs` (the mod posts sync lines) and `missed` (a turn did not arrive); an upsert that also refreshes liveness |
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
-| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question or a context ask |
+| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question (`forRequest` names the request the turn's answer now belongs to) or a context ask |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
-| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a voice turn (none: a permission prompt), `text` what Claude wrote in the step that pauses |
-| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters |
-| `POST /v1/target`, `POST /v1/call` | make this session the target; Start or Stop |
+| `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `turn` the main-loop turn it belongs to: `{ id, request? }`, `request` being the voice request the turn's answer belongs to; absent between turns and from a released mod |
+| `POST /v1/sync` | `sessionId`, `turn`, `kind` and `text`: a line of a main-loop turn. A voice turn posts its `start`, what is typed into it and the mod's lines; its answer goes by `/v1/answer`. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
+| `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. One the app asked for before the latest gap or forget is ignored; one nobody asked for (`/live context`) cannot be dated and is taken, so it can clear a *paused* mark across a refused turn |
+| `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
-Every reply carries the status: the phase, the sessions with their labels (`Title · ab12` when
+Every reply carries the status: the phase, `isMuted`, the sessions with their labels (`Title · ab12` when
 two titles are the same) and which one is the target, the minutes today, the problem sentence
 and the count of unheard results. What only the app's menu shows (the minutes this call, the
 target's context line and its conversation) is not on the wire.
@@ -148,9 +206,12 @@ is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text
 owner (local voice detection) nor the voice is speaking; when either was, the bridge waits until
 both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
 line. A window that passes with no result closes the line once it is silent; when the result comes,
-it opens the line again, as below. A line with no handoff waiting keeps the plain silence rule, so
-an exchange that sends nothing to Claude costs no more than before. codex has no request that makes
-the v3 voice respond, so whether it says the speakable text at once is the model's choice
+it opens the line again, as below. A question or an approval notice of the session the open line is
+about goes the same way, whoever started the turn, and ends no wait for a result; another session's
+is added as context unless that session was handed a request. A line with no handoff waiting keeps
+the plain silence rule, so an exchange that sends nothing to Claude costs no more than before. codex
+has no request that makes the v3 voice respond, so whether it says the speakable text at once is the
+model's choice
 ([ADR 0001](../adr/0001-platform-findings.md) (b)).
 
 ```mermaid
@@ -189,7 +250,7 @@ The realtime session is billed while open, so silence closes it. Voice detection
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
-its context when **Load context automatically** is on (the default); the line does not wait for
+its context when the voice would lack part of the session (see the mod's Start above) and neither the pause setting is on nor the session *paused*; the line does not wait for
 it, and a summary that comes while the line connects is added once it is connected, unless the
 line was seeded with the same one.
 
@@ -217,11 +278,12 @@ the target's conversation holds a turn of the owner's; a line seeded without one
 0001](../adr/0001-platform-findings.md) (b)). The bridge decides this from the registry's target and
 the conversation, and passes it with the delivery. The new realtime session is seeded with the
 target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
-the voice usually says it unprompted, within about 8 s of connecting ([ADR
-0001](../adr/0001-platform-findings.md) (n)). If it does not, the 20 s silence rule closes the line,
-and the line chimes and waits as below. The mod's request that brought the line does not wait for
-the connect, and a question or approval the owner settles at the keyboard while its line still
-connects closes that line.
+the voice often says it unprompted, and sometimes says nothing ([ADR
+0001](../adr/0001-platform-findings.md) (n)). Until the owner or the voice speaks on such a line,
+its silence is `CallMachine.firstWordSeconds` (5 s) instead of 20 s, also after another line
+arrives; then the line closes, and the line chimes and waits as below. A voice that starts later is
+cut off. The mod's request that brought the line does not wait for the connect, and a question or
+approval the owner settles at the keyboard while its line still connects closes that line.
 
 Any other line that arrives while the line is closed (one from a session that is not the target, a
 later update) does not open it. It chimes, the notification names the session, and the line waits;
@@ -258,7 +320,9 @@ chimes and waits again: it may be said twice, but it is never lost.
 This is the one description of the rule; the README links here.
 
 A newer request to the same session withdraws its older unheard result, a timed-out one
-included, so the voice never reads an answer that has been superseded. An `[APPROVAL]` notice is
+included, so the voice never says a superseded answer. An answer that arrives after a newer
+request is not said either: it is kept in the conversation as Claude's line and added to the open
+line as context (`Bridge.keepSuperseded`). An `[APPROVAL]` notice is
 withdrawn once the approval is settled.
 
 ### Question loop
@@ -311,11 +375,16 @@ sequenceDiagram
 
 ### Approval notice
 
-The bridge never answers a permission prompt. When a voice turn hits one, the voice says that
-Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and
-re-run", and that only the owner can answer it, in Claude Code.
+This notice is not sent where Claude Code's built-in guard loads and the mod is not the
+organization's own ([known limitations](../../README.md#known-limitations), [ADR 0001](../adr/0001-platform-findings.md)).
 
-Both pauses of a voice turn, this prompt and Claude's question below, carry the text of the
+The bridge never answers a permission prompt. When a main-loop turn hits one, the voice is given
+that Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and
+re-run", and that only the owner can answer it, in Claude Code. It may say so; nothing makes it
+(on a live line it went unsaid in the runs counted in
+[ADR 0001](../adr/0001-platform-findings.md) (n)).
+
+Both pauses of a turn, this prompt and Claude's question below, carry the text of the
 main loop's model step that pauses: the engine's turn end carries only the turn's last text, and
 a pause only itself, so that text would reach the voice no other way. The mod keeps it as the
 step streams, since the engine may run a tool before its step ends, and takes it once: a second
@@ -330,10 +399,10 @@ sequenceDiagram
   participant Bridge
   participant Mod
   participant Claude
-  Claude->>Mod: classic.PermissionRequest (during a voice turn)
+  Claude->>Mod: classic.PermissionRequest (during a main-loop turn)
   Mod->>Bridge: POST /v1/activity approval (and the step's text)
   Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before asking: …"
-  Codex-->>Owner: says so (a closed line opens for it, as for a result)
+  Codex-->>Owner: may say so (a closed line opens for it, as for a result)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
   Mod->>Bridge: POST /v1/activity working
@@ -341,13 +410,15 @@ sequenceDiagram
 
 ### Claude's question mid-turn
 
-When Claude asks the owner a question during a voice turn (the AskUserQuestion dialog), the
+When Claude asks the owner a question during a main-loop turn (the AskUserQuestion dialog), the
 dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
-line, followed by the step's text (above). The voice explains it and talks it over from what it
+line, followed by the step's text (above). The voice may explain it and talk it over from what it
 knows, without handoffs; the owner's next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
-dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session
-has not polled by then goes as a request of its own.
+dialog. With none in flight (a typed turn asked, or a voice turn outlived its request) the reply is
+the request in flight and the mod moves the turn onto it, so the turn's answer closes it; a mod that
+does not sync cannot, so there it opens nothing. An answer at the keyboard that comes first
+withdraws the line, and a reply the session has not polled by then goes as a request of its own.
 
 ```mermaid
 sequenceDiagram
@@ -356,7 +427,7 @@ sequenceDiagram
   participant Bridge
   participant Mod
   participant Claude
-  Claude->>Mod: tool.call AskUserQuestion (during a voice turn)
+  Claude->>Mod: tool.call AskUserQuestion (during a main-loop turn)
   Mod->>Bridge: POST /v1/activity approval + question (and the step's text)
   Bridge->>Codex: "[ASKING] label: question. Options: …"
   Codex-->>Owner: explains, talks it over
@@ -433,13 +504,24 @@ only if it is still the one it bound.
   does nothing but report "No Claude Code session has joined: run /live on in a session, then
   start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
   session closing, the menu's ×, or no poll for 5 s) stops a call that is on, a Start still
-  launching codex included, as Stop does, and reports the same sentence.
+  launching codex included, as Stop does, and reports the same sentence. Any session that leaves
+  takes its waiting question, its approval notice and its question's route with it; the lines stay
+  recorded.
 - **Codex missing or signed out:** Start reports why in one sentence, in the menu and the
   band, and the call stays off. So does a `codex features list` that fails, cannot be read, or
   gives no answer within 10 s.
-- **A plan without realtime voice, or any realtime error:** the first connect reports codex's
-  own words in one sentence, with a hint when they name sign-in or the plan, and the call goes
-  back to `listening`.
+- **A realtime error:** the first connect reports codex's own words in one sentence, with a hint
+  when they name sign-in or the plan, and the call goes back to `listening`.
+- **A refusal a new line would get too:** the plan's usage limit, a plan without voice or a 429
+  with no known body, recognised in codex's wording, as this path carries no code; or an `error`
+  about usage on the line's data channel, which codex does not report, recognised by its code.
+  The call ends, so speech does not open lines that fail, and until Start or Stop it keeps what
+  waits to be said, lines that arrive meanwhile too, with a question's route. A new target, here as
+  at any time, takes another session's waiting question off the queue and ends its route; the
+  question stays recorded, so that session's next line is seeded with it. A synced line is
+  context, not one of those: the conversation keeps it for the next seed. The pause setting counts
+  this call as stopped. Only a spent budget is called a limit: the others are said as ChatGPT not
+  allowing the voice.
 - **Codex installed with npm, or found only through a shell's start-up files:** the app reads
   `PATH` from the user's own shell (at most 3 s) and starts codex with it; a codex whose runtime
   is still missing gets its own sentence.
@@ -454,5 +536,9 @@ only if it is still the one it bound.
   could not be opened, perhaps because another app holds it; a request still pending after
   10 s fails with its own sentence instead of listening to nothing. When the
   default input changes mid-call, the page takes the new one and keeps the peer.
+- **Unmute cannot take the microphone** (denied, busy, missing) **or the audio page cannot be
+  reached:** the call goes to `off` with the reason, as at Start.
+- **The audio page cannot confirm a Mute:** the call ends, which releases the microphone, rather
+  than showing Muted over an open one.
 - **Local Network access blocked:** with no ICE candidate within 2 s, the call goes to `off` with a
   sentence naming the setting.

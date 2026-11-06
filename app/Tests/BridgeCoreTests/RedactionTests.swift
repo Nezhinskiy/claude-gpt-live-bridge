@@ -16,10 +16,28 @@ struct RedactionTests {
     ("clone https://user:hunter2@example.com/repo.git", "hunter2"),
     ("password: hunter2", "hunter2"), ("client_secret=abc123def", "abc123"),
     ("API_KEY = 'abc123def'", "abc123"), ("access_token: abc123def", "abc123"),
+    ("AWS_SECRET_ACCESS_KEY=abc123def456", "abc123"),
+    ("STRIPE_SECRET_KEY=sk_live_abc123def456", "sk_live"),
+    ("DB_PASSWORD_PROD=hunter2", "hunter2"),
   ])
   func redactsNamedPattern(text: String, secret: String) {
     let redacted = Redaction.redact(text)
     #expect(!redacted.contains(secret) && redacted.contains("(redacted)"), "\(redacted)")
+  }
+
+  /// All typed text goes through this on the bridge's actor, so a pasted dump of the mod's 32,000
+  /// characters must not hold up every session's poll.
+  @Test(arguments: ["a3f9", "token", "secret_"])
+  func aLongUnbrokenRunTakesNoTime(run: String) {
+    let text = String(repeating: run, count: 32_000 / run.count)
+    let took = ContinuousClock().measure { _ = Redaction.redact(text) }
+    #expect(took < .seconds(1))
+  }
+
+  /// The field name may run on after the keyword, up to a limit that keeps the rule linear.
+  @Test func aLongFieldNameIsStillAField() {
+    let name = "api_key_" + String(repeating: "x", count: 56)
+    #expect(Redaction.redact("\(name)=hunter2") == "\(name)=(redacted)")
   }
 
   @Test func keepsFullGitShas() {

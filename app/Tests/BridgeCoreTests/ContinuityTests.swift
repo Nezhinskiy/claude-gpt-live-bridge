@@ -4,13 +4,24 @@ import Testing
 @testable import BridgeCore
 
 struct ContinuityTests {
+  /// codex counts UTF-8 bytes over 4 and refuses a start past the limit (ADR 0001 (o)).
+  @Test func aRussianSeedStaysUnderCodexsLimit() {
+    var conversation = Conversation()
+    let line = String(repeating: "Это строка ответа. ", count: 100)
+    for _ in 0..<Conversation.keptLines { conversation.record(.claude, line) }
+    let tokens = conversation.initialItems(tasks: []).reduce(0) {
+      $0 + ($1.text.utf8.count + 3) / 4
+    }
+    #expect(tokens <= Conversation.maxTokens)
+  }
+
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
   @Test func itemsKeepNewestWithinLimits() {
     var conversation = Conversation()
     for n in 0..<30 { conversation.record(.owner, "\(n)".padding(2_000)) }
-    #expect(conversation.lines.count == 24)
+    #expect(conversation.lines.count == 30)
     let items = conversation.initialItems(tasks: [])  // 500 estimated tokens each: 16 fit
     #expect(items.map { $0.text.prefix(2) } == (14..<30).map { "\($0)" })
     let tasks = (0..<120).map { "task \($0)" }
@@ -107,6 +118,268 @@ struct ContinuityTests {
     #expect(throws: DecodingError.self) {
       try JSONDecoder().decode(Continuity.self, from: Data(old.utf8))
     }
+  }
+}
+
+extension ContinuityTests {
+  var voice: RequestID { RequestID(rawValue: "request-1") }
+
+  func admit(
+    _ continuity: inout Continuity, _ turn: String, request: RequestID? = nil, _ kind: SyncKind,
+    _ id: SessionID, pausing: Bool
+  ) -> Bool {
+    continuity.admits(
+      turn: TurnRef(id: turn, request: request), kind: kind, in: id, pausing: pausing)
+  }
+
+  @Test func aFileFromBeforeSyncStillDecodes() throws {
+    let old = """
+      {"conversations":{"\(a.rawValue)":{"lines":[{"speaker":"owner","text":"hi"}],\
+      "context":"[CONTEXT] Alpha: x","lastUsed":1}}}
+      """
+    let continuity = try JSONDecoder().decode(Continuity.self, from: Data(old.utf8))
+    #expect(continuity[a].context == "[CONTEXT] Alpha: x")
+    #expect(continuity[a].lines.map(\.text) == ["hi"])
+    #expect(continuity[a].outOfSync == nil)
+    #expect(continuity[a].isCurrent)
+  }
+
+  /// A voice turn holds nothing of the owner's to keep out, until the owner types into it.
+  @Test func aVoiceTurnIsAdmittedWhilePausing() {
+    var continuity = Continuity()
+    #expect(admit(&continuity, "t1", request: voice, .start, a, pausing: true))
+    #expect(continuity[a].outOfSync == nil)
+  }
+
+  @Test func aVoiceTurnTypedIntoWhilePausingIsRefused() {
+    var continuity = Continuity()
+    #expect(admit(&continuity, "t1", request: voice, .start, a, pausing: true))
+    #expect(!admit(&continuity, "t1", request: voice, .typed, a, pausing: true))
+    #expect(continuity[a].outOfSync == .paused)
+  }
+
+  /// The `start` of its turn never arrived: its prompt may be the paused text.
+  @Test(arguments: [SyncKind.answer, .report])
+  func aClaudeLineWithNoDecisionStaysOutOfAPausedSession(kind: SyncKind) {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: true)
+    #expect(!admit(&continuity, "t1", kind, a, pausing: false))
+  }
+
+  @Test func aClaudeLineWithNoDecisionGoesInOutsideThePause() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: false)
+    #expect(admit(&continuity, "t1", .answer, a, pausing: false))
+  }
+
+  /// The owner's own words with the call on are no paused line, whatever the session's mark.
+  @Test func aTypedLineWithNoDecisionGoesInToAPausedSession() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: true)
+    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
+  }
+
+  @Test func aVoiceTurnsLineWithNoDecisionGoesInToAPausedSession() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: true)
+    #expect(admit(&continuity, "t1", request: voice, .report, a, pausing: true))
+  }
+
+  @Test func aNewTurnDecidesAgain() {
+    var continuity = Continuity()
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
+    #expect(admit(&continuity, "t2", .start, a, pausing: false))
+    #expect(continuity[a].outOfSync == .paused)
+    #expect(!admit(&continuity, "t3", .answer, a, pausing: true))
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    #expect(continuity[a].outOfSync == nil)
+  }
+
+  @Test func everyRefusedLineMarksPaused() {
+    var continuity = Continuity()
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    #expect(continuity[a].outOfSync == nil)
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
+    #expect(continuity[a].outOfSync == .paused)
+  }
+
+  @Test func missedDoesNotReplacePaused() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: false)
+    #expect(continuity[a].outOfSync == .missed)
+    continuity.markMissed(a, asPaused: true)
+    #expect(continuity[a].outOfSync == .paused)
+    continuity.markMissed(a, asPaused: false)
+    #expect(continuity[a].outOfSync == .paused)
+  }
+
+  @Test func aSummaryClearsBothCauses() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: false)
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    #expect(continuity[a].outOfSync == nil)
+    continuity.markMissed(a, asPaused: true)
+    continuity.setContext("[CONTEXT] Alpha: y", for: a)
+    #expect(continuity[a].outOfSync == nil)
+  }
+
+  /// After `/clear` the state and the turn's decision go with the conversation.
+  @Test func moveCarriesTheStateAndTheTurn() {
+    var continuity = Continuity()
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
+    continuity.move(a, to: b)
+    #expect(continuity[b].outOfSync == .paused)
+    #expect(!admit(&continuity, "t1", .answer, b, pausing: false))
+    #expect(continuity[a].outOfSync == nil)
+  }
+
+  /// New conversation drops lines and context; a pause and the turn's decision stay.
+  /// The ask came after the gap, so its summary covers it.
+  @Test func aSummaryAskedForAfterAGapCoversIt() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.markMissed(a, asPaused: false)
+    continuity.noteSummaryAsk(of: a, at: now)
+    let taken = continuity.takeSummaryAsk(of: a, at: now)
+    #expect(taken)
+  }
+
+  @Test func aSummaryNobodyAskedForIsTaken() {
+    var continuity = Continuity()
+    continuity.markMissed(a, asPaused: false)
+    let taken = continuity.takeSummaryAsk(of: a, at: Date())
+    #expect(taken)
+  }
+
+  /// A gap the join reports after the ask makes it stale, as a refused line does.
+  @Test func aMissedTurnAfterTheAskRefusesItsSummary() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    let taken = continuity.takeSummaryAsk(of: a, at: now)
+    #expect(!taken)
+  }
+
+  /// The mod joins a second ask to the summary on its way, which is the first ask's.
+  @Test func aSecondAskDoesNotFreshenTheFirst() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    continuity.noteSummaryAsk(of: a, at: now + 1)
+    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
+    #expect(!taken)
+  }
+
+  /// A summary refused closes its ask: the owner's next press stands on its own.
+  @Test func aRefusedSummaryClosesItsAsk() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    _ = continuity.takeSummaryAsk(of: a, at: now)
+    continuity.noteSummaryAsk(of: a, at: now + 1)
+    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
+    #expect(taken)
+  }
+
+  /// A summary that never came (nothing to summarise, or a failure) does not hold back a later one.
+  @Test func anAskPastItsLifeRefusesNothing() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    let later = now + Conversation.askLife
+    continuity.noteSummaryAsk(of: a, at: later)
+    let taken = continuity.takeSummaryAsk(of: a, at: later)
+    #expect(taken)
+  }
+
+  /// `/clear` moves the conversation, and the ask with it.
+  @Test func anAskMovesWithItsConversation() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    continuity.move(a, to: b)
+    let taken = continuity.takeSummaryAsk(of: b, at: now)
+    #expect(!taken)
+  }
+
+  @Test func forgetKeepsAPauseAndItsDecision() {
+    var continuity = Continuity()
+    continuity.record(.owner, "hi", in: a)
+    #expect(!admit(&continuity, "t1", .typed, a, pausing: true))
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
+    continuity.forget(a)
+    #expect(continuity[a].lines.isEmpty)
+    #expect(continuity[a].context == nil)
+    #expect(continuity[a].outOfSync == .paused)
+    #expect(!admit(&continuity, "t1", .answer, a, pausing: false))
+
+    continuity.record(.owner, "hi", in: b)
+    continuity.markMissed(b, asPaused: false)
+    continuity.forget(b)
+    #expect(continuity[b].outOfSync == nil)
+    #expect(!continuity[b].isCurrent)
+  }
+
+  @Test func forgetKeepsAnAdmittedDecisionToo() {
+    var continuity = Continuity()
+    #expect(admit(&continuity, "t1", .typed, a, pausing: false))
+    continuity.forget(a)
+    #expect(admit(&continuity, "t1", .answer, a, pausing: true))
+  }
+
+  @Test func noContextIsNotCurrent() {
+    var continuity = Continuity()
+    continuity.record(.owner, "hi", in: a)
+    #expect(!continuity[a].isCurrent)
+  }
+
+  @Test func currentAfterASummaryAndAShortExchange() {
+    var continuity = Continuity()
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    #expect(continuity[a].isCurrent)
+    continuity.record(.owner, "hi", in: a)
+    continuity.record(.voice, "hello", in: a)
+    #expect(continuity[a].isCurrent)
+    continuity.markMissed(a, asPaused: false)
+    #expect(!continuity[a].isCurrent)
+  }
+
+  @Test func linesTheSeedCannotCarryAreNotCurrent() {
+    var continuity = Continuity()
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    for n in 0..<30 { continuity.record(.owner, "\(n)".padding(2_000), in: a) }
+    #expect(continuity[a].lines.count == 30)
+    #expect(!continuity[a].isCurrent)
+  }
+
+  /// A summary covers the lines before it: the count starts again.
+  @Test func aSummaryAfterManyLinesIsCurrent() {
+    var continuity = Continuity()
+    for n in 0..<30 { continuity.record(.owner, "\(n)".padding(2_000), in: a) }
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    #expect(continuity[a].isCurrent)
+  }
+
+  @Test func linesRolledOffAreNotCurrent() {
+    var continuity = Continuity()
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    for n in 0...Conversation.keptLines { continuity.record(.owner, "w\(n)", in: a) }
+    #expect(continuity[a].lines.count == Conversation.keptLines)
+    #expect(!continuity[a].isCurrent)
+  }
+
+  @Test func aHandoffLineCountsForNothing() {
+    var continuity = Continuity()
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    for n in 0...Conversation.keptLines { continuity.record(.handoff, "task \(n)", in: a) }
+    #expect(continuity[a].isCurrent)
   }
 }
 

@@ -6,6 +6,122 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0]
+
+### Added
+
+- **Conversation sync.** What you type in a joined session and Claude's final answer to it now go
+  into that session's conversation with the voice, as context: an open line gets them at once, a
+  line opened later is seeded with them, and neither chimes nor opens a closed line. This happens
+  while the call is on, and also while it is stopped, so the voice has them at the next Start;
+  nothing leaves the Mac until a line opens. A question Claude asks or a permission prompt it waits
+  on is given to the voice in the target whoever started the turn, and the voice may say it; in
+  another session, one from a turn that was not a voice request is only recorded. A question or a
+  prompt settled without the voice, or a turn that ends without an answer, reaches the voice as a line saying so. Typing does not wait on a stuck codex: the mod's hooks hold
+  at most 200 ms for their posts. A voice answer a newer request superseded is no longer dropped: it is kept in the
+  conversation, unsaid, and added to the open line as context. An older mod's sessions are treated
+  as missing turns, so their lines load a summary as before. On such
+  a mod a voice turn that outlives its 10-minute request and gets a spoken reply loses its answer:
+  the reply opens no request, the answer is refused, and the mod says so in the session (traced, not
+  run). A newer mod on an older app works but
+  differs: a question from a turn you typed goes to the voice too, in other sessions as well, and a
+  spoken reply to it goes with nothing in flight, so the line can wait up to 120 seconds, billed,
+  for no result (traced in the code, not run). Sync is delivered in part: still unchecked are the
+  real desktop app, a real model, **Load context** in the real menu, and whether the voice announces
+  a permission prompt ([known limitations](README.md#known-limitations)). The data is described in
+  [SECURITY.md](SECURITY.md#residual-risk-by-design).
+- **Pause sync while the call is stopped** in Settings (off by default): with it on, what you type
+  while the call is stopped is not recorded, and no line loads a summary by itself; only **Load
+  context** or `/live context` does. It removes nothing already recorded. Typing under the pause
+  into a turn makes the answer of the voice request that turn names fail with a plain reason, with
+  nothing of it recorded or said, and that turn's later questions and approval notices stay out. A
+  request that only waits behind that turn keeps its answer, which can quote the paused text
+  ([SECURITY.md](SECURITY.md#residual-risk-by-design)).
+- The menu shows how much of your Codex and Claude usage is used, one row each, with the percent
+  used of every window the plan reports (up to three), orange from 90 %, and the reset times on
+  hover. Codex's figures are read when the menu opens, at most once a minute, by a short-lived
+  codex that asks OpenAI, also while the call is off; Claude's come from a joined session that has
+  answered ([Privacy](README.md#privacy)).
+- **Star LiveBridge on GitHub** in the menu bar menu opens the repository's page, for those who
+  want to support the project.
+- **Mute** beside Stop, in the band above the prompt and in the menu's call card (**Unmute**
+  while muted), releases the microphone while the call goes on: an answer from Claude still opens
+  the line and goes to the voice to say. While muted LiveBridge holds no microphone, and macOS's
+  microphone indicator shows it. Mute does not close an open line: it closes as if you had
+  stopped speaking when you pressed Mute (the usual silence, counted from Mute if you were
+  speaking), so Mute does not save realtime minutes, and it is not a control against
+  other processes running as you ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+
+### Changed
+
+- The conversation kept for each session holds its last 64 lines instead of 24.
+- **Load context automatically when a line opens** is gone from Settings. A line now loads a summary
+  by itself when the voice lacks part of the session ([when](README.md#the-band-and-the-menu)). An
+  owner who had turned it off gets **Pause
+  sync while the call is stopped** turned on at the update, so summaries stay by hand; turns typed
+  while the call is on now sync all the same.
+- **Load context** in the menu is disabled, reading **Context up to date**, while the voice has
+  the whole conversation. A summary the app asked for before a later gap or **New conversation** is
+  ignored, and the menu keeps offering it.
+- A voice line that Claude's answer opens now closes and chimes when nobody has spoken on it 5
+  seconds after it connects, instead of after 20 seconds of silence. In the runs measured, the
+  voice started within about 2 seconds or not at all
+  ([measurement](docs/adr/0001-platform-findings.md)); a voice that starts later is cut off, and
+  the answer chimes and waits. A silent line costs about 15 seconds less, and the chime comes
+  sooner.
+- After an update, Settings lists the joined Claude Code sessions still on the old mod, by name,
+  instead of always saying that open sessions keep it until they restart. A mod reports its
+  version when it joins; one from before this release names none and counts as old.
+
+### Fixed
+
+- The requirements now say Claude Code 2.1.301 or later. They said 2.1.289, but the mod's hooks do
+  not load on 2.1.296, so `/live` is not there; 2.1.301 is the lowest version checked that loads
+  the mod.
+- At the ChatGPT plan's usage limit the app now says so, in codex's sentence with its reset time
+  where codex gives one, and ends the call, instead of "Realtime voice failed" or a wrong hint that
+  the plan lacks voice, and a new failing line for every word spoken. Answers keep waiting, and
+  Start tries once more. So does a plan without voice, and the service's usage check on the line's
+  data channel, which codex does not report; those are not called a limit, as nothing shows one.
+- The requirements, the site and the app's help and hint now ask for a ChatGPT plan whose Codex
+  includes voice, and the README names the plans OpenAI's pricing page lists, instead of "realtime
+  voice", which no OpenAI page says.
+- A long conversation in a language other than English could stop a line from opening: the app
+  measured its seed in characters while codex counts bytes and refuses a start past its limit.
+- An answer, a question or a permission prompt from the target now opens the closed line whichever
+  session the last line was about, as long as the target's conversation holds a turn of yours (after
+  **New conversation** it only chimes). When the last line had been about another session, the app
+  could close the new line before it started, so the voice was given nothing and the line waited for
+  you to speak or for a second one.
+- Choosing another session, from the menu, the band, `/live target` or `POST /v1/target`, takes
+  every other session's waiting question off the voice's queue and ends its route, so your next
+  words go to the new target and do not answer a question you left behind; it stays recorded for
+  that session's seed. A pause at the plan's limit, with no change of target, keeps the question
+  and its route. A session that leaves or is removed takes its waiting question and approval notice
+  with it, and a failed microphone ends a route as Stop does.
+- A voice request whose turn ends with no answer, as a plain **No** at a permission prompt or a
+  cancelled question does, now fails and says Claude ended the turn without an answer, instead of
+  saying the answer is code or a table only. With a mod from before this release an empty answer
+  still reads as code or a table only.
+- Redaction no longer stalls on a long unbroken run of text.
+- A `/clear` while the line connects keeps the line's seed.
+- A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
+  after the call has ended: the Start that was waiting on the prompt is cancelled.
+
+### Note
+
+- The README's [known limitations](README.md#known-limitations) now say what the mod loses where
+  an organization manages Claude Code: there the mod's hooks on `classic.PermissionRequest`,
+  `classic.PostToolUse`, `classic.PostToolUseFailure` and `classic.PermissionDenied` do not run,
+  so the voice does not say that a permission prompt is waiting, and three managed settings keep
+  a mod you installed from loading. Nothing about the prompt itself changes: it still appears in Claude Code
+  and only you can answer it. No code changed.
+- This release's end-to-end check was `scripts/smoke.sh` on the real voice with a stand-in Claude
+  Code session, and conversation sync's manual check, also on a canned model. Not run: sync with a
+  real model, or in the Claude desktop app. Not seen in the real menu on the final build: **Load
+  context**, and the colouring of the usage rows. The in-app update from 0.3.0 was read, and its
+  data files tested, but not run.
+
 ## [0.3.0]
 
 ### Added

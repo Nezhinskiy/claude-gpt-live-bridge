@@ -1,12 +1,13 @@
 {
   "status": {
     "call": "live",
+    "isMuted": true,
     "minutesToday": 12.25,
     "sessions": [
       {
         "activity": "approval",
         "isTarget": true,
-        "label": "Example session · 0000",
+        "label": "Example session \u00b7 0000",
         "sessionId": "00000000-0000-0000-0000-000000000001"
       }
     ],
@@ -14,6 +15,7 @@
   },
   "work": {
     "brief": "Call it out, the shorter one",
+    "forRequest": "00000000-0000-0000-0000-00000000000a",
     "id": "00000000-0000-0000-0000-00000000000b",
     "kind": "reply",
     "transcript": [

@@ -9,33 +9,47 @@ struct SettingsStoreTests {
   @Test func defaultsUntilChanged() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     let store = SettingsStore(file: file)
-    #expect(store.current == Settings(voice: nil, autoContext: true, notifyResults: true))
+    #expect(store.current == Settings(voice: nil, notifyResults: true))
     #expect(store.current.prompt == "")
   }
 
-  /// A line the app opens loads the session's context unless the owner turned that off; a file
-  /// from before the setting, or without the key, reads it on.
-  @Test func loadContextAutomaticallyIsOnByDefault() throws {
-    #expect(Settings().autoContext)
+  /// A file from before the setting was removed: opting out of the automatic summary becomes
+  /// the pause, so summaries stay by hand; opting in leaves it off.
+  @Test func anOldOptOutBecomesThePause() throws {
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"voice":"marin","autoContext":false}"#.utf8).write(to: file)
+    #expect(SettingsStore(file: file).current.pauseSyncWhileStopped)
+    // an explicit choice of the new setting wins over the old key
+    try Data(#"{"autoContext":false,"pauseSyncWhileStopped":false}"#.utf8).write(to: file)
+    #expect(!SettingsStore(file: file).current.pauseSyncWhileStopped)
+  }
+
+  @Test func anOldOptInLeavesThePauseOff() throws {
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"autoContext":true}"#.utf8).write(to: file)
+    #expect(!SettingsStore(file: file).current.pauseSyncWhileStopped)
+  }
+
+  @Test func pauseSyncDefaultsOff() throws {
+    #expect(!Settings().pauseSyncWhileStopped)
     let file = try temporaryDirectory().appending(path: "settings.json")
     try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
-    #expect(SettingsStore(file: file).current.autoContext)
-    SettingsStore(file: file).update { $0.autoContext = false }
-    #expect(!SettingsStore(file: file).current.autoContext)
+    #expect(!SettingsStore(file: file).current.pauseSyncWhileStopped)
+    SettingsStore(file: file).update { $0.pauseSyncWhileStopped = true }
+    #expect(SettingsStore(file: file).current.pauseSyncWhileStopped)
   }
 
   @Test func changesAreKeptAcrossRestarts() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     SettingsStore(file: file).update {
       $0.voice = "cedar"
-      $0.autoContext = true
       $0.notifyResults = false
       $0.prompt = "Speak with me in Spanish."
     }
     #expect(
       SettingsStore(file: file).current
         == Settings(
-          voice: "cedar", autoContext: true, notifyResults: false,
+          voice: "cedar", notifyResults: false,
           prompt: "Speak with me in Spanish."))
     SettingsStore(file: file).update { $0.voice = nil }
     #expect(SettingsStore(file: file).current.voice == nil)
@@ -47,7 +61,6 @@ struct SettingsStoreTests {
     let file = try temporaryDirectory().appending(path: "settings.json")
     SettingsStore(file: file).update {
       $0.voice = "cedar"
-      $0.autoContext = true
       $0.notifyResults = false
       $0.prompt = "Speak with me in Spanish."
     }
@@ -67,7 +80,7 @@ struct SettingsStoreTests {
     try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
     #expect(
       SettingsStore(file: file).current
-        == Settings(voice: "marin", autoContext: true, notifyResults: true))
+        == Settings(voice: "marin", notifyResults: true))
     try Data(#"{"voice":"marin","model":"gpt-realtime-example","prompt":"Hi."}"#.utf8)
       .write(to: file)
     #expect(SettingsStore(file: file).current == Settings(voice: "marin", prompt: "Hi."))

@@ -1,6 +1,8 @@
+import Foundation
+
 /// What the menu bar menu holds for one status, top to bottom, as a plain value: the call card,
-/// the sessions, the target's whole conversation, the minutes, an update to install, Settings and
-/// Quit. The app renders it
+/// the sessions, the target's whole conversation, the minutes, an update to install, a star on
+/// GitHub, Settings and Quit. The app renders it
 /// into an `NSMenu`, the custom rows as hosted SwiftUI views and the rest as native items, so
 /// the menu has the system's own corners, material and shadow. Pure.
 public struct MenuContent: Sendable, Equatable {
@@ -12,7 +14,7 @@ public struct MenuContent: Sendable, Equatable {
 
   /// What a native item does.
   public enum Command: Sendable, Equatable {
-    case copyJoinCommand, loadContext, newConversation, settings, quit
+    case copyJoinCommand, loadContext, newConversation, starOnGitHub, settings, quit
     /// Installs the release announced, this version.
     case installUpdate(AppVersion)
 
@@ -21,7 +23,7 @@ public struct MenuContent: Sendable, Equatable {
       switch self {
       case .settings: ","
       case .quit: "q"
-      case .copyJoinCommand, .loadContext, .newConversation, .installUpdate: ""
+      case .copyJoinCommand, .loadContext, .newConversation, .starOnGitHub, .installUpdate: ""
       }
     }
   }
@@ -34,7 +36,10 @@ public struct MenuContent: Sendable, Equatable {
     /// What the button does; nil while there is no bridge to ask.
     public let action: CallAction?
     public let canAct: Bool
-    /// "N unheard — speak to hear", when results wait.
+    /// Mute, or Unmute while muted; nil while the call is off or there is no bridge.
+    public let muteAction: CallAction?
+    /// "N unheard — speak to hear", when results wait; "N unheard — unmute and speak to hear"
+    /// while muted.
     public let unheard: String?
     public let problem: String?
     /// The problem is the microphone's refusal: the card offers to open that setting.
@@ -43,6 +48,7 @@ public struct MenuContent: Sendable, Equatable {
     public let codexHelp: CodexHelp?
 
     public var actionTitle: String? { action.map { $0 == .start ? "Start" : "Stop" } }
+    public var muteActionTitle: String? { muteAction.map { $0 == .mute ? "Mute" : "Unmute" } }
   }
 
   public indirect enum Item: Sendable, Equatable {
@@ -62,6 +68,8 @@ public struct MenuContent: Sendable, Equatable {
     case transcript([Conversation.Line])
     /// The target's context line as it was sent: a custom view, wrapped.
     case sent(String)
+    /// A source's usage: a row that only informs, its tooltip saying when the windows reset.
+    case limit(LimitRow)
   }
 
   public let items: [Item]
@@ -70,7 +78,8 @@ public struct MenuContent: Sendable, Equatable {
   /// `available` is a newer release found and not yet installed: the menu offers to install it.
   public init(
     update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
-    available: AppVersion?
+    available: AppVersion?, codexLimits: UsageLimits? = nil, claudeLimits: UsageLimits? = nil,
+    now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
   ) {
     let install: [Item] =
       available.map {
@@ -78,16 +87,23 @@ public struct MenuContent: Sendable, Equatable {
       } ?? []
     let footer: [Item] =
       install + [
+        .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
         .command(.settings, title: "Settings…", isEnabled: true),
         .command(.quit, title: "Quit LiveBridge", isEnabled: true),
       ]
     let shown = update.map { StatusPresentation($0.status) }
+    let hear =
+      update?.status.call == .off
+      ? "start and speak" : shown?.isMuted == true ? "unmute and speak" : "speak"
     let card = CallCard(
       headline: shown?.headline ?? (problem == nil ? "Starting…" : "Off"),
       detail: shown?.detail ?? "",
       tint: problem != nil ? .problem : shown?.tint ?? .quiet, action: shown?.action,
-      canAct: shown?.canAct ?? false,
-      unheard: shown.flatMap { $0.unheard > 0 ? "\($0.unheard) unheard — speak to hear" : nil },
+      canAct: shown?.canAct ?? false, muteAction: shown?.muteAction,
+      unheard: shown.flatMap {
+        $0.unheard > 0
+          ? "\($0.unheard) unheard — \(hear) to hear" : nil
+      },
       problem: problem?.sentence,
       opensMicrophoneSettings: problem?.opensMicrophoneSettings ?? false,
       codexHelp: problem?.help)
@@ -121,17 +137,20 @@ public struct MenuContent: Sendable, Equatable {
       if !talk.isEmpty { talk.append(.separator) }
       talk += [.header("What was sent"), .sent(Self.capped(sent))]
     }
+    let load = target == nil ? contextLoad : contextLoad.shown(needsContext: update.needsContext)
     let context: [Item] = [
-      .command(
-        .loadContext, title: contextLoad.title, isEnabled: target != nil && contextLoad.isEnabled
-      ),
+      .command(.loadContext, title: load.title, isEnabled: target != nil && load.isEnabled),
       .command(.newConversation, title: "New conversation…", isEnabled: target != nil),
       .submenu("Conversation", isEnabled: !talk.isEmpty, items: talk),
     ]
 
+    let limits: [Item] = [("Codex", codexLimits), ("Claude", claudeLimits)].compactMap {
+      LimitRow(name: $0.0, limits: $0.1, now: now, calendar: calendar, locale: locale)
+        .map(Item.limit)
+    }
     items =
-      [.call(card), .separator] + sessions + [.separator] + context
-      + [.separator, .note(Self.minutes(update)), .separator] + footer
+      [.call(card), .separator] + sessions + [.separator] + context + [.separator] + limits
+      + (limits.isEmpty ? [] : [.separator]) + [.note(Self.minutes(update)), .separator] + footer
   }
 
   private static func minutes(_ update: BridgeUpdate) -> String {
@@ -153,7 +172,8 @@ public struct MenuContent: Sendable, Equatable {
       switch item {
       case .call(let card):
         let button = card.actionTitle.map { " · \($0)" + (card.canAct ? "" : " (disabled)") }
-        return [indent + "[call] \(card.headline)" + (button ?? "")]
+        let mute = card.muteActionTitle.map { " · \($0)" }
+        return [indent + "[call] \(card.headline)" + (button ?? "") + (mute ?? "")]
       case .separator: return [indent + "---"]
       case .header(let title): return [indent + "# \(title)"]
       case .session(let row):
@@ -169,6 +189,7 @@ public struct MenuContent: Sendable, Equatable {
         return [indent + "[transcript]"]
           + lines.map { indent + "| \($0.speaker.name): \($0.text)" }
       case .sent(let text): return [indent + "[sent] \(text)"]
+      case .limit(let row): return [indent + "[limit] \(row.name) — \(row.text)"]
       }
     }
   }

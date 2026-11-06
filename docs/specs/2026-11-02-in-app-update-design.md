@@ -33,8 +33,8 @@ At the bottom of Settings, in a section of its own:
 - **Check for updates automatically**, on by default (off by default for a build from source,
   below).
 - After an update, until the next one: `Updated from 0.1.2.` and, when the mod could not be
-  updated, the two commands to run by hand. When the mod was updated:
-  `Claude Code sessions already open keep the old mod until they restart.`
+  updated, the two commands to run by hand. Either way, while a joined session still runs a mod
+  older than the app (or one that names no version): `Still on the old mod: <labels>.`
 
 The update runs only for the copy installed at `/Applications/LiveBridge.app`: the app's
 `Bundle.main.bundleURL`, symlinks resolved, equals that path, and that path is not a symlink.

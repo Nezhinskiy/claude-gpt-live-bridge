@@ -19,7 +19,10 @@ struct CallMachineTests {
   static let unheard: [CallEvent] = [.start, deliver(a), .speechStarted]
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
   static let r = Problem.other("r")
+  static let limit = Problem.codex(.realtimeError("You’ve hit your usage limit."))
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
+  /// A line a result opened waits this long for the voice's first word.
+  static let firstWord = CallEffect.armSilenceTimer(seconds: 5)
   static let alpha = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   static let beta = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
   /// Lines of the bridge's own, which no session waits for.
@@ -40,6 +43,8 @@ struct CallMachineTests {
   static func deliver(_ line: VoiceLine) -> CallEvent { .deliver(line) }
   /// A line the bridge says opens a closed line: the target's answer or question.
   static func opening(_ line: VoiceLine) -> CallEvent { .deliver(line, opensLine: true) }
+  /// A line of the session the open line is about.
+  static func onItsLine(_ line: VoiceLine) -> CallEvent { .deliver(line, onOwnLine: true) }
   static let asking = alphas(.asking, "Which branch?")
   /// A line from Alpha, the session the request was handed to.
   static let fromAlpha = deliver(result)
@@ -58,8 +63,42 @@ struct CallMachineTests {
   }
 
   static let table = [
-    row("startOpensOnlyTheMic", [], .start, .listening, [.startLocalVAD, .problem(nil)]),
+    row(
+      "startClearsTheProblemThenOpensOnlyTheMic", [], .start, .listening,
+      [.problem(nil), .startLocalVAD]),
     row("speechOpensTheVoice", [.start], .speechStarted, .connecting, [.openRealtime]),
+    row(
+      "muteWhileListeningReleasesTheMicrophone", [.start], .mute, .listening,
+      [.muteMicrophone]),
+    row("speechWhileMutedIsIgnored", [.start, .mute], .speechStarted, .listening, []),
+    row(
+      "speechWhileMutedOnALiveLineIsIgnored", live + [.mute], .speechStarted, .live, []),
+    row(
+      "aResultWhileMutedStillOpensTheLine", [.start, .mute], opening(result), .connecting,
+      [.openRealtimeForResult], pending: [result]),
+    row(
+      "muteWhileSpeakingOnALiveLineEndsTheSpeech", live + [.speechStarted], .mute, .live,
+      [.muteMicrophone, arm]),
+    row(
+      "muteWhileAResultIsHeldGivesItItsGrace", waiting + [.speechStarted, fromAlpha], .mute,
+      .live, [.muteMicrophone, arm, grace], pending: [result]),
+    row(
+      "muteWhileConnectingArmsTheSilenceOnConnect", connecting + [.mute], .connected, .live,
+      [.problem(nil), .flushPreroll, arm]),
+    row(
+      "speechWhileMutedOnAConnectingLineDoesNotPinIt", connecting + [.mute, .speechStarted],
+      .connected, .live, [.problem(nil), .flushPreroll, arm]),
+    row("muteOnAQuietLiveLineLeavesItsSilenceRunning", live, .mute, .live, [.muteMicrophone]),
+    row(
+      "muteOnALineAResultOpenedDoesNotExtendTheFirstWordWait",
+      [.start, opening(result), .connected], .mute, .live, [.muteMicrophone],
+      pending: [result]),
+    row("aSecondMuteDoesNothing", live + [.mute], .mute, .live, []),
+    row(
+      "unmuteTakesTheMicrophoneAgain", [.start, .mute], .unmute, .listening,
+      [.unmuteMicrophone]),
+    row("unmuteWhileUnmutedDoesNothing", [.start], .unmute, .listening, []),
+    row("muteWhileOffDoesNothing", [], .mute, .off, []),
     row(
       "deliverWhileListeningChimesAndWaits", [.start], deliver(a), .listening, [.chime],
       pending: [a]),
@@ -68,14 +107,14 @@ struct CallMachineTests {
       pending: [a]),
     row(
       "deliverWhileConnectingIsSentAfterConnect", connecting + [deliver(a)], .connected,
-      .live, [.flushPreroll, .addContext(a), cap, .problem(nil)], pending: [a]),
+      .live, [.problem(nil), .flushPreroll, .addContext(a), cap], pending: [a]),
     row(
       "pendingIsSpokenAfterOwnerSpeaks", unheard + [deliver(b)], .connected, .live,
-      [.flushPreroll, .addContext(a), .addContext(b), cap, .problem(nil)],
+      [.problem(nil), .flushPreroll, .addContext(a), .addContext(b), cap],
       pending: [a, b]),
     row(
       "connectAfterSpeechEndedArmsSilence", connecting + [.speechEnded], .connected, .live,
-      [.flushPreroll, arm, .problem(nil)]),
+      [.problem(nil), .flushPreroll, arm]),
     row(
       "failedConnectChimesForUnheardResults", unheard, .connectFailed(r), .listening,
       [.problem(r), .chime], pending: [a]),
@@ -83,11 +122,66 @@ struct CallMachineTests {
       "closeWhileConnectingChimesForUnheardResults", unheard, .remoteClosed(r), .listening,
       [.problem(r), .chime], pending: [a]),
     row(
+      "aUsageLimitAtOpenEndsTheCall", connecting, .connectFailed(limit), .off,
+      [.problem(limit), .stopLocalVAD, .endCodex]),
+    row(
+      "aUsageLimitMidLineEndsTheCall", live, .remoteClosed(limit), .off,
+      [.problem(limit), .stopLocalVAD, .endCodex]),
+    row(
+      "aUsageLimitKeepsWhatWaits", unheard, .connectFailed(limit), .off,
+      [.problem(limit), .stopLocalVAD, .endCodex, .chime], pending: [a]),
+    row(
+      "aHeldLineIsNoLongerHeldAfterALimit",
+      live + [
+        .handedOff(alpha), .speechStarted, fromAlpha, .remoteClosed(limit), .start,
+        .speechStarted, .connected, .speechEnded,
+      ],
+      .graceElapsed, .live, [], pending: [result]),
+    row(
+      "aLineAfterALimitIsKept", connecting + [.connectFailed(limit)], deliver(a), .off, [.chime],
+      pending: [a]),
+    row(
+      "aLineAfterStopIsDropped", connecting + [.stop], deliver(a), .off, []),
+    row(
+      "stopForgetsWhatALimitKept", unheard + [.connectFailed(limit)], .stop, .off,
+      [.closeRealtime, .stopLocalVAD]),
+    row(
+      "startTriesAgainAfterAUsageLimit", connecting + [.connectFailed(limit)], .start, .listening,
+      [.problem(nil), .startLocalVAD]),
+    row(
+      "aLineAfterStartIsNotKeptByThePause",
+      connecting + [.connectFailed(limit), .start, .stop], deliver(a), .off, []),
+    row(
+      "theServiceRefusingEndsALiveLine", live, .refused(limit), .off,
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
+    row(
+      "theServiceRefusingEndsAConnectingLine", connecting, .refused(limit), .off,
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
+    row(
+      "theServiceRefusingEndsAListeningCall", [.start], .refused(limit), .off,
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
+    row("theServiceRefusingAStoppedCallDoesNothing", [], .refused(limit), .off, []),
+    row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
       [.openRealtimeForResult], pending: [result]),
     row(
-      "theOpenedLineGetsItAsContext", [.start, opening(result)], .connected, .live,
-      [.flushPreroll, .addContext(result), arm, .problem(nil)], pending: [result]),
+      "theOpenedLineGetsItAsContextAndWaitsBrieflyForTheVoice", [.start, opening(result)],
+      .connected, .live, [.problem(nil), .flushPreroll, .addContext(result), firstWord],
+      pending: [result]),
+    row(
+      "theOwnerSpeakingWhileAnOpenedLineConnectsGetsTheNoiseCap",
+      [.start, opening(result), .speechStarted], .connected, .live,
+      [.problem(nil), .flushPreroll, .addContext(result), cap], pending: [result]),
+    row(
+      "anotherLineBeforeTheFirstWordKeepsTheShortWait", [.start, opening(result), .connected],
+      deliver(a), .live, [.addContext(a), firstWord], pending: [result, a]),
+    row(
+      "theOwnersWordsOnAnOpenedLineGetTheUsualSilence", [.start, opening(result), .connected],
+      .userTranscribed, .live, [arm], pending: [result]),
+    row(
+      "theVoiceSpeakingOnAnOpenedLineGetsTheUsualSilence",
+      [.start, opening(result), .connected], .assistantSpeaking, .live, [arm],
+      pending: [result]),
     row(
       "anOpenedLineLeftSilentChimes", [.start, opening(result), .connected], .silenceElapsed,
       .listening, [.closeRealtime, .chime], pending: [result]),
@@ -196,6 +290,30 @@ struct CallMachineTests {
       "anApprovalIsSaidAtOnce", waiting, deliver(approval), .live, [.speak(approval), arm],
       pending: [approval]),
     row(
+      "aQuestionOnItsOwnLineIsSaid", live, onItsLine(asking), .live, [.speak(asking), arm],
+      pending: [asking]),
+    row(
+      "anApprovalOnItsOwnLineIsSaid", live, onItsLine(approval), .live, [.speak(approval), arm],
+      pending: [approval]),
+    row(
+      "aQuestionOnAnotherSessionsLineIsContext", live, deliver(asking), .live,
+      [.addContext(asking), arm], pending: [asking]),
+    row(
+      "aResultNobodyWaitsForOnItsOwnLineIsContext", live, onItsLine(result), .live,
+      [.addContext(result), arm], pending: [result]),
+    row(
+      "aQuestionOnItsOwnLineWaitsWhileTheOwnerSpeaks", live + [.speechStarted], onItsLine(asking),
+      .live, [cap], pending: [asking]),
+    row(
+      "aQuestionOnItsOwnLineWaitsWhileTheVoiceSpeaks", live + [.assistantSpeaking],
+      onItsLine(asking), .live, [arm], pending: [asking]),
+    row(
+      "aHeldQuestionIsSaidAfterTheGrace", live + [.speechStarted, onItsLine(asking), .speechEnded],
+      .graceElapsed, .live, [.speak(asking), arm], pending: [asking]),
+    row(
+      "aQuestionOnItsOwnLineEndsNoWait", waiting + [onItsLine(asking)], .silenceElapsed, .live, [],
+      pending: [asking]),
+    row(
       "anApprovalLeavesTheLineWaiting", waiting + [deliver(approval)], .silenceElapsed, .live, [],
       pending: [approval]),
     row(
@@ -296,6 +414,16 @@ struct CallMachineTests {
     #expect(machine.phase == .listening)
   }
 
+  /// A line a question opened stays once the owner speaks on it while it connects.
+  @Test func withdrawingKeepsAnOpeningLineTheOwnerSpeaksOn() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.opening(Self.asking), .speechStarted] {
+      _ = machine.handle(event)
+    }
+    #expect(machine.withdraw { $0 == Self.asking } == [])
+    #expect(machine.phase == .connecting)
+  }
+
   /// A line the owner opened by speaking stays, whatever is withdrawn from it.
   @Test func withdrawingKeepsALineTheOwnerOpened() {
     var machine = CallMachine()
@@ -314,5 +442,162 @@ struct CallMachineTests {
     #expect(machine.handle(.speechEnded) == [Self.arm])
     #expect(machine.handle(.graceElapsed) == [])
     #expect(machine.pending.isEmpty)
+  }
+
+  /// A line of a turn that is not a voice request: what the voice is given as context, not delivered to be said.
+  static let typed = alphas(.typed, "Rename the folder to out")
+  static let claude = alphas(.claude, "Renamed the folder to out.")
+
+  @Test func aSyncedLineGoesIntoALiveLineAtOnce() {
+    var machine = CallMachine()
+    for event in Self.live { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.typed)) == [.addContext(Self.typed)])
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aConnectingLineTakesSyncedLinesWhenConnected() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, .speechStarted] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    let effects = machine.handle(.connected)
+    #expect(Array(effects.prefix(2)) == [.problem(nil), .flushPreroll])
+    #expect(effects.contains(.addContext(Self.typed)))
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aLineOpenedByAResultTakesThemTooWhenConnected() {
+    var machine = CallMachine()
+    for event in [CallEvent.start, Self.opening(Self.result)] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.claude)) == [])
+    let effects = machine.handle(.connected)
+    #expect(
+      effects.filter { $0 == .addContext(Self.result) || $0 == .addContext(Self.claude) }
+        == [.addContext(Self.result), .addContext(Self.claude)])
+  }
+
+  @Test func dropSyncedForgetsThem() {
+    var machine = CallMachine()
+    for event in Self.connecting + [.synced(Self.typed)] { _ = machine.handle(event) }
+    machine.dropSynced()
+    #expect(!machine.handle(.connected).contains(.addContext(Self.typed)))
+  }
+
+  /// The conversation has them, and seeds the next line.
+  @Test func aHangUpDropsThem() {
+    var machine = CallMachine()
+    for event in Self.connecting + [.synced(Self.typed)] { _ = machine.handle(event) }
+    _ = machine.handle(.connectFailed(Self.r))
+    _ = machine.handle(.speechStarted)
+    #expect(!machine.handle(.connected).contains(.addContext(Self.typed)))
+  }
+
+  @Test func aSyncedLineNeverChimesOrOpens() {
+    var machine = CallMachine()
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    _ = machine.handle(.start)
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    #expect(machine.phase == .listening)
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aMutedLineStillTakesSyncedLines() {
+    var machine = CallMachine()
+    for event in Self.live + [.mute] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.claude)) == [.addContext(Self.claude)])
+  }
+
+  /// The conversation has them, and seeds the next line; a refusal keeps only what is to be said.
+  @Test func aRefusalDropsThem() {
+    var machine = CallMachine()
+    for event in Self.connecting + [.synced(Self.typed), .refused(Self.limit)] {
+      _ = machine.handle(event)
+    }
+    for event in Self.connecting { _ = machine.handle(event) }
+    #expect(!machine.handle(.connected).contains(.addContext(Self.typed)))
+  }
+
+  @Test func aPausedCallHoldsNoSyncedLine() {
+    var machine = CallMachine()
+    for event in Self.live + [.refused(Self.limit)] { _ = machine.handle(event) }
+    #expect(machine.handle(.synced(Self.typed)) == [])
+    #expect(machine.pending.isEmpty)
+  }
+
+  @Test func aLineThePauseKeptAndASyncedLineAreEachGivenOnce() {
+    var machine = CallMachine()
+    for event in Self.live + [Self.deliver(Self.result), .refused(Self.limit)] {
+      _ = machine.handle(event)
+    }
+    for event in Self.connecting + [.synced(Self.typed)] { _ = machine.handle(event) }
+    let added = machine.handle(.connected).filter {
+      $0 == .addContext(Self.result) || $0 == .addContext(Self.typed)
+    }
+    #expect(added == [.addContext(Self.result), .addContext(Self.typed)])
+  }
+
+  // MARK: The question routes
+
+  static let betaAsks = VoiceLine(
+    kind: .asking, label: "Beta · 2c3d", body: "Which folder?", session: beta)
+
+  /// A machine that went through `events`.
+  static func after(_ events: [CallEvent]) -> CallMachine {
+    var machine = CallMachine()
+    for event in events { _ = machine.handle(event) }
+    return machine
+  }
+
+  /// Only a question takes a reply: a result routes the next handoff nowhere.
+  @Test func aLineThatAsksNothingRoutesNothing() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.result)])
+    #expect(machine.takeQuestionRoute() == nil)
+  }
+
+  @Test func theLastQuestionTakesTheHandoff() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.asking), Self.deliver(Self.betaAsks)])
+    #expect(machine.takeQuestionRoute() == Self.beta)
+  }
+
+  @Test func aQuestionAskedAgainIsTheLastAgain() {
+    var machine = Self.after(
+      Self.live + [
+        Self.deliver(Self.asking), Self.deliver(Self.betaAsks), Self.deliver(Self.asking),
+      ])
+    #expect(machine.takeQuestionRoute() == Self.alpha)
+  }
+
+  /// Nothing tells a reply from a new request: one handoff follows a question, the next does not.
+  @Test func aRouteTakesTheRoutesUnderItAlong() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.asking), Self.deliver(Self.betaAsks)])
+    _ = machine.takeQuestionRoute()
+    #expect(machine.takeQuestionRoute() == nil)
+  }
+
+  @Test func aRouteMovesWithItsSession() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.asking)])
+    let new = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    machine.rename(Self.alpha, to: new)
+    #expect(machine.takeQuestionRoute() == new)
+  }
+
+  /// The voice said the question, so the line that replaces this one will not, and an unrelated
+  /// handoff must not follow it.
+  @Test func aPauseEndsTheRouteOfAQuestionAlreadySaid() {
+    var machine = Self.after(
+      Self.live + [
+        Self.deliver(Self.asking), .assistantSpeaking, Self.said("Alpha asks which branch."),
+        .refused(Self.limit),
+      ])
+    #expect(machine.takeQuestionRoute() == nil)
+  }
+
+  /// A result of the session still waits, but a result takes no reply.
+  @Test func aPauseEndsTheRouteThoughAResultOfTheSessionWaits() {
+    var machine = Self.after(
+      Self.live + [
+        Self.deliver(Self.asking), Self.deliver(Self.result), .assistantSpeaking,
+        Self.said("Alpha asks which branch."), .refused(Self.limit),
+      ])
+    #expect(machine.takeQuestionRoute() == nil)
   }
 }

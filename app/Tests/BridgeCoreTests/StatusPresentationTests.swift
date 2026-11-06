@@ -8,7 +8,7 @@ struct StatusPresentationTests {
 
   static func status(
     _ call: CallPhase, other activity: SessionActivity = .idle, problem: String? = nil,
-    unheard: Int = 0
+    unheard: Int = 0, muted: Bool = false
   ) -> StatusReply {
     StatusReply(
       call: call,
@@ -17,28 +17,53 @@ struct StatusPresentationTests {
         SessionRow(
           sessionId: other, label: "Docs site · ab12", activity: activity, isTarget: false),
       ],
-      minutesToday: 31.4, problem: problem, unheard: unheard)
+      minutesToday: 31.4, problem: problem, unheard: unheard, isMuted: muted)
   }
 
-  static let phases: [(CallPhase, String, CallAction, Tint)] = [
-    (.off, "Off", .start, .quiet),
-    (.listening, "Listening — line closed", .stop, .quiet),
-    (.connecting, "Connecting…", .stop, .active),
-    (.live, "Live", .stop, .active),
+  static let phases: [(CallPhase, String, CallAction, CallAction?, Tint)] = [
+    (.off, "Off", .start, nil, .quiet),
+    (.listening, "Listening — line closed", .stop, .mute, .quiet),
+    (.connecting, "Connecting…", .stop, .mute, .active),
+    (.live, "Live", .stop, .mute, .active),
   ]
 
   @Test(arguments: [SessionActivity.idle, .working, .approval])
   func eachPhaseWithEachActivity(_ activity: SessionActivity) {
-    for (phase, headline, action, tint) in Self.phases {
+    for (phase, headline, action, muteAction, tint) in Self.phases {
       let shown = StatusPresentation(Self.status(phase, other: activity))
       #expect(shown.bars == phase)
       #expect(shown.headline == headline)
       #expect(shown.action == action)
+      #expect(shown.muteAction == muteAction)
       let badge: Badge = [.idle: .none, .working: .working, .approval: .approval][activity]!
       #expect(shown.badge == badge, "\(phase) \(activity)")
       #expect(shown.tint == (activity == .approval ? .attention : tint), "\(phase) \(activity)")
       #expect(shown.badge != .problem)
     }
+  }
+
+  @Test func aMutedCallOffersUnmute() {
+    #expect(
+      StatusPresentation(Self.status(.listening, muted: true)).muteAction == .unmute)
+  }
+
+  @Test func mutedListeningSaysOnlyClaudeOpensTheLine() {
+    let shown = StatusPresentation(Self.status(.listening, muted: true))
+    #expect(shown.headline == "Muted — line closed")
+    #expect(shown.detail == "The line opens when Claude answers you.")
+    #expect(shown.accessibilityLabel.contains("Muted"))
+  }
+
+  @Test func aMutedConnectingCallKeepsItsHeadline() {
+    let shown = StatusPresentation(Self.status(.connecting, muted: true))
+    #expect(shown.headline == "Connecting… · muted")
+  }
+
+  @Test func aMutedLineKeepsItsPhase() {
+    let shown = StatusPresentation(Self.status(.live, muted: true))
+    #expect(shown.headline == "Live · muted")
+    #expect(shown.bars == .live)
+    #expect(shown.tint == .active)
   }
 
   @Test func liveNamesTheTarget() {
