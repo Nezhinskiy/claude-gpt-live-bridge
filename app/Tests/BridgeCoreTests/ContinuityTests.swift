@@ -4,6 +4,17 @@ import Testing
 @testable import BridgeCore
 
 struct ContinuityTests {
+  /// codex counts UTF-8 bytes over 4 and refuses a start past the limit (ADR 0001 (o)).
+  @Test func aRussianSeedStaysUnderCodexsLimit() {
+    var conversation = Conversation()
+    let line = String(repeating: "Это строка ответа. ", count: 100)
+    for _ in 0..<Conversation.keptLines { conversation.record(.claude, line) }
+    let tokens = conversation.initialItems(tasks: []).reduce(0) {
+      $0 + ($1.text.utf8.count + 3) / 4
+    }
+    #expect(tokens <= Conversation.maxTokens)
+  }
+
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
