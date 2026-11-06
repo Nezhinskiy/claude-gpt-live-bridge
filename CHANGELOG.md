@@ -15,8 +15,8 @@ All notable changes to this project are listed here. The format follows
   nothing leaves the Mac until a line opens. A question Claude asks or a permission prompt it waits
   on is given to the voice in the target whoever started the turn, and the voice may say it; in
   another session, one from a turn that was not a voice request is only recorded. A question or a
-  prompt settled without the voice, or a turn that ends without an answer, reaches the voice as a
-  line saying so. A voice answer a newer request superseded is no longer dropped: it is kept in the
+  prompt settled without the voice, or a turn that ends without an answer, reaches the voice as a line saying so. Typing does not wait on a stuck codex: the mod's hooks hold
+  at most 200 ms for their posts. A voice answer a newer request superseded is no longer dropped: it is kept in the
   conversation, unsaid, and added to the open line as context. An older mod's sessions are treated
   as missing turns, so their lines load a summary as before. A newer mod on an older app works but
   differs: a question from a turn you typed goes to the voice too, in other sessions as well, and a
@@ -28,8 +28,10 @@ All notable changes to this project are listed here. The format follows
 - **Pause sync while the call is stopped** in Settings (off by default): with it on, what you type
   while the call is stopped is not recorded, and no line loads a summary by itself; only **Load
   context** or `/live context` does. It removes nothing already recorded. Typing under the pause
-  into a turn that runs a voice request makes that request's answer fail with a plain reason, with
-  nothing of it recorded or said, and that turn's later questions and approval notices stay out.
+  into a turn makes the answer of the voice request that turn names fail with a plain reason, with
+  nothing of it recorded or said, and that turn's later questions and approval notices stay out. A
+  request that only waits behind that turn keeps its answer, which can quote the paused text
+  ([SECURITY.md](SECURITY.md#residual-risk-by-design)).
 - The menu shows how much of your Codex and Claude usage is used, one row each, with the percent
   used of every window the plan reports (up to three), orange from 90 %, and the reset times on
   hover. Codex's figures are read when the menu opens, at most once a minute, by a short-lived
@@ -49,8 +51,8 @@ All notable changes to this project are listed here. The format follows
 
 - The conversation kept for each session holds its last 64 lines instead of 24.
 - **Load context automatically when a line opens** is gone from Settings. A line now loads a summary
-  by itself when the voice lacks part of the session ([when](README.md#the-band-and-the-menu)), and
-  never after a pause or while the pause setting is on. An owner who had turned it off gets **Pause
+  by itself when the voice lacks part of the session ([when](README.md#the-band-and-the-menu)). An
+  owner who had turned it off gets **Pause
   sync while the call is stopped** turned on at the update, so summaries stay by hand; turns typed
   while the call is on now sync all the same.
 - **Load context** in the menu is disabled, reading **Context up to date**, while the voice has
@@ -96,9 +98,6 @@ All notable changes to this project are listed here. The format follows
   cancelled question does, now fails and says Claude ended the turn without an answer, instead of
   saying the answer is code or a table only. With a mod from before this release an empty answer
   still reads as code or a table only.
-- A turn with no voice request that ends without an answer now reaches the voice as a line saying
-  so.
-- A typed turn no longer waits on a stuck codex: the mod's hooks hold at most 200 ms for their posts.
 - Redaction no longer stalls on a long unbroken run of text.
 - A `/clear` while the line connects keeps the line's seed.
 - A Stop pressed while macOS's first microphone prompt was showing no longer opens the microphone
