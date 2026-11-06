@@ -24,11 +24,14 @@
   <a href="#योगदान">योगदान</a>
 </p>
 
-LiveBridge एक macOS menu bar app है, जो आपके ChatGPT login पर `codex app-server` के ज़रिए
-GPT-Live voice line तैयार रखता है (API key की ज़रूरत नहीं)। Voice फ्रंट डेस्क की तरह काम करता है:
-वह बातचीत करता है, पूछता है कि आपका मतलब क्या है, और असली काम एक छोटे Claude Code mod,
-`livebridge`, के ज़रिए आपके Claude Code session को सौंप देता है। Claude अपने model, tools और
-permission mode से काम करता है, और voice आपको नतीजा बताता है।
+LiveBridge एक macOS menu bar app है, जो आपके ChatGPT login पर `codex app-server` के ज़रिए GPT-Live
+voice line तैयार रखता है (API key की ज़रूरत नहीं)। Voice फ्रंट डेस्क की तरह काम करता है: वह बातचीत
+करता है, पूछता है कि आपका मतलब क्या है, और असली काम एक छोटे Claude Code mod, `livebridge`, के ज़रिए
+आपके Claude Code session को सौंप देता है। Claude अपने model, tools और permission mode से काम करता
+है, और voice आपको नतीजा बताता है। Claude के काम करते समय line खुली रखने की ज़रूरत नहीं: उसका जवाब
+बंद line को फिर से खोलता है और voice को बोलने के लिए दिया जाता है। Voice यह भी जानता रहता है कि आप
+session में क्या टाइप करते हैं और Claude क्या जवाब देता है, इसलिए आप बोलने और टाइप करने के बीच आ-जा
+सकते हैं।
 
 *मूल पाठ अंग्रेज़ी में है ([README.md](README.md)); यह अनुवाद पीछे रह सकता है।*
 
@@ -37,8 +40,7 @@ permission mode से काम करता है, और voice आपको 
 **डिज़ाइन से ही लोकल।** कोई telemetry नहीं और अपना कोई server नहीं: LiveBridge आपके Mac पर आपके अपने
 codex और आपके अपने Claude Code के बीच एक bridge है। App और mod सिर्फ़ एक Unix socket पर बात करते
 हैं, जिसे केवल आपका user खोल सकता है, और app किसी network port पर listen नहीं करता। जो traffic ये
-दोनों tools पहले से भेजते हैं (voice line का traffic आपके codex के ज़रिए OpenAI को, सिर्फ़ तब जब
-line खुली हो, और Claude का काम आपके Claude Code session के ज़रिए Anthropic को), उसके अलावा app का
+दोनों tools पहले से भेजते हैं (voice line का traffic आपके codex के ज़रिए OpenAI को, सिर्फ़ तब जब line खुली हो, साथ में जुड़े session में आपका टाइप किया text, और Claude का काम आपके Claude Code session के ज़रिए Anthropic को), उसके अलावा app का
 अपना traffic सिर्फ़ ये है: menu खोलने पर थोड़ी देर चलने वाला एक codex OpenAI से आपके Codex usage के आँकड़े
 माँगता है, call बंद हो तब भी; और [updates](#अपडेट-करना) का traffic: GitHub से नए release की अपने-आप होने वाली जाँच
 (दिन में एक बार, और हर launch पर जब तक उसके बताए release को install न किया गया हो), जिसे आप बंद कर
@@ -54,7 +56,7 @@ line खुली हो, और Claude का काम आपके Claude Cod
 ## त्वरित शुरुआत
 
 आपको चाहिए: Apple Silicon पर macOS 14+, Claude Code 2.1.301+, और [codex](https://github.com/openai/codex),
-जिसमें `codex login` से ऐसे ChatGPT plan पर sign in किया गया हो जिसमें realtime voice शामिल है;
+जिसमें `codex login` से ऐसे ChatGPT plan पर sign in किया गया हो जिसके Codex में voice शामिल है;
 app को खुद build करने के लिए Swift 6.0+ वाला Xcode भी। विवरण [आवश्यकताएँ](#आवश्यकताएँ) में हैं।
 
 ```sh
@@ -87,7 +89,8 @@ Update, अनुमतियाँ, नए build के बाद भी microp
 - [Codex CLI](https://github.com/openai/codex) (`codex`, 0.166.0 के साथ टेस्ट किया गया), जो
   Homebrew (`brew install --cask codex`) या npm (`npm install -g @openai/codex`) से install हो,
   Terminal window में आपके shell द्वारा सेट किए गए `PATH` पर हो, और `codex login` से ऐसे ChatGPT plan
-  पर sign in हो जिसमें realtime voice शामिल है। जिस codex की `codex features list` LiveBridge पढ़
+  पर sign in हो जिसके Codex में voice शामिल है (Plus, Pro, Business, Enterprise या Education,
+  [OpenAI की Codex pricing](https://learn.chatgpt.com/docs/pricing) के अनुसार)। जिस codex की `codex features list` LiveBridge पढ़
   नहीं पाता, उसे वह अस्वीकार कर देता है, इसलिए कोई दूसरा संस्करण तब तक शुरू नहीं हो सकता जब तक
   LiveBridge अपडेट न हो।
 - App build करने के लिए: Swift 6.0 या उसके बाद के toolchain वाला Xcode। टेस्ट किए गए संस्करण
@@ -203,6 +206,10 @@ claude plugin uninstall livebridge@livebridge
 बीच में रुका update छोड़ सकता है। app ऐसी copies अगले launch पर हटा देता है; uninstall के बाद, अगर
 ऐसी copy हो तो उसे हाथ से हटाएँ।
 
+`claude plugin uninstall` शायद mod का snapshot, `~/.claude/plugins/store/livebridge_*.json`, छोड़
+दे: Claude Code की documentation में जो हटता है उसकी सूची में यह file नहीं है, और यह चलाकर नहीं देखा
+गया। अगर वह मौजूद हो तो उसे हाथ से मिटा दें।
+
 ## उपयोग
 
 ### कमांड
@@ -225,37 +232,41 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 **Start** दबाएँ, prompt के ऊपर वाले band में या menu bar menu में, और बोलें।
 
-- **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है
-  उसे session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
-  हिस्सा न होता (सारांश अभी नहीं है, कोई turn नहीं पहुँचा, सारांश के बाद की पंक्तियाँ voice की क्षमता से
-  ज़्यादा हैं, या mod sync से पहले का है), पर **Pause sync** चालू रहते या pause के बाद कभी नहीं
-  ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही
-  हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे
-  वापस ले आता है।
+- **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है उसे
+  session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
+  हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद कभी नहीं
+  ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही हो,
+  तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे वापस ले
+  आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
-  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), उपयोग की सीमाएँ, मिनट,
+  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है, voice के Claude को सौंपे
+  हर अनुरोध के लिए एक **Task** पंक्ति के साथ), उपयोग की सीमाएँ, मिनट,
   **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
-  चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice उसे
-  बोलती है। band phase वैसी ही रखता है और `· muted` जोड़ता है; जब कोई line खुली न हो, menu "Muted —
-  line closed" कहता है। Mute line बंद नहीं करता: खुली line सामान्य चुप्पी के बाद बंद होती है, जो आप
-  बोल रहे थे तो Mute से गिनी जाती है, और line पहले से शांत थी तो तब बंद होती है जब Mute के बिना
-  होती; वह किसी भी चुप्पी की तरह billed होती है, इसलिए Mute से realtime minutes नहीं बचते।
-  **Unmute** microphone फिर लेता है, और न ले पाए (मना किया गया, busy, मौजूद नहीं) तो call कारण के
-  साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू होता
-  है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
+  चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice को
+  बोलने के लिए दिया जाता है। band phase वैसी ही रखता है और `· muted` जोड़ता है; जब कोई line खुली न
+  हो, menu "Muted — line closed" कहता है। Mute line बंद नहीं करता: खुली line सामान्य चुप्पी के बाद
+  बंद होती है, जो आप बोल रहे थे तो Mute से गिनी जाती है, और line पहले से शांत थी तो तब बंद होती है
+  जब Mute के बिना होती; वह किसी भी चुप्पी की तरह billed होती है, इसलिए Mute से realtime minutes नहीं
+  बचते। **Unmute** microphone फिर लेता है, और न ले पाए (मना किया गया, busy, मौजूद नहीं) तो call कारण
+  के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू
+  होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge))।
-- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है, कोई turn
-  नहीं पहुँचा, सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे
-  बढ़ जाती है), session paused रहा है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to date**
-  दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। `/live context` हमेशा काम करता है।
+- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है,
+  कोई turn नहीं पहुँचा, कोई सवाल या permission notice app तक नहीं पहुँचा, mod बंद रहते turns चले,
+  सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे बढ़
+  जाती है), session paused रहा है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
+  date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। सारांश पर कोई तारीख
+  नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है, और `/live context` विफल हो सकता है,
+  भूली हुई बात वापस ला सकता है या paused का निशान हटा सकता है ([BR-002](docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
-  line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े जाते हैं;
-  उन्हें सिर्फ़ **Stop** मिटाता है। **Pause sync** बंद हो और session paused न हो, तो अगली line उसी session के
-  transcript का सारांश अपने-आप load करती है, जिसमें वह भी है जो session ने पढ़ा; इससे बचने के लिए पहले
-  session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए session में `/live on` उसे फिर से
-  जोड़ देता है।
+  line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े
+  जाते हैं; उन्हें सिर्फ़ **Stop** मिटाता है। Claude के इंतज़ार कर रहे सवालों के नियम अलग हैं
+  ([विवरण](SECURITY.md#residual-risk-by-design))। **Pause sync** बंद हो और session paused न हो, तो
+  अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें वह भी है जो session ने
+  पढ़ा; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
+  session में `/live on` उसे फिर से जोड़ देता है।
 
 ### सेटिंग्स
 
@@ -266,17 +277,17 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **Prompt** (डिफ़ॉल्ट रूप से खाली): voice के लिए आपके अपने निर्देश, जैसे "मुझसे Spanish में बात
   करो", अधिकतम 2,000 अक्षर। ये LiveBridge के अपने voice नियमों के बाद जोड़े जाते हैं, और दोनों में
   टकराव होने पर उन्हीं नियमों की चलती है, और अगली बार line खुलने से लागू होते हैं।
-- **Pause sync while the call is stopped** (डिफ़ॉल्ट रूप से बंद): डिफ़ॉल्ट रूप से, जुड़े हुए session में आप जो
-  टाइप करते हैं और उस पर Claude का अंतिम जवाब, call रुकी होने पर भी voice के साथ उस session की
-  conversation में रखे जाते हैं, और अगली line खुलने पर voice के पास होते हैं। line खुलने तक Mac से कुछ
-  बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू करें, Stop दबाएँ,
-  फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और session paused चिह्नित हो
-  जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause के बाद भी नहीं: यह सिर्फ़
-  **Load context** या `/live context` करता है, और वह सारांश पूरे transcript से लिखा जाता है, इसलिए उसमें वह
-  भी आता है जिसे आपने pause किया था। उस session में कोई voice अनुरोध चल रहा हो, तो टाइप करने से उसका जवाब
-  विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के
-  बाद के जवाब paused text दोहरा सकते हैं; यह क्या करता है और क्या नहीं, यह
-  [SECURITY.md](SECURITY.md#residual-risk-by-design) में है।
+- **Pause sync while the call is stopped** (डिफ़ॉल्ट रूप से बंद): डिफ़ॉल्ट रूप से, जुड़े हुए session
+  में आप जो टाइप करते हैं और उस पर Claude का अंतिम जवाब, call रुकी होने पर भी voice के साथ उस
+  session की conversation में रखे जाते हैं, और अगली line खुलने पर voice के पास होते हैं। line खुलने
+  तक Mac से कुछ बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू
+  करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
+  session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
+  के बाद भी नहीं: यह सिर्फ़ **Load context** या `/live context` करता है, और वह सारांश पूरे
+  transcript से लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था। जिस turn में voice
+  अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
+  जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
+  हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](SECURITY.md#residual-risk-by-design) में है।
 - **Play a sound when a request is queued for Claude** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध
   Claude को सौंपता है, हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ))।
 - **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
@@ -295,21 +306,37 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   [SECURITY.md](SECURITY.md) बताता है कि सुरक्षा उपाय क्या है।
 - वह नतीजे session के नाम के साथ एक-दो वाक्यों में पढ़कर सुनाता है। Code blocks और tables session में
   ही रहते हैं, और जो credentials वह पहचान लेता है उन्हें छिपा (redact) दिया जाता है।
-- जब Claude कोई सवाल पूछता है, तो voice उसे आपके सामने रखता है और आपका जवाब उसी session को वापस
-  भेजता है। Claude जो काम बाद में background में पूरा करता है, उसकी रिपोर्ट update के रूप में दी जाती है।
-- जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice यह बताता है, सिवाय
-  [वहाँ जहाँ कोई organization Claude Code को manage करता है](#ज्ञात-सीमाएँ)। Prompt का जवाब आप
-  Claude Code में देते हैं; LiveBridge उसका जवाब कभी आपकी जगह नहीं देता।
-- आप जो टाइप करते हैं, वह उसे पता रहता है। session के जुड़े रहते, आप उसमें जो टाइप करते हैं और हर उस turn पर
-  Claude का अंतिम जवाब जो voice अनुरोध नहीं था, उस session की voice के साथ conversation में context के रूप
-  में जाते हैं: voice उनका ज़िक्र कर सकता है, पर उनके लिए chime नहीं बजता और वह उनके लिए बंद line नहीं खोलता।
-  खुली line को वे तुरंत मिलते हैं; बाद में खुली line उनसे शुरू होती है। जिस voice जवाब को नए अनुरोध ने हटा दिया,
-  वह बोला नहीं जाता, पर रखा जाता है और उसी तरह जोड़ा जाता है। turn के बीच का Claude का text sync नहीं होता,
-  सिवाय उसके जो उसने सवाल या permission prompt से ठीक पहले लिखा, वह उसी के साथ जाता है; subagents और tools का
-  output भी sync नहीं होते। target में Claude का सवाल या permission prompt voice बोलता है, चाहे उसे किसी भी turn
-  ने पैदा किया हो; किसी दूसरे session में वह वहाँ के नतीजे की तरह बोला जाता है या chime बजता है, सिवाय इसके कि
-  आपके टाइप किए turn का सिर्फ़ दर्ज होता है। जिस turn को pause बाहर रखता है, उसमें इनमें से कुछ नहीं होता। जब आप
-  Claude के सवाल या permission prompt का जवाब keyboard पर देते हैं, तो voice को बता दिया जाता है।
+- Claude का काम पूरा होने पर वह लौट आता है। line खुली रखने की ज़रूरत नहीं: बातचीत शांत होने पर line
+  बंद हो जाती है, और आपके अनुरोध पर Claude का जवाब उसे फिर से खोलता है और voice को बोलने के लिए दिया
+  जाता है, इसलिए Claude के काम करते समय आप जा सकते हैं। यह उस session के लिए है जिससे आप बात कर रहे
+  हैं; दूसरे session का नतीजा chime बजाकर इंतज़ार करता है ([billing कैसे होती
+  है](#बिलिंग-का-ध्यान-रखने-वाला-डिज़ाइन))। अगर फिर से खुली line पर voice चुप रहे, तो जवाब भी chime
+  बजाकर इंतज़ार करता है, इसलिए वह खोता नहीं। Claude का आपसे पूछा गया सवाल या जिस permission prompt
+  का वह इंतज़ार कर रहा है, वह line को उसी तरह खोलता है, पर voice उसे शायद न बोले: Mac से दूर होने पर
+  इस पर भरोसा न करें ([ज्ञात सीमाएँ](#ज्ञात-सीमाएँ))।
+- जब Claude कोई सवाल पूछता है, तो वह voice को आपके सामने रखने के लिए दिया जाता है और आपका जवाब उसी
+  session को वापस जाता है। Claude काम करते हुए जो सवाल पूछता है (विकल्पों वाला dialog), उसके साथ भी
+  ऐसा ही होता है: voice को वह इसलिए दिया जाता है कि वह आपको उसके बारे में बताए, विकल्पों को अपने
+  शब्दों में समझाए और जब तक आप चाहें आपसे उन पर बात करे, Claude से पूछे बिना। आप जो तय करते हैं, कोई
+  विकल्प या Claude से वापस कोई सवाल, वही dialog का जवाब बनता है; आप चाहें तो keyboard पर भी जवाब दे
+  सकते हैं। Claude जो काम बाद में background में पूरा करता है, वह update के रूप में voice को जाता
+  है।
+- जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice को एक notice दिया जाता है और वह यह
+  बता सकता है, सिवाय [वहाँ जहाँ कोई organization Claude Code को manage करता है](#ज्ञात-सीमाएँ)।
+  Prompt का जवाब आप Claude Code में देते हैं; LiveBridge उसका जवाब कभी आपकी जगह नहीं देता।
+- आप जो टाइप करते हैं, वह उसे दिया जाता है। session के जुड़े रहते, आप उसमें जो टाइप करते हैं और हर
+  उस turn पर Claude का अंतिम जवाब जो voice अनुरोध नहीं था, उस session की voice के साथ conversation
+  में context के रूप में जाते हैं: उनके लिए chime नहीं बजता और वे बंद line नहीं खोलते ([इसकी
+  सीमाएँ](#ज्ञात-सीमाएँ))। खुली line को वे तुरंत मिलते हैं; बाद में खुली line उनसे शुरू होती है। जिस
+  voice जवाब को नए अनुरोध ने हटा दिया, वह बोला नहीं जाता, पर रखा जाता है और उसी तरह जोड़ा जाता है।
+  turn के बीच का Claude का text sync नहीं होता, सिवाय उसके जो उसने सवाल या permission prompt से ठीक
+  पहले लिखा, वह उसी के साथ जाता है; subagents और tools का output भी sync नहीं होते। target में
+  Claude का सवाल या permission prompt voice को दिया जाता है, चाहे उसे किसी भी turn ने पैदा किया हो;
+  किसी दूसरे session में वह वैसे ही जाता है जैसे वहाँ का नतीजा जाता, सिवाय इसके कि जो turn voice
+  अनुरोध नहीं था, उसका सिर्फ़ दर्ज होता है। जिस turn को pause बाहर रखता है, उसमें इनमें से कुछ नहीं
+  होता। जब कोई सवाल या prompt voice के बिना निपट जाता है, या कोई turn बिना जवाब के ख़त्म होता है, तो
+  voice को यह बताने वाली पंक्ति दी जाती है ([कौन-सी
+  पंक्तियाँ](SECURITY.md#what-session-text-can-do))।
 
 ## बिलिंग का ध्यान रखने वाला डिज़ाइन
 
@@ -324,22 +351,27 @@ Realtime voice session खुली रहने तक खर्च होत�
   सबसे पहले भेजे जाते हैं, ताकि आपके पहले शब्द न छूटें।
 - 20 सेकंड की चुप्पी के बाद line बंद हो जाती है। शब्दों के बिना आवाज़ (संगीत, TV) उसे 90 सेकंड बाद
   बंद करती है।
-- जब voice कोई अनुरोध Claude को सौंपता है (handoff), तो उस handoff के बाद line अधिकतम 2 मिनट तक
-  खुली रहती है, जिसका बिल किसी भी खुली line की तरह बनता है, और जब कोई बोल नहीं रहा होता तब voice
-  Claude का जवाब सुनाता है। अगला handoff 2 मिनट फिर से शुरू करता है; जिस बातचीत में Claude को कुछ
-  नहीं भेजा जाता, वह सामान्य 20 सेकंड की चुप्पी के बाद बंद हो जाती है।
-- जिस session से आप बात कर रहे हैं, उसे दिए गए अनुरोध पर Claude का जवाब, उसमें Claude का आपसे
-  पूछा गया सवाल, या वह permission prompt जिसका वह इंतज़ार कर रहा है, line बंद होने के बाद आए तो
-  line फिर से खोलता है और voice उसे सुनाता है; इसका खर्च किसी भी खुली line जैसा है। line बंद रहते
-  आने वाली बाकी हर चीज़ (उस session से आई कोई भी चीज़ जिससे आप हट गए, बाद का update) chime बजाती है और इंतज़ार करती है: band और menu उसे न सुना
-  हुआ दिखाते हैं, और जब आप अगली बार बोलते हैं तो voice आपको बताता है
-  ([कब माना जाता है कि सुन लिया गया](docs/architecture/overview.md#a-result-while-the-line-is-closed))।
+- जब voice कोई अनुरोध Claude को सौंपता है (handoff), तो उस handoff के बाद line अधिकतम 2 मिनट तक खुली
+  रहती है, जिसका बिल किसी भी खुली line की तरह बनता है, और जब कोई बोल नहीं रहा होता तब Claude का जवाब
+  voice को सुनाने के लिए दिया जाता है। अगला handoff 2 मिनट फिर से शुरू करता है; जिस बातचीत में
+  Claude को कुछ नहीं भेजा जाता, वह सामान्य 20 सेकंड की चुप्पी के बाद बंद हो जाती है।
+- जिस session से आप बात कर रहे हैं, उसे दिए गए अनुरोध पर Claude का जवाब, उसमें Claude का आपसे पूछा
+  गया सवाल, या वह permission prompt जिसका वह इंतज़ार कर रहा है, line बंद होने के बाद आए तो line फिर
+  से खोलता है और voice को सुनाने के लिए दिया जाता है; इसका खर्च किसी भी खुली line जैसा है। line बंद
+  रहते आने वाली बाकी हर चीज़ (उस session से आई कोई भी चीज़ जिससे आप हट गए, बाद का update) chime
+  बजाती है और इंतज़ार करती है: band और menu उसे न सुना हुआ दिखाते हैं, और जब आप अगली बार बोलते हैं
+  तो वह voice को जाती है ([कब माना जाता है कि सुन लिया
+  गया](docs/architecture/overview.md#a-result-while-the-line-is-closed))।
 - हर Claude Code session की voice के साथ अपनी अलग conversation होती है। वह अगले realtime session में
   आगे ले जाई जाती है, और Stop और Start के पार भी, ताकि voice को याद रहे कि आपने एक मिनट पहले क्या
   कहा था। नया target conversation बदल देता है: खुली line बंद हो जाती है, और आपके अगले शब्द उसे नए target
   की conversation के साथ खोलते हैं।
-- Menu वे मिनट दिखाता है जितनी देर line खुली रही, जैसा app ने नापा; आपका plan realtime voice को कैसे
-  मीटर करता है, यह प्रकाशित नहीं है।
+- Menu वे मिनट दिखाता है जितनी देर line खुली रही, जिन्हें app voice के connect होने से गिनता है,
+  इसलिए आपका plan थोड़ा ज़्यादा गिन सकता है। OpenAI desktop voice की कीमत आपके Codex usage budget के
+  प्रति मिनट के हिसाब से तय करता है, और उसके API पर मॉडल का वही परिवार मौन का भी बिल बनाता है
+  ([विवरण](docs/research/2026-11-04-gpt-live-billing.md),
+  [सीमाएँ](docs/research/2026-11-05-gpt-live-limits.md)); आपके plan का अपना usage page ही प्रामाणिक
+  है।
 - Menu दिखाता है कि आपके Codex और Claude usage का कितना हिस्सा इस्तेमाल हो चुका है: हर एक की एक
   पंक्ति, plan जितनी windows बताता है उनमें से हर एक का इस्तेमाल हुआ प्रतिशत (हर पंक्ति में अधिकतम
   तीन, जैसे `7% of 5 h · 19% of week`), 90 % या उससे अधिक होने पर नारंगी; किसी पंक्ति पर hover करने
@@ -363,26 +395,32 @@ session के ज़रिए OpenAI को यह जाता है:
   रहते LiveBridge कुछ capture नहीं करता, इसलिए कुछ नहीं जाता; Mute दबाने से पहले आपने जो बोला, जो
   line पहले से connect हो रही थी उस पर, वह फिर भी जा सकता है);
 - voice के निर्देश: LiveBridge के अपने नियम, फिर आपकी Settings का **Prompt**, अगर आपने लिखा हो;
-- target session की हाल की conversation (आख़िरी 64 पंक्तियों तक, और उससे ज़्यादा नहीं जितना codex लेता
-  है: context और खुले कामों समेत 128 items और लगभग 8,192 tokens), ताकि उसे नए realtime session में
-  जारी रखा जा सके। इसमें वह है जो आपने उस session में टाइप किया और हर टाइप किए गए turn पर Claude का
-  अंतिम जवाब, साथ में आपकी और voice की बोली, इसलिए किसी session में टाइप करना उसे OpenAI तक पहुँचा देता
-  है जब उस session के साथ line खुलती है। line खुली रहते target की हर नई पंक्ति तुरंत उसमें जाती है। दूसरे session की sync की गई पंक्तियाँ तभी जाती हैं जब line उसके साथ target के रूप में खुलती है; उसके
-  नतीजे, सवाल और approval notices खुली line में जाते हैं, चाहे वह कोई भी session हो;
+- target session की हाल की conversation (आख़िरी 64 पंक्तियों तक, और उससे ज़्यादा नहीं जितना codex
+  लेता है: context और खुले कामों समेत 128 items और लगभग 8,192 tokens), ताकि उसे नए realtime session
+  में जारी रखा जा सके। इसमें वह है जो आपने उस session में टाइप किया और हर उस turn पर Claude का अंतिम
+  जवाब जो voice अनुरोध नहीं था, चाहे वह किसी से भी शुरू हुआ हो (आपका टाइप किया turn, कोई schedule,
+  दूसरा agent, कोई background task), साथ में mod के notes और आपकी और voice की बोली, इसलिए किसी
+  session में टाइप करना उसे OpenAI तक पहुँचा देता है जब उस session के साथ line खुलती है। line खुली
+  रहते target की हर नई पंक्ति तुरंत उसमें जाती है। दूसरे session की sync की गई पंक्तियाँ तभी जाती
+  हैं जब line उसके साथ target के रूप में खुलती है; उसके नतीजे, सवाल और approval notices खुली line
+  में जाते हैं, चाहे वह कोई भी session हो;
 - target session के अभी खुले अनुरोध, उनके एक-पंक्ति के सार (brief) के रूप में;
-- हर नतीजा, सवाल, update, approval notice, टाइप किया गया text और टाइप किए गए turn का जवाब, अधिकतम
-  2,000 अक्षरों की एक पंक्ति के रूप में, code blocks और tables हटाकर (टाइप किया गया text जो सिर्फ़ code या
-  table है, उसकी जगह यह बताने वाला वाक्य रखा जाता है कि code टाइप किया गया)। Turn के बीच Claude का पूछा सवाल, और Claude के main loop (subagent
-  नहीं) की permission prompt का approval notice, वह text भी साथ लाते हैं जो Claude ने पूछने से
-  ठीक पहले लिखा। Update, Claude का जवाब है जो किसी background task के notification से शुरू हुए
-  बाद के turn में आता है, voice अनुरोध के बाद 10 मिनट तक और तब तक जब तक session में कोई दूसरा
-  turn शुरू न हो;
+- हर नतीजा, सवाल, update, approval notice, टाइप किया गया text, ऐसे turn का जवाब जो voice अनुरोध नहीं
+  था, नए अनुरोध से हटाया गया voice जवाब और mod का note, अधिकतम 2,000 अक्षरों की एक पंक्ति के रूप
+  में, code blocks और tables हटाकर (टाइप किया गया text जो सिर्फ़ code या table है, उसकी जगह यह बताने
+  वाला वाक्य रखा जाता है कि code टाइप किया गया)। mod के notes अनुमति दिए गए या निपटे हुए permission
+  prompt के tool का नाम बताते हैं, और बताते हैं कि कोई सवाल बंद हुआ या कोई turn बिना जवाब के ख़त्म
+  हुआ। Turn के बीच Claude का पूछा सवाल, और Claude के main loop (subagent नहीं) की permission prompt
+  का approval notice, वह text भी साथ लाते हैं जो Claude ने पूछने से ठीक पहले लिखा। Update, Claude का
+  जवाब है जो किसी background task के notification से शुरू हुए बाद के turn में आता है, voice अनुरोध
+  के बाद 10 मिनट तक और तब तक जब तक session में कोई दूसरा turn शुरू न हो;
 - target session का context सारांश, अधिकतम 1,500 अक्षरों की एक पंक्ति के रूप में। यह load होने पर सेव
   होता है और जब भी line खुलती है और वह session target होता है, तब भेजा जाता है, Stop और Start के
   पार और app के restart के बाद भी। Menu का Conversation submenu उस पंक्ति को ठीक वैसी ही दिखाता है
   जैसी वह भेजी जाती है;
-- ऊपर की हर पंक्ति के साथ, उसके session का label: Claude Code session का title, या अगर title न हो तो
-  session folder का नाम;
+- ऊपर की हर पंक्ति के साथ, उसके session का label: Claude Code session का title (80 अक्षरों तक), या
+  अगर title न हो तो session folder का नाम। label redact नहीं होता और pause उसे नहीं छूता, इसलिए
+  paused text से लिखा गया title हर पंक्ति के साथ जाता है;
 - WebRTC offer, जो Mac के local network addresses को connection candidates के रूप में सूचीबद्ध करता है।
 
 नतीजे, सवाल, updates, सारांश और टाइप किए गए turns की पंक्तियाँ पहले जानी-पहचानी credential आकृतियों (private keys, JWTs, आम API
@@ -416,29 +454,63 @@ release मिलने पर app `gh auth status` चलाता है, य�
 उसे target रखकर **New conversation** दबाते हैं या उसे × से हटाते हैं। जो session चला गया है, उसकी
 पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए 20 sessions उन्हें बाहर न धकेल दें; उन्हें
 जल्दी मिटाने के लिए, उसी session में फिर से `/live on` चलाएँ और **New conversation** दबाएँ।
-Uninstall करने से वे सब हट जाती हैं।
+Uninstall करने से वे सब हट जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](SECURITY.md#residual-risk-by-design))।
 
 [SECURITY.md](SECURITY.md) में threat model है: संक्षेप में, जो कुछ भी आपका microphone सुन सकता है
 वह एक ऐसा अनुरोध बन सकता है जिसे Claude session के अपने permission mode के तहत चलाता है।
 
 ## ज्ञात सीमाएँ
 
-- Remote Control से किसी session को भेजा गया prompt voice की conversation में आपके शब्दों के रूप में दर्ज नहीं होता, हालाँकि उस पर Claude का जवाब दर्ज होता है ([SECURITY.md](SECURITY.md#what-session-text-can-do) बताता है कि कौन-से prompt आपके माने जाते हैं)।
 - voice कभी-कभी कहता है कि वह देख रहा है ("On it", "Looking now"), पर अनुरोध Claude को नहीं सौंपता,
-  इसलिए Claude तक कुछ नहीं पहुँचता: [टेस्टिंग](docs/bugs/BR-001.md) में लगभग पाँच में से एक अनुरोध,
-  जबकि voice का नियम इसकी मनाही करता है। जब app किसी अनुरोध को Claude की queue में डालता है, तो एक
-  छोटी आवाज़ बजती है; अगर voice कहे कि वह देख रहा है और कोई आवाज़ न बजे, तो अनुरोध दोबारा कहें। app
-  शब्दों से ऐसे वादे और जवाब में फ़र्क नहीं कर सकता, क्योंकि voice आपकी भाषा में बोलता है।
-- जो नतीजा तब आता है जब line उसका इंतज़ार कर रही हो, वह voice को बोलने के लिए text के रूप में जाता है;
-  codex में ऐसा कोई call नहीं है जो voice को तुरंत बुलवाए, इसलिए कब बोलना है यह model तय करता है।
-  टेस्टिंग में वह कुछ सेकंड के भीतर बोल गया। अगर नहीं बोलता, तो नतीजा न सुना हुआ रहता है: voice उसे आपके
-  अगले शब्दों के बाद सुनाता है, या line बंद होने पर chime बजती है।
-- जब Claude का जवाब line को फिर से खोलता है, तो voice कभी-कभी चुप रहता है
-  ([माप](docs/adr/0001-platform-findings.md))। तब line 5 सेकंड बाद बंद हो जाती है और जवाब chime
-  बजाकर इंतज़ार करता है, जैसा नीचे बताया गया है।
+  इसलिए Claude तक कुछ नहीं पहुँचता: पहले लिखे गए नियम के साथ लगभग पाँच में से एक अनुरोध, और अब के
+  नियम के साथ 20 में से 0, जो किस्मत से अलग बताने के लिए बहुत कम है ([BR-001](docs/bugs/BR-001.md))।
+  वह ऐसे काम का दावा भी कर सकता है जो उसने नहीं किया, जैसे "I'll take a look.", उन पंक्तियों पर भी
+  जो उसके पास सिर्फ़ context के रूप में हैं ([ADR 0001 (n),
+  (o)](docs/adr/0001-platform-findings.md))। जब app किसी अनुरोध को Claude की queue में डालता है, तो
+  एक छोटी आवाज़ बजती है; अगर voice कहे कि वह देख रहा है और कोई आवाज़ न बजे, तो अनुरोध दोबारा कहें।
+  app शब्दों से ऐसे वादे और जवाब में फ़र्क नहीं कर सकता, क्योंकि voice आपकी भाषा में बोलता है।
+- Claude का सवाल, या वह permission prompt जिसका वह इंतज़ार कर रहा है, सिर्फ़ voice को दिया जाता है,
+  और voice उसे शायद न बोले; उसे कोई मजबूर नहीं करता। इसलिए Mac से दूर होने पर voice के prompt बताने
+  पर भरोसा न करें: Claude बिना किसी सूचना के इंतज़ार करता रह सकता है। Prompt फिर भी Claude Code में
+  इंतज़ार करता है, और वही एकमात्र नियंत्रण है; voice नियंत्रण नहीं है, और LiveBridge prompt का जवाब
+  कभी नहीं देता। जाँचों में, खुली line पर टाइप किए गए turn का permission notice keyboard के जवाब से
+  पहले 3 में से 0 runs में बोला गया, यह गिनती है, दर नहीं ([ADR 0001
+  (n)](docs/adr/0001-platform-findings.md))। बंद line इनके लिए तभी खुलती है जब target की
+  conversation में आपका कोई turn हो; नहीं तो app chime बजाता है, और call बंद हो तो ये सिर्फ़ दर्ज
+  होते हैं।
+- Claude desktop app टाइप किए गए prompt का origin क्या बताता है, यह देखा नहीं गया ([ADR 0001
+  (m)](docs/adr/0001-platform-findings.md))। mod किसी prompt को आपका तभी दर्ज करता है जब उसका origin
+  `composer` हो। अगर वहाँ टाइप किया prompt किसी और रूप में आए, तो वहाँ टाइप किया कुछ भी दर्ज नहीं
+  होता, कोई gap चिह्नित नहीं होता, menu **Context up to date** कहता है, और pause कम पहुँचता है
+  ([विवरण](SECURITY.md#what-session-text-can-do))।
+- जो नतीजा तब आता है जब line उसका इंतज़ार कर रही हो, वह voice को बोलने के लिए text के रूप में जाता
+  है; codex में ऐसा कोई call नहीं है जो voice को तुरंत बुलवाए, इसलिए कब बोलना है यह model तय करता
+  है। टेस्टिंग में वह कुछ सेकंड के भीतर बोल गया। अगर नहीं बोलता, तो नतीजा न सुना हुआ रहता है: वह
+  आपके अगले शब्दों के साथ फिर voice को जाता है, या line बंद होने पर chime बजती है।
+- जब Claude का जवाब line को फिर से खोलता है, तो voice चुप रह सकता है: मापे गए 14 में से 4 runs में
+  ऐसा हुआ, जो छोटा नमूना है ([ADR 0001 (n)](docs/adr/0001-platform-findings.md))। तब line connect
+  होने के 5 सेकंड बाद बंद हो जाती है और जवाब chime बजाकर इंतज़ार करता है, जैसा नीचे बताया गया है।
+  जहाँ voice बोला, वहाँ उसने connect के लगभग 2 सेकंड के भीतर बोलना शुरू किया; जो voice उन 5 सेकंड के
+  बाद शुरू होता, वह कट जाता है।
 - जब आपके अगले शब्द line को फिर से खोलते हैं, तो voice कभी-कभी सिर्फ़ उन्हीं का जवाब देता है और
   इंतज़ार कर रहा नतीजा नहीं सुनाता। नतीजा खोता नहीं है: वह इंतज़ार में रहता है, line बंद होने पर chime
   बजाता है और notification भेजता है, और अगली बार line खुलने पर फिर से voice को जाता है।
+- आपके ChatGPT plan की usage limit पर voice तब तक रुक जाता है जब तक limit reset न हो। Menu और band
+  यह बताते हैं, codex के वाक्य में और जहाँ codex दे वहाँ reset के समय के साथ, और call खत्म हो जाती
+  है, ताकि बोलने से विफल होने वाली lines न खुलें। Claude Code काम करता रहता है, जवाब इंतज़ार करते
+  रहते हैं, और Start एक बार फिर कोशिश करता है। app किसी limit को सिर्फ़ codex के शब्दों या service
+  के error code से पहचानता है, क्योंकि और कुछ यह नहीं बताता
+  ([विवरण](docs/research/2026-11-05-gpt-live-limits.md))। जिस इनकार को वह नहीं पहचानता, जैसे बिना
+  कारण बताए गिरी हुई line ("The voice session closed (transport_closed)."), उसमें call चालू रहती है,
+  इसलिए आपके अगले शब्द फिर कोशिश करते हैं; limit reset होने तक **Stop** दबाएँ।
+- जो prompt composer में टाइप नहीं किया गया (host का संदेश, schedule, दूसरा agent और शायद Remote
+  Control), वह voice की conversation में आपके शब्दों के रूप में दर्ज नहीं होता, हालाँकि उस पर Claude
+  का जवाब दर्ज होता है, और pause में वह चल रहे turn को अस्वीकार नहीं करता
+  ([SECURITY.md](SECURITY.md#what-session-text-can-do) बताता है कि कौन-से prompt आपके माने जाते
+  हैं)।
+- जो session अब भी इस release से पहले के mod पर है, वह restart होने तक sync नहीं होता: वह turns छूटे
+  session की तरह सारांश load करता है, और कोई pause उसकी पंक्तियों को अस्वीकार नहीं करता ([और क्या
+  अलग है](CHANGELOG.md))।
 - जो Claude Code session mod के load होने से पहले ही खुला था, उसमें `/live` चलने से पहले उसे दोबारा
   खोलना पड़ सकता है।
 - Claude desktop app में, ऐसे session में टाइप किया गया `/live` जिसका Claude Code process अभी शुरू
