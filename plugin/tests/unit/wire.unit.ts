@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
+import { TurnTracker } from '../../hooks/turns.ts'
 import { socketPath } from '../../hooks/wire.ts'
 import type * as Wire from '../../hooks/wire.ts'
 
@@ -95,12 +96,23 @@ function mismatches(value: unknown, shape: Shape, at: string): string[] {
 test('everyWireFixtureParsesIntoItsType', () => {
   const dir = `${import.meta.dirname}/../../../wire/fixtures`
   const names = readdirSync(dir).filter(name => name.endsWith('.json'))
-  assert.ok(names.length >= 28)
+  assert.ok(names.length >= 29)
   for (const name of names) {
     const shape = SHAPES[name.replace(/(-[a-z]+)*\.json$/, '')]
     assert.ok(shape, `${name}: no wire type for this fixture`)
     assert.deepEqual(mismatches(JSON.parse(readFileSync(`${dir}/${name}`, 'utf8')), shape, name), [])
   }
+})
+
+/** An older app's reply has no `forRequest`: the mod goes on as if it had said nothing of the answer. */
+test('aReplyWithoutItsRequestLeavesTheTurnTyped', () => {
+  const dir = `${import.meta.dirname}/../../../wire/fixtures`
+  const { work } = JSON.parse(readFileSync(`${dir}/next-reply-older.json`, 'utf8')) as Wire.PollReply
+  assert.ok(work?.kind === 'reply')
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
+  tracker.replied(work.id, work.forRequest, 1000)
+  assert.deepEqual(tracker.current, { id: 't1' })
 })
 
 test('theCheckRejectsADriftedShape', () => {
