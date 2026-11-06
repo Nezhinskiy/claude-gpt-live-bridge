@@ -278,6 +278,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
   })
   on('classic.PermissionRequest', () => ({}))
   on('classic.PostToolUse', () => ({}))
+  on('classic.PostToolUseFailure', () => ({}))
+  on('classic.PermissionDenied', () => ({}))
   return world
 }
 

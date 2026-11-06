@@ -617,6 +617,33 @@ test('anAllowedPromptIsSynced', async ($, on) => {
   expect(world.take('sync')).toEqual([])
 })
 
+/** The tool ran and failed: the prompt for that run was allowed all the same. */
+test('aToolThatFailsSettlesItsPromptAsAllowed', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.classic.PostToolUseFailure({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_use_id: 'u1', error: 'exit 1' })
+  expect(world.take('sync').map(line => line?.text)).toEqual(['You allowed Bash at the keyboard.'])
+})
+
+/** Auto mode refused, not the person: nothing to tell the voice but that the session goes on. */
+test('anAutoDenialSaysOnlyThatTheSessionWorks', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.classic.PermissionDenied({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_use_id: 'u1', reason: 'auto' })
+  expect(world.take('sync')).toEqual([])
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
+})
+
+test('anAutoDenialLeavesAnOpenQuestionAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  const { asked } = await atAQuestion($, world)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  await $.classic.PermissionDenied({ tool_name: 'Bash', tool_input: { command: 'ls' }, tool_use_id: 'u1', reason: 'auto', agent_id: 'a1' })
+  expect(world.take('activity')).toEqual([])
+  world.answerDialog('out')
+  await asked
+})
+
 /** Stop with the pause on: a Yes is not typing, so the turn that started synced keeps its answer. */
 test('anAllowedPromptDoesNotRefuseASyncedTurn', async ($, on) => {
   const world = fakeWorld(on)
