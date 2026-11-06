@@ -1485,6 +1485,47 @@ struct BridgeTests {
     #expect(await !test.lines().contains { $0.contains("private thing") })
   }
 
+  /// What Claude wrote and asked in a withheld turn is the text its answer may not carry out.
+  @Test func aQuestionInAWithheldTurnStaysOut() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.typedIntoAVoiceTurn()
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: test.a, state: .approval, question: "Which private thing?",
+        text: "The private thing."))
+    #expect(await test.lines().isEmpty)
+    try await test.registry.enqueue(test.request(2), for: test.a)
+    #expect(try await test.registry.poll(test.a) == nil)  // no question: no reply goes out
+  }
+
+  @Test func aPermissionPromptInAWithheldTurnStaysOut() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.typedIntoAVoiceTurn()
+    await test.live()
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(sessionId: test.a, state: .approval, text: "The private thing."))
+    #expect(await test.lines().isEmpty)
+    #expect(await test.voice.added.isEmpty)
+    #expect(await test.voice.spoken.isEmpty)
+  }
+
+  /// Said before the owner typed: `working` must still reach the settle, which withdraws it.
+  @Test func aQuestionSaidBeforeTheMarkIsStillWithdrawn() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")  // refused: the turn stays so
+    await test.live()
+    try await test.handOff()
+    try await test.post(
+      "/v1/activity", ActivityBody(sessionId: test.a, state: .approval, question: "Which name?"))
+    #expect(await eventually { await test.bridge.status.unheard == 1 })
+    try await test.sync(test.a, "More of it.")
+    try await test.post("/v1/activity", ActivityBody(sessionId: test.a, state: .working))
+    #expect(await eventually { await test.bridge.status.unheard == 0 })
+  }
+
   /// Under the pause a voice turn nobody typed into keeps its answer.
   @Test func aVoiceTurnNobodyTypedIntoKeepsItsAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)

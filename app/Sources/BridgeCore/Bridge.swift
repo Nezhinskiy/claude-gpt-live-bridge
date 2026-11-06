@@ -549,19 +549,23 @@ public actor Bridge: Router {
   /// is routed to that session as its reply. Either carries what Claude wrote before it.
   /// From a turn the owner typed (`typedTurn`) in a session that is not the target, either is
   /// context only: kept in its conversation, with no chime and no route. From a turn the pause
-  /// refused, neither is kept or said, and the registry is told of no question.
+  /// refused, or a voice turn whose answer is withheld, neither is kept or said, and the registry
+  /// is told of no question.
   private func activity(_ body: ActivityBody) async {
     let id = body.sessionId
     guard let row = try? await label(of: id) else { return }
     var body = body
+    var isRefused = false
     if let turn = body.typedTurn {
-      let admitted = continuity.admits(turn: turn, from: .claude, in: id, pausing: pausing)
+      isRefused = !continuity.admits(turn: turn, from: .claude, in: id, pausing: pausing)
       save()
-      guard admitted else {
-        body.question = nil
-        await registry.setActivity(body)
-        return
-      }
+    }
+    // A voice turn's activity names no turn; `working` still has to settle what was said before.
+    if body.state == .approval, await registry.isAnswerWithheld(of: id) { isRefused = true }
+    guard !isRefused else {
+      body.question = nil
+      await registry.setActivity(body)
+      return
     }
     await registry.setActivity(body)
     switch (row.activity == .approval, body.state == .approval) {
