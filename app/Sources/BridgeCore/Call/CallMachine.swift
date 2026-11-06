@@ -59,7 +59,7 @@ public enum CallEvent: Equatable, Sendable {
   /// became the target, or the target's conversation was erased.
   case conversationChanged
   /// A line of a turn that is not a voice request (`.typed` or `.claude`): the voice is given it
-  /// to know, never to say. It chimes and opens nothing.
+  /// as context, not delivered to be said. It chimes and opens nothing.
   case synced(VoiceLine)
 }
 

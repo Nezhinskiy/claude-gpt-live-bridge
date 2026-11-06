@@ -377,7 +377,7 @@ struct CallMachineTests {
     #expect(machine.pending.isEmpty)
   }
 
-  /// A line of a turn that is not a voice request: what the voice is given, never what it says.
+  /// A line of a turn that is not a voice request: what the voice is given as context, not delivered to be said.
   static let typed = alphas(.typed, "Rename the folder to out")
   static let claude = alphas(.claude, "Renamed the folder to out.")
 
