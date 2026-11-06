@@ -333,8 +333,9 @@ permiso:
   máximo una vez por minuto, con un codex de corta vida; las de Claude llegan de una sesión unida
   cuando ya ha respondido. Una fila sin nada que mostrar se omite, y la de Codex dice `blocked`
   cuando codex informa de que el uso ordinario no está permitido. La última lectura de Codex se
-  conserva 15 minutos; después, la fila de Codex puede aparecer unos segundos tras abrir el menú, cuando
-  llega la lectura. Qué límite detiene primero la
+  muestra enseguida y una nueva la sustituye unos segundos después, así que las cifras pueden cambiar
+  con el menú abierto; justo tras el arranque la fila aparece cuando llega la primera lectura, y si
+  las lecturas fallan, una lectura desaparece a los 15 minutos. Qué límite detiene primero la
   voz no está documentado ([detalles](docs/research/2026-11-05-gpt-live-limits.md)).
 
 ## Privacidad

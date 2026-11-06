@@ -72,6 +72,20 @@ struct LimitsPollTests {
     #expect(poll.reading(at: t0 + 15 * 60 + 1) == nil)
   }
 
+  @Test func anOldReadingStandsWhileAReadIsUnderWay() {
+    var poll = LimitsPoll()
+    let first = reading()
+    let began = poll.begin(at: t0)
+    #expect(began)
+    poll.finish(first)
+    let late = t0 + 3600
+    let again = poll.begin(at: late)
+    #expect(again)
+    #expect(poll.reading(at: late) == first)
+    poll.finish(nil)
+    #expect(poll.reading(at: late) == nil)
+  }
+
   @Test func aClockMovedBackDoesNotStopTheReads() {
     var poll = LimitsPoll()
     let began = poll.begin(at: t0)

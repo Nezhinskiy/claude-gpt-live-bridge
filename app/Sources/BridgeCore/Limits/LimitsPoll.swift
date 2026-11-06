@@ -5,7 +5,7 @@ import Foundation
 public struct LimitsPoll: Sendable, Equatable {
   /// The least time between two starts of a read.
   public static let readEvery: TimeInterval = 60
-  /// A reading older than this is no longer shown.
+  /// A reading older than this is no longer shown, unless a read that may replace it is under way.
   public static let staleAfter = UsageLimits.undatedLife
 
   private var last: UsageLimits?
@@ -32,9 +32,12 @@ public struct LimitsPoll: Sendable, Equatable {
     if let reading { last = reading }
   }
 
-  /// The last reading, nil once it is older than `staleAfter`.
+  /// The last reading, nil once it is older than `staleAfter` with no read under way, so the
+  /// menu's lower rows do not move when the new one lands.
   public func reading(at now: Date) -> UsageLimits? {
-    guard let last, now.timeIntervalSince(last.readAt) <= Self.staleAfter else { return nil }
+    guard let last, isReading || now.timeIntervalSince(last.readAt) <= Self.staleAfter else {
+      return nil
+    }
     return last
   }
 }
