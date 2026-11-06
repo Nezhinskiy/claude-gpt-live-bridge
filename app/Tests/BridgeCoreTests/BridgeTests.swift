@@ -2269,8 +2269,8 @@ struct BridgeTests {
     try await post(
       "/v1/activity",
       ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
-    try await post(
-      "/v1/activity", ActivityBody(sessionId: a, state: .working, typedTurn: "turn-1"))
+    #expect(await bridge.status.unheard == 1)
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
     #expect(await bridge.status.unheard == 0)
   }
 
@@ -2304,9 +2304,10 @@ struct BridgeTests {
       "/v1/activity",
       ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
     #expect(await bridge.status.unheard == 0)
+    #expect(try saved()[b].lines.contains { $0.text.hasPrefix("[ASKING] Beta:") })
     await live()
     voice.emit(.handoff(request(2)))
-    #expect(await eventually { (try? await registry.poll(a)) != nil })
+    #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
     #expect(try await registry.poll(b) == nil)
   }
 
