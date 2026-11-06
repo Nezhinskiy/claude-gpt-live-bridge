@@ -78,7 +78,7 @@ struct MenuContentTests {
         },
         minutesToday: 31.4, problem: problem?.sentence, unheard: unheard, isMuted: muted),
       problem: problem, minutesThisCall: 4.2, conversation: lines,
-      labelsOnAnOlderMod: [], needsContext: needsContext)
+      labelsOnAnOlderMod: [], contextNeed: needsContext ? .load : .none)
   }
 
   static func menu(
@@ -100,7 +100,15 @@ struct MenuContentTests {
     #expect(!outline.contains("Load context"))
   }
 
-  /// Out of sync (missed or paused) or with no context: the update says it needs one.
+  /// Nothing lost, and the next line loads a summary by itself: nothing to press.
+  @Test func loadContextIsDisabledWhenTheLineLoadsIt() {
+    let waiting = Self.status(sessions: 1).with(contextNeed: .withTheLine)
+    let outline = Self.menu(waiting).outline
+    #expect(outline.contains("Context loads with the line (disabled)"))
+    #expect(!outline.contains("Load context"))
+  }
+
+  /// Out of sync (missed or paused), or a summary only a press can load: the update says so.
   @Test func loadContextIsEnabledOutOfSync() {
     let outline = Self.menu(Self.status(sessions: 1, needsContext: true)).outline
     #expect(outline.contains("Load context"))

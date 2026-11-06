@@ -1333,9 +1333,9 @@ struct BridgeTests {
   /// The menu's Load context follows `needsContext`, for each cause and for a current voice.
   @Test func needsContextHoldsForEachCause() async throws {
     try await join(a, "Alpha")
-    #expect(await bridge.current.needsContext)  // no context
+    #expect(await bridge.current.contextNeed == .withTheLine)  // no context, nothing lost
     try await post("/v1/context", context())
-    #expect(await !bridge.current.needsContext)  // current
+    #expect(await bridge.current.contextNeed == .none)  // current
     try await join(a, "Alpha", missed: true)
     #expect(await bridge.current.needsContext)  // missed
     try await post("/v1/context", context())
@@ -1347,6 +1347,25 @@ struct BridgeTests {
     try await test.post("/v1/context", test.context())
     try await test.sync(test.a, "Private thing.")
     #expect(await test.bridge.current.needsContext)  // paused
+  }
+
+  /// No line loads a summary while the pause setting is on, so only a press can.
+  @Test func withThePauseSettingOnASessionWithNoSummaryNeedsAPress() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// A gap is the owner's to load, even with no summary yet.
+  @Test func aGapWithNoSummaryNeedsAPress() async throws {
+    try await join(a, "Alpha", missed: true)
+    #expect(await bridge.current.contextNeed == .load)
+  }
+
+  /// A mod that does not sync loses turns, so a summary with the line does not cover it.
+  @Test func aModThatDoesNotSyncNeedsAPress() async throws {
+    try await join(a, "Alpha", syncs: nil)
+    #expect(await bridge.current.contextNeed == .load)
   }
 
   /// Review Focus 3: New conversation keeps the mark, so the next line asks for no summary of

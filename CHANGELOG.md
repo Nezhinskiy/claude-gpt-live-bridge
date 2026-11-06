@@ -10,6 +10,9 @@ All notable changes to this project are listed here. The format follows
 
 - A loaded summary now sits in **Conversation** where it was loaded, marked **Loaded context** and
   shown whole, instead of under **What was sent** at the bottom, cut to 600 characters.
+- **Load context** is no longer enabled just because a new session has no summary, since its next
+  line loads one by itself: the item reads **Context loads with the line** and is disabled. It stays
+  enabled for a gap, a mod that does not sync, too many lines, and **Pause sync**.
 
 ## [0.4.0]
 

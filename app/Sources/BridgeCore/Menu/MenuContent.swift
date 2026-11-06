@@ -129,7 +129,7 @@ public struct MenuContent: Sendable, Equatable {
       if let target { talk.append(.header(target)) }
       talk.append(.transcript(update.conversation))
     }
-    let load = target == nil ? contextLoad : contextLoad.shown(needsContext: update.needsContext)
+    let load = target == nil ? contextLoad : contextLoad.shown(update.contextNeed)
     let context: [Item] = [
       .command(.loadContext, title: load.title, isEnabled: target != nil && load.isEnabled),
       .command(.newConversation, title: "New conversation…", isEnabled: target != nil),
