@@ -628,7 +628,7 @@ public actor Bridge: Router {
     guard admitted,
       let line = AnswerShaper.synced(body.text, from: body.from, label: row.label, session: id)
     else { return }
-    continuity.record(body.from == .owner ? .owner : .claude, line.text, in: id)
+    record(body.from == .owner ? .owner : .claude, line.text, in: id)  // saves
     if lineKnowsSession, lineSession == id { await send(.synced(line)) }
   }
 

@@ -43,9 +43,9 @@ public enum RegistryError: Error, Equatable {
 /// next request is that question's reply instead: it goes out at once, for the request in
 /// flight, and supersedes nothing; with none in flight (a turn the owner typed asked), the reply
 /// is the request in flight, and the turn's final answer closes it. A newer request supersedes
-/// the answer of an older one, which is then not delivered. A session that stops polling for 5 s is dropped and its open
-/// request fails; a request in flight for 10 minutes fails too. Exactly one
-/// session is the target while any is joined.
+/// the answer of an older one, which is then not delivered. A session that stops polling for
+/// 5 s is dropped and its open request fails; a request in flight for 10 minutes fails too.
+/// Exactly one session is the target while any is joined.
 public actor SessionRegistry {
   private struct Session {
     let joinOrder: Int

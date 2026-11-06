@@ -1505,6 +1505,19 @@ struct BridgeTests {
     #expect(await voice.opens.isEmpty)
   }
 
+  /// An admitted line is saved with the conversation: a restarted app still has it.
+  @Test func aSyncedLineSurvivesARestart() async throws {
+    try await join(a, "Alpha")
+    try await sync(a, "Fix the build.")
+    try await sync(a, from: .claude, "The build is fixed.")
+    let restarted = try restart()
+    try await restarted.join(restarted.a, "Alpha")
+    #expect(
+      await restarted.lines() == [
+        "You: [TYPED] Alpha: Fix the build.", "Claude: [CLAUDE] Alpha: The build is fixed.",
+      ])
+  }
+
   @Test func anOtherSessionsLineStaysInItsOwnConversation() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
