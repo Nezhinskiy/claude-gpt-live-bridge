@@ -442,10 +442,13 @@ function settles(e: { tool_name: string; agent_id?: string }): boolean {
   return true
 }
 
-/** A settled prompt: a line of the owner's for the running turn, and the session works on. */
+/**
+ * A settled prompt: a line for the running turn, and the session works on. It is the mod's report,
+ * not the owner's typing, so it goes as Claude's: under the pause an owner's line refuses the turn.
+ */
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
   const turn = tracker.current
-  if (turn) await postSync($, { turnId: turn.turnId, from: 'owner', text })
+  if (turn) await postSync($, { turnId: turn.turnId, from: 'claude', text })
   await link?.activity('working')
 }
 

@@ -587,12 +587,31 @@ test('anAllowedPromptIsSynced', async ($, on) => {
   await atAPrompt($, world)
   await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
   const [line] = world.take('sync')
-  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'owner' })
+  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'claude' })
   expect(line?.text).toContain('allowed')
   expect(line?.text).toContain('Bash')
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
   await step($, world, 't1', '')
   expect(world.take('sync')).toEqual([])
+})
+
+/** Stop with the pause on: a Yes is not typing, so the turn that started synced keeps its answer. */
+test('anAllowedPromptDoesNotRefuseASyncedTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  world.isPausing = true
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Removed.' })
+  expect(world.kept).toContain('Removed.')
+})
+
+test('aSettledPromptDoesNotRefuseASyncedTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  world.isPausing = true
+  await step($, world, 't1', 'Another way, then.')
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Done another way.' })
+  expect(world.kept).toContain('Done another way.')
 })
 
 test('anotherToolsRunSettlesNothing', async ($, on) => {
@@ -609,7 +628,7 @@ test('aNoAtTheDialogSettlesAtTheNextStep', async ($, on) => {
   await atAPrompt($, world)
   await step($, world, 't1', 'Another way, then.')
   const [line] = world.take('sync')
-  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'owner' })
+  expect(line).toMatchObject({ sessionId: ID, turnId: 't1', from: 'claude' })
   expect(line?.text).toContain('Bash')
   expect(line?.text).not.toContain('allowed')
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }])
@@ -643,7 +662,7 @@ test('aPromptOpenAtTheTurnsEndIsSettled', async ($, on) => {
   await $.turn.complete({ ...DONE, turnId: 't1', answer: '' })
   const lines = world.take('sync')
   expect(lines).toHaveLength(1)
-  expect(lines[0]).toMatchObject({ sessionId: ID, turnId: 't1', from: 'owner' })
+  expect(lines[0]).toMatchObject({ sessionId: ID, turnId: 't1', from: 'claude' })
   expect(lines[0]?.text).toContain('Bash')
   expect(lines[0]?.text).not.toContain('allowed')
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working' }, { sessionId: ID, state: 'idle' }])
