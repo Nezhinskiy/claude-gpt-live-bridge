@@ -133,9 +133,12 @@ the session as a prompt, and posts the turn's answer back. It tells voice turns 
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
 origin. It posts every other main-loop turn to the app as synced lines (`POST /v1/sync`; a
 background turn inside the follow-up window posts its answer as an update instead): the
-owner's prompt at the turn's start, but only when its origin is `composer`, the only kind
-observed to be a person typing ([ADR 0001](../adr/0001-platform-findings.md), item m; a Remote
-Control prompt is not the owner's, its answer is Claude's), and Claude's final answer at its end.
+owner's prompt at the turn's start, but only when its origin is `composer`, the only kind taken
+to be a person typing ([ADR 0001](../adr/0001-platform-findings.md), item m): observed in a
+terminal, **inferred and not observed in the desktop app**, so a prompt typed there may arrive as
+`sdk` and go unrecorded with no gap marked. Another kind is not the owner's, and its answer is
+Claude's; that `bridge` is Remote Control is the type's wording, not observed. Claude's final answer
+goes at the turn's end.
 Hooks post in the order they ran, in a queue of their own beside the poll's, and wait for it at
 most 200 ms. It also posts, under the running turn whatever its kind, a keyboard answer to Claude's question
 as the owner's line, and as Claude's lines the mod's own reports: a question closed with no
@@ -176,7 +179,7 @@ that both test suites parse.
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `turn` the main-loop turn it belongs to: `{ id, request? }`, `request` being the voice request the turn's answer belongs to; absent between turns and from a released mod |
 | `POST /v1/sync` | `sessionId`, `turn`, `kind` and `text`: a line of a main-loop turn. A voice turn posts its `start`, what is typed into it and the mod's lines; its answer goes by `/v1/answer`. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
 | `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
-| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. One the app asked for before the latest gap or forget is ignored |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. One the app asked for before the latest gap or forget is ignored; one nobody asked for (`/live context`) cannot be dated and is taken, so it can clear a *paused* mark across a refused turn |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
 Every reply carries the status: the phase, `isMuted`, the sessions with their labels (`Title · ab12` when
@@ -375,9 +378,11 @@ sequenceDiagram
 This notice is not sent where Claude Code's built-in guard loads and the mod is not the
 organization's own ([known limitations](../../README.md#known-limitations), [ADR 0001](../adr/0001-platform-findings.md)).
 
-The bridge never answers a permission prompt. When a main-loop turn hits one, the voice says that
-Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and
-re-run", and that only the owner can answer it, in Claude Code.
+The bridge never answers a permission prompt. When a main-loop turn hits one, the voice is given
+that Claude is waiting and what Claude wrote before it, such as "I'm going to delete build/ and
+re-run", and that only the owner can answer it, in Claude Code. It may say so; nothing makes it
+(on a live line it went unsaid in the runs counted in
+[ADR 0001](../adr/0001-platform-findings.md) (n)).
 
 Both pauses of a turn, this prompt and Claude's question below, carry the text of the
 main loop's model step that pauses: the engine's turn end carries only the turn's last text, and
@@ -397,7 +402,7 @@ sequenceDiagram
   Claude->>Mod: classic.PermissionRequest (during a main-loop turn)
   Mod->>Bridge: POST /v1/activity approval (and the step's text)
   Bridge->>Codex: "[APPROVAL] label: Claude is waiting for your approval. Claude wrote just before asking: …"
-  Codex-->>Owner: says so (a closed line opens for it, as for a result)
+  Codex-->>Owner: may say so (a closed line opens for it, as for a result)
   Owner->>Claude: answers the prompt in Claude Code
   Claude->>Mod: classic.PostToolUse or PermissionDenied
   Mod->>Bridge: POST /v1/activity working
@@ -407,7 +412,7 @@ sequenceDiagram
 
 When Claude asks the owner a question during a main-loop turn (the AskUserQuestion dialog), the
 dialog opens as usual and the question, with its options, goes to the voice as an `[ASKING]`
-line, followed by the step's text (above). The voice explains it and talks it over from what it
+line, followed by the step's text (above). The voice may explain it and talk it over from what it
 knows, without handoffs; the owner's next handoff to that session is the reply. It goes out at once as `reply` work, beside the
 request in flight, and the mod returns it as the dialog's free-text answer, which closes the
 dialog. An answer at the keyboard that comes first withdraws the line, and a reply the session

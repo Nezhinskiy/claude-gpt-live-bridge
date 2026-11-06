@@ -334,6 +334,17 @@ Six more runs the same day, "I'm listening." and silence in turn:
   silent line is the failure, not a slow one.
 - These runs kept the line open 310 s, about $0.26.
 
+Counts for conversation sync, 2026-11-06, `codex-cli 0.166.0`, the debug app and the real mod, with
+a canned model writing Claude's text. State counts only: one run is not a rate.
+
+- On a line a prompt opened, with nobody speaking, the voice spoke first 0 of 3; 2 of the 3 were cut
+  by the script at 3.2 s.
+- `[APPROVAL]` on a live line, said before the keyboard answer: 0 of 2 as context (`c3b37b5`); 0 of 1
+  by `appendSpeech` after R-3 (`bd37211`), where the voice said "I'm on it—I'll take care of that."
+  at 3.8 s and never said a prompt waited. It also claimed work.
+- `[ASKING]` by `appendSpeech` on a live line: said 1 of 1, at 6.9 s, and the question was answered
+  by voice with the answer spoken (line 5 of the manual check).
+
 **(o) Context added to an open line while the owner starts speaking.** Observed, 2026-11-06,
 `codex-cli 0.166.0`, 12 runs of a probe build that was never committed: the debug app with
 `--fake-mic` (`say` phrases, 9 s apart, in English), a fake session, the prompt's paragraph on
@@ -502,8 +513,11 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
 
 Observed, as in (i): a typed prompt is `composer`, and a host's message marked
 `origin: {kind: "human"}` reaches the mod as `composer` too; `human` never does, and a host's
-unmarked message is `sdk`. The desktop app was not observed, but its transcripts stamp every text
-the owner typed `human`. A slash command that expands into a prompt is `composer` with `command`
+unmarked message is `sdk`. The desktop app was not observed: that its typed prompts arrive as
+`composer` is **inferred** from its transcripts, which stamp every text the owner typed `human`.
+One typed prompt in the desktop app, reading the mod's origin, would settle it; until then a prompt
+typed there may go unrecorded with no gap marked. That `bridge` is Remote Control is the type's own
+wording and was not observed either: if it arrives as `composer` it is recorded as the owner's. A slash command that expands into a prompt is `composer` with `command`
 and no `isMeta`; its `prompt.submit.text` is what was typed, its `turn.start.text` the wrapper
 (`<command-message>…`). A mod's own command fires `command.run` only.
 
@@ -614,6 +628,9 @@ band in the terminal.
   again; until then the owner gets a chime and an unheard count, not the result itself. The
   target's answer, question or approval notice now opens the line instead (decision of
   2026-11-04, below).
+- Not yet observed for conversation sync, and to be checked by hand: the origin of a prompt typed in
+  the desktop app (item m), Load context in the real menu (macOS refused accessibility to the
+  check), and a real Claude model on this branch (every Claude text so far was canned).
 - Not yet observed, and to be checked by hand in the desktop app before release: the microphone
   path with a granted permission (and whether it avoids the Local Network prompt), which events
   fire for a permission dialog, the origin of a task-notification turn, `$.process.run` in a
