@@ -114,15 +114,6 @@ export class TurnTracker {
     this.#prompts = saved?.prompts ?? []
   }
 
-  /**
-   * The voice request whose turn runs now. One waiting to start does not count: until its turn
-   * starts, the running turn is someone else's, and so are its questions and approvals.
-   */
-  get running(): RequestId | null {
-    for (const turn of this.#turns.values()) if (turn.isVoice) return turn.id
-    return null
-  }
-
   /** The main-loop turn running, as the wire names it; null between turns. */
   get current(): TurnRef | null {
     const running = this.#latest

@@ -203,7 +203,6 @@ test('replied makes the rest of the turn a voice turn', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
   tracker.replied(REPLY, REPLY, 1000)
-  assert.equal(tracker.running, REPLY)
   assert.deepEqual(tracker.current, { id: 't1', request: REPLY })
   assert.deepEqual(tracker.turnCompleted('t1', 'Renamed to out.', 'answer'), {
     post: { id: REPLY, status: 'ok', text: 'Renamed to out.' }, sync: null,
@@ -215,7 +214,6 @@ test('replied with another request in flight makes the answer its update', () =>
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
   tracker.replied(REPLY, ID, 1000)
-  assert.equal(tracker.running, null)
   assert.deepEqual(tracker.current, { id: 't1', request: ID })
   assert.deepEqual(tracker.turnCompleted('t1', 'Renamed to out.', 'answer'), {
     post: { id: ID, status: 'update', text: 'Renamed to out.' }, sync: null,
@@ -248,7 +246,6 @@ test('replied changes nothing in a voice turn', () => {
   tracker.submitted(ID)
   tracker.turnStarted('t1', framed(ID), 'voice', 0)
   tracker.replied(REPLY, REPLY, 1000)
-  assert.equal(tracker.running, ID)
   assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').post, { id: ID, status: 'ok', text: 'Done.' })
 })
 
@@ -256,7 +253,6 @@ test('replied changes nothing without forRequest', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
   tracker.replied(REPLY, undefined, 1000)
-  assert.equal(tracker.running, null)
   assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer'), {
     post: null, sync: { turn: { id: 't1' }, kind: 'answer', text: 'Done.' },
   })
@@ -265,7 +261,7 @@ test('replied changes nothing without forRequest', () => {
 test('replied changes nothing with no turn', () => {
   const tracker = new TurnTracker()
   tracker.replied(REPLY, REPLY, 1000)
-  assert.equal(tracker.running, null)
+  assert.equal(tracker.current, null)
   assert.equal(tracker.snapshot().followUp, null)
 })
 
@@ -317,7 +313,6 @@ test('a snapshot from before sync loads', () => {
   const tracker = new TurnTracker({
     pending: null, followUp: { id: ID, until: 5000 }, turns: [['t1', { id: ID, isVoice: true }]],
   })
-  assert.equal(tracker.running, ID)
   assert.deepEqual(tracker.current, { id: 't1', request: ID })
   assert.equal(tracker.turnCompleted('t1', 'Done.', 'answer').post?.status, 'ok')
   assert.deepEqual(tracker.turnStarted('t2', 'second', null, 1000).map(line => line.kind), ['start'], 'nothing was typed into it')
@@ -450,16 +445,14 @@ test('aRefusedSubmissionIsNoLongerPending', () => {
   assert.equal(tracker.snapshot().pending, null)
 })
 
-test('onlyARunningVoiceTurnIsRunning', () => {
+test('a voice request names only its own turn', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
   tracker.submitted(ID)
-  assert.equal(tracker.running, null, 'a request waiting behind a typed turn')
+  assert.deepEqual(tracker.current, { id: 't1' }, 'a request waiting behind a typed turn')
   tracker.turnCompleted('t1', 'Renamed.', 'answer')
   tracker.turnStarted('t2', framed(ID), 'background', 1000)
-  assert.equal(tracker.running, ID)
-  tracker.turnCompleted('t2', 'Done.', 'answer')
-  assert.equal(tracker.running, null)
+  assert.deepEqual(tracker.current, { id: 't2', request: ID })
 })
 
 test('a tool run settles only the prompt for its own input', () => {
