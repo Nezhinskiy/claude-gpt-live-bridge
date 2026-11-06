@@ -105,7 +105,9 @@ only from Start to Stop, and the owner looks at the limit before a call too. Its
 process on the same lockdown argv.
 
 - When: each time the menu opens, at most once a minute (a clock moved back does not stop the reads), one read at a time. The menu shows the last
-  reading at once and the new one replaces it when it arrives, a few seconds later at worst. No
+  reading at once and the new one replaces it when it arrives, a few seconds later at worst. A
+  reading older than 15 minutes is gone, so after a quiet quarter of an hour the row is not there
+  when the menu opens and appears when the read lands. No
   background reads (the owner chose the menu only).
 - A failed read leaves the last reading until it is 15 minutes old (codex's own staleness limit),
   then it goes.

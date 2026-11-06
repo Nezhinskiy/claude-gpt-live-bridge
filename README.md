@@ -320,7 +320,9 @@ a question Claude asks you, or that Claude waits for your approval:
   orange from 90 %; hover a row for when each window resets. Codex's figures are read each time
   the menu opens, at most once a minute, by a short-lived codex; Claude's come from a joined
   session once it has answered. A row with nothing to show is left out, and the Codex row says
-  `blocked` when codex reports ordinary usage as not allowed. Which limit stops the voice first
+  `blocked` when codex reports ordinary usage as not allowed. The last Codex reading stays for 15
+  minutes; after that the Codex row can appear a few seconds after the menu opens, when the read
+  lands. Which limit stops the voice first
   is not documented ([details](docs/research/2026-11-05-gpt-live-limits.md)).
 
 ## Privacy

@@ -349,7 +349,9 @@ attend votre autorisation :
   quand chaque fenêtre se réinitialise. Les chiffres de Codex sont lus à chaque ouverture du menu,
   au plus une fois par minute, par un codex de courte durée ; ceux de Claude viennent d'une
   session rejointe qui a déjà répondu. Une ligne sans rien à montrer est omise, et celle de Codex
-  indique `blocked` quand codex signale que l'usage ordinaire n'est pas autorisé. Quelle limite
+  indique `blocked` quand codex signale que l'usage ordinaire n'est pas autorisé. La dernière lecture
+  de Codex reste 15 minutes ; ensuite la ligne de Codex peut apparaître quelques secondes après
+  l'ouverture du menu, quand la lecture arrive. Quelle limite
   arrête la voix en premier n'est pas documenté
   ([détails](docs/research/2026-11-05-gpt-live-limits.md)).
 
