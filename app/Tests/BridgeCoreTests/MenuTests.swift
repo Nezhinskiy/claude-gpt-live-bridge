@@ -65,7 +65,7 @@ struct MenuContentTests {
 
   static func status(
     _ call: CallPhase = .off, sessions count: Int, target: Int = 0, problem: Problem? = nil,
-    lines: [Conversation.Line] = [], context: String? = nil, unheard: Int = 0,
+    lines: [Conversation.Line] = [], unheard: Int = 0,
     muted: Bool = false, needsContext: Bool = true
   ) -> BridgeUpdate {
     BridgeUpdate(
@@ -77,7 +77,7 @@ struct MenuContentTests {
             isTarget: $0 == target)
         },
         minutesToday: 31.4, problem: problem?.sentence, unheard: unheard, isMuted: muted),
-      problem: problem, minutesThisCall: 4.2, context: context, conversation: lines,
+      problem: problem, minutesThisCall: 4.2, conversation: lines,
       labelsOnAnOlderMod: [], needsContext: needsContext)
   }
 
@@ -225,8 +225,7 @@ struct MenuContentTests {
   @Test func theConversationSubmenuHoldsTheWholeConversation() throws {
     let long = String(repeating: "word ", count: 120) + "end."
     let whole = (1...12).map { Self.line(.owner, "Line \($0).") } + [Self.line(.claude, long)]
-    let menu = Self.menu(
-      Self.status(sessions: 1, lines: whole, context: "[CONTEXT] Alpha: Tidy."))
+    let menu = Self.menu(Self.status(sessions: 1, lines: whole))
     let items = try #require(
       menu.items.lazy.compactMap { item -> [MenuContent.Item]? in
         if case .submenu("Conversation", true, let items) = item { items } else { nil }
@@ -236,21 +235,16 @@ struct MenuContentTests {
     #expect(lines == whole)
     #expect(lines.last?.text == long)
     #expect(items.filter { if case .transcript = $0 { true } else { false } }.count == 1)
-    #expect(items.suffix(2) == [.header("What was sent"), .sent("[CONTEXT] Alpha: Tidy.")])
   }
 
-  @Test func theConversationSubmenuHoldsWhatWasSent() throws {
-    let long = String(repeating: "a", count: MenuContent.sentCharacters + 50)
-    let menu = Self.menu(Self.status(sessions: 1, context: long))
-    let items = try #require(
-      menu.items.lazy.compactMap { item -> [MenuContent.Item]? in
-        if case .submenu("Conversation", true, let items) = item { items } else { nil }
-      }.first)
-    #expect(items.first == .header("What was sent"))
-    let text = try #require(
-      items.last.flatMap { if case .sent(let text) = $0 { text } else { nil } })
-    #expect(text.count == MenuContent.sentCharacters)
-    #expect(text.hasSuffix("…"))
+  /// Nothing said yet, but a summary was loaded: there is still something to open.
+  @Test func aSummaryAloneOpensTheConversationSubmenu() {
+    let menu = Self.menu(
+      Self.status(sessions: 1, lines: [Self.line(.context, "[CONTEXT] Alpha: Tidy.")]))
+    #expect(
+      menu.items.contains {
+        if case .submenu("Conversation", true, _) = $0 { true } else { false }
+      })
   }
 
   @Test func theCardCarriesTheProblemAndItsHelp() throws {

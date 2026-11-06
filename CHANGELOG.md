@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- A loaded summary now sits in **Conversation** where it was loaded, marked **Loaded context** and
+  shown whole, instead of under **What was sent** at the bottom, cut to 600 characters.
+
 ## [0.4.0]
 
 ### Added

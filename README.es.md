@@ -247,7 +247,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
-  conserva LiveBridge (con una línea **Task** por cada petición que la voz pasó a Claude), los
+  conserva LiveBridge (con una línea **Task** por cada petición que la voz pasó a Claude y una línea **Loaded context** donde se cargó un resumen), los
   límites de uso, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
   **Settings…** y **Quit LiveBridge**.
 - **Mute** (junto a **Stop**, en la banda y en la tarjeta de llamada del menú; **Unmute** mientras

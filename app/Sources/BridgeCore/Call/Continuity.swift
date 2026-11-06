@@ -25,9 +25,10 @@ public struct Conversation: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
     /// notice), as the voice got it, or Claude's final answer to a turn that was not a voice
     /// request (synced, as context). `handoff`: the brief of a request the session's queue took,
-    /// so the menu shows that it was handed on.
+    /// so the menu shows that it was handed on. `context`: a loaded summary, as the voice got it,
+    /// where it was loaded.
     public enum Speaker: String, Codable, Sendable {
-      case owner, voice, claude, handoff
+      case owner, voice, claude, handoff, context
 
       /// How the menu names who said a line.
       public var name: String {
@@ -36,6 +37,7 @@ public struct Conversation: Codable, Sendable, Equatable {
         case .voice: "Voice"
         case .claude: "Claude"
         case .handoff: "Task"
+        case .context: "Loaded context"
         }
       }
 
@@ -44,7 +46,7 @@ public struct Conversation: Codable, Sendable, Equatable {
         switch self {
         case .voice: .assistant
         case .owner, .claude: .user
-        case .handoff: nil
+        case .handoff, .context: nil
         }
       }
     }
@@ -53,6 +55,12 @@ public struct Conversation: Codable, Sendable, Equatable {
   }
 
   public private(set) var lines: [Line] = []
+  /// The lines as the menu shows them. A summary no kept line holds is older than them all, or
+  /// was loaded by 0.4.0, which kept no place for it, so it goes first.
+  public var shownLines: [Line] {
+    guard let context, !lines.contains(where: { $0.speaker == .context }) else { return lines }
+    return [Line(speaker: .context, text: context)] + lines
+  }
   /// The session's `[CONTEXT]` line, as the voice gets it.
   public var context: String?
   /// When the conversation was last used, on `Continuity`'s count.
@@ -98,6 +106,7 @@ public struct Conversation: Codable, Sendable, Equatable {
   }
 
   mutating func setContext(_ line: String) {
+    if line != context { record(.context, line) }
     context = line
     outOfSync = nil
     linesSinceContext = 0

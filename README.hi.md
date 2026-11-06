@@ -240,7 +240,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है, voice के Claude को सौंपे
-  हर अनुरोध के लिए एक **Task** पंक्ति के साथ), उपयोग की सीमाएँ, मिनट,
+  हर अनुरोध के लिए एक **Task** पंक्ति और जहाँ सारांश load हुआ वहाँ एक **Loaded context** पंक्ति के साथ), उपयोग की सीमाएँ, मिनट,
   **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
   चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice को

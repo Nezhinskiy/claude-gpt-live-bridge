@@ -260,7 +260,7 @@ parlez.
   rejointe, `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
-  la conserve (avec une ligne **Task** pour chaque demande que la voix a transmise à Claude), les
+  la conserve (avec une ligne **Task** pour chaque demande que la voix a transmise à Claude et une ligne **Loaded context** là où un résumé a été chargé), les
   limites d'utilisation, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt),
   **Settings…** et
   **Quit LiveBridge**.

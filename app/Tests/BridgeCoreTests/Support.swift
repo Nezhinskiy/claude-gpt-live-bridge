@@ -69,3 +69,8 @@ final class TestTime: TimeSource {
     for sleeper in due { sleeper.wake.resume() }
   }
 }
+
+extension BridgeUpdate {
+  /// The newest summary the conversation shows.
+  var context: String? { conversation.last { $0.speaker == .context }?.text }
+}

@@ -1512,11 +1512,12 @@ struct BridgeTests {
     await live()
     let said = (1...5).map { "Remember line \($0)." }
     for line in said { voice.emit(.userUtterance(line)) }
-    #expect(await eventually { await lines().count == 5 })
-    #expect(await lines() == said.map { "You: \($0)" })
+    #expect(await eventually { await lines().count == 6 })
+    let summary = "Loaded context: [CONTEXT] Alpha: Alpha's work."
+    #expect(await lines() == [summary] + said.map { "You: \($0)" })
     var updates = bridge.updates.makeAsyncIterator()
     let update = await updates.next()
-    #expect(update?.conversation.map(\.text) == said)
+    #expect(update?.conversation.suffix(5).map(\.text) == said)
     #expect(update?.context == "[CONTEXT] Alpha: Alpha's work.")
     let reply = await bridge.handle(
       HTTPRequest(method: "GET", path: "/v1/next", query: ["sessionId": b.rawValue], body: Data()))

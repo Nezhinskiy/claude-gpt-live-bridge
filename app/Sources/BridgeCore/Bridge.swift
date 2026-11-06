@@ -116,8 +116,8 @@ public actor Bridge: Router {
       var olderMods: [String] = []
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
-        status: status, problem: problem, minutesThisCall: minutes, context: shown.context,
-        conversation: shown.lines, labelsOnAnOlderMod: olderMods, needsContext: needsContext,
+        status: status, problem: problem, minutesThisCall: minutes,
+        conversation: shown.shownLines, labelsOnAnOlderMod: olderMods, needsContext: needsContext,
         claudeLimits: claudeLimits)
     }
   }
@@ -783,8 +783,6 @@ public struct BridgeUpdate: Sendable, Equatable {
   /// The status's problem, with its kind.
   public let problem: Problem?
   public let minutesThisCall: Double
-  /// The target's `[CONTEXT]` line, exactly as the voice gets it; kept across restarts.
-  public let context: String?
   /// The target's whole conversation, oldest first: every line the app keeps.
   public let conversation: [Conversation.Line]
   /// The joined sessions whose mod is older than the app, or names no version, by label.

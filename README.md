@@ -235,7 +235,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
-  for each request the voice handed to Claude), the usage limits, the minutes, **Star LiveBridge on GitHub**
+  for each request the voice handed to Claude and a **Loaded context** line where a summary was
+  loaded), the usage limits, the minutes, **Star LiveBridge on GitHub**
   (opens the repository's page), **Settings…** and **Quit LiveBridge**.
 - **Mute** (beside **Stop**, in the band and in the menu's call card; **Unmute** while muted)
   releases your microphone while the call goes on: an answer from Claude still opens the line and
