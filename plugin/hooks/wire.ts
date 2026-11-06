@@ -27,11 +27,12 @@ export type Utterance = { role: Role; text: string };
 export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance[] };
 /**
  * `reply`: the owner's reply to the question Claude is waiting on. `forRequest` is the request
- * the turn's answer belongs to: the one in flight once this reply goes out.
+ * the turn's answer belongs to: the one in flight once this reply goes out. Absent from an
+ * older app's reply.
  */
 export type Work =
   | ({ kind: 'request' } & VoiceRequest)
-  | ({ kind: 'reply'; forRequest: RequestId } & VoiceRequest)
+  | ({ kind: 'reply'; forRequest?: RequestId } & VoiceRequest)
   | { kind: 'context' };
 
 /**

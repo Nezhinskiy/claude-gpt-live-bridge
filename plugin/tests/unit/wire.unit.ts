@@ -37,7 +37,7 @@ const WORK: Shape = {
       kind: { oneOf: ['request'] }, id: S, brief: S, transcript: { list: UTTERANCE },
     }),
     fields<Extract<Wire.Work, { kind: 'reply' }>>({
-      kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE }, forRequest: S,
+      kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE }, forRequest: optional(S),
     }),
     fields<Extract<Wire.Work, { kind: 'context' }>>({ kind: { oneOf: ['context'] } }),
   ],
