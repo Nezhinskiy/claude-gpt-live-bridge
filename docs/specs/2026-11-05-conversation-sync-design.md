@@ -64,22 +64,27 @@ while the menu says it is current, is a failure even if every line technically a
   writing to the conversations on the Mac. Nothing leaves the Mac until a line opens with that
   session ([What leaves the Mac](#what-leaves-the-mac)).
 - **Settings gains "Pause sync while the call is stopped", off by default.** For text the owner
-  does not want to reach OpenAI: press Stop, then type. With it on, turns typed while the call is
-  off are not recorded, and the session is marked out of sync.
+  does not want to reach OpenAI: press Stop, then type. With it on, nothing the owner types while
+  the call is off is recorded, a prompt typed into a running turn included, and the session is
+  marked out of sync. While the setting is on, no line loads a summary by itself either: only
+  Load context or `/live context` does.
 - **Load context** in the menu is enabled only when the target is out of sync or has never had a
   context; otherwise it is disabled, because the voice is already current. `/live context` keeps
   working always (an explicit request).
 - **The setting "Load context automatically when a line opens" is removed.** A line loads a
   summary by itself only when its session has never had one, or is out of sync for a reason other
-  than the pause; never after a pause, because the summary is written from the whole transcript
-  and would carry the paused text to the voice. After a pause, the owner decides with Load context.
+  than the pause; never after a pause, and never while the pause setting is on, because the summary
+  is written from the whole transcript and would carry the paused text to the voice. After a pause,
+  the owner decides with Load context. **New conversation** and removing a session keep the mark.
+  An owner who had turned that setting off gets the pause setting on at update, so summaries stay
+  by hand; the changelog says that turns typed while the call is on now sync (my call).
 - Claude's question in the target, from any main-loop turn, is said by the voice and opens a
   closed line, as a voice turn's question does today; the owner may answer it by voice or at the
   keyboard. A permission prompt is announced the same way, with what Claude wrote in its step.
 - Answering Claude's question at the keyboard drops the question from the voice's queue, as now,
   and adds a context line with the answer ("You answered at the keyboard: …"). Settling a
-  permission prompt at the keyboard adds a line that it was settled, and whether it was allowed or
-  denied where the mod can tell that reliably.
+  permission prompt at the keyboard adds a line that it was settled, and that it was allowed where
+  the mod can tell. No hook reports a person's denial, so a denial is only "settled".
 
 ## Decisions
 
@@ -94,18 +99,25 @@ while the menu says it is current, is a failure even if every line technically a
   minutes): if the voice still comments on the held lines, the design comes back here.
 - **Questions and permission prompts outside the target** (my call, from "sync without opening a
   call"): from a typed turn they are recorded as context only, with no chime and no unheard count;
-  from a voice turn they keep today's behaviour.
+  from a voice turn they keep today's behaviour. A question still open when its session becomes the
+  target is in the seed, and the owner may answer it by voice, as a target's own question.
 - **A turn's sync is decided when it starts** (my call). The call state and the pause setting at
   the turn's start decide for its prompt, its keyboard answers and its final answer alike, so a
   paused prompt never has its answer synced after Start, and a turn typed while the call was on
-  stays synced if it finishes after Stop.
+  stays synced if it finishes after Stop. One exception, from "press Stop, then type": what the
+  owner types after Stop with the pause on is dropped even into a turn that started synced, and
+  the rest of that turn stops syncing, as its answer may repeat it.
 - **A spoken reply makes the rest of the turn a voice turn** (the owner's decision). When the owner
   answers a typed turn's question by voice, the voice hands it off and the line waits for a result
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is
-  spoken like any voice turn's. Answered at the keyboard, the turn stays typed and its answer is
-  context: the owner is at the Mac.
+  spoken like any voice turn's. With another voice request already waiting behind that turn, the
+  answer is spoken as an update to it. Answered at the keyboard, the turn stays typed and its answer
+  is context: the owner is at the Mac.
 - **Text typed into a running turn** (a `prompt.submit` with a `turnId`, voice turns included) is
   the owner's words and is synced as a typed owner line (my call).
+- **Only the owner's words are the owner's** (my call). A prompt from another agent, plugin or
+  schedule is not recorded as the owner's: only origins observed to be the owner's are. The turn's
+  answer is synced all the same.
 - **The kept window.** When the lines since the session's summary no longer all reach the voice,
   rolled off the kept window or past what codex's seed limits carry, the next line loads a fresh
   summary itself and the menu says the session is out of sync (my call): the voice never silently
@@ -117,13 +129,14 @@ while the menu says it is current, is a failure even if every line technically a
   itself:
   - *missed*: a turn the app did not receive (the app was not running, the session was not joined,
     a post failed, the mod predates sync). A line may load a summary itself.
-  - *paused*: the owner's pause setting dropped a turn. Only Load context, or `/live context`,
-    loads one.
+  - *paused*: the owner's pause setting dropped a turn, or a turn was missed while the setting was
+    on. Only Load context, or `/live context`, loads one.
   A loaded summary clears both. The flag persists with the conversation across app restarts.
 - **Redacted and clipped.** Each synced line goes through the existing redactor
-  (`Text/Redaction.swift`) and is clipped to at most 2,000 characters (my call; the builder may
-  tune it against codex's `initialItems` limits in `Continuity`, 128 items and about 8,192
-  tokens). A typed line is marked as typed, so the voice can tell it from speech.
+  (`Text/Redaction.swift`), loses its code and tables as an answer does, and is clipped to at most
+  2,000 characters (my call; the builder may tune it against codex's `initialItems` limits in
+  `Continuity`, 128 items and about 8,192 tokens). A typed line is marked as typed, so the voice can
+  tell it from speech.
 - **Older peers.** A newer mod against an older app gets an unknown route and carries on as today.
   An older mod against a newer app (its join does not say it syncs) leaves its session permanently
   *missed*, so its lines load a summary as they do now.
@@ -141,21 +154,22 @@ while the menu says it is current, is a failure even if every line technically a
   prompt at the turn's start lets an open line know before Claude finishes.
 - The guards on the AskUserQuestion `tool.call` and `classic.PermissionRequest` hooks widen from
   "a voice turn is running" to "a main-loop turn is running and the session is joined". The race
-  between a spoken reply and the keyboard stays as it is for questions.
+  between a spoken reply and the keyboard stays as it is for questions. A spoken reply tells the
+  mod which request the turn's answer now belongs to; the app decides that.
 - When the keyboard wins the AskUserQuestion race, the mod posts the answer as a synced line.
-  When a permission prompt settles (`PostToolUse` / `PostToolUseFailure`), it posts that it was
-  settled, with allowed or denied only where the hook tells it reliably.
+  When a permission prompt settles, it posts that it was settled: allowed when the tool ran, and
+  otherwise only settled, once the next model step or the turn's end shows the dialog is gone.
 - The mod tracks whether every turn since the last delivered summary reached the app. When one did
-  not (no link, a refused post), it tells the app the session is *missed*, on the next successful
-  post or on join.
-- The summary cache (`summary`, `staleSummary`) stays: the app still asks for a summary when a
-  line needs one.
+  not (no link, a refused post, a lost voice answer, a turn before joining), its next join says the
+  session is *missed*.
+- The summary cache (`summary`, `staleSummary`) stays, but goes stale with every completed turn: a
+  summary the app asks for has to hold what the conversation could not carry.
 
 ### Wire
 
-One new route, mod to app, for a synced line: the session, who it is from (the owner typing, or
-Claude), and its text; and a way to say the session missed a turn (a field on that route or on
-join, the builder's choice). New fixtures for each shape, `/Users/example`, `Example session`,
+One new route, mod to app, for a synced line: the session, its turn, who it is from (the owner, or
+Claude), and its text; and on join, whether the session syncs at all and whether it missed a turn.
+A reply work item names the request its turn's answer belongs to. New fixtures for each shape, `/Users/example`, `Example session`,
 `00000000-…` ids. `Wire.swift`, `plugin/hooks/wire.ts` and `wire/fixtures/` change together.
 `StatusReply` tells the mod nothing new, unless the builder needs the target's out-of-sync state
 for the band.
@@ -190,14 +204,14 @@ already repeats much of the same text in its answers to voice requests.
 README (Privacy, How a call works, Settings, the Load context item) and its six translations;
 `SECURITY.md`: "A loaded context persists" and the advice after it are rewritten, since turning
 off auto-load no longer stops a session's text from reaching the voice: synced answers carry it
-too. The mitigation is `/clear` and **New conversation**, removing the session from LiveBridge, or
-the pause setting with Stop. A page Claude reads in a typed turn can now steer the voice through
+too. The mitigation is `/clear` with **New conversation**; removing a session holds until it joins again; the pause
+setting with Stop keeps new text out and removes nothing already recorded. The docs also say what is
+stored and for how long, and that Claude's later answers can repeat paused text. A page Claude reads in a typed turn can now steer the voice through
 Claude's answer, as it already could in a voice turn. `docs/architecture/overview.md`; and the
 2026-11-04 voice-session-context spec is marked superseded where it says typed turns do not reach
 the voice and that auto-load stays on.
 
 ## Left to the builder
 
-The wire route's name and the *missed* signal's shape; the clip length; how the typed marker is
-worded; `keptLines`; whether allowed or denied is reliably known from the hooks; the menu's wording
-for a disabled Load context.
+The clip length; how the typed marker is
+worded; `keptLines`; the menu's wording for a disabled Load context.
