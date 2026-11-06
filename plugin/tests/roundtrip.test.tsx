@@ -680,11 +680,21 @@ test('aPromptOpenAtTheTurnsEndIsSettled', async ($, on) => {
   await atAPrompt($, world)
   await $.turn.complete({ ...DONE, turnId: 't1', answer: '' })
   const lines = world.take('sync')
-  expect(lines).toHaveLength(1)
   expect(lines[0]).toMatchObject({ sessionId: ID, turn: { id: 't1' }, kind: 'report' })
   expect(lines[0]?.text).toContain('Bash')
   expect(lines[0]?.text).not.toContain('allowed')
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }, { sessionId: ID, state: 'idle', turn: TYPED }])
+})
+
+/** Esc: nothing else tells the voice the work stopped, and its picture would pass for current. */
+test('anInterruptedTurnReportsThatItEnded', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('sync')
+  await $.turn.complete({ durationMs: 1, isAborted: true, reason: 'aborted', turnId: 't1', answer: '' })
+  expect(world.take('sync')).toMatchObject([{ sessionId: ID, turn: { id: 't1' }, kind: 'report' }])
 })
 
 /** A subagent's prompt open at the turn's end was not the main loop's to report. */

@@ -51,6 +51,12 @@ const FAILURE: Record<TurnOutcome, string> = {
   error: 'the turn ended with an error',
 }
 
+/** The mod's line for a turn that ended without an answer: a voice turn says it as its reason instead. */
+function endedWithout(outcome: TurnOutcome): string {
+  const reason = FAILURE[outcome]
+  return `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`
+}
+
 /** How the wire names a turn: by the id its lines go under, with the request its answer belongs to. */
 const refOf = (turnId: string, turn: Tracked): TurnRef =>
   ({ id: turn.linesUnder ?? turnId, ...(turn.id !== null && { request: turn.id }) })
@@ -234,12 +240,14 @@ export class TurnTracker {
     this.#turns.delete(turnId)
     const text = answer.trim()
     const isAnswered = outcome === 'answer' && text !== ''
-    if (turn.id === null) {
-      return { post: null, sync: isAnswered ? { turn: refOf(turnId, turn), kind: 'answer', text } : null }
+    if (turn.isVoice) {
+      if (!isAnswered) return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }
+      return { post: { id: turn.id, status: /\?[*_`)"'”’\s]*$/u.test(text) ? 'question' : 'ok', text }, sync: null }
     }
-    if (!turn.isVoice) return { post: isAnswered ? { id: turn.id, status: 'update', text } : null, sync: null }
-    if (outcome !== 'answer' || text === '') return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }
-    return { post: { id: turn.id, status: /\?[*_`)"'”’\s]*$/u.test(text) ? 'question' : 'ok', text }, sync: null }
+    const under = refOf(turnId, turn)
+    if (!isAnswered) return { post: null, sync: { turn: under, kind: 'report', text: endedWithout(outcome) } }
+    if (turn.id === null) return { post: null, sync: { turn: under, kind: 'answer', text } }
+    return { post: { id: turn.id, status: 'update', text }, sync: null }
   }
 
   snapshot(): TurnSnapshot {

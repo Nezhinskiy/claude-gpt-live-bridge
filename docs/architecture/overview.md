@@ -138,7 +138,7 @@ observed to be a person typing ([ADR 0001](../adr/0001-platform-findings.md), it
 Control prompt is not the owner's, its answer is Claude's), and Claude's final answer at its end.
 It also posts, under the running turn whatever its kind, a keyboard answer to Claude's question
 as the owner's line, and as Claude's lines the mod's own reports: a question closed with no
-answer, and a permission prompt that was settled. A question Claude asks, or a permission prompt
+answer, a permission prompt that was settled, and a turn that ended without an answer. A question Claude asks, or a permission prompt
 it waits on, in any main-loop turn of a joined session goes to the app; the app says it for the
 target, and for another session says it unless the turn was typed, when it only records it (a
 subagent's approval has no turn and is said). A voice request that waits for the

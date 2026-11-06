@@ -180,7 +180,10 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   otherwise only settled, once the next model step or the turn's end shows the dialog is gone.
   That line is the mod's report (`report`), not the owner's typing, so it goes as Claude's and
   never refuses a turn under the pause. So does a question closed with no answer; a keyboard answer
-  to Claude's question is the owner's (`typed`).
+  to Claude's question is the owner's (`typed`). So does a turn that ends without an answer
+  (interrupted, refused, an error, or an empty answer), under the turn's decision, so the voice
+  does not take the work for pending; a voice turn closes its request as failed instead, and posts
+  no second line.
 - The mod tracks whether every turn since the last delivered summary reached the app. When one did
   not (no link, a refused post, a lost voice answer, a turn before joining), its next join says the
   session is *missed*.

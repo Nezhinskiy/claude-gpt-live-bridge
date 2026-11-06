@@ -146,19 +146,40 @@ test('a voice turn posts only its start', () => {
   assert.equal(tracker.turnCompleted('t1', 'Three files.', 'answer').sync, null)
 })
 
-test('an interrupted turn posts nothing', () => {
+test('an interrupted turn posts a report', () => {
   for (const outcome of ['aborted', 'refusal', 'error'] as const) {
     const tracker = new TurnTracker()
     tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
-    assert.deepEqual(tracker.turnCompleted('t1', 'Half an answer', outcome), { post: null, sync: null }, outcome)
+    const { post, sync } = tracker.turnCompleted('t1', 'Half an answer', outcome)
+    assert.equal(post, null, outcome)
+    assert.equal(sync?.kind, 'report', outcome)
+    assert.deepEqual(sync?.turn, { id: 't1' }, outcome)
+    assert.ok(sync?.text && !sync.text.includes('Half an answer'), outcome)
   }
 })
 
 /** A plain No at a permission dialog, or a cancelled question, ends the turn this way. */
-test('a turn that ends with no answer posts no line', () => {
+test('a turn that ends with no answer posts a report', () => {
   const tracker = new TurnTracker()
   tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
-  assert.deepEqual(tracker.turnCompleted('t1', ' \n', 'answer'), { post: null, sync: null })
+  assert.equal(tracker.turnCompleted('t1', ' \n', 'answer').sync?.kind, 'report')
+})
+
+test('an other turn that ends with no answer posts a report', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'A message from a peer session.', 'other', 0)
+  assert.equal(tracker.turnCompleted('t1', '', 'aborted').sync?.kind, 'report')
+})
+
+/** Its prompt went to the app and its answer would have gone as an update: nothing else closes it. */
+test('a turn a spoken reply tied to another request posts a report under it', () => {
+  const tracker = new TurnTracker()
+  tracker.turnStarted('t1', 'Rename the folder', 'owner', 0)
+  tracker.replied(REPLY, ID, 1000)
+  const { post, sync } = tracker.turnCompleted('t1', '', 'aborted')
+  assert.equal(post, null)
+  assert.equal(sync?.kind, 'report')
+  assert.deepEqual(sync?.turn, { id: 't1', request: ID })
 })
 
 /** The same end in a voice turn: its request closes as failed, and the reason says what happened. */
@@ -167,6 +188,15 @@ test('a voice turn that ends with no answer fails, with a reason', () => {
   assert.equal(post?.status, 'failed')
   assert.equal(post?.text, '')
   assert.ok(post?.reason)
+})
+
+test('a voice turn that fails posts no second line', () => {
+  for (const outcome of ['aborted', 'error'] as const) {
+    const tracker = new TurnTracker()
+    tracker.submitted(ID)
+    tracker.turnStarted('t1', framed(ID), 'voice', 0)
+    assert.equal(tracker.turnCompleted('t1', '', outcome).sync, null, outcome)
+  }
 })
 
 test('replied makes the rest of the turn a voice turn', () => {
