@@ -237,7 +237,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   `/live on` la recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
-  conserva LiveBridge, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
+  conserva LiveBridge, los límites de uso, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
   **Settings…** y **Quit LiveBridge**.
 - **Mute** (junto a **Stop**, en la banda y en la tarjeta de llamada del menú; **Unmute** mientras
   está silenciado) libera tu micrófono mientras la llamada continúa: una respuesta de Claude sigue
@@ -301,7 +301,7 @@ acabas de hacer, o para decir esa respuesta, una pregunta de Claude o que Claude
 permiso:
 
 - Mientras hay una llamada en curso y nadie habla, el micrófono alimenta únicamente un detector de
-  voz en tu Mac. No se envía nada a ninguna parte.
+  voz en tu Mac. No se envía audio a ninguna parte.
   Mientras está silenciado, LiveBridge no tiene el micrófono, y el indicador de micrófono de macOS lo muestra.
 - Cuando empiezas a hablar, se abre la línea. Los 2 segundos anteriores a que empezaras se
   conservan y se envían primero, para que no se pierdan tus primeras palabras.
@@ -324,6 +324,14 @@ permiso:
   palabras la abren con la conversación del nuevo destino.
 - El menú muestra los minutos que la línea estuvo abierta, medidos por la aplicación; cómo mide tu
   plan la voz en tiempo real no es público.
+- El menú muestra cuánto de tu uso de Codex y de Claude se ha gastado, una fila cada uno, como
+  porcentaje usado de cada ventana que informa el plan (hasta tres por fila, por ejemplo
+  `7% of 5 h · 19% of week`), en naranja desde el 90 %; pasa el cursor sobre una fila para ver
+  cuándo se reinicia cada ventana. Las cifras de Codex se leen cada vez que se abre el menú, como
+  máximo una vez por minuto, con un codex de corta vida; las de Claude llegan de una sesión unida
+  cuando ya ha respondido. Una fila sin nada que mostrar se omite, y la de Codex dice `blocked`
+  cuando codex informa de que el uso ordinario no está permitido. Qué límite detiene primero la
+  voz no está documentado ([detalles](docs/research/2026-11-05-gpt-live-limits.md)).
 
 ## Privacidad
 
@@ -364,6 +372,12 @@ El hilo de codex que transporta la voz es efímero y de solo lectura, con todas 
 codex desactivadas salvo donde conserva tu inicio de sesión y cómo usa tu proxy, y con todos los
 servidores MCP desactivados; está ahí solo para conversar. El trabajo de Claude va a Anthropic como
 siempre lo hace tu sesión de Claude Code.
+
+Al abrir el menú, LiveBridge inicia un codex de corta vida que pregunta a OpenAI, con tu inicio
+de sesión de ChatGPT, cuánto de tu uso de Codex se ha gastado (el porcentaje y la hora de reinicio
+de cada ventana). Ocurre como máximo una vez por minuto, también con la llamada apagada, y no
+envía audio ni texto. Las cifras de Claude llegan a la aplicación desde el mod por el socket y no
+van a ningún otro sitio; la aplicación guarda ambas solo en memoria.
 
 Para las actualizaciones, la aplicación se comunica con GitHub. Con **Check for updates
 automatically** activado, una vez al día (y en cada arranque mientras no se haya instalado una

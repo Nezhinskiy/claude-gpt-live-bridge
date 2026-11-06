@@ -225,7 +225,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   `/live on` brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
-  for each request the voice handed to Claude), the minutes, **Star LiveBridge on GitHub**
+  for each request the voice handed to Claude), the usage limits, the minutes, **Star LiveBridge on GitHub**
   (opens the repository's page), **Settings…** and **Quit LiveBridge**.
 - **Mute** (beside **Stop**, in the band and in the menu's call card; **Unmute** while muted)
   releases your microphone while the call goes on: an answer from Claude still opens the line and
@@ -290,7 +290,7 @@ talking, while Claude's answer to a request you just made may still come, or to 
 a question Claude asks you, or that Claude waits for your approval:
 
 - While a call is on and nobody is talking, the microphone feeds only a voice detector on your
-  Mac. Nothing is sent anywhere.
+  Mac. No audio is sent anywhere.
   While muted, LiveBridge holds no microphone, and macOS's microphone indicator shows that.
 - When you start speaking, the line opens. The 2 seconds before you started are kept and sent
   first, so your first words are not lost.
@@ -314,6 +314,13 @@ a question Claude asks you, or that Claude waits for your approval:
   voice per minute of your Codex budget, and on its API the same model family bills silence too
   ([details](docs/research/2026-11-04-gpt-live-billing.md)); your plan's own usage page is the
   authority.
+- The menu shows how much of your Codex and Claude usage is used, a row each, as the percent used
+  of every window the plan reports (up to three a row, for example `7% of 5 h · 19% of week`),
+  orange from 90 %; hover a row for when each window resets. Codex's figures are read each time
+  the menu opens, at most once a minute, by a short-lived codex; Claude's come from a joined
+  session once it has answered. A row with nothing to show is left out, and the Codex row says
+  `blocked` when codex reports ordinary usage as not allowed. Which limit stops the voice first
+  is not documented ([details](docs/research/2026-11-05-gpt-live-limits.md)).
 
 ## Privacy
 
@@ -352,6 +359,11 @@ The codex thread that carries the voice is ephemeral and read-only, with every c
 turned off except where it keeps your login and how it uses your proxy, and every MCP server
 off; it is there only to talk. Claude's work goes to Anthropic as your Claude Code session
 always does.
+
+Opening the menu makes LiveBridge start a short-lived codex that asks OpenAI, with your ChatGPT
+login, how much of your Codex usage is used (each window's percent and reset time). It happens at
+most once a minute, also while the call is off, and sends no audio or text. Claude's figures reach
+the app from the mod over the socket and go nowhere else; the app keeps both only in memory.
 
 For updates the app talks to GitHub. With **Check for updates automatically** on, once a day
 (and at each launch while a release it announced is not installed) it asks GitHub's API, without

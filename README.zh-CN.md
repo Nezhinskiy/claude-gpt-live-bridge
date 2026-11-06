@@ -188,7 +188,7 @@ claude plugin uninstall livebridge@livebridge
   该会话的摘要（[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
   状态条，`/live on` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
-  **Load context**、LiveBridge 保存的目标会话 **Conversation**、分钟数、
+  **Load context**、LiveBridge 保存的目标会话 **Conversation**、用量限额、分钟数、
   **Star LiveBridge on GitHub**（打开仓库页面）、**Settings…** 和 **Quit LiveBridge**。
 - **Mute**（在 **Stop** 旁边，位于状态条和菜单的通话卡片中；Mute 后显示 **Unmute**）会在通话继续时释放你的麦克风：Claude 的答复仍会打开线路，语音仍会说出它。状态条保留阶段并加上 `· muted`；没有线路打开时，菜单显示 “Muted — line closed”。Mute 不会关闭线路：已打开的线路会在通常的无声时长后关闭：若你当时在说话，则从 Mute 起算；若线路本来就安静，Mute 不会改变它何时关闭，计费与任何无声时段相同，因此 Mute 不会节省实时分钟数。**Unmute** 会重新使用麦克风，若无法使用（被拒绝、被占用、缺失），通话会带着原因结束。**Stop** 会结束通话和 Mute；下一次 **Start** 从未 Mute 开始。Mute 不是锁：任何以你的用户身份运行的进程都可以解除它（[SECURITY.md](SECURITY.md#who-can-drive-the-bridge)）。
 - **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。
@@ -222,7 +222,7 @@ claude plugin uninstall livebridge@livebridge
 
 实时语音会话在打开期间产生费用，因此 LiveBridge 只在有人说话时、在你刚提出的请求的 Claude 答复可能即将到来时，或为了说出这条答复、Claude 的提问或 Claude 正在等待你的许可时，才打开它：
 
-- 通话进行中且无人说话时，麦克风只为你 Mac 上的语音检测器供音，不会向任何地方发送任何内容。
+- 通话进行中且无人说话时，麦克风只为你 Mac 上的语音检测器供音，不会向任何地方发送音频。
   处于 Mute 时，LiveBridge 不持有麦克风，macOS 的麦克风指示器会显示这一点。
 - 当你开始说话时，线路打开。你开口前的 2 秒音频会被保留并最先发送，因此你的头几个字不会丢失。
 - 静音 20 秒后线路关闭。没有语言的声音（音乐、电视）会在 90 秒后将其关闭。
@@ -234,6 +234,7 @@ claude plugin uninstall livebridge@livebridge
 - 每个 Claude Code 会话都与语音有各自的对话。它会延续到下一个实时会话中，并在 Stop 和 Start 之间保留，因此语音记得你一分钟前说过的话。
   切换目标会同时切换对话：已打开的线路会关闭，你接下来说的话会带着新目标的对话重新打开它。
 - 菜单显示线路打开的分钟数，由应用测量；你的套餐如何对实时语音计量，并未公布。
+- 菜单显示你的 Codex 和 Claude 用量已用多少：各一行，按套餐所报告的每个窗口给出已用百分比（每行最多三个，例如 `7% of 5 h · 19% of week`），达到 90% 时显示为橙色；悬停在某一行上可看到各窗口何时重置。Codex 的数字在每次打开菜单时读取，最多每分钟一次，由一个短时运行的 codex 读取；Claude 的数字来自已加入且已回答过的会话。没有可显示内容的行不会出现；当 codex 报告不允许普通用量时，Codex 的那一行会显示 `blocked`。哪一项限额最先让语音停下，并未公布（[详情](docs/research/2026-11-05-gpt-live-limits.md)）。
 
 ## 隐私
 
@@ -256,6 +257,8 @@ LiveBridge 没有遥测，也不监听任何网络端口；模组通过一个只
 
 承载语音的 codex 线程是临时的、只读的，除保存你的登录信息和使用你的代理的方式之外，codex 的所有功能都已关闭，所有 MCP 服务器也都已关闭；
 它只用于对话。Claude 的工作则像你的 Claude Code 会话一贯的做法那样发往 Anthropic。
+
+打开菜单时，LiveBridge 会启动一个短时运行的 codex，用你的 ChatGPT 登录向 OpenAI 查询你的 Codex 用量已用多少（每个窗口的已用百分比和重置时间）。此操作最多每分钟一次，通话关闭时也会发生，不会发送音频或文本。Claude 的数字由模组经套接字交给应用，不会发往别处；应用只把两者保存在内存中。
 
 为了更新，应用会与 GitHub 通信。开启 **Check for updates automatically** 后，它每天一次（以及在它通知过的版本尚未安装时的每次启动）在不带任何凭据的情况下向 GitHub 的 API
 询问最新的发布版本；GitHub 会看到你 Mac 的 IP 地址。点击 Settings 中的 **Check for update** 时也会发出同样的请求。

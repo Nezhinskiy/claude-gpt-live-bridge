@@ -2,8 +2,7 @@
 
 Status: designed, approved by the owner on 2026-11-06. The data below was read that day on the
 owner's Plus login with codex 0.166.0, spending no voice. The wider research:
-`docs/research/2026-11-05-gpt-live-limits.md` (on branch `claude/research-gpt-live-limits-66ebd7`
-until it merges).
+[`docs/research/2026-11-05-gpt-live-limits.md`](../research/2026-11-05-gpt-live-limits.md).
 
 ## Why
 

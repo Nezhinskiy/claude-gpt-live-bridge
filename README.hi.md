@@ -230,7 +230,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे
   वापस ले आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
-  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), मिनट,
+  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), उपयोग की सीमाएँ, मिनट,
   **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
   चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice उसे
@@ -290,7 +290,7 @@ Realtime voice session खुली रहने तक खर्च होत�
 सवाल या इस बात को सुनाने के लिए कि Claude आपकी अनुमति का इंतज़ार कर रहा है:
 
 - जब call चालू हो और कोई बोल नहीं रहा, तब microphone सिर्फ़ आपके Mac पर चल रहे voice detector को
-  audio देता है। कहीं कुछ भेजा नहीं जाता।
+  audio देता है। कहीं कोई audio भेजा नहीं जाता।
   Muted रहते हुए LiveBridge के पास कोई microphone नहीं होता, और macOS का microphone indicator यह दिखाता है।
 - जब आप बोलना शुरू करते हैं, line खुल जाती है। बोलना शुरू करने से पहले के 2 सेकंड रखे जाते हैं और
   सबसे पहले भेजे जाते हैं, ताकि आपके पहले शब्द न छूटें।
@@ -312,6 +312,14 @@ Realtime voice session खुली रहने तक खर्च होत�
   की conversation के साथ खोलते हैं।
 - Menu वे मिनट दिखाता है जितनी देर line खुली रही, जैसा app ने नापा; आपका plan realtime voice को कैसे
   मीटर करता है, यह प्रकाशित नहीं है।
+- Menu दिखाता है कि आपके Codex और Claude usage का कितना हिस्सा इस्तेमाल हो चुका है: हर एक की एक
+  पंक्ति, plan जितनी windows बताता है उनमें से हर एक का इस्तेमाल हुआ प्रतिशत (हर पंक्ति में अधिकतम
+  तीन, जैसे `7% of 5 h · 19% of week`), 90 % या उससे अधिक होने पर नारंगी; किसी पंक्ति पर hover करने
+  से हर window के reset होने का समय दिखता है। Codex के आँकड़े हर बार menu खुलने पर, अधिकतम मिनट में
+  एक बार, एक अल्पकालिक codex से पढ़े जाते हैं; Claude के आँकड़े किसी जुड़े हुए session से तब आते हैं जब
+  वह जवाब दे चुका हो। जिस पंक्ति में दिखाने को कुछ न हो वह छोड़ दी जाती है, और codex जब बताता है कि
+  सामान्य उपयोग की अनुमति नहीं है तब Codex की पंक्ति में `blocked` लिखा आता है। कौन-सी limit voice को
+  सबसे पहले रोकती है, यह प्रकाशित नहीं है ([विवरण](docs/research/2026-11-05-gpt-live-limits.md))।
 
 ## गोपनीयता
 
@@ -349,6 +357,11 @@ voice को ले जाने वाला codex thread अस्थायी
 सिवाय उनके जहाँ वह आपका login रखता है और जहाँ वह आपके proxy का उपयोग करता है, और हर MCP server बंद
 है; वह सिर्फ़ बात करने के लिए है। Claude का काम Anthropic को वैसे ही जाता है जैसे आपका Claude Code
 session हमेशा भेजता है।
+
+Menu खोलने पर LiveBridge एक अल्पकालिक codex शुरू करता है, जो आपके ChatGPT login से OpenAI से पूछता है कि
+आपका Codex usage कितना इस्तेमाल हो चुका है (हर window का प्रतिशत और reset का समय)। यह अधिकतम मिनट में एक
+बार होता है, call बंद होने पर भी, और इसमें कोई audio या text नहीं भेजा जाता। Claude के आँकड़े mod से socket
+के ज़रिए app तक पहुँचते हैं और कहीं और नहीं जाते; app दोनों को सिर्फ़ memory में रखता है।
 
 Updates के लिए app GitHub से बात करता है। **Check for updates automatically** चालू होने पर, दिन में
 एक बार (और हर launch पर, जब तक उसके बताए release को install न किया गया हो) वह बिना credentials के
