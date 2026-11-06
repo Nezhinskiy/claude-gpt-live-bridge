@@ -261,7 +261,7 @@ struct MenuContentTests {
     #expect(card.opensMicrophoneSettings && card.codexHelp == nil)
     let signIn = try #require(Self.card(Self.menu(nil, problem: .codex(.notLoggedIn))))
     #expect(signIn.codexHelp == .signIn && !signIn.opensMicrophoneSettings)
-    #expect(card.unheard == "2 unheard — speak to hear")
+    #expect(card.unheard == "2 unheard — start and speak to hear")
     #expect(card.tint == .problem)
     #expect(card.actionTitle == "Start")
     #expect(card.canAct)

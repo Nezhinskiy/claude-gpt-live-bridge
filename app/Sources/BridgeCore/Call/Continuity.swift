@@ -124,6 +124,7 @@ public struct Conversation: Codable, Sendable, Equatable {
     return notes + talk
   }
 
+  /// codex's own estimate: UTF-8 bytes over 4. Past its limits it refuses the line (ADR 0001 (o)).
   static func estimatedTokens(_ text: String) -> Int { (text.utf8.count + 3) / 4 }
 }
 

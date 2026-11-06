@@ -87,6 +87,9 @@ public struct MenuContent: Sendable, Equatable {
         .command(.quit, title: "Quit LiveBridge", isEnabled: true),
       ]
     let shown = update.map { StatusPresentation($0.status) }
+    let hear =
+      update?.status.call == .off
+      ? "start and speak" : shown?.isMuted == true ? "unmute and speak" : "speak"
     let card = CallCard(
       headline: shown?.headline ?? (problem == nil ? "Starting…" : "Off"),
       detail: shown?.detail ?? "",
@@ -94,7 +97,7 @@ public struct MenuContent: Sendable, Equatable {
       canAct: shown?.canAct ?? false, muteAction: shown?.muteAction,
       unheard: shown.flatMap {
         $0.unheard > 0
-          ? "\($0.unheard) unheard — \($0.isMuted ? "unmute and speak" : "speak") to hear" : nil
+          ? "\($0.unheard) unheard — \(hear) to hear" : nil
       },
       problem: problem?.sentence,
       opensMicrophoneSettings: problem?.opensMicrophoneSettings ?? false,

@@ -167,7 +167,16 @@ final class AppModel {
       let (events, sink) = AsyncStream.makeStream(of: AudioEvent.self)
       audio.onEvent = { sink.yield($0) }
       audio.onLevel = { [weak self] in self?.showLevel($0) }
-      Task { for await event in events { await bridge.audioEvent(event) } }
+      Task {
+        for await event in events {
+          // `.speechStarted` stays suspended while its line opens, and a refusal is about that line
+          if case .lineError = event {
+            Task { await bridge.audioEvent(event) }
+          } else {
+            await bridge.audioEvent(event)
+          }
+        }
+      }
       Task { [weak self] in
         for await update in bridge.updates { self?.show(update) }
       }

@@ -13,6 +13,13 @@ struct ResultNoticeTests {
       session: session)
   }
 
+  /// With the call off the microphone is released, so speaking alone hears nothing.
+  @Test func aCallThatIsOffSaysToStartFirst() throws {
+    let notice = try #require(
+      ResultNotice.waiting([line("Done.", a)], labels: labels, callIsOff: true))
+    #expect(notice.body.contains("start the call and speak"))
+  }
+
   @Test func nothingWaitingIsNoNotice() {
     #expect(ResultNotice.waiting([], labels: labels) == nil)
   }

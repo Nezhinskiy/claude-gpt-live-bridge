@@ -374,7 +374,8 @@ such lines and adds two more right after `.connected`, on a line opened by speec
 - `initial_items` at the tag `rust-v0.166.0` (`codex-rs/core/src/realtime_conversation.rs`,
   `utils/string/src/truncate.rs`): past 128 items or 8,192 estimated tokens the start fails with
   `InvalidRequest`; the estimate is `(text.len() + 3) / 4`, and `len` counts UTF-8 bytes.
-  `Conversation.estimatedTokens` counts UTF-8 bytes, as codex does.
+  `Conversation.estimatedTokens` counted characters, Cyrillic at about half, until it took the
+  same estimate.
 
 ### Claude Code mod API
 
