@@ -69,6 +69,12 @@ export function spokenReply(request: VoiceRequest): string {
   return `${clean(request.brief)}\n\n(The owner answered by voice; a voice assistant relayed it.)`
 }
 
+/** A question's end at the keyboard, as a line for the voice: what was chosen, or that nothing was. */
+export function keyboardAnswer(result: { answers?: Record<string, string>; response?: string } | undefined): string {
+  const said = [...Object.values(result?.answers ?? {}), result?.response ?? ''].filter(text => text.trim() !== '')
+  return said.length === 0 ? "Claude's question was closed at the keyboard." : `You answered at the keyboard: ${said.join('; ')}`
+}
+
 /**
  * The voice request a turn's prompt carries: its text must open with the engine's framing of
  * this plugin's message and hold the marker line. Null for any other turn.

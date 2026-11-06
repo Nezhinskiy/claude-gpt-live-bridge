@@ -1,7 +1,8 @@
-// Which turns answer a voice request, and what each one posts back to the app. Pure: the hooks
-// feed it `prompt.submit` origins and the main loop's turn starts and ends.
+// Which turns answer a voice request, what each one posts back to the app, and which lines of
+// the other main-loop turns the app is sent. Pure: the hooks feed it `prompt.submit` origins and
+// the main loop's turn starts and ends.
 import { voiceRequestId } from './prompt.ts'
-import type { AnswerStatus, RequestId } from './wire.ts'
+import type { AnswerStatus, RequestId, SyncSource } from './wire.ts'
 
 /**
  * In characters: under the app's 131,072-byte body limit even at four UTF-8 bytes each; the app
@@ -11,25 +12,37 @@ export const ANSWER_LIMIT = 32_000
 /** How long after a voice request its background work still reports to the voice. */
 export const FOLLOW_UP_MS = 10 * 60_000
 
-export type TurnOrigin = 'voice' | 'typed' | 'background'
+export type TurnOrigin = 'voice' | 'owner' | 'other' | 'background'
 export type TurnOutcome = 'answer' | 'aborted' | 'refusal' | 'error'
 export type Post = { id: RequestId; status: AnswerStatus; text: string; reason?: string }
+/** A line for the app's conversation with the voice. Empty `text` takes the turn's decision and records nothing. */
+export type SyncLine = { turnId: string; from: SyncSource; text: string }
 
 /** What the tracker keeps across a reload of the mod (JSON data). */
 export type TurnSnapshot = {
   pending: RequestId | null
   followUp: FollowUp | null
   turns: [string, Tracked][]
+  /** Absent from a snapshot written before sync. */
+  typed?: TypedPrompt[]
 }
 type FollowUp = { id: RequestId; until: number }
-type Tracked = { id: RequestId; isVoice: boolean }
+/**
+ * A main-loop turn. `id`: the voice request its answer goes to; null for a turn with none behind
+ * it. `linesUnder`: the turn id its lines go under, when that is not its own.
+ */
+type Tracked = ({ id: RequestId; isVoice: boolean } | { id: null; isVoice: false }) & { linesUnder?: string }
+/** A prompt posted with a running turn's id, until a turn turns out to be its own, or none will. */
+type TypedPrompt = { text: string; turnId: string }
 
 /**
  * Background work a voice request may have started (a background task's notification, a
  * returning background agent included). Every other origin, one this list does not know too,
- * counts as typed: its answer is never sent to the voice.
+ * is `other`: its answer never goes to the voice as a result.
  */
 const BACKGROUND = new Set(['task-notification'])
+/** The origins seen to be a person's own typing (ADR 0001, item m). */
+const OWNER = new Set(['composer'])
 const FAILURE: Record<Exclude<TurnOutcome, 'answer'>, string> = {
   aborted: 'the turn was interrupted',
   refusal: 'the model refused the request',
@@ -48,21 +61,26 @@ export function clip(text: string, limit: number): string {
   return text
 }
 
-/** A turn's origin from the `origin` of the `prompt.submit` before it (ADR 0001, item m). */
-export function originOf(origin: { kind: string; name?: string }, self: string): TurnOrigin {
+/**
+ * A turn's origin from the `origin` of the `prompt.submit` before it (ADR 0001, item m).
+ * `isMeta`: the person does not see the prompt as typed, so it is not their words.
+ */
+export function originOf(origin: { kind: string; name?: string }, self: string, isMeta = false): TurnOrigin {
   if (origin.kind === 'plugin' && origin.name === self) return 'voice'
-  return BACKGROUND.has(origin.kind) ? 'background' : 'typed'
+  if (BACKGROUND.has(origin.kind)) return 'background'
+  return OWNER.has(origin.kind) && !isMeta ? 'owner' : 'other'
 }
 
 /**
- * Follows the voice request in flight and the follow-up window after it: for `FOLLOW_UP_MS`
- * and until any other turn, each background turn's answer is a later update to the last voice
- * request.
+ * Follows every main-loop turn: the voice request in flight, the follow-up window after it (for
+ * `FOLLOW_UP_MS` and until any other turn, each background turn's answer is a later update to
+ * the last voice request), and what a turn with no request behind it posts as sync lines.
  */
 export class TurnTracker {
   #pending: RequestId | null
   #followUp: FollowUp | null
   #turns: Map<string, Tracked>
+  #typed: TypedPrompt[]
   /** The visible text of the main loop's model step so far, until a question or an approval takes it. */
   #stepText = ''
 
@@ -70,6 +88,7 @@ export class TurnTracker {
     this.#pending = saved?.pending ?? null
     this.#followUp = saved?.followUp ?? null
     this.#turns = new Map(saved?.turns ?? [])
+    this.#typed = saved?.typed ?? []
   }
 
   /**
@@ -79,6 +98,18 @@ export class TurnTracker {
   get running(): RequestId | null {
     for (const turn of this.#turns.values()) if (turn.isVoice) return turn.id
     return null
+  }
+
+  /** The main-loop turn running, by the id its lines go under; null between turns. */
+  get current(): { turnId: string; isVoice: boolean } | null {
+    const running = this.#latest
+    return running && { turnId: running.turn.linesUnder ?? running.turnId, isVoice: running.turn.isVoice }
+  }
+
+  /** The turn that started last: main-loop turns run one at a time. */
+  get #latest(): { turnId: string; turn: Tracked } | null {
+    const entry = [...this.#turns].at(-1)
+    return entry === undefined ? null : { turnId: entry[0], turn: entry[1] }
   }
 
   /** The main loop's next model step starts: nothing of it is written yet. */
@@ -112,32 +143,79 @@ export class TurnTracker {
     if (this.#pending === id) this.#pending = null
   }
 
-  /** A main-loop turn started at `now` (ms). Its prompt names the voice request it answers, if any. */
-  turnStarted(turnId: string, text: string, origin: TurnOrigin, now: number): void {
+  /**
+   * The owner typed `text` into running turn `turnId`, and it goes under that turn. The engine
+   * does not say whether it folds in or gets a turn of its own later (ADR 0001, item m), so it is
+   * remembered until a turn claims it.
+   */
+  typedInto(turnId: string, text: string): SyncLine {
+    const lines = this.#turns.get(turnId)?.linesUnder ?? turnId
+    this.#typed.push({ text, turnId: lines })
+    return { turnId: lines, from: 'owner', text }
+  }
+
+  /**
+   * A main-loop turn started at `now` (ms): the line it opens with, if any. An owner's turn opens
+   * with its prompt; any other turn that is not a voice request's answer with an empty line, which
+   * takes the turn's decision. `text` is `turn.start`'s, which names the voice request; `prompt`
+   * is `prompt.submit`'s, what was typed. `origin` is null when no `prompt.submit` came first: so
+   * starts the turn of a prompt typed into the turn before it, whose lines stay under that id.
+   */
+  turnStarted(turnId: string, text: string, origin: TurnOrigin | null, now: number, prompt = text): SyncLine | null {
     const id = voiceRequestId(text)
+    const at = id === null && origin !== 'owner' ? this.#typed.findIndex(one => one.text === text) : -1
+    const claimed = this.#typed[at]
+    // Prompts before the one claimed folded in; with none claimed, every one did.
+    this.#typed = claimed === undefined ? [] : this.#typed.slice(at + 1)
     if (id !== null) {
       this.#turns.set(turnId, { id, isVoice: true })
       this.#followUp = { id, until: now + FOLLOW_UP_MS }
       if (this.#pending === id) this.#pending = null
-    } else if (origin === 'background' && this.#followUp !== null && now < this.#followUp.until) {
-      this.#turns.set(turnId, { id: this.#followUp.id, isVoice: false })
-    } else {
-      this.#followUp = null
+      return null
     }
+    if (claimed !== undefined) {
+      this.#turns.set(turnId, { id: null, isVoice: false, linesUnder: claimed.turnId })
+      this.#followUp = null
+      return null
+    }
+    if (origin === 'background' && this.#followUp !== null && now < this.#followUp.until) {
+      this.#turns.set(turnId, { id: this.#followUp.id, isVoice: false })
+      return null
+    }
+    this.#turns.set(turnId, { id: null, isVoice: false })
+    this.#followUp = null
+    return origin === 'owner' ? { turnId, from: 'owner', text: prompt } : { turnId, from: 'claude', text: '' }
   }
 
-  /** A main-loop turn ended: what to post for it, or null when it posts nothing. */
-  turnCompleted(turnId: string, answer: string, outcome: TurnOutcome): Post | null {
+  /**
+   * The owner's spoken reply `replyId` answered the running turn's question, and the app says
+   * its answer belongs to `forRequest`, undefined from an older app. The same request: the rest of
+   * the turn is a voice turn. Another one, already in flight: the answer is an update to it.
+   */
+  replied(replyId: RequestId, forRequest: RequestId | undefined, now: number): void {
+    const running = this.#latest
+    if (running === null || running.turn.isVoice || forRequest === undefined) return
+    const isOwn = forRequest === replyId
+    this.#turns.set(running.turnId, { ...running.turn, id: forRequest, isVoice: isOwn })
+    if (isOwn) this.#followUp = { id: forRequest, until: now + FOLLOW_UP_MS }
+  }
+
+  /** A main-loop turn ended: what to post for it, as an answer to the voice request or a line. */
+  turnCompleted(turnId: string, answer: string, outcome: TurnOutcome): { post: Post | null; sync: SyncLine | null } {
     const turn = this.#turns.get(turnId)
-    if (turn === undefined) return null
+    if (turn === undefined) return { post: null, sync: null }
     this.#turns.delete(turnId)
     const text = answer.trim()
-    if (!turn.isVoice) return outcome === 'answer' && text !== '' ? { id: turn.id, status: 'update', text } : null
-    if (outcome !== 'answer') return { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }
-    return { id: turn.id, status: /\?[*_`)"'”’\s]*$/u.test(text) ? 'question' : 'ok', text }
+    const isAnswered = outcome === 'answer' && text !== ''
+    if (turn.id === null) {
+      return { post: null, sync: isAnswered ? { turnId: turn.linesUnder ?? turnId, from: 'claude', text } : null }
+    }
+    if (!turn.isVoice) return { post: isAnswered ? { id: turn.id, status: 'update', text } : null, sync: null }
+    if (outcome !== 'answer') return { post: { id: turn.id, status: 'failed', text, reason: FAILURE[outcome] }, sync: null }
+    return { post: { id: turn.id, status: /\?[*_`)"'”’\s]*$/u.test(text) ? 'question' : 'ok', text }, sync: null }
   }
 
   snapshot(): TurnSnapshot {
-    return { pending: this.#pending, followUp: this.#followUp, turns: [...this.#turns] }
+    return { pending: this.#pending, followUp: this.#followUp, turns: [...this.#turns], typed: this.#typed }
   }
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { askedText, FRAMING, PLUGIN_NAME, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
+import { askedText, FRAMING, keyboardAnswer, PLUGIN_NAME, VOICE_TAG, voicePrompt, voiceRequestId } from '../../hooks/prompt.ts'
 import type { VoiceRequest } from '../../hooks/wire.ts'
 
 const request: VoiceRequest = {
@@ -88,3 +88,25 @@ test('claudesQuestionIsToldWithItsOptions', () => {
     'Which name? Options: out: Shorter.')
 })
 
+test('aKeyboardAnswerSaysWhatWasChosen', () => {
+  const said = keyboardAnswer({ answers: { 'Which name?': 'out' } })
+  assert.match(said, /out/)
+  assert.doesNotMatch(said, /Which name/)
+})
+
+test('aKeyboardAnswerHoldsEveryLabel', () => {
+  const said = keyboardAnswer({ answers: { 'Which name?': 'out', 'Which folder?': 'src' } })
+  assert.match(said, /out/)
+  assert.match(said, /src/)
+})
+
+test('aKeyboardAnswerHoldsTheFreeText', () => {
+  assert.match(keyboardAnswer({ answers: {}, response: 'neither, ask me later' }), /neither, ask me later/)
+})
+
+test('aQuestionClosedWithNoAnswerSaysSo', () => {
+  const closed = keyboardAnswer(undefined)
+  assert.notEqual(closed, '')
+  assert.equal(keyboardAnswer({ answers: {} }), closed)
+  assert.equal(keyboardAnswer({ answers: { 'Which name?': ' ' }, response: '' }), closed)
+})

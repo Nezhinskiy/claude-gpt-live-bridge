@@ -391,15 +391,28 @@ directory"; nothing enforces it.
 turn id. The plugin's own `prompt.submit` hook (not the calling hook) sees the submission with
 that origin, and the main-loop `turn.start` follows it.
 
-**(i) Permission dialog.** Documented only. `tool.check` decides `allow`, `ask` or `deny`, and
-an `ask` goes to the mode's decider (the dialog, the auto-mode classifier or a host), so it does
-not mean a dialog is shown; its `approver` says who would answer (`person`, `host`, absent). The
-settings-hook event `classic.PermissionRequest` (`tool_name`, `tool_input`, base fields incl.
-`agent_id`, no `tool_use_id`) runs when a request reaches the person; `classic.Notification`
-with `notification_type` reports prompts as notifications. The dialog ends with the tool running
-or failing (`classic.PostToolUse`, `classic.PostToolUseFailure`, both with `tool_use_id`), with
-`classic.PermissionDenied`, or with the turn ending (`turn.complete`). Not observed: the CLI could
-not run a model turn here.
+**(i) Permission dialog.** `tool.check` decides `allow`, `ask` or `deny`, and an `ask` goes to
+the mode's decider (the dialog, the auto-mode classifier or a host), so it does not mean a dialog
+is shown; its `approver` says who would answer (`person`, `host`, absent). The settings-hook event
+`classic.PermissionRequest` (`tool_name`, `tool_input`, base fields incl. `agent_id`, no
+`tool_use_id`) runs when a request reaches the person, and also when a host answers it;
+`classic.Notification` with `notification_type` reports prompts as notifications. Those are
+documented; the rest was observed, on the conditions below.
+
+After the dialog: **Yes** gives `classic.PostToolUse` (with `tool_use_id`), the next main
+`turn.step`, `classic.Stop`, `turn.complete`. **No with feedback** gives the next main `turn.step`,
+`classic.Stop`, `turn.complete`, and no `PostToolUse`. **A plain No** gives only `turn.complete
+{answer: "", reason: "answer"}`, not `aborted`: no `turn.step`, no `classic.Stop`, and the model is
+not called again. `classic.PostToolUseFailure` and `classic.PermissionDenied` are documented and
+registered without error, but fired in no run. `AskUserQuestion` raises
+`classic.PermissionRequest` too and, once answered, `classic.PostToolUse`; cancelled, only
+`turn.complete {answer: ""}` follows. A host's `can_use_tool` answers end the same way: allow as
+Yes, deny with a message as No with feedback, deny with `interrupt: true` as a plain No.
+
+How it was seen: Claude Code 2.1.312 in a terminal pty, and the SDK host's stream-json protocol
+emulated on 2.1.312 and on 2.1.317 (the desktop app's own engine), all against a canned model on
+localhost under a throwaway `HOME`. The desktop app itself and a real model were not observed;
+nor were auto mode, or a tool that fails after Yes.
 
 **(j) Framing of a plugin's prompt.** Observed: `turn.start` reports a plugin's
 `$.prompt.submit({ text })` (without `asUser`) as
@@ -418,7 +431,24 @@ carries no origin. `prompt.submit`, which precedes the main-loop `turn.start` of
 submission (observed for `origin.kind` `sdk` and `plugin`), carries `origin`, whose kinds
 include `composer` (typed), `bridge`, `sdk`, `task-notification` (a background task's
 notification, a returning background agent included), `scheduled-trigger`, `peer`, `plugin`,
-`unclassified` and others; a delivery into a running turn carries `turnId` and starts no turn.
+`unclassified` and others.
+
+Observed, as in (i): a typed prompt is `composer`, and a host's message marked
+`origin: {kind: "human"}` reaches the mod as `composer` too; `human` never does, and a host's
+unmarked message is `sdk`. The desktop app was not observed, but its transcripts stamp every text
+the owner typed `human`. A slash command that expands into a prompt is `composer` with `command`
+and no `isMeta`; its `prompt.submit.text` is what was typed, its `turn.start.text` the wrapper
+(`<command-message>…`). A mod's own command fires `command.run` only.
+
+A `prompt.submit` with a `turnId` is not "a delivery that starts no turn". In the terminal one fires
+at Enter during a running turn, and what follows depends on where the turn is. While a tool runs
+the prompt folds in: the next model request holds it inside the tool result, with no turn of its
+own, and the turn's answer may not address it. While the model streams its final text it gets a
+turn of its own after the first: a `turn.start` with the same text and no second `prompt.submit`.
+The two cannot be told apart at Enter. A host's message mid-turn comes late: during final text, a
+`prompt.submit` with no `turnId` after `turn.complete`, then its turn; during a tool, with a
+`turnId` after `classic.PostToolUse`, folded in. Other origin kinds, and a voice prompt delivered
+mid-turn, were not observed.
 
 ## Decision
 
@@ -473,8 +503,11 @@ notification, a returning background agent included), `scheduled-trigger`, `peer
   first line of the engine framing above plus its own marker inside the text, not by the
   trailing sentence.
 - A turn's origin is the `origin` of the `prompt.submit` just before its main-loop `turn.start`:
-  `plugin` with our name is voice; `task-notification` and other non-person kinds are background;
-  `composer`, `bridge` and `sdk` are typed.
+  `plugin` with our name is voice; `task-notification` is background; `composer` alone is the
+  owner's, unless `isMeta`, as the only kind seen to be a person typing; every other kind, `bridge`
+  and `sdk` included, is other, whose answer syncs and whose prompt does not. A turn with no
+  `prompt.submit` before it whose text equals a prompt typed into the turn before is that prompt's
+  own, and stays under that turn's id.
 - "Waiting for approval" is `classic.PermissionRequest` during a voice turn (or a subagent it
   started); it clears at the next `classic.PostToolUse`, `classic.PostToolUseFailure` or
   `classic.PermissionDenied` for the same tool, or at `turn.complete`. `tool.check` is not used

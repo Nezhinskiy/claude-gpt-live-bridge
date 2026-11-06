@@ -107,7 +107,8 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   paused prompt never has its answer synced after Start, and a turn typed while the call was on
   stays synced if it finishes after Stop. One exception, from "press Stop, then type": what the
   owner types after Stop with the pause on is dropped even into a turn that started synced, and
-  the rest of that turn stops syncing, as its answer may repeat it.
+  the rest of that turn stops syncing, as its answer may repeat it. The own turn of a prompt typed
+  into a running turn keeps that turn's decision.
 - **A spoken reply makes the rest of the turn a voice turn** (the owner's decision). When the owner
   answers a typed turn's question by voice, the voice hands it off and the line waits for a result
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is

@@ -456,14 +456,13 @@ export const register: Register = on => {
   // The hooks at sites that can refuse only observe: one that fails lets the event go on.
   on('prompt.submit', ($, e, next) => {
     // A delivery into a running turn starts no turn of its own.
-    if (e.turnId === undefined) lastOrigin = originOf(e.origin, PLUGIN_NAME)
+    if (e.turnId === undefined) lastOrigin = originOf(e.origin, PLUGIN_NAME, e.isMeta)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      // A turn with no origin seen is treated as typed: its answer never reaches the voice.
-      tracker.turnStarted(e.turnId, e.text, lastOrigin ?? 'typed', await $.clock.now())
+      tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now())
       lastOrigin = null
       await serial(() => follow($, false))
       await save($)
@@ -492,7 +491,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
-      const post = tracker.turnCompleted(e.turnId, e.answer, e.reason)
+      const { post } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
       if (!post) staleSummary()  // a voice turn's answer went to the voice: the summary still holds
       approval = null
       await save($)
