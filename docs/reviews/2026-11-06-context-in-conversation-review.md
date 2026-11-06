@@ -5,6 +5,9 @@ against `dev` at `f4ec846`. Report only; nothing in the PR was changed.
 
 ## Verdict
 
+This verdict was on PR 47 at `8248100`. PR 47 merged with the fixes; the release verdict is in
+[the last section](#the-release-pr-48-049ec0b6).
+
 **Fix first, docs only.** No code defect blocks the release, and the second commit adds no blocker.
 One sentence in `SECURITY.md` is false since the first commit, and
 `docs/architecture/overview.md` describes the seed wrongly. The second commit left both as they
@@ -220,3 +223,62 @@ state moved.
 
 No finding. `shownLines` scans at most 64 lines for each update, and the extra disk use is bounded
 by the same 64 lines of at most 1,500 characters.
+
+## The release, PR 48 at `49ec0b6`
+
+**Ship**, once CI's `check` and CodeQL's Swift analysis finish on `49ec0b6`; both were still running
+when this was written. Push the tag `v0.4.1` right after the merge.
+
+### The release commit
+
+| CONTRIBUTING's "Releasing" | Found |
+|---|---|
+| One version | `0.4.1` in `app/Support/Info.plist` and `plugin/.claude-plugin/plugin.json` |
+| Build number | `CFBundleVersion` 6 to 7, the same step as 0.4.0 |
+| Marketplace `ref` | `v0.4.1`; the tag does not exist yet, which is right before the merge |
+| CHANGELOG | Unreleased renamed to `[0.4.1]`, a fresh empty Unreleased above it |
+| Other versions | No stale `0.4.0` in a shipped file; two mentions in comments are history |
+
+It touches the same six files as the 0.4.0 release commit. `AGENTS.md` and `docs/roadmap.md` both
+say 0.4.1 is the latest. Both are true once the tag is out. No wire change: of the mod, only
+`plugin.json` differs from `f4ec846`.
+
+### The CHANGELOG note
+
+Accurate, and 0.4.0's section set the same habit of saying what was not checked. "Empties" is a
+little broad: an older app fails to decode the file only once it holds a **Loaded context** line.
+The note errs toward warning, so it can stay.
+
+### The PR body
+
+- **"`scripts/check.sh` exits 0 on the release commit, 606 Swift tests":** confirmed. I ran it in a
+  temporary worktree of `49ec0b6`: exit 0, 606 Swift tests, no skipped mod tests.
+- **"PR 47 and PR 46 each had a reviewer session and a green CI":** confirmed. Every check passed on
+  PR 47's head `eee4fa1` and on PR 46. `eee4fa1` came after the second review; it is the fix commit
+  read below.
+- **"`scripts/smoke.sh` was not run, as what opens a line did not change":** confirmed. The diff from
+  `f4ec846` does not touch `openLine`, `askForContext` or `initialItems`.
+- **The "Not checked" list:** I found nothing missing from it.
+- **One overstatement, which does not block:** "not offered to a session whose next line asks for
+  the summary anyway". A session with a gap, a mod that does not sync or too many lines is still
+  offered the press, and its next line asks too. The CHANGELOG entry says this correctly, and the
+  sentence lives only in the PR body.
+
+### The fixes in `dev`
+
+| Finding | State at `49ec0b6` |
+|---|---|
+| 1, `SECURITY.md` | Fixed at lines 209 and 276: "replaces the old one for the voice and keeps the lines, the old summary among them" |
+| 2, `overview.md` | Fixed: the list names each summary, and the seed is "less those briefs and summaries" |
+| 4, `README.uk.md` | Fixed: `резюме` at line 250 |
+| 5, two comments | Fixed: `initialItems` and `BridgeUpdate.conversation` |
+| 9, the missing test | Fixed: `linesTheSeedCannotCarryNeedAPress`, the probe's assertions |
+| 10, `ContextNeed.load` | Fixed: it says the next line also asks, and only a pause needs a press |
+| 11, "loads" | Fixed in the CHANGELOG, the READMEs and the `contextNeed` comment: the line "asks for" one |
+
+Finding 11 stops short in one place, harmlessly: the `ContextNeed.withTheLine` comment still says
+"loads", and so does the menu title, which was left as the owner's call.
+
+Still open, neither blocking: finding 3 (`README.md:445-446` still says "the context line last
+loaded from it") and finding 8 (an open line with no summary, the owner's decision). Finding 6 is
+now in the CHANGELOG note. Finding 7 stands: one look at the real menu on the release build.
