@@ -119,7 +119,10 @@ process on the same lockdown argv.
 - Several sessions share one account as a rule, so they feed one reading, keyed by window: the
   later `resetsAt` wins, and on the same `resetsAt` the higher percent wins, as use within a window
   only grows. A window nobody reports any more goes at its reset; a Codex read replaces the whole
-  reading. A window with no `resetsAt` takes the newest. `$.session.usage()` reports the last
+  reading. A window with no `resetsAt` takes the newest, except that a known reset is kept against
+  an undated report (the window keeps the old reset and the higher percent); a held window with no
+  reset that a report does not mention is dropped, and one that stays is dropped 15 minutes after the
+  reading, as it has no reset to wait for. `$.session.usage()` reports the last
   response and has no timestamp, so an idle session joining would otherwise put old, lower figures
   over fresh ones. "Read at" is when the held reading last changed or was confirmed by an arrival.
   A session on another account mixes with this one; accepted.
@@ -131,7 +134,8 @@ process on the same lockdown argv.
   a 404, ignored like any failed send.
 
 **Past its reset.** A window whose `resetsAt` has passed says nothing about the new window, so it is
-left out until a new reading comes. That matters for Claude, whose readings arrive only with a turn.
+left out until a new reading comes. A window with no `resetsAt` is left out 15 minutes after the
+reading it came from, the same number as Codex's own staleness limit. That matters for Claude, whose readings arrive only with a turn.
 
 **The menu.** `MenuContent` gets a limit item carrying the row's parts, tooltip and which windows are
 near the limit; `outline` prints it for the tests. All rules are pure and tested there. The

@@ -42,8 +42,28 @@ struct UsageLimitsTests {
   @Test func aWindowWithNoResetTakesTheNewest() {
     let dated = window(week, 50, now.addingTimeInterval(100))
     let undated = window(week, 5)
-    #expect(reading(dated).merging(reading(undated)).windows == [undated])
     #expect(reading(undated).merging(reading(dated)).windows == [dated])
+    #expect(reading(undated).merging(reading(window(week, 9))).windows == [window(week, 9)])
+  }
+
+  @Test func aKnownResetSurvivesAnUndatedReport() {
+    let reset = now.addingTimeInterval(100)
+    let held = reading(window(week, 50, reset))
+    #expect(held.merging(reading(window(week, 60))).windows == [window(week, 60, reset)])
+    #expect(held.merging(reading(window(week, 5))).windows == [window(week, 50, reset)])
+  }
+
+  @Test func anUndatedWindowGoesAfterFifteenMinutes() {
+    let undated = window(five, 95)
+    let got = reading(undated, readAt: now)
+    #expect(got.current(at: now.addingTimeInterval(15 * 60)).windows == [undated])
+    #expect(got.current(at: now.addingTimeInterval(15 * 60 + 1)).windows.isEmpty)
+  }
+
+  @Test func anUndatedWindowNobodyReportsGoes() {
+    let held = reading(window(week, 30), window(five, 10, now.addingTimeInterval(100)))
+    let merged = held.merging(reading(window(.kind("x"), 5)))
+    #expect(merged.windows.map(\.span) == [five, .kind("x")])
   }
 
   @Test func aMissingWindowKeepsTheHeldOne() {

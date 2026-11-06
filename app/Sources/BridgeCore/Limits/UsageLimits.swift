@@ -124,29 +124,43 @@ public struct UsageLimits: Sendable, Equatable {
     }
   }
 
-  /// This reading without the windows whose reset has passed: they say nothing about the new one.
+  /// How long a window with no reset stays after the reading: nothing says when it ends, so it is
+  /// not kept for ever. Codex's own staleness limit.
+  public static let undatedLife: TimeInterval = 15 * 60
+
+  /// This reading without the windows that no longer say anything about the current one: those
+  /// whose reset has passed, and those with no reset once `undatedLife` has passed since `readAt`.
   public func current(at now: Date) -> UsageLimits {
     var copy = self
     copy.windows = windows.filter { window in
-      guard let resetsAt = window.resetsAt else { return true }
+      guard let resetsAt = window.resetsAt else {
+        return now.timeIntervalSince(readAt) <= Self.undatedLife
+      }
       return resetsAt >= now
     }
     return copy
   }
 
   /// `newer` over this one, window by window: the later reset wins, on the same reset the higher
-  /// percent (use within a window only grows), and a window with no reset takes the newer. A
-  /// window `newer` lacks stays as held until its reset.
+  /// percent (use within a window only grows), and a window with no reset takes the newer, except
+  /// that a known reset is kept against an undated report (with the higher percent). A window
+  /// `newer` lacks stays as held until its reset; one with no reset has none to wait for and goes.
   public func merging(_ newer: UsageLimits) -> UsageLimits {
     func merged(_ old: LimitWindow, _ new: LimitWindow) -> LimitWindow {
-      guard let oldReset = old.resetsAt, let newReset = new.resetsAt else { return new }
+      guard let oldReset = old.resetsAt else { return new }
+      guard let newReset = new.resetsAt else {
+        return LimitWindow(
+          span: new.span, usedPercent: max(old.usedPercent, new.usedPercent), resetsAt: oldReset)
+      }
       if newReset != oldReset { return newReset > oldReset ? new : old }
       return new.usedPercent >= old.usedPercent ? new : old
     }
     var all = newer.windows.map { new in
       windows.first { $0.span == new.span }.map { merged($0, new) } ?? new
     }
-    all += windows.filter { old in !newer.windows.contains { $0.span == old.span } }
+    all += windows.filter { old in
+      old.resetsAt != nil && !newer.windows.contains { $0.span == old.span }
+    }
     return UsageLimits(windows: all, isBlocked: newer.isBlocked, readAt: newer.readAt)
   }
 }

@@ -6,7 +6,7 @@ public struct LimitsPoll: Sendable, Equatable {
   /// The least time between two starts of a read.
   public static let readEvery: TimeInterval = 60
   /// A reading older than this is no longer shown.
-  public static let staleAfter: TimeInterval = 15 * 60
+  public static let staleAfter = UsageLimits.undatedLife
 
   private var last: UsageLimits?
   private var lastBegan: Date?
