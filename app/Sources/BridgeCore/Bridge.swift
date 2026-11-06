@@ -638,19 +638,13 @@ public actor Bridge: Router {
 
   /// A newer request superseded this answer, so it is not said, and the mod, told 200, notes no
   /// gap. So it is kept as Claude's synced line, unless it is a failure, which holds no answer.
-  /// With the pause on and the call off it stays out as any synced line does; it has no turn of
-  /// its own, so the turn's decision is left to the turn.
+  /// `SessionRegistry.complete` has already dropped one whose request is withheld.
   private func keepSuperseded(_ body: AnswerBody) async {
     let id = body.sessionId
     guard body.status != .failed, let row = try? await label(of: id),
       let line = AnswerShaper.synced(body.text, from: .claude, label: row.label, session: id)
     else { return }
-    if pausing {
-      continuity.markMissed(id, asPaused: true)
-      save()
-    } else {
-      await addSynced(line, as: .claude)
-    }
+    await addSynced(line, as: .claude)
   }
 
   /// Keeps a synced line in its session's conversation; the open line about that session is

@@ -1416,13 +1416,14 @@ struct BridgeTests {
     #expect(await lines().isEmpty)
   }
 
-  /// With the pause on and the call off, it is a synced line like any other: dropped, and marked.
-  @Test func aSupersededAnswerStaysOutOfAPause() async throws {
+  /// Stop with the pause on and nobody typing: its turn started before Stop, so it keeps its
+  /// answer, as the decision rule says.
+  @Test func aSupersededAnswerAfterStopIsKept() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
     try await test.superseded()
-    #expect(await test.lines().isEmpty)
-    #expect(try test.saved()[test.a].outOfSync == .paused)
+    #expect(await test.lines() == ["Claude: [CLAUDE] Alpha: Done."])
+    #expect(try test.saved()[test.a].outOfSync == nil)
   }
 
   /// With the pause on and the call off: a voice turn runs, and the owner types into it.
