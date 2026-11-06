@@ -136,7 +136,8 @@ background turn inside the follow-up window posts its answer as an update instea
 owner's prompt at the turn's start, but only when its origin is `composer`, the only kind
 observed to be a person typing ([ADR 0001](../adr/0001-platform-findings.md), item m; a Remote
 Control prompt is not the owner's, its answer is Claude's), and Claude's final answer at its end.
-It also posts, under the running turn whatever its kind, a keyboard answer to Claude's question
+Hooks post in the order they ran, in a queue of their own beside the poll's, and wait for it at
+most 200 ms. It also posts, under the running turn whatever its kind, a keyboard answer to Claude's question
 as the owner's line, and as Claude's lines the mod's own reports: a question closed with no
 answer, a permission prompt that was settled, and a turn that ended without an answer. A question Claude asks, or a permission prompt
 it waits on, in any main-loop turn of a joined session goes to the app; the app says it for the

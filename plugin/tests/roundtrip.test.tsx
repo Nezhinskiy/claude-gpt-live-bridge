@@ -1044,6 +1044,81 @@ test('aDeliveryThatIsNotTheOwnersIsNotSynced', async ($, on) => {
 })
 
 /** A long prompt or answer is cut to what fits the app's body limit; the app shapes it for the voice. */
+/** The app answers a line once the open line took it: up to 20 s with codex stuck (`Bridge.addSynced`). */
+test('aStuckLineDoesNotHoldTheTurnItOpens', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  let release = () => {}
+  world.holdSync = new Promise<void>(resolve => { release = resolve })
+  const started = $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await aMoment()
+  await world.clock.advance(1000)
+  await started
+  expect(world.take('activity')).toEqual([])
+  world.holdSync = null
+  release()
+  await aMoment()
+  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: TYPED }])
+})
+
+test('aStuckLineDoesNotHoldWhatIsTypedNext', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  world.take('sync')
+  let release = () => {}
+  world.holdSync = new Promise<void>(resolve => { release = resolve })
+  const first = $.prompt.submit(composer('first', 't1'))
+  await aMoment()
+  await world.clock.advance(1000)
+  await first
+  const second = $.prompt.submit(composer('second', 't1'))
+  await aMoment()
+  await world.clock.advance(1000)
+  await second
+  world.holdSync = null
+  release()
+  await aMoment()
+  expect(world.take('sync')).toEqual([owner('t1', 'first'), owner('t1', 'second')])
+})
+
+/** An approval ahead of its turn's `start` would take the turn's decision. */
+test('whatFollowsAStuckLineStaysBehindIt', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  let release = () => {}
+  world.holdSync = new Promise<void>(resolve => { release = resolve })
+  const started = $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await aMoment()
+  await world.clock.advance(1000)
+  await started
+  const asked = $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' } })
+  await aMoment()
+  await world.clock.advance(1000)
+  await asked
+  expect(world.take('activity')).toEqual([])
+  world.holdSync = null
+  release()
+  await aMoment()
+  expect(world.take('activity').map(body => body?.state)).toEqual(['working', 'approval'])
+})
+
+/** The app drops a session that stops polling after 5 s, so a line codex holds for 20 must not hold the poll. */
+test('aStuckLineLeavesThePollRunning', async ($, on) => {
+  const world = fakeWorld(on)
+  await joined($, world)
+  world.calls = []
+  let release = () => {}
+  world.holdSync = new Promise<void>(resolve => { release = resolve })
+  const started = $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  await aMoment()
+  await world.clock.advance(3000)
+  expect(world.take('next').length).toBeGreaterThan(1)
+  world.holdSync = null
+  release()
+  await started
+})
+
 test('aLongLineIsCutToAnAnswersLimit', async ($, on) => {
   const world = fakeWorld(on)
   await joined($, world)

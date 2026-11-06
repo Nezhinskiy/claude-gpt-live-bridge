@@ -189,6 +189,10 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   (interrupted, refused, an error, or an empty answer), under the turn's decision, so the voice
   does not take the work for pending; a voice turn closes its request as failed instead, and posts
   no second line.
+- The hooks' posts to the app go in the order the hooks ran, in a queue of their own, and a hook
+  waits for them at most 200 ms: the app answers a line once the open line took it, up to 20 s with
+  codex stuck, and typing must not wait for that. Not through the link's `serial`: the app drops a
+  session that stops polling after 5 s, so a held line must leave the poll running.
 - The mod tracks whether every turn since the last delivered summary reached the app. When one did
   not (no link, a refused post, a lost voice answer, a turn before joining, a turn while the mod was
   off, a question or permission notice the app did not take), its next join says the session is

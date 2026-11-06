@@ -24,6 +24,8 @@ const CONTEXT_TIMEOUT_MS = 60_000
 const SENT_NOTE_MS = 3_000
 /** How long the polled band may go undrawn before every surface is asked for it again. */
 const UNDRAWN_MS = 3_000
+/** How long a hook waits for its posts to the app before it lets the engine go on. */
+const HOOK_HOLD_MS = 200
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
@@ -70,6 +72,8 @@ let summary: string | null = null
 let turnsDone = 0
 /** The summary on its way, which a second ask joins instead of asking the model again. */
 let sending: Promise<ContextOutcome> | null = null
+/** The hooks' posts to the app, in the order the hooks ran. */
+let posts: Promise<unknown> = Promise.resolve()
 /** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
 let sendCount = 0
 
@@ -105,6 +109,21 @@ async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
   if ((await link?.sync(body)) === true) return
   noteGap()
   await save($)
+}
+
+/**
+ * Runs a hook's `work` after the posts queued before it, and holds the hook no longer than
+ * `HOOK_HOLD_MS`: the app answers a line once the open line took it, up to 20 s with codex stuck,
+ * and typing must not wait for that. Its own queue, not `serial`: the app drops a session that
+ * stops polling after 5 s, so a held line must leave the poll running. What `work` needs of the
+ * hook's moment it takes before this call.
+ */
+async function inOrder($: EngineInterface, work: () => Promise<void>): Promise<void> {
+  const done = posts.then(work).catch((error: unknown) => $.ui.log(`LiveBridge: ${String(error)}`))
+  posts = done
+  let timer: { cancel(): void } | undefined
+  await Promise.race([done, new Promise<void>(resolve => { timer = $.clock.after(HOOK_HOLD_MS, resolve) })])
+  timer?.cancel()
 }
 
 /**
@@ -476,16 +495,17 @@ async function awaiting($: EngineInterface, said: Omit<ActivityBody, 'sessionId'
  * not the owner's typing, so it refuses nothing.
  */
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
-  await save($)
   const turn = tracker.current
-  if (turn) await postSync($, { turn, kind: 'report', text })
-  await worksOn($)
+  const isOver = nothingWaits()
+  await save($)
+  await inOrder($, async () => {
+    if (turn) await postSync($, { turn, kind: 'report', text })
+    if (isOver) await link?.activity('working', under(turn))
+  })
 }
 
-/** The session works on, unless a prompt or Claude's question still waits: the app has one row for them. */
-async function worksOn($: EngineInterface): Promise<void> {
-  if (!tracker.isPrompting && answerQuestion === null) await link?.activity('working', under(tracker.current))
-}
+/** Whether the session works on: the app has one row for a prompt and for Claude's question. */
+const nothingWaits = () => !tracker.isPrompting && answerQuestion === null
 
 /** The tool ran, or failed, so the prompt for that very run was allowed. */
 async function toolRan($: EngineInterface, e: { tool_name: string; tool_input: unknown; agent_id?: string }): Promise<void> {
@@ -567,8 +587,9 @@ export const register: Register = on => {
     if (e.turnId === undefined && entered.drop !== undefined) lastSubmit = null
     // Whether it folds in or gets a turn of its own, it goes to the app now, under the running turn.
     if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
-      await postSync($, tracker.typedInto(e.turnId, e.text, entered.text))
+      const line = tracker.typedInto(e.turnId, e.text, entered.text)
       await save($)
+      await inOrder($, () => postSync($, line))
     }
     return entered
   }).catch(($, e, next) => next(e))
@@ -587,10 +608,13 @@ export const register: Register = on => {
       const { lines, isLost } = tracker.turnStarted(e.turnId, e.text, lastSubmit?.origin ?? null, await $.clock.now(), lastSubmit?.text)
       if (isLost) noteGap()
       lastSubmit = null
-      await serial(() => follow($, false))  // /clear: the line goes under the session's new id
-      await save($)
-      for (const line of lines) await postSync($, line)
-      await link?.activity('working', under(tracker.current))
+      const turn = tracker.current
+      await inOrder($, async () => {
+        await serial(() => follow($, false))  // /clear: the line goes under the session's new id
+        await save($)
+        for (const line of lines) await postSync($, line)
+        await link?.activity('working', under(turn))
+      })
     }
     return next(e)
   })
@@ -622,10 +646,12 @@ export const register: Register = on => {
       if (isLost) noteGap()
       staleSummary()
       await save($)
-      if (sync) await postSync($, sync)
-      const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
-      if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
-      await link?.activity('idle', under(turn))
+      await inOrder($, async () => {
+        if (sync) await postSync($, sync)
+        const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
+        if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
+        await link?.activity('idle', under(turn))
+      })
     }
     return next(e)
   })
@@ -640,9 +666,13 @@ export const register: Register = on => {
     const answered = next(e)
     const spoken = new Promise<Reply>(resolve => { answerQuestion = resolve })
     try {
-      // The app says what waits only on a change to `approval`.
-      if (tracker.isPrompting) await link.activity('working', { turn })
-      await awaiting($, { question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn })
+      const isOverPrompt = tracker.isPrompting
+      const said = { question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn }
+      await inOrder($, async () => {
+        // The app says what waits only on a change to `approval`.
+        if (isOverPrompt) await link?.activity('working', { turn })
+        await awaiting($, said)
+      })
       // Over at once: a reply from here on has no question, whatever posting the answer takes.
       const first = await Promise.race([answered, spoken]).finally(() => { answerQuestion = null })
       if ('kind' in first) {
@@ -651,11 +681,15 @@ export const register: Register = on => {
         return { result: { questions: e.questions, answers: {}, response: spokenReply(first) } }
       }
       const result = first.isError === true ? undefined : first.result
-      await postSync($, { turn, ...keyboardAnswer(result) })
+      await inOrder($, () => postSync($, { turn, ...keyboardAnswer(result) }))
       return first
     } finally {
-      await link?.activity('working', under(tracker.current))
-      if (tracker.isPrompting) await awaiting($, under(tracker.current))
+      const after = under(tracker.current)
+      const isPrompting = tracker.isPrompting
+      await inOrder($, async () => {
+        await link?.activity('working', after)
+        if (isPrompting) await awaiting($, after)
+      })
     }
   }).catch(($, e, next) => next(e))
 
@@ -666,11 +700,11 @@ export const register: Register = on => {
     const turn = tracker.current
     if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
       tracker.promptOpened(e.tool_name, e.tool_input, e.agent_id)
-      await save($)
       // A bare approval would take back the open question, and the app would say nothing for it.
-      if (answerQuestion === null) {
-        await awaiting($, { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })
-      }
+      const isAsking = answerQuestion !== null
+      const said = { ...(!isAsking && e.agent_id === undefined && wrote(tracker.takeStepText())), turn }
+      await save($)
+      if (!isAsking) await inOrder($, () => awaiting($, said))
     }
     return next(e)
   }).catch(($, e, next) => next(e))
@@ -679,8 +713,13 @@ export const register: Register = on => {
   on('classic.PostToolUseFailure', async ($, e, next) => (await toolRan($, e), next(e)))
     .catch(($, e, next) => next(e))
   // Auto mode's refusal, not the person's: nothing to tell the voice but that it goes on.
-  on('classic.PermissionDenied', async ($, e, next) => (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id) && (await worksOn($)), next(e)))
-    .catch(($, e, next) => next(e))
+  on('classic.PermissionDenied', async ($, e, next) => {
+    if (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id) && nothingWaits()) {
+      const turn = tracker.current
+      await inOrder($, async () => { await link?.activity('working', under(turn)) })
+    }
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {
     // After /clear the session goes on under a new id: the next poll leaves the old one and joins.
