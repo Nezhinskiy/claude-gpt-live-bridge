@@ -126,9 +126,12 @@ export class BridgeLink {
     return reply?.status === 410 ? REMOVED : reply?.ok === true
   }
 
-  /** `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only). */
-  async activity(state: SessionActivity, said: Omit<ActivityBody, 'sessionId' | 'state'> = {}): Promise<void> {
-    await this.#forSession('activity', { state, ...said })
+  /**
+   * `said`: what Claude asks the owner, or wrote before a permission prompt (`approval` only), and
+   * the turn. False when the app did not take it.
+   */
+  async activity(state: SessionActivity, said: Omit<ActivityBody, 'sessionId' | 'state'> = {}): Promise<boolean> {
+    return (await this.#forSession('activity', { state, ...said }))?.ok === true
   }
 
   /** Posts a line of a turn; false when the app did not take it, which a session not joined never does. */

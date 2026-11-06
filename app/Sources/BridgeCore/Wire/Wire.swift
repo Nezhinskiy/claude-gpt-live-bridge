@@ -93,15 +93,34 @@ public struct JoinBody: Codable, Sendable, Equatable {
   public var missed: Bool?
 }
 
-public enum SyncSource: String, Codable, Sendable { case owner, claude }
+/// The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
+/// answer belongs to; absent from a turn with none behind it. A spoken reply that makes a typed
+/// turn a voice turn adds it to the turn's later lines.
+public struct TurnRef: Codable, Sendable, Equatable {
+  public var id: String
+  public var request: RequestID?
+}
 
-/// `POST /v1/sync`: a line of a turn that is not a voice request. Empty `text`, at a turn's
-/// start, takes the turn's decision and records nothing.
+/// What a line of a turn is. Only `typed` refuses a turn and only `start` has no text; who said a
+/// line and its tag follow from this.
+public enum SyncKind: String, Codable, Sendable {
+  /// A turn's first word: it takes the turn's decision and records nothing.
+  case start
+  /// The owner's words: a prompt, text typed into a running turn, a keyboard answer.
+  case typed
+  /// Claude's final answer.
+  case answer
+  /// The mod's own line: a settled prompt, or a question closed with no answer. It goes as
+  /// Claude's.
+  case report
+}
+
+/// `POST /v1/sync`: a line of a turn. `text` is absent from `start` alone.
 public struct SyncBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
-  public var turnId: String
-  public var from: SyncSource
-  public var text: String
+  public var turn: TurnRef
+  public var kind: SyncKind
+  public var text: String?
 }
 
 /// `POST /v1/leave`.
@@ -130,13 +149,14 @@ public enum SessionActivity: String, Codable, Sendable { case idle, working, app
 /// `POST /v1/activity`. `question`, with `approval`: Claude asked the owner this and waits for
 /// the reply, which the voice may hand over as `Work.reply`; without it, a permission prompt
 /// waits, which the voice only reports. `text`, with `approval`: what Claude wrote in the step
-/// that pauses. `typedTurn`: the turn's id when it is not a voice turn.
+/// that pauses. `turn`: the main-loop turn it belongs to; absent between turns, and from a released
+/// mod, which reports only its voice turns and never a `turn`.
 public struct ActivityBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var state: SessionActivity
   public var question: String?
   public var text: String?
-  public var typedTurn: String?
+  public var turn: TurnRef?
 }
 
 /// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`.

@@ -26,21 +26,18 @@ public enum AnswerShaper {
   /// The owner's counterpart: what stands in for typed text that is code or tables only.
   static let typedCodeOnly = "the owner typed code or a table only; it is in the session."
 
-  /// A line of a turn that is not a voice request, as context: the owner's typed text
-  /// (`[TYPED]`) or Claude's final answer (`[CLAUDE]`), shaped like any answer. Nil for text with
+  /// A line of a turn, as context: the owner's typed text (`[TYPED]`), or Claude's final answer or
+  /// the mod's report (`[CLAUDE]`), shaped like any answer. Nil for a `start`, and for text with
   /// nothing to say: an empty one. Code or tables only is a short sentence saying so.
   public static func synced(
-    _ text: String, from source: SyncSource, label: String, session: SessionID
+    _ text: String, kind: SyncKind, label: String, session: SessionID
   ) -> VoiceLine? {
-    guard !text.allSatisfy(\.isWhitespace) else { return nil }
+    guard kind != .start, !text.allSatisfy(\.isWhitespace) else { return nil }
     let prose = prose(text)
     let isCodeOnly = prose.allSatisfy(\.isWhitespace)
-    return switch source {
-    case .owner:
-      line(.typed, label: label, body: isCodeOnly ? typedCodeOnly : prose, session: session)
-    case .claude:
-      line(.claude, label: label, body: isCodeOnly ? codeOnly : prose, session: session)
-    }
+    return kind == .typed
+      ? line(.typed, label: label, body: isCodeOnly ? typedCodeOnly : prose, session: session)
+      : line(.claude, label: label, body: isCodeOnly ? codeOnly : prose, session: session)
   }
 
   /// `text` without its fenced code blocks and table rows, its lines joined by spaces.

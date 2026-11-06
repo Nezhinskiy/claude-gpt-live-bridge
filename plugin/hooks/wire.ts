@@ -5,6 +5,8 @@
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
 // `removed`; also the reply to its join unless `owner` is true), 413 body over 131072 bytes.
+// `sync` and `context` look a session up among the joined, so a removed one gets their 404, and
+// `activity` and `limits` ignore it, 200.
 
 /** The socket path relative to the home folder Foundation reports. */
 const SOCKET_REL = 'Library/Application Support/LiveBridge/run/bridge.sock';
@@ -50,9 +52,19 @@ export type JoinBody = {
   sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string;
   syncs?: boolean; missed?: boolean;
 };
-/** `from`: the owner's typed line or Claude's text. Empty `text`, at a turn's start, takes the turn's decision and records nothing. */
-export type SyncSource = 'owner' | 'claude';
-export type SyncBody = { sessionId: SessionId; turnId: string; from: SyncSource; text: string };
+/**
+ * The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
+ * answer belongs to; absent from a turn with none behind it. A spoken reply that makes a typed
+ * turn a voice turn adds it to the turn's later lines.
+ */
+export type TurnRef = { id: string; request?: RequestId };
+/**
+ * `start`: a turn's first word, which takes the turn's decision and records nothing; the only kind
+ * with no `text`. `typed`: the owner's words, the only kind that refuses a turn. `answer`: Claude's
+ * final answer. `report`: the mod's own line, which goes as Claude's.
+ */
+export type SyncKind = 'start' | 'typed' | 'answer' | 'report';
+export type SyncBody = { sessionId: SessionId; turn: TurnRef; kind: SyncKind; text?: string };
 export type LeaveBody = { sessionId: SessionId };
 export type TargetBody = { sessionId: SessionId };
 
@@ -66,10 +78,10 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  * `question`, with `approval`: Claude asked the owner this and waits for the reply, which the
  * voice may hand over as a `reply` work item; without it, a permission prompt waits, which the
  * voice only reports. `text`, with `approval`: what Claude wrote in the step that pauses.
- * `typedTurn`: the turn's id when it is not a voice turn.
+ * `turn`: the main-loop turn it belongs to; absent between turns.
  */
 export type ActivityBody =
-  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; typedTurn?: string };
+  { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; turn?: TurnRef };
 export type ContextBody = { sessionId: SessionId; summary: string };
 
 /**

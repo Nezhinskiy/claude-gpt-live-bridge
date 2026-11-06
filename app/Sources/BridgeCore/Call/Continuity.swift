@@ -1,3 +1,5 @@
+import Foundation
+
 /// One item seeding a realtime session (codex `initialItems`).
 public struct InitialItem: Codable, Sendable, Equatable {
   public var role: Role
@@ -15,6 +17,9 @@ public struct Conversation: Codable, Sendable, Equatable {
   /// codex's limits on `initialItems`; tokens are estimated at 4 UTF-8 bytes each, as codex counts.
   public static let maxItems = 128
   public static let maxTokens = 8_192
+  /// How long an ask can still be answered: twice what the mod allows a summary, which may never
+  /// come (a failure, or a session with nothing to summarise).
+  static let askLife = 2 * ContextLoads.timeout
 
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
@@ -60,10 +65,18 @@ public struct Conversation: Codable, Sendable, Equatable {
   private var linesSinceContext: Int?
   /// The decision on the turn whose lines were last offered (`Continuity.admits`).
   var turn: TurnDecision?
+  /// The summary asked for and not yet arrived.
+  private var summaryAsk: SummaryAsk?
 
   struct TurnDecision: Codable, Sendable, Equatable {
     var id: String
     var admitted: Bool
+  }
+
+  struct SummaryAsk: Codable, Sendable, Equatable {
+    var at: Date
+    /// A gap or a forget came after the ask, so its summary cannot cover the conversation.
+    var isStale = false
   }
 
   public init() {}
@@ -90,19 +103,42 @@ public struct Conversation: Codable, Sendable, Equatable {
     linesSinceContext = 0
   }
 
-  mutating func markPaused() { outOfSync = .paused }
+  mutating func markPaused() {
+    outOfSync = .paused
+    summaryAsk?.isStale = true
+  }
 
   mutating func markMissed(asPaused: Bool) {
     if outOfSync != .paused { outOfSync = asPaused ? .paused : .missed }
+    summaryAsk?.isStale = true
   }
 
-  /// What "New conversation" leaves: a pause and the turn's decision.
+  /// A summary was asked for. An ask still open stays as it is: the mod joins a second ask to the
+  /// summary on its way, which is the first ask's.
+  mutating func noteSummaryAsk(at now: Date) {
+    if openAsk(at: now) == nil { summaryAsk = SummaryAsk(at: now) }
+  }
+
+  /// A summary arrived and answers the open ask. False: it was asked for before a gap or a forget.
+  mutating func takeSummaryAsk(at now: Date) -> Bool {
+    defer { summaryAsk = nil }
+    return openAsk(at: now)?.isStale != true
+  }
+
+  private func openAsk(at now: Date) -> SummaryAsk? {
+    summaryAsk.flatMap { now < $0.at + Self.askLife ? $0 : nil }
+  }
+
+  /// What "New conversation" leaves: a pause, the turn's decision, and an ask that can no longer
+  /// cover anything.
   var afterForgetting: Conversation? {
     var kept = Conversation()
     kept.lastUsed = lastUsed
     kept.turn = turn
     if outOfSync == .paused { kept.outOfSync = .paused }
-    return kept.turn == nil && kept.outOfSync == nil ? nil : kept
+    kept.summaryAsk = summaryAsk
+    kept.summaryAsk?.isStale = true
+    return kept.turn == nil && kept.outOfSync == nil && kept.summaryAsk == nil ? nil : kept
   }
 
   /// The context and the open task lines, then the newest lines that fit codex's limits. Notes
@@ -152,18 +188,34 @@ public struct Continuity: Codable, Sendable, Equatable {
     use(id) { $0.setContext(line) }
   }
 
+  /// The app asked `id` for a summary.
+  public mutating func noteSummaryAsk(of id: SessionID, at now: Date) {
+    use(id) { $0.noteSummaryAsk(at: now) }
+  }
+
+  /// A summary from `id` arrived. False: it was asked for before the latest gap or forget, so it
+  /// covers less than the conversation lacks and must not be taken. One nobody asked for (`/live
+  /// context`) cannot be dated, and is taken.
+  public mutating func takeSummaryAsk(of id: SessionID, at now: Date) -> Bool {
+    use(id) { $0.takeSummaryAsk(at: now) }
+  }
+
   /// Whether a line of `turn` goes in. A turn's first line decides, and later lines keep that
-  /// decision, except that an owner's line while `pausing` refuses the turn from there on.
+  /// decision, except that a `typed` line while `pausing` refuses the turn from there on. A voice
+  /// turn holds nothing of the owner's until then, so only a `typed` line refuses it. A line of
+  /// Claude's that opens a turn in a `paused` session stays out: the turn's `start` never arrived,
+  /// and its prompt may be the paused text.
   /// `pausing`: the pause setting is on and the call is off. Every refused line marks `paused`.
   public mutating func admits(
-    turn: String, from: SyncSource, in id: SessionID, pausing: Bool
+    turn: TurnRef, kind: SyncKind, in id: SessionID, pausing: Bool
   ) -> Bool {
     use(id) { conversation in
-      var admitted = !pausing
-      if let decision = conversation.turn, decision.id == turn {
-        admitted = decision.admitted && !(from == .owner && pausing)
-      }
-      conversation.turn = Conversation.TurnDecision(id: turn, admitted: admitted)
+      let decided = conversation.turn.flatMap { $0.id == turn.id ? $0.admitted : nil }
+      let isClaudes = kind == .answer || kind == .report
+      let isUnseen = isClaudes && conversation.outOfSync == .paused
+      let first = turn.request != nil || !(pausing || isUnseen)
+      let admitted = (decided ?? first) && !(kind == .typed && pausing)
+      conversation.turn = Conversation.TurnDecision(id: turn.id, admitted: admitted)
       if !admitted { conversation.markPaused() }
       return admitted
     }

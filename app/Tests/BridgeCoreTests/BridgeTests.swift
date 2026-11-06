@@ -95,9 +95,22 @@ actor FakeAudio: AudioSide {
   }
   func startListening() { calls.append("startListening") }
   func stopListening() { calls.append("stopListening") }
+  /// While set, the next offer waits for `releaseOffer()`, as the page takes a moment to make one.
+  var holdsOffer = false
+  private var heldOffers: [CheckedContinuation<Void, Never>] = []
+  var offerWaiting: Int { heldOffers.count }
+  func holdOffer() { holdsOffer = true }
+  func releaseOffer() {
+    for wait in heldOffers { wait.resume() }
+    heldOffers = []
+  }
   /// Whether each offer carried the pre-roll.
   var offers: [Bool] = []
-  func makeOffer(preroll: Bool) -> String {
+  func makeOffer(preroll: Bool) async -> String {
+    if holdsOffer {
+      holdsOffer = false
+      await withCheckedContinuation { heldOffers.append($0) }
+    }
     offers.append(preroll)
     return "offer"
   }
@@ -175,12 +188,16 @@ struct BridgeTests {
 
   func setPause(_ on: Bool) { pause.withLock { $0 = on } }
 
-  /// A line of a turn that is not a voice request, as the mod posts it.
+  /// A line of a turn, as the mod posts it.
   @discardableResult
   func sync(
-    _ id: SessionID, turn: String = "turn-1", from: SyncSource = .owner, _ text: String
+    _ id: SessionID, turn: String = "turn-1", request: RequestID? = nil, kind: SyncKind = .typed,
+    _ text: String? = nil
   ) async throws -> HTTPResponse {
-    try await post("/v1/sync", SyncBody(sessionId: id, turnId: turn, from: from, text: text))
+    try await post(
+      "/v1/sync",
+      SyncBody(
+        sessionId: id, turn: TurnRef(id: turn, request: request), kind: kind, text: text))
   }
 
   /// The conversations as saved, which a restarted app reads.
@@ -530,12 +547,13 @@ struct BridgeTests {
     try await registry.enqueue(request(1), for: a)
     #expect(try await registry.poll(a) == .request(request(1)))
     await live()
+    await bridge.audioEvent(.speechEnded)
     let question = "Which name? Options: out."
     let text = "Two folders.\n```\nrm -rf build\n```\n| a | b |\nPick one."
     try await post(
       "/v1/activity", ActivityBody(sessionId: a, state: .approval, question: question, text: text))
     let said = "Which name? Options: out. Claude wrote just before asking: Two folders. Pick one."
-    #expect(await voice.added == ["[ASKING] Alpha: \(said)"])
+    #expect(await voice.spoken == ["[ASKING] Alpha: \(said)"])
   }
 
   /// What Claude wrote in the step that asked for a permission follows the approval notice,
@@ -543,20 +561,22 @@ struct BridgeTests {
   @Test func anApprovalsLineCarriesTheStepsProse() async throws {
     try await join(a, "Alpha")
     await live()
+    await bridge.audioEvent(.speechEnded)
     let text = "Deleting build.\n```\nrm -rf build\n```\n| a | b |\nThen test."
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
     let notice = "Claude is waiting for your approval"
     let said = "\(notice). Claude wrote just before asking: Deleting build. Then test."
-    #expect(await voice.added == ["[APPROVAL] Alpha: \(said)"])
+    #expect(await voice.spoken == ["[APPROVAL] Alpha: \(said)"])
   }
 
   /// A step that wrote only code or a table adds nothing to the notice.
   @Test func anApprovalAfterACodeOnlyStepIsTheNoticeAlone() async throws {
     try await join(a, "Alpha")
     await live()
+    await bridge.audioEvent(.speechEnded)
     let text = "```\nrm -rf build\n```\n| a | b |"
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
-    #expect(await voice.added == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
+    #expect(await voice.spoken == ["[APPROVAL] Alpha: Claude is waiting for your approval"])
   }
 
   /// What the app shows lists the joined sessions whose mod is older than the app.
@@ -574,13 +594,27 @@ struct BridgeTests {
     #expect(await test.bridge.current.labelsOnAnOlderMod == [])
   }
 
+  /// On a live line a typed turn's question is given to say, as a voice turn's is.
+  @Test func aTypedTurnsQuestionIsSaidOnItsOwnLine() async throws {
+    try await join(a, "Alpha")
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await sync(a, "Rename it.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    #expect(await voice.spoken == ["[ASKING] Alpha: Which name?"])
+  }
+
   /// A step's text longer than a line is cut, and the notice before it stays whole.
   @Test func aLongStepTextNeverCutsTheNotice() async throws {
     try await join(a, "Alpha")
     await live()
+    await bridge.audioEvent(.speechEnded)
     let text = String(repeating: "Deleting build. ", count: 200)
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, text: text))
-    let line = try #require(await voice.added.first)
+    let line = try #require(await voice.spoken.first)
     #expect(line.hasPrefix("[APPROVAL] Alpha: Claude is waiting for your approval. Claude wrote"))
     #expect(line.count <= AnswerShaper.maxCharacters)
   }
@@ -660,6 +694,21 @@ struct BridgeTests {
     await voices.made.last?.emit(.handoff(request(4)))
     let task = "[TASK] Alpha: Example request 4"
     #expect(await eventually { await test.registry.openTasks().contains(task) })
+  }
+
+  /// A failed microphone ends the call as Stop does, and the route with it.
+  @Test func aFailedMicrophoneEndsTheRoute() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    try await test.answer(request(1), from: b, .question, "Which branch?")
+    await test.bridge.audioEvent(.failed(.other("The microphone failed.")))
+    #expect(await test.bridge.status.call == .off)
+    await test.live()
+    await voices.made.last?.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(a) == .request(request(2)) })
   }
 
   /// A question the owner never heard, because the call was off, routes nothing.
@@ -1112,6 +1161,46 @@ struct BridgeTests {
       await eventually { await notifier.posted.last?.body.contains("start the call") == true })
   }
 
+  /// A summary asked for before a refused turn does not hold that turn, so the session stays out
+  /// of sync and the voice keeps what it had.
+  @Test func aSummaryAskedForBeforeAPausedTurnClearsNothing() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(a, "Alpha")
+    try await test.post("/v1/context", ContextBody(sessionId: a, summary: "Old."))
+    await test.live()
+    await test.bridge.loadContext()
+    #expect(try await test.registry.poll(a) == .context)
+    await test.bridge.perform(.stop)
+    try await test.sync(a, turn: "turn-2", "Private thing.")
+    try await test.post("/v1/context", ContextBody(sessionId: a, summary: "From before."))
+    #expect(try test.saved()[a].outOfSync == .paused)
+    #expect(await test.bridge.current.needsContext)
+    #expect(await test.bridge.current.context == "[CONTEXT] Alpha: Old.")
+  }
+
+  /// A summary on its way when the owner presses New conversation does not bring back what was
+  /// just forgotten.
+  @Test func aSummaryAskedForBeforeNewConversationIsIgnored() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context)
+    await bridge.newConversation()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    #expect(await bridge.current.context == nil)
+  }
+
+  /// The menu's press stays pending for an ignored summary: nothing loaded.
+  @Test func anIgnoredSummaryIsNotAnnounced() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    var arrivals = bridge.contextArrivals.makeAsyncIterator()
+    await bridge.loadContext()
+    await bridge.newConversation()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    #expect(await arrivals.next() == b)
+  }
+
   /// The context line is shown exactly as the voice gets it, also after the app restarts.
   @Test func contextIsRedactedCappedAndShown() async throws {
     try await join(a, "Alpha")
@@ -1552,10 +1641,25 @@ struct BridgeTests {
 
   /// With the pause on and the call off: a voice turn runs, and the owner types into it.
   func typedIntoAVoiceTurn() async throws {
+    try await voiceTurn()
+    try await sync(a, request: request(1).id, "Private thing.")
+  }
+
+  /// Alpha's request 1 in flight, and its turn started.
+  func voiceTurn() async throws {
     try await join(a, "Alpha")
     try await registry.enqueue(request(1), for: a)
     _ = try await registry.poll(a)
-    try await sync(a, "Private thing.")
+    try await sync(a, request: request(1).id, kind: .start)
+  }
+
+  /// An approval in the voice turn of request 1.
+  func voiceApproval(question: String? = nil, text: String? = nil) async throws {
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: question, text: text,
+        turn: TurnRef(id: "turn-1", request: request(1).id)))
   }
 
   /// The voice turn's answer, which may repeat what was typed.
@@ -1602,7 +1706,7 @@ struct BridgeTests {
     await test.live()
     await test.bridge.audioEvent(.speechEnded)
     try await test.handOff()
-    try await test.sync(test.a, "More of it.")
+    try await test.sync(test.a, request: test.request(1).id, "More of it.")
     try await test.voiceAnswer()
     #expect(await eventually { await test.voice.spoken.count == 1 })
     #expect(await test.voice.spoken.first?.hasPrefix("[FAILED] Alpha:") == true)
@@ -1613,11 +1717,7 @@ struct BridgeTests {
   @Test func aQuestionInAWithheldTurnStaysOut() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.typedIntoAVoiceTurn()
-    try await test.post(
-      "/v1/activity",
-      ActivityBody(
-        sessionId: test.a, state: .approval, question: "Which private thing?",
-        text: "The private thing."))
+    try await test.voiceApproval(question: "Which private thing?", text: "The private thing.")
     #expect(await test.lines().isEmpty)
     try await test.registry.enqueue(test.request(2), for: test.a)
     #expect(try await test.registry.poll(test.a) == nil)  // no question: no reply goes out
@@ -1627,9 +1727,7 @@ struct BridgeTests {
     let test = try BridgeTests(pausesSync: true)
     try await test.typedIntoAVoiceTurn()
     await test.live()
-    try await test.post(
-      "/v1/activity",
-      ActivityBody(sessionId: test.a, state: .approval, text: "The private thing."))
+    try await test.voiceApproval(text: "The private thing.")
     #expect(await test.lines().isEmpty)
     #expect(await test.voice.added.isEmpty)
     #expect(await test.voice.spoken.isEmpty)
@@ -1645,7 +1743,7 @@ struct BridgeTests {
     try await test.post(
       "/v1/activity", ActivityBody(sessionId: test.a, state: .approval, question: "Which name?"))
     #expect(await eventually { await test.bridge.status.unheard == 1 })
-    try await test.sync(test.a, "More of it.")
+    try await test.sync(test.a, request: test.request(1).id, "More of it.")
     try await test.post("/v1/activity", ActivityBody(sessionId: test.a, state: .working))
     #expect(await eventually { await test.bridge.status.unheard == 0 })
   }
@@ -1671,7 +1769,8 @@ struct BridgeTests {
     try await test.join(test.a, "Alpha")
     try await test.answer(test.request(1), from: test.a)
     let lines = await test.lines()
-    try await test.sync(test.a, turn: "background-turn", "Private thing.")
+    try await test.sync(
+      test.a, turn: "background-turn", request: test.request(1).id, "Private thing.")
     let reply = try await test.post(
       "/v1/answer",
       AnswerBody(
@@ -1684,18 +1783,67 @@ struct BridgeTests {
   /// Under the pause a voice turn nobody typed into keeps its answer.
   @Test func aVoiceTurnNobodyTypedIntoKeepsItsAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)
-    try await test.join(test.a, "Alpha")
-    try await test.answer(test.request(1), from: test.a)
-    #expect(await test.lines() == ["Claude: [RESULT] Alpha: Done."])
+    try await test.voiceTurn()
+    try await test.voiceAnswer()
+    #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
+    #expect(try test.saved()[test.a].outOfSync == nil)
   }
 
-  /// A claude line refused under the pause says nothing of the owner's: no answer is withheld.
-  @Test func aRefusedClaudeLineWithholdsNoAnswer() async throws {
+  /// A request handed over before Stop starts its turn with the call off: nothing was typed, so
+  /// the pause has nothing to mark.
+  @Test func aVoiceTurnsStartUnderThePauseMarksNothing() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.voiceTurn()
+    #expect(try test.saved()[test.a].outOfSync == nil)
+  }
+
+  @Test func aVoiceTurnsReportStaysUnderThePause() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.voiceTurn()
+    try await test.sync(test.a, request: test.request(1).id, kind: .report, "You allowed Bash.")
+    #expect(await test.lines() == ["Claude: [CLAUDE] Alpha: You allowed Bash."])
+  }
+
+  @Test func aVoiceTurnsQuestionStaysUnderThePause() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.voiceTurn()
+    try await test.voiceApproval(question: "Which name?")
+    #expect(await test.lines() == ["Claude: [ASKING] Alpha: Which name?"])
+  }
+
+  /// R-13: a refused turn, Start, a spoken request that waits behind that turn, one more line typed
+  /// into the turn with the call on. The request is not that turn's, and the sync was not paused.
+  @Test func aRequestWaitingBehindARefusedTurnIsNotWithheld() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    await test.live()
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    try await test.sync(test.a, "One more thing, typed with the call on.")
+    try await test.voiceAnswer()
+    #expect(await !test.voice.added.contains { $0.hasPrefix("[FAILED]") })
+  }
+
+  /// A released mod names no turn and reports only its voice turns: its question is said, as it
+  /// always was, whatever the pause, and marks nothing.
+  @Test func aReleasedModsQuestionIsSaidUnderThePause() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha", syncs: false)
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(sessionId: test.a, state: .approval, question: "Which name?"))
+    #expect(await test.lines() == ["Claude: [ASKING] Alpha: Which name?"])
+    #expect(try test.saved()[test.a].outOfSync == nil)
+  }
+
+  /// A `start` refused under the pause says nothing of the owner's: no answer is withheld.
+  @Test func aRefusedStartWithholdsNoAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
     try await test.registry.enqueue(test.request(1), for: test.a)
     _ = try await test.registry.poll(test.a)
-    try await test.sync(test.a, from: .claude, "")
+    try await test.sync(test.a, kind: .start)
     try await test.voiceAnswer()
     #expect(await test.lines() == ["Claude: [RESULT] Alpha: It repeats the private thing."])
   }
@@ -1859,7 +2007,7 @@ struct BridgeTests {
   @Test func aSyncedLineSurvivesARestart() async throws {
     try await join(a, "Alpha")
     try await sync(a, "Fix the build.")
-    try await sync(a, from: .claude, "The build is fixed.")
+    try await sync(a, kind: .answer, "The build is fixed.")
     let restarted = try restart()
     try await restarted.join(restarted.a, "Alpha")
     #expect(
@@ -1877,11 +2025,36 @@ struct BridgeTests {
     #expect(await lines() == ["You: [TYPED] Beta: Fix Beta's build."])
   }
 
+  /// A line on Alpha: what is typed in Beta is kept in Beta's conversation and goes nowhere.
+  @Test func anOtherSessionsLineStaysOffTheOpenLine() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await sync(b, "Fix Beta's build.")
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// `/clear` while the line connects: the session has a new id, and the seed is still its
+  /// conversation.
+  @Test func aClearWhileTheLineConnectsKeepsTheSeed() async throws {
+    try await join(a, "Alpha")
+    try await sync(a, "Fix the build.")
+    await bridge.perform(.start)
+    await audio.holdOffer()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await audio.offerWaiting == 1 })
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
+    await audio.releaseOffer()
+    await opening.value
+    #expect(await voice.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
+  }
+
   /// Claude's line is a seed item although its speaker is `.claude`, as an unheard result's is not.
   @Test func aSyncedLineIsSeededToTheNextLine() async throws {
     try await join(a, "Alpha")
     try await sync(a, "Fix the build.")
-    try await sync(a, from: .claude, "The build is fixed.")
+    try await sync(a, kind: .answer, "The build is fixed.")
     await live()
     let items = try #require(await voice.opens.last)
     #expect(
@@ -1937,10 +2110,10 @@ struct BridgeTests {
     await live()
     try await sync(a, "My password: hunter2\n```\nlet secret = 1\n```\nthanks")
     try await sync(
-      a, from: .claude,
+      a, kind: .answer,
       "Done. key sk-abcdefghijklmnopqrst\n```\nlet code = 1\n```\n| a | b |\n"
         + String(repeating: "More detail here. ", count: 300))
-    try await sync(a, from: .claude, "```\nlet only = 1\n```")
+    try await sync(a, kind: .answer, "```\nlet only = 1\n```")
     let added = await voice.added
     #expect(added.count == 3)
     for line in added {
@@ -1969,7 +2142,18 @@ struct BridgeTests {
     try await test.join(test.a, "Alpha")
     try await test.sync(test.a, "Private thing.")
     await test.bridge.perform(.start)
-    try await test.sync(test.a, from: .claude, "I did the private thing.")
+    try await test.sync(test.a, kind: .answer, "I did the private thing.")
+    #expect(await test.lines().isEmpty)
+  }
+
+  /// R-12: the owner's post failed, so the join says the session missed a turn, under the pause.
+  /// The turn's answer, which may repeat what was typed, stays off the line opened after Start.
+  @Test func anAnswerOfATurnTheAppNeverSawStaysOutOfAPausedSession() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha", missed: true)
+    await test.live()
+    try await test.sync(test.a, kind: .answer, "It repeats the private thing.")
+    #expect(await !test.voice.added.contains { $0.contains("private thing") })
     #expect(await test.lines().isEmpty)
   }
 
@@ -1981,7 +2165,7 @@ struct BridgeTests {
     let restarted = try BridgeTests(dir: test.dir, time: test.time, pausesSync: true)
     try await restarted.join(restarted.a, "Alpha")
     await restarted.bridge.perform(.start)
-    try await restarted.sync(restarted.a, from: .claude, "I did the private thing.")
+    try await restarted.sync(restarted.a, kind: .answer, "I did the private thing.")
     #expect(await restarted.lines().isEmpty)
   }
 
@@ -1991,7 +2175,7 @@ struct BridgeTests {
     await test.bridge.perform(.start)
     try await test.sync(test.a, "Fix the build.")
     await test.bridge.perform(.stop)
-    try await test.sync(test.a, from: .claude, "The build is fixed.")
+    try await test.sync(test.a, kind: .answer, "The build is fixed.")
     #expect(
       await test.lines() == [
         "You: [TYPED] Alpha: Fix the build.", "Claude: [CLAUDE] Alpha: The build is fixed.",
@@ -2008,28 +2192,28 @@ struct BridgeTests {
     try await test.sync(test.a, "Fix the build.")
     await test.bridge.perform(.stop)
     try await test.sync(test.a, "Also, the private thing.")
-    try await test.sync(test.a, from: .claude, "Both are done.")
+    try await test.sync(test.a, kind: .answer, "Both are done.")
     #expect(await test.lines() == ["You: [TYPED] Alpha: Fix the build."])
     #expect(try test.saved()[test.a].outOfSync == .paused)
   }
 
-  /// A turn's start posts an empty line to take the decision; under the pause it is refused, and
-  /// the turn's answer stays out after Start.
-  @Test func anEmptyLineTakesTheDecisionAndRecordsNothing() async throws {
+  /// A turn's `start` takes the decision; under the pause it is refused, and the turn's answer
+  /// stays out after Start.
+  @Test func aStartTakesTheDecisionAndRecordsNothing() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
-    try await test.sync(test.a, "")
+    try await test.sync(test.a, kind: .start)
     #expect(try test.saved()[test.a].outOfSync == .paused)
     await test.bridge.perform(.start)
-    try await test.sync(test.a, from: .claude, "An answer.")
+    try await test.sync(test.a, kind: .answer, "An answer.")
     #expect(await test.lines().isEmpty)
   }
 
-  @Test func anEmptyLineWithoutThePauseAdmitsItsTurn() async throws {
+  @Test func aStartWithoutThePauseAdmitsItsTurn() async throws {
     try await join(a, "Alpha")
-    try await sync(a, "")
+    try await sync(a, kind: .start)
     #expect(await lines().isEmpty)
-    try await sync(a, from: .claude, "An answer.")
+    try await sync(a, kind: .answer, "An answer.")
     #expect(await lines() == ["Claude: [CLAUDE] Alpha: An answer."])
     #expect(try saved()[a].outOfSync == nil)
   }
@@ -2055,6 +2239,28 @@ struct BridgeTests {
 
   // MARK: Questions and approvals from typed turns
 
+  /// R-18: a subagent's prompt carries the turn it ran in. Outside the target, in a typed turn,
+  /// it is context only.
+  @Test func aBareApprovalInATypedTurnOutsideTheTargetDoesNotChime() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: b, state: .approval, turn: TurnRef(id: "turn-1")))
+    #expect(await bridge.status.unheard == 0)
+    #expect(await !audio.calls.contains("chime"))
+  }
+
+  /// R-18: in a refused turn its notice is not recorded.
+  @Test func aBareApprovalInARefusedTurnIsNotRecorded() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(sessionId: test.a, state: .approval, turn: TurnRef(id: "turn-1")))
+    #expect(try test.saved()[test.a].lines.isEmpty)
+  }
+
   /// Claude's question in a turn the owner typed, on the target after an owner line, is said and
   /// opens the closed line.
   @Test func aTypedTurnsQuestionOpensTheTargetsLine() async throws {
@@ -2063,7 +2269,8 @@ struct BridgeTests {
     try await sync(a, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await eventually { await voice.opens.count == 1 })
     #expect(
       await voice.opens.last?.map(\.text).contains("[TYPED] Alpha: Rename the folder.") == true)
@@ -2086,7 +2293,8 @@ struct BridgeTests {
       try await test.post(
         "/v1/activity",
         ActivityBody(
-          sessionId: test.b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+          sessionId: test.b, state: .approval, question: "Which name?",
+          turn: TurnRef(id: "turn-1")))
       try #require(await eventually { await test.voice.opens.count == 2 })
       try #require(await eventually { await test.bridge.status.call == .live })
       #expect(
@@ -2100,7 +2308,8 @@ struct BridgeTests {
     await bridge.perform(.start)
     try await sync(a, "Delete the build folder.")
     try await post(
-      "/v1/activity", ActivityBody(sessionId: a, state: .approval, typedTurn: "turn-1"))
+      "/v1/activity",
+      ActivityBody(sessionId: a, state: .approval, turn: TurnRef(id: "turn-1")))
     #expect(await eventually { await voice.opens.count == 1 })
   }
 
@@ -2113,7 +2322,8 @@ struct BridgeTests {
     try await sync(b, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 0)
     #expect(await !audio.calls.contains("chime"))
     #expect(await bridge.status.call == .listening)
@@ -2138,7 +2348,8 @@ struct BridgeTests {
     try await sync(b, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     await bridge.setTarget(b)
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.opens.last?.map(\.text).contains("[ASKING] Beta: Which name?") == true)
@@ -2166,15 +2377,15 @@ struct BridgeTests {
     try await test.post(
       "/v1/activity",
       ActivityBody(
-        sessionId: test.a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+        sessionId: test.a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await test.lines().isEmpty)
     #expect(await test.bridge.status.unheard == 0)
     try await test.registry.enqueue(test.request(1), for: test.a)
     #expect(try await test.registry.poll(test.a) == .request(test.request(1)))
   }
 
-  /// A subagent's prompt already has the session waiting; a refused turn's question after it
-  /// must still not make the session ask.
+  /// Another prompt already has the session waiting; a refused turn's question after it must
+  /// still not make the session ask.
   @Test func aRefusedTurnIsCheckedWhilePausedOnAnotherPrompt() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
@@ -2183,7 +2394,7 @@ struct BridgeTests {
     try await test.post(
       "/v1/activity",
       ActivityBody(
-        sessionId: test.a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+        sessionId: test.a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     try await test.registry.enqueue(test.request(1), for: test.a)
     #expect(try await test.registry.poll(test.a) == .request(test.request(1)))
     // only the subagent's prompt is kept, not the refused turn's question
@@ -2199,7 +2410,8 @@ struct BridgeTests {
     try await sync(a, "Rename the folder.")
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     voice.emit(.handoff(request(1)))
     let reply = Work.reply(request(1), forRequest: request(1).id)
     #expect(try await eventually { try await registry.poll(a) == reply })
@@ -2207,7 +2419,7 @@ struct BridgeTests {
       "/v1/answer",
       AnswerBody(sessionId: a, id: request(1).id, status: .ok, text: "Renamed.", reason: nil))
     #expect(answered.status == 200)
-    #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Renamed."] })
+    #expect(await eventually { await voice.spoken.last == "[RESULT] Alpha: Renamed." })
   }
 
   // MARK: Synced lines in a call paused at the plan's limit
@@ -2282,7 +2494,8 @@ struct BridgeTests {
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 1)
     await live()
     #expect(await seeded("Which name?") == 0)
@@ -2294,30 +2507,177 @@ struct BridgeTests {
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 1)
     try await post("/v1/activity", ActivityBody(sessionId: a, state: .working))
     #expect(await bridge.status.unheard == 0)
   }
 
-  /// A question still waiting to be said is given to the next line, whichever session that is
-  /// about, so the owner's reply must reach the session that asked, not the new target.
-  @Test func aKeptQuestionKeepsItsRouteAcrossATargetChange() async throws {
+  /// A change of target, by the menu or by the band, takes Alpha's waiting question off the queue
+  /// and ends its route: it is not said on Beta's line, and the owner's next words are Beta's.
+  @Test(arguments: [true, false])
+  func aTargetChangeTakesAWaitingQuestionOffTheQueue(byTheMenu: Bool) async throws {
+    let test = try BridgeTests()
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    await test.pausedAtTheLimit()
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    if byTheMenu {
+      await test.bridge.setTarget(b)
+    } else {
+      try await test.post("/v1/target", TargetBody(sessionId: b))
+    }
+    #expect(await test.bridge.status.unheard == 0)
+    await test.live()
+    #expect(await test.voice.added.isEmpty)
+    _ = try await test.registry.poll(a)  // the first line's ask for a summary
+    test.voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
+    #expect(try await test.registry.poll(a) == nil)
+  }
+
+  /// A question a change of target took off the queue stays recorded: Alpha's next line has it.
+  @Test func aQuestionTakenOffTheQueueIsInItsSessionsSeed() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
     await live()
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     await bridge.setTarget(b)
+    await bridge.setTarget(a)
     await live()
-    #expect(await voice.added == ["[ASKING] Alpha: Which name?"])
+    let seed = await voice.opens.last?.map(\.text) ?? []
+    #expect(seed.contains("[ASKING] Alpha: Which name?"))
+  }
+
+  /// The menu's choice of another target with the line live: the owner's next words are Beta's.
+  @Test func aTargetChangeOnALiveLineEndsTheRoute() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    try await test.sync(a, "Rename it.")
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    await test.bridge.setTarget(b)
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await voices.made.last?.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
+  }
+
+  /// `/live target`, and the band's Talk here: a question the voice has said routes nothing once
+  /// the owner chose another session.
+  @Test func aPostedTargetEndsTheRouteOfAQuestionAlreadySaid() async throws {
+    let voices = FakeVoices()
+    let test = try BridgeTests { await voices.make() }
+    try await test.join(a, "Alpha")
+    try await test.join(b, "Beta")
+    await test.live()
+    try await test.answer(request(1), from: a, .question, "Deploy which branch?")
+    await voices.made.last?.emit(.assistantSpeaking)
+    await voices.made.last?.emit(.assistantUtterance("Alpha asks: deploy which branch?"))
+    #expect(await eventually { await test.bridge.status.unheard == 0 })
+    try await test.post("/v1/target", TargetBody(sessionId: b))
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await voices.made.last?.emit(.handoff(request(2)))
+    #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
+  }
+
+  /// The band's Start posts a target: of the same session it changes nothing, so a pause at the
+  /// limit keeps its question and that question's route.
+  @Test func aPostOfTheSameTargetKeepsAWaitingQuestion() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    await pausedAtTheLimit()
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    try await post("/v1/target", TargetBody(sessionId: a))
+    await live()
+    #expect(await voice.added == ["[ASKING] Beta: Which?"])
     voice.emit(.handoff(request(2)))
     let reply = Work.reply(request(2), forRequest: request(2).id)
-    #expect(try await eventually { try await registry.poll(a) == reply })
+    #expect(try await eventually { try await registry.poll(b) == reply })
+  }
+
+  /// A waiting question whose own session becomes the target is that session's to say: it stays on
+  /// the queue, and the reply reaches it.
+  @Test func aQuestionOfTheNewTargetStaysOnTheQueue() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    await pausedAtTheLimit()
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Which?"))
+    await bridge.setTarget(b)
+    await live()
+    #expect(await voice.added == ["[ASKING] Beta: Which?"])
+    voice.emit(.handoff(request(2)))
+    let reply = Work.reply(request(2), forRequest: request(2).id)
+    #expect(try await eventually { try await registry.poll(b) == reply })
+  }
+
+  /// A session that left can take no reply: its waiting question goes, and is not said on the
+  /// next line, where the reply would land in the target as a request.
+  @Test func aSessionThatLeftTakesItsQuestionOffTheQueue() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.perform(.start)
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    #expect(await bridge.status.unheard == 1)
+    try await post("/v1/leave", LeaveBody(sessionId: a))
     #expect(await bridge.status.unheard == 0)
-    #expect(await registry.openTasks(of: b).isEmpty)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.added.isEmpty)
+  }
+
+  /// A session that left and came back asks nothing any more, so the next handoff is the target's.
+  @Test func aSessionThatLeftEndsItsRoute() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await answer(request(1), from: b, .question, "Which branch?")
+    try await post("/v1/leave", LeaveBody(sessionId: b))
+    try await join(b, "Beta")
+    voice.emit(.handoff(request(2)))
+    #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
+  }
+
+  /// Beta's question took the route from Alpha's. Once Beta's closes, the route is Alpha's again:
+  /// its question is still open, and the reply must not land in Beta as a request.
+  @Test func aQuestionThatClosesGivesTheRouteBack() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await bridge.setTarget(b)
+    await live()
+    try await registry.enqueue(request(1), for: a)
+    #expect(try await registry.poll(a) == .request(request(1)))
+    try await post("/v1/activity", ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await sync(b, "Rename it.")
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
+    try await post("/v1/activity", ActivityBody(sessionId: b, state: .working))
+    voice.emit(.handoff(request(2)))
+    let reply = Work.reply(request(2), forRequest: request(1).id)
+    #expect(try await eventually { try await registry.poll(a) == reply })
   }
 
   /// In another session a typed turn's question is only recorded, whatever the call is doing.
@@ -2328,7 +2688,8 @@ struct BridgeTests {
     await pausedAtTheLimit()
     try await post(
       "/v1/activity",
-      ActivityBody(sessionId: b, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which name?", turn: TurnRef(id: "turn-1")))
     #expect(await bridge.status.unheard == 0)
     #expect(try saved()[b].lines.contains { $0.text.hasPrefix("[ASKING] Beta:") })
     await live()
@@ -2358,7 +2719,7 @@ struct BridgeTests {
     await test.live()
     try await test.sync(test.a, "Rename the folder.")
     await test.pausedAtTheLimit()
-    try await test.sync(test.a, from: .claude, "Renamed.")
+    try await test.sync(test.a, kind: .answer, "Renamed.")
     #expect(await test.lines().contains("Claude: [CLAUDE] Alpha: Renamed."))
   }
 
@@ -2370,7 +2731,7 @@ struct BridgeTests {
     _ = try await test.registry.poll(test.a)
     await test.live()
     await test.pausedAtTheLimit()
-    try await test.sync(test.a, "Private thing.")
+    try await test.sync(test.a, request: test.request(1).id, "Private thing.")
     try await test.voiceAnswer()
     #expect(await !test.lines().contains { $0.contains("private thing") })
     await test.live()

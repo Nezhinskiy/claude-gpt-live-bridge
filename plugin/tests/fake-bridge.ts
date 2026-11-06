@@ -68,9 +68,11 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     syncStatus: 200,
     /** The pause setting is on and the call is off, as `Continuity.admits` sees them. */
     isPausing: false,
+    /** The session is marked *paused*: a line was refused. */
+    isPaused: false,
     /** The last turn the app decided on, its one slot per conversation (`Continuity.admits`). */
     decision: null as { turnId: string; isAdmitted: boolean } | null,
-    /** The non-empty sync lines the app admitted, in order. */
+    /** The sync lines with text the app admitted, in order. */
     kept: [] as string[],
     /** The status the app answers a usage reading with (404: it refuses it). */
     limitsStatus: 200,
@@ -199,10 +201,13 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
       }
     }
     if (route === 'sync') {
-      const held = world.decision?.turnId === body.turnId ? world.decision : null
-      const isAdmitted = held ? held.isAdmitted && !(body.from === 'owner' && world.isPausing) : !world.isPausing
-      world.decision = { turnId: body.turnId, isAdmitted }
-      if (isAdmitted && body.text !== '') world.kept.push(body.text)
+      const held = world.decision?.turnId === body.turn.id ? world.decision : null
+      const isUnseen = (body.kind === 'answer' || body.kind === 'report') && world.isPaused
+      const isFirstAdmitted = body.turn.request !== undefined || !(world.isPausing || isUnseen)
+      const isAdmitted = (held?.isAdmitted ?? isFirstAdmitted) && !(body.kind === 'typed' && world.isPausing)
+      world.decision = { turnId: body.turn.id, isAdmitted }
+      world.isPaused ||= !isAdmitted
+      if (isAdmitted && body.text !== undefined) world.kept.push(body.text)
       if (world.holdSync !== null) await world.holdSync
     }
     const reply = route !== 'next'
@@ -279,4 +284,10 @@ export async function step($: Engine, world: ReturnType<typeof fakeWorld>, turnI
   const stream = $.turn.step({ turnId, index: 0, model: 'example-model', messageCount: 1, ...(agentId && { agentId }) })
   for await (const chunk of stream) void chunk
   return stream.result
+}
+
+/** The session starts and `/live on` joins it. */
+export async function liveOn($: Engine) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
 }

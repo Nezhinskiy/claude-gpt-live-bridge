@@ -5,6 +5,11 @@
 > review round per wave. Inside a wave every task keeps its own failing test, verification and
 > commit. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **After the final review.** The tasks below are the plan as written. Where the review changed the
+> design, the spec is the authority: the wire carries `turn: { id, request? }` and `kind: start | typed |
+> answer | report` in place of `typedTurn` and `from`; a change of target ends a question's route; a
+> question or approval of the open line's session is given to say (`.speak`).
+
 **Goal:** every joined session's conversation with the voice holds the owner's typed turns and
 Claude's final answers; the target's open line learns them at once; questions and
 permission prompts from any main-loop turn reach the voice; **Load context** is needed only after
@@ -65,7 +70,7 @@ run in order, because D's engine tests are worth more against a settled wire.
   | pause on, typed turn | dropped, *paused* | recorded | recorded | recorded |
   | pause on, typed into a running turn | dropped, turn refused | recorded | recorded | recorded |
   | pause on, no context or *missed* | no summary | no summary | no summary | no summary |
-  | typed question, target | recorded only | opens the line | given on connect | added now |
+  | typed question, target | recorded only | opens the line | given on connect | given to say now |
   | typed question, other session | recorded only | recorded only | recorded only | recorded only |
   | `/clear` mid-turn | decision moves with the conversation | same | same | same |
   | New conversation | lines go; *paused* and the decision stay | same | line closes | line closes |
@@ -652,7 +657,8 @@ also settled the seed's limit: codex counts UTF-8 bytes over 4, and refuses a st
 - [ ] **Step 3: The overview, the older spec** marked superseded where it says typed turns do not reach
   the voice and that auto-load stays on, and **the CHANGELOG**: typed turns now sync while the call is on;
   an owner who had turned auto-load off gets the pause on; a mod and an app from before this keep working.
-- [ ] **Step 4: The trail.** Set this spec and plan to `delivered`, run `stayfixed docs trail`.
+- [ ] **Step 4: The trail.** Set this spec and plan to `delivered`, run `stayfixed docs trail`. (After the
+  final review of PR 42 both are `delivered in part`; see the spec's status.)
 - [ ] **Step 5: The owner's manual check,** asked for in Russian with the debug app and mod from the
   branch, and reported as it came out, in the PR body: two joined sessions; type in each; switch target
   without Stop and ask the voice what was typed; a question in a typed turn answered at the keyboard,

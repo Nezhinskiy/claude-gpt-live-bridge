@@ -12,7 +12,7 @@ import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
-import type { AnswerStatus, LimitWindowBody, VoiceRequest, Work } from './wire.ts'
+import type { ActivityBody, AnswerStatus, LimitWindowBody, TurnRef, VoiceRequest, Work } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
@@ -24,6 +24,8 @@ const CONTEXT_TIMEOUT_MS = 60_000
 const SENT_NOTE_MS = 3_000
 /** How long the polled band may go undrawn before every surface is asked for it again. */
 const UNDRAWN_MS = 3_000
+/** How long a hook waits for its posts to the app before it lets the engine go on. */
+const HOOK_HOLD_MS = 200
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
 const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
@@ -45,12 +47,13 @@ let home = ''
 /** This mod's version, from its own plugin.json at load, for the app's Settings; undefined if unread. */
 let modVersion: string | undefined
 let tracker = new TurnTracker()
-let lastOrigin: TurnOrigin | null = null
-/** That `prompt.submit`'s text, what was typed: a slash command's `turn.start` holds its expansion. */
-let lastPrompt: string | undefined
+/**
+ * The `prompt.submit` that will start the next turn: its origin, and what was typed, as a slash
+ * command's `turn.start` holds its expansion.
+ */
+let lastSubmit: { origin: TurnOrigin; text: string } | null = null
 /** When a surface last asked for the band while this session was joined. */
 let drawnAt = 0
-let approval: { tool: string; agent: string | undefined } | null = null
 /** Answers the question Claude asked in the running turn with the owner's spoken reply, while it is open. */
 let answerQuestion: ((reply: Reply) => void) | null = null
 let offlineSince: number | null = null
@@ -61,7 +64,7 @@ let recordFile: string | null = null
 let lastScan = -Infinity
 /**
  * The last summary the model wrote, while nothing has happened since: until any main turn
- * completes, or `/clear`. Sending it again costs no model call. Kept in memory only, as the
+ * completes, a gap, or `/clear`. Sending it again costs no model call. Kept in memory only, as the
  * transcript it summarises is the session's own.
  */
 let summary: string | null = null
@@ -69,7 +72,9 @@ let summary: string | null = null
 let turnsDone = 0
 /** The summary on its way, which a second ask joins instead of asking the model again. */
 let sending: Promise<ContextOutcome> | null = null
-/** Counts sends; one that timed out is over, and what it wrote later is dropped. */
+/** The hooks' posts to the app, in the order the hooks ran. */
+let posts: Promise<unknown> = Promise.resolve()
+/** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
 let sendCount = 0
 
 type ContextOutcome = 'sent' | 'empty' | 'failed'
@@ -77,26 +82,48 @@ type ContextOutcome = 'sent' | 'empty' | 'failed'
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
 
+/**
+ * Keeps the tracker and the gap for a reload. A store that fails costs nothing else: what goes to
+ * the app matters more, and a hook past its `next` would have its `.catch` run the event again.
+ */
 async function save($: EngineInterface): Promise<void> {
-  if (link?.session) await $.store.set(joinedKey(link.session.sessionId), { ...tracker.snapshot(), hasGap: link.hasGap })
-}
-
-/** A turn the tracker lost reached the app in no way, which the next join says. */
-function noteLostTurn(): void {
-  if (tracker.takeLostTurn()) link?.noteGap()
+  if (!link?.session) return
+  const key = joinedKey(link.session.sessionId)
+  const sessionTurns = await turnCount($)
+  await $.store.set(key, { ...tracker.snapshot(), hasGap: link?.hasGap, sessionTurns }).catch(() => {})
 }
 
 /**
- * A snapshot that may fail: for a hook with lines still to post, or past its `next`, whose
- * `.catch` would run the event again. What goes to the app matters more.
+ * A turn did not reach the app, which the next join says. No summary from before it covers it: the
+ * one kept goes, and the one being written is dropped, as nothing could date it once posted.
  */
-const trySave = ($: EngineInterface) => save($).catch(() => {})
-
-/** Posts a line of a turn; one the app did not take is a gap, which the next join says. */
-async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
-  if ((await link?.sync({ ...line, text: clip(line.text, ANSWER_LIMIT) })) === true) return
+function noteGap(): void {
   link?.noteGap()
-  await trySave($)
+  staleSummary()
+  if (sending !== null) sendCount += 1
+}
+
+/** Posts a line of a turn, cut to `ANSWER_LIMIT`; one the app did not take is a gap, which the next join says. */
+async function postSync($: EngineInterface, line: SyncLine): Promise<void> {
+  const body = line.text === undefined ? line : { ...line, text: clip(line.text, ANSWER_LIMIT) }
+  if ((await link?.sync(body)) === true) return
+  noteGap()
+  await save($)
+}
+
+/**
+ * Runs a hook's `work` after the posts queued before it, and holds the hook no longer than
+ * `HOOK_HOLD_MS`: the app answers a line once the open line took it, up to 20 s with codex stuck,
+ * and typing must not wait for that. Its own queue, not `serial`: the app drops a session that
+ * stops polling after 5 s, so a held line must leave the poll running. What `work` needs of the
+ * hook's moment it takes before this call.
+ */
+async function inOrder($: EngineInterface, work: () => Promise<void>): Promise<void> {
+  const done = posts.then(work).catch((error: unknown) => $.ui.log(`LiveBridge: ${String(error)}`))
+  posts = done
+  let timer: { cancel(): void } | undefined
+  await Promise.race([done, new Promise<void>(resolve => { timer = $.clock.after(HOOK_HOLD_MS, resolve) })])
+  timer?.cancel()
 }
 
 /**
@@ -176,7 +203,7 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   const sessionId = await $.session.id()
   const title = (await readTitle($, sessionId)) ?? ''
   // The app got no turn from before the owner's join; a reload's gap is in its snapshot.
-  if (byOwner && (await hasTurns($))) link?.noteGap()
+  if (byOwner && (await hasTurns($))) noteGap()
   // Only the owner's own join brings back a session they removed.
   const isJoined = (await link?.join({ sessionId, title, modVersion, syncs: true, ...(byOwner && { owner: true }) })) === true
   await save($)
@@ -222,7 +249,7 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
     await $.store.delete(joinedKey(joined.sessionId)).catch(() => {})  // the join matters more
   }
   await link.rejoin({ ...joined, sessionId, title, ...(isNewId && { replaces: joined.sessionId }) })
-  await trySave($)
+  await save($)
 }
 
 /**
@@ -233,6 +260,7 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
 async function tick($: EngineInterface): Promise<void> {
   if (!link?.session) return  // it left, or was removed, while this poll waited its turn
   const hadGap = link.hasGap
+  const asked = answerQuestion  // a reply this poll brings can only be to a question open now
   const reply = await link.next()
   if (reply === REMOVED || !link.session) return  // the link queued `removed`; a join may have met it
   if (hadGap && !link.hasGap) await save($)  // a join said it: a reload must not say it again
@@ -265,8 +293,8 @@ async function tick($: EngineInterface): Promise<void> {
     // Queued behind an off or a removal that came in while this poll ran: those fail it in the app.
     enqueue($, () => deliver($, work))
   } else if (work?.kind === 'reply') {
-    if (answerQuestion !== null) {
-      answerQuestion(work)
+    if (asked !== null && asked === answerQuestion) {
+      asked(work)
     } else {
       $.ui.log(LATE_REPLY)
       // The app opened a request for a reply to a typed turn; a voice turn's refuses this, harmlessly.
@@ -282,8 +310,8 @@ async function tick($: EngineInterface): Promise<void> {
  * request a newer one replaced is refused by design, so only a result is said to be lost.
  */
 async function answerLost($: EngineInterface, status: AnswerStatus): Promise<void> {
-  link?.noteGap()
-  await trySave($)
+  noteGap()
+  await save($)
   if (status === 'update') return
   note = LOST_ANSWER
   $.ui.log(LOST_ANSWER)
@@ -324,7 +352,7 @@ async function removed($: EngineInterface, sessionId: string): Promise<void> {
 /** The prompt was refused: the request fails at once, and no later turn counts as its turn. */
 async function refused($: EngineInterface, id: string): Promise<void> {
   tracker.refused(id)
-  await trySave($)  // the answer matters more than the snapshot
+  await save($)
   await link?.answer({ id, status: 'failed', text: '', reason: 'Claude Code did not take the prompt' })
 }
 
@@ -342,13 +370,14 @@ function showContext($: EngineInterface, context: Band['context']) {
   })
 }
 
+/** How many prompts the session has had; undefined when the engine does not say. */
+function turnCount($: EngineInterface): Promise<number | undefined> {
+  return $.session.turns().catch(() => undefined)
+}
+
 /** Whether the session has had a prompt: a new one has nothing to summarise. */
 async function hasTurns($: EngineInterface): Promise<boolean> {
-  try {
-    return (await $.session.turns()) > 0
-  } catch {
-    return true  // not known: the model says when there is nothing
-  }
+  return ((await turnCount($)) ?? 1) > 0  // not known: the model says when there is nothing
 }
 
 /**
@@ -451,40 +480,46 @@ async function startHere(): Promise<void> {
 /** What the step that pauses wrote, as the activity's `text`; none when it wrote nothing. */
 const wrote = (text: string) => (text === '' ? {} : { text })
 
-/** Names a main-loop turn that is not a voice turn: the app decides on it as on its lines. */
-const typedTurn = ({ turnId, isVoice }: { turnId: string; isVoice: boolean }) => (isVoice ? {} : { typedTurn: turnId })
+/** Names the main-loop turn an activity belongs to, for the app; none between turns. */
+const under = (turn: TurnRef | null) => (turn === null ? {} : { turn })
 
-/** Whether a tool's run, failure or denial settles the permission request being reported. */
-function settles(e: { tool_name: string; agent_id?: string }): boolean {
-  if (approval?.tool !== e.tool_name || approval.agent !== e.agent_id) return false
-  approval = null
-  return true
+/** Tells the app what waits; one it did not take is a gap, as the voice never hears of it. */
+async function awaiting($: EngineInterface, said: Omit<ActivityBody, 'sessionId' | 'state'>): Promise<void> {
+  if ((await link?.activity('approval', said)) === true) return
+  noteGap()
+  await save($)
 }
 
 /**
  * A settled prompt: a line for the running turn, and the session works on. It is the mod's report,
- * not the owner's typing, so it goes as Claude's: under the pause an owner's line refuses the turn.
+ * not the owner's typing, so it refuses nothing.
  */
 async function promptSettled($: EngineInterface, text: string): Promise<void> {
   const turn = tracker.current
-  if (turn) await postSync($, { turnId: turn.turnId, from: 'claude', text })
-  await link?.activity('working')
+  const isOver = nothingWaits()
+  await save($)
+  await inOrder($, async () => {
+    if (turn) await postSync($, { turn, kind: 'report', text })
+    if (isOver) await link?.activity('working', under(turn))
+  })
 }
 
-/** The tool ran, or failed, so the prompt was allowed. */
-async function toolRan($: EngineInterface, e: { tool_name: string; agent_id?: string }): Promise<void> {
-  if (settles(e)) await promptSettled($, `You allowed ${e.tool_name} at the keyboard.`)
+/** Whether the session works on: the app has one row for a prompt and for Claude's question. */
+const nothingWaits = () => !tracker.isPrompting && answerQuestion === null
+
+/** The tool ran, or failed, so the prompt for that very run was allowed. */
+async function toolRan($: EngineInterface, e: { tool_name: string; tool_input: unknown; agent_id?: string }): Promise<void> {
+  if (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id)) await promptSettled($, `You allowed ${e.tool_name} at the keyboard.`)
 }
 
 /**
- * The next main step, or the turn's end, with the main loop's prompt still open: no tool ran and
- * the dialog is gone. No hook reports a person's No (ADR 0001, item i), so it is only settled.
+ * The next step of the loop that asked, or its end, with its prompt still open: no tool ran and the
+ * dialog is gone. No hook reports a person's No (ADR 0001, item i), so it is only settled.
  */
-async function promptGone($: EngineInterface): Promise<void> {
-  if (approval === null || approval.agent !== undefined) return
-  const { tool } = approval
-  approval = null
-  await promptSettled($, `The permission prompt for ${tool} was settled at the keyboard.`)
+async function promptGone($: EngineInterface, agent?: string): Promise<void> {
+  for (let tool = tracker.promptGone(agent); tool !== null; tool = tracker.promptGone(agent)) {
+    await promptSettled($, `The permission prompt for ${tool} was settled at the keyboard.`)
+  }
 }
 
 /**
@@ -526,8 +561,10 @@ export const register: Register = on => {
     const saved = await $.store.get(joinedKey(await $.session.id()))
     if (saved !== undefined) {
       tracker = new TurnTracker(saved as TurnSnapshot)
-      // A snapshot from before sync says nothing: none of its turns reached the app.
-      if ((saved as { hasGap?: boolean }).hasGap !== false) link.noteGap()
+      // A snapshot from before sync says nothing: none of its turns reached the app. More turns than
+      // the snapshot saw ran with the mod off: disabling it ends no session, so its key stayed.
+      const { hasGap, sessionTurns } = saved as { hasGap?: boolean; sessionTurns?: number }
+      if (hasGap !== false || (sessionTurns ?? Infinity) < ((await turnCount($)) ?? 0)) noteGap()
       await serial(() => turnOn($, false))
     }
     return next(e)
@@ -545,19 +582,14 @@ export const register: Register = on => {
   // The hooks at sites that can refuse only observe: one that fails lets the event go on.
   on('prompt.submit', async ($, e, next) => {
     const origin = originOf(e.origin, PLUGIN_NAME, e.isMeta)
-    if (e.turnId === undefined) {
-      lastOrigin = origin
-      lastPrompt = e.text
-    }
+    if (e.turnId === undefined) lastSubmit = { origin, text: e.text }
     const entered = await next(e)
-    if (e.turnId === undefined && entered.drop !== undefined) {
-      lastOrigin = null
-      lastPrompt = undefined
-    }
+    if (e.turnId === undefined && entered.drop !== undefined) lastSubmit = null
     // Whether it folds in or gets a turn of its own, it goes to the app now, under the running turn.
     if (e.turnId !== undefined && origin === 'owner' && entered.drop === undefined) {
-      await postSync($, tracker.typedInto(e.turnId, e.text, entered.text))
-      await trySave($)
+      const line = tracker.typedInto(e.turnId, e.text, entered.text)
+      await save($)
+      await inOrder($, () => postSync($, line))
     }
     return entered
   }).catch(($, e, next) => next(e))
@@ -573,14 +605,16 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
-      const line = tracker.turnStarted(e.turnId, e.text, lastOrigin, await $.clock.now(), lastPrompt)
-      noteLostTurn()
-      lastOrigin = null
-      lastPrompt = undefined
-      await serial(() => follow($, false))  // /clear: the line goes under the session's new id
-      await trySave($)
-      if (line) await postSync($, line)
-      await link?.activity('working')
+      const { lines, isLost } = tracker.turnStarted(e.turnId, e.text, lastSubmit?.origin ?? null, await $.clock.now(), lastSubmit?.text)
+      if (isLost) noteGap()
+      lastSubmit = null
+      const turn = tracker.current
+      await inOrder($, async () => {
+        await serial(() => follow($, false))  // /clear: the line goes under the session's new id
+        await save($)
+        for (const line of lines) await postSync($, line)
+        await link?.activity('working', under(turn))
+      })
     }
     return next(e)
   })
@@ -589,9 +623,9 @@ export const register: Register = on => {
   // prompt only itself: what Claude wrote in the step that asks would reach the voice in neither.
   // Kept as it streams, since the engine may run the step's tools before the step ends.
   on('turn.step', async function* ($, e, next) {
+    await promptGone($, e.agentId)
     if (e.agentId !== undefined) return yield* next(e)
     tracker.stepStarted()
-    await promptGone($)
     const stream = next(e)
     let block: number | undefined
     for await (const chunk of stream) {
@@ -605,17 +639,19 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    await promptGone($, e.agentId)
     if (e.agentId === undefined) {
-      await promptGone($)
-      const { post, sync } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
-      noteLostTurn()
+      const turn = tracker.current
+      const { post, sync, isLost } = tracker.turnCompleted(e.turnId, e.answer, e.reason)
+      if (isLost) noteGap()
       staleSummary()
-      approval = null
-      await trySave($)
-      if (sync) await postSync($, sync)
-      const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
-      if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
-      await link?.activity('idle')
+      await save($)
+      await inOrder($, async () => {
+        if (sync) await postSync($, sync)
+        const taken = post && (await link?.answer({ ...post, text: clip(post.text, ANSWER_LIMIT) }))
+        if (post && taken !== true && taken !== REMOVED) await answerLost($, post.status)
+        await link?.activity('idle', under(turn))
+      })
     }
     return next(e)
   })
@@ -630,33 +666,45 @@ export const register: Register = on => {
     const answered = next(e)
     const spoken = new Promise<Reply>(resolve => { answerQuestion = resolve })
     try {
-      await link.activity('approval', {
-        question: askedText(e.questions), ...wrote(tracker.takeStepText()), ...typedTurn(turn),
+      const isOverPrompt = tracker.isPrompting
+      const said = { question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn }
+      await inOrder($, async () => {
+        // The app says what waits only on a change to `approval`.
+        if (isOverPrompt) await link?.activity('working', { turn })
+        await awaiting($, said)
       })
       // Over at once: a reply from here on has no question, whatever posting the answer takes.
       const first = await Promise.race([answered, spoken]).finally(() => { answerQuestion = null })
       if ('kind' in first) {
         tracker.replied(first.id, first.forRequest, await $.clock.now())
-        await trySave($)
+        await save($)
         return { result: { questions: e.questions, answers: {}, response: spokenReply(first) } }
       }
       const result = first.isError === true ? undefined : first.result
-      await postSync($, { turnId: turn.turnId, ...keyboardAnswer(result) })
+      await inOrder($, () => postSync($, { turn, ...keyboardAnswer(result) }))
       return first
     } finally {
-      await link?.activity('working')
+      const after = under(tracker.current)
+      const isPrompting = tracker.isPrompting
+      await inOrder($, async () => {
+        await link?.activity('working', after)
+        if (isPrompting) await awaiting($, after)
+      })
     }
   }).catch(($, e, next) => next(e))
 
   // ADR 0001 (i): a permission request that reaches the person during a main-loop turn, with what
   // the main loop wrote in the step that asks for it. Claude's question has its own report above.
-  // A subagent's is no step of the main loop's: it carries neither that text nor the turn.
+  // A subagent's is no step of the main loop's, so it carries none of that text, but it ran in the turn.
   on('classic.PermissionRequest', async ($, e, next) => {
     const turn = tracker.current
     if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
-      approval = { tool: e.tool_name, agent: e.agent_id }
-      const said = e.agent_id === undefined ? { ...wrote(tracker.takeStepText()), ...typedTurn(turn) } : {}
-      await link.activity('approval', said)
+      tracker.promptOpened(e.tool_name, e.tool_input, e.agent_id)
+      // A bare approval would take back the open question, and the app would say nothing for it.
+      const isAsking = answerQuestion !== null
+      const said = { ...(!isAsking && e.agent_id === undefined && wrote(tracker.takeStepText())), turn }
+      await save($)
+      if (!isAsking) await inOrder($, () => awaiting($, said))
     }
     return next(e)
   }).catch(($, e, next) => next(e))
@@ -665,8 +713,13 @@ export const register: Register = on => {
   on('classic.PostToolUseFailure', async ($, e, next) => (await toolRan($, e), next(e)))
     .catch(($, e, next) => next(e))
   // Auto mode's refusal, not the person's: nothing to tell the voice but that it goes on.
-  on('classic.PermissionDenied', async ($, e, next) => (settles(e) && (await link?.activity('working')), next(e)))
-    .catch(($, e, next) => next(e))
+  on('classic.PermissionDenied', async ($, e, next) => {
+    if (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id) && nothingWaits()) {
+      const turn = tracker.current
+      await inOrder($, async () => { await link?.activity('working', under(turn)) })
+    }
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {
     // After /clear the session goes on under a new id: the next poll leaves the old one and joins.
