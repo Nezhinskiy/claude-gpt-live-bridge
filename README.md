@@ -36,7 +36,8 @@ voice tells you the result.
 between your own codex and your own Claude Code. The app and the mod talk over a Unix socket
 only your user can open, and the app listens on no network port. Besides what those two tools
 already send (the voice line to OpenAI through your codex, only while it is open, and Claude's
-work to Anthropic through your Claude Code session), the app's only traffic of its own is for
+work to Anthropic through your Claude Code session), the app's only traffic of its own is a short-lived codex that, when you open the menu, asks OpenAI
+for your Codex usage figures, also while the call is off, and the traffic for
 [updates](#updating): an automatic check with GitHub for a new release (daily, and at launch
 while one it announced is not installed), which you can turn off; the same check when you press
 **Check for update**; `gh auth status` when a new release is announced; and the download, its

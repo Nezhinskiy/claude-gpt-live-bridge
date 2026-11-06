@@ -41,7 +41,8 @@ communiquent uniquement par un socket Unix que seul votre utilisateur peut ouvri
 l'application n'écoute sur aucun port réseau. En dehors de ce que ces deux outils envoient déjà
 (la ligne vocale vers OpenAI via votre codex, uniquement tant qu'elle est ouverte, et le travail
 de Claude vers Anthropic via votre session Claude Code), le seul trafic propre à l'application
-sert aux [mises à jour](#mises-à-jour) : une demande automatique à GitHub pour savoir s'il existe
+est un codex éphémère qui, à l'ouverture du menu, demande à OpenAI vos chiffres d'utilisation de
+Codex, même quand l'appel est coupé, et celui des [mises à jour](#mises-à-jour) : une demande automatique à GitHub pour savoir s'il existe
 une nouvelle version (quotidienne, et à chaque lancement tant qu'une version qu'elle a annoncée
 n'est pas installée), que vous pouvez désactiver ; la même demande quand vous cliquez sur **Check
 for update** ; `gh auth status` quand une nouvelle version est annoncée ; et, quand vous cliquez

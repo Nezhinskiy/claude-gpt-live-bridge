@@ -39,7 +39,9 @@ entre tu propio codex y tu propio Claude Code. La aplicación y el mod se comuni
 Unix que solo tu usuario puede abrir, y la aplicación no escucha en ningún puerto de red. Además
 de lo que esas dos herramientas ya envían (la línea de voz a OpenAI a través de tu codex, solo
 mientras está abierta, y el trabajo de Claude a Anthropic a través de tu sesión de Claude Code),
-el único tráfico propio de la aplicación es para las [actualizaciones](#actualización): una
+el único tráfico propio de la aplicación es un codex de vida corta que, al abrir el menú, pide a
+OpenAI las cifras de uso de Codex, también con la llamada apagada, y el de las
+[actualizaciones](#actualización): una
 consulta automática a GitHub por si hay una versión nueva (diaria, y en cada arranque mientras no
 se haya instalado una que anunció), que puedes desactivar; la misma consulta cuando pulsas **Check
 for update**; `gh auth status` cuando se anuncia una versión nueva; y, cuando pulsas **Install**,

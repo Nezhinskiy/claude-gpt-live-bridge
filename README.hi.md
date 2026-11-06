@@ -39,7 +39,8 @@ codex और आपके अपने Claude Code के बीच एक bridg
 हैं, जिसे केवल आपका user खोल सकता है, और app किसी network port पर listen नहीं करता। जो traffic ये
 दोनों tools पहले से भेजते हैं (voice line का traffic आपके codex के ज़रिए OpenAI को, सिर्फ़ तब जब
 line खुली हो, और Claude का काम आपके Claude Code session के ज़रिए Anthropic को), उसके अलावा app का
-अपना traffic सिर्फ़ [updates](#अपडेट-करना) के लिए है: GitHub से नए release की अपने-आप होने वाली जाँच
+अपना traffic सिर्फ़ ये है: menu खोलने पर थोड़ी देर चलने वाला एक codex OpenAI से आपके Codex usage के आँकड़े
+माँगता है, call बंद हो तब भी; और [updates](#अपडेट-करना) का traffic: GitHub से नए release की अपने-आप होने वाली जाँच
 (दिन में एक बार, और हर launch पर जब तक उसके बताए release को install न किया गया हो), जिसे आप बंद कर
 सकते हैं; **Check for update** दबाने पर वही जाँच; नए release की सूचना देने पर `gh auth status`; और
 **Install** click करने पर download, उसकी जाँच और mod का update। [गोपनीयता](#गोपनीयता) में ठीक-ठीक
