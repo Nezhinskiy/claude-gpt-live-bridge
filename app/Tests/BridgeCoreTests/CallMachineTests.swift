@@ -534,4 +534,70 @@ struct CallMachineTests {
     }
     #expect(added == [.addContext(Self.result), .addContext(Self.typed)])
   }
+
+  // MARK: The question routes
+
+  static let betaAsks = VoiceLine(
+    kind: .asking, label: "Beta · 2c3d", body: "Which folder?", session: beta)
+
+  /// A machine that went through `events`.
+  static func after(_ events: [CallEvent]) -> CallMachine {
+    var machine = CallMachine()
+    for event in events { _ = machine.handle(event) }
+    return machine
+  }
+
+  /// Only a question takes a reply: a result routes the next handoff nowhere.
+  @Test func aLineThatAsksNothingRoutesNothing() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.result)])
+    #expect(machine.takeQuestionRoute() == nil)
+  }
+
+  @Test func theLastQuestionTakesTheHandoff() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.asking), Self.deliver(Self.betaAsks)])
+    #expect(machine.takeQuestionRoute() == Self.beta)
+  }
+
+  @Test func aQuestionAskedAgainIsTheLastAgain() {
+    var machine = Self.after(
+      Self.live + [
+        Self.deliver(Self.asking), Self.deliver(Self.betaAsks), Self.deliver(Self.asking),
+      ])
+    #expect(machine.takeQuestionRoute() == Self.alpha)
+  }
+
+  /// Nothing tells a reply from a new request: one handoff follows a question, the next does not.
+  @Test func aRouteTakesTheRoutesUnderItAlong() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.asking), Self.deliver(Self.betaAsks)])
+    _ = machine.takeQuestionRoute()
+    #expect(machine.takeQuestionRoute() == nil)
+  }
+
+  @Test func aRouteMovesWithItsSession() {
+    var machine = Self.after(Self.live + [Self.deliver(Self.asking)])
+    let new = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    machine.rename(Self.alpha, to: new)
+    #expect(machine.takeQuestionRoute() == new)
+  }
+
+  /// The voice said the question, so the line that replaces this one will not, and an unrelated
+  /// handoff must not follow it.
+  @Test func aPauseEndsTheRouteOfAQuestionAlreadySaid() {
+    var machine = Self.after(
+      Self.live + [
+        Self.deliver(Self.asking), .assistantSpeaking, Self.said("Alpha asks which branch."),
+        .refused(Self.limit),
+      ])
+    #expect(machine.takeQuestionRoute() == nil)
+  }
+
+  /// A result of the session still waits, but a result takes no reply.
+  @Test func aPauseEndsTheRouteThoughAResultOfTheSessionWaits() {
+    var machine = Self.after(
+      Self.live + [
+        Self.deliver(Self.asking), Self.deliver(Self.result), .assistantSpeaking,
+        Self.said("Alpha asks which branch."), .refused(Self.limit),
+      ])
+    #expect(machine.takeQuestionRoute() == nil)
+  }
 }

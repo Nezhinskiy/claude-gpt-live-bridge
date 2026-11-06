@@ -1132,7 +1132,7 @@ struct BridgeTests {
     await bridge.perform(.start)
     await live()
     voice.emit(.handoff(request(2)))
-    #expect(await eventually { (try? await registry.poll(a)) != nil })
+    #expect(try await eventually { try await registry.poll(a) == .request(request(2)) })
     #expect(try await registry.poll(b) == nil)
   }
 
@@ -1882,6 +1882,40 @@ struct BridgeTests {
     #expect(answered.status == 409)
     try await restarted.registry.enqueue(test.request(3), for: test.a)
     #expect(try await restarted.registry.poll(test.a) == .request(test.request(3)))
+  }
+
+  /// A voice turn's question keeps today's behaviour outside the target: said, not only recorded.
+  /// A typed turn's there is context (`anotherSessionsTypedQuestionIsContextOnly`).
+  @Test func aVoiceTurnsQuestionInAnotherSessionIsSaid() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: b, state: .approval, question: "Which folder?",
+        turn: TurnRef(id: "voice-turn", request: request(1).id)))
+    #expect(await bridge.status.unheard == 1)
+  }
+
+  /// `working` settles what was said, whatever became of the turn: it takes no decision of its own,
+  /// so a question the pause kept goes though the owner typed into its turn since.
+  @Test func aRefusedTurnsWorkingStillWithdrawsItsQuestion() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    await test.live()
+    let turn = TurnRef(id: "turn-1", request: nil)
+    try await test.sync(test.a, kind: .start)
+    try await test.post(
+      "/v1/activity",
+      ActivityBody(sessionId: test.a, state: .approval, question: "Which?", turn: turn))
+    test.voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
+    #expect(await eventually { await test.bridge.status.call == .off })
+    try await test.sync(test.a, "Private thing.")  // refused: the turn stays so
+    #expect(await test.bridge.status.unheard == 1)
+    try await test.post(
+      "/v1/activity", ActivityBody(sessionId: test.a, state: .working, turn: turn))
+    #expect(await test.bridge.status.unheard == 0)
   }
 
   /// A `start` refused under the pause says nothing of the owner's: no answer is withheld.
