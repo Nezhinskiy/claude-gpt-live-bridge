@@ -1897,6 +1897,25 @@ struct BridgeTests {
     #expect(try await restarted.registry.poll(test.a) == .request(test.request(3)))
   }
 
+  /// `/clear` while the line connects: the stored context moves with the session, and so does the
+  /// summary held for that line.
+  @Test func aHeldSummaryIsGivenAfterAClear() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.voice.holdOpen()
+    await test.bridge.perform(.start)
+    let opened = Task { await test.bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await test.voice.openWaiting == 1 })
+    try await test.post("/v1/context", ContextBody(sessionId: test.a, summary: "Held summary"))
+    let new = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await test.post(
+      "/v1/join", JoinBody(sessionId: new, title: "Alpha", replaces: test.a, syncs: true))
+    await test.voice.releaseOpen()
+    await opened.value
+    #expect(await eventually { await test.bridge.status.call == .live })
+    #expect(await test.voice.added.contains { $0.contains("Held summary") })
+  }
+
   /// A voice turn's question keeps today's behaviour outside the target: said, not only recorded.
   /// A typed turn's there is context (`anotherSessionsTypedQuestionIsContextOnly`).
   @Test func aVoiceTurnsQuestionInAnotherSessionIsSaid() async throws {
