@@ -28,7 +28,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var rows: [SessionID: HostedItem<SessionRowView>] = [:]
   private var transcript: ScrollingItem<TranscriptView>?
   private var sent: HostedItem<SentView>?
-  private var limits: [String: HostedItem<LimitRowView>] = [:]
   /// What a hosted session row's item is, for the menu's highlight.
   private var rowKeys: [ObjectIdentifier: String] = [:]
   /// Actions that wait until the menu has closed and its tracking has ended, as an alert does.
@@ -97,7 +96,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     rows = rows.filter { used.contains("row|\($0.key.rawValue)") }
     if !used.contains("transcript") { transcript = nil }
     if !used.contains("sent") { sent = nil }
-    limits = limits.filter { used.contains("limit|\($0.key)") }
     rowKeys = Dictionary(
       uniqueKeysWithValues: rows.map { (ObjectIdentifier($0.value.item), "row|\($0.key.rawValue)") }
     )
@@ -180,15 +178,34 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         return row.item
 
       case .limit(let shown):
-        used.insert("limit|\(shown.name)")
-        let view = LimitRowView(row: shown)
-        let row = limits[shown.name] ?? HostedItem(view, enabled: false)
-        row.show(view)
-        limits[shown.name] = row
-        return row.item
+        let item = native("limit|\(shown.name)", used: &used) { NSMenuItem() }
+        item.title = "\(shown.name) \(shown.text)"
+        item.attributedTitle = Self.limitTitle(shown)
+        item.toolTip = shown.tooltip
+        item.isEnabled = true
+        return item
       }
     }
     sync(menu, built)
+  }
+
+  /// A limit row's title: the name and the figures, small and quiet, a figure near its limit
+  /// orange, and the whole title orange when blocked.
+  private static func limitTitle(_ row: LimitRow) -> NSAttributedString {
+    let font = NSFont.systemFont(ofSize: 11)
+    let quiet: NSColor = row.isBlocked ? .systemOrange : .secondaryLabelColor
+    func part(_ text: String, _ color: NSColor) -> NSAttributedString {
+      NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
+    }
+    let title = NSMutableAttributedString(attributedString: part(row.name + "  ", quiet))
+    for (index, figure) in row.figures.enumerated() {
+      if index > 0 { title.append(part(" · ", quiet)) }
+      title.append(part(figure.text, figure.isNear ? .systemOrange : quiet))
+    }
+    if row.isBlocked {
+      title.append(part(row.figures.isEmpty ? "blocked" : " · blocked", quiet))
+    }
+    return title
   }
 
   /// Puts `items` in `menu`, in order, unless it holds exactly them already. An item stands in
