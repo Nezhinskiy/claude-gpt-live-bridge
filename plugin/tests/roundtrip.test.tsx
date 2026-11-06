@@ -228,7 +228,7 @@ test('claudesQuestionIsAnsweredByVoice', async ($, on) => {
     question: 'Which name should the folder get? Options: build: the default; out: shorter.',
     turn: VOICE,
   }])
-  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: REQUEST.id })
   await world.clock.advance(1000)
   expect((await asked).result).toEqual({ questions: ASKED, answers: {}, response: spokenReply(SPOKEN) })
   expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'working', turn: VOICE }])
@@ -485,6 +485,22 @@ test('aSpokenReplyInAVoiceTurnKeepsItsRequest', async ($, on) => {
   await asked
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
   expect(world.take('answer')).toEqual([{ sessionId: ID, id: REQUEST.id, status: 'ok', text: 'Renamed to out.' }])
+})
+
+/** The app restarted mid-turn, so it holds the reply as the request: the turn's answer must close it. */
+test('aSpokenReplyAfterAnAppRestartTakesTheTurnsAnswer', async ($, on) => {
+  const world = fakeWorld(on)
+  await inVoiceTurn($, world)
+  world.joined.delete(ID)
+  await world.clock.advance(1000)
+  expect(world.joined.has(ID)).toBe(true)
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.work.push({ kind: 'reply', ...SPOKEN, forRequest: SPOKEN.id })
+  await world.clock.advance(1000)
+  await asked
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.take('answer')).toEqual([{ sessionId: ID, id: SPOKEN.id, status: 'ok', text: 'Renamed to out.' }])
 })
 
 test('aSpokenReplyWithARequestWaitingIsAnUpdate', async ($, on) => {

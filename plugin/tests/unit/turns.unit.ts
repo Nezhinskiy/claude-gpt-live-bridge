@@ -6,6 +6,7 @@ import { ANSWER_LIMIT, clip, FOLLOW_UP_MS, originOf, TurnTracker } from '../../h
 
 const ID = '00000000-0000-0000-0000-00000000000a'
 const REPLY = '00000000-0000-0000-0000-00000000000b'
+const OTHER = '00000000-0000-0000-0000-00000000000c'
 const framed = (id: string) =>
   `${FRAMING}${voicePrompt({ id, brief: 'List the files', transcript: [] })}\n\nThis is how Claude Code surfaces a prompt a plugin submits between turns.`
 
@@ -206,12 +207,31 @@ test('a spoken reply puts its request on the turn\'s later lines', () => {
   assert.deepEqual(tracker.typedInto('t1', 'second').turn, { id: 't1', request: REPLY })
 })
 
-test('replied changes nothing in a voice turn', () => {
+test('replied changes nothing in a voice turn whose request is the one in flight', () => {
+  const tracker = new TurnTracker()
+  tracker.submitted(ID)
+  tracker.turnStarted('t1', framed(ID), 'voice', 0)
+  tracker.replied(REPLY, ID, 1000)
+  assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').post, { id: ID, status: 'ok', text: 'Done.' })
+})
+
+/** Its request timed out, or went with an app restart: the app holds the reply as the request now. */
+test('replied moves a voice turn whose request the app no longer holds', () => {
   const tracker = new TurnTracker()
   tracker.submitted(ID)
   tracker.turnStarted('t1', framed(ID), 'voice', 0)
   tracker.replied(REPLY, REPLY, 1000)
-  assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').post, { id: ID, status: 'ok', text: 'Done.' })
+  assert.deepEqual(tracker.current, { id: 't1', request: REPLY })
+  assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').post, { id: REPLY, status: 'ok', text: 'Done.' })
+})
+
+/** Its own request is gone and a later one, polled, waits behind the turn: the answer is that one's update. */
+test('replied gives a voice turn the request in flight when that is not its own', () => {
+  const tracker = new TurnTracker()
+  tracker.submitted(ID)
+  tracker.turnStarted('t1', framed(ID), 'voice', 0)
+  tracker.replied(REPLY, OTHER, 1000)
+  assert.deepEqual(tracker.turnCompleted('t1', 'Done.', 'answer').post, { id: OTHER, status: 'update', text: 'Done.' })
 })
 
 test('replied changes nothing without forRequest', () => {
