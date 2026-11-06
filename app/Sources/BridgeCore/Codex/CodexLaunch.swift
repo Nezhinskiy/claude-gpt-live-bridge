@@ -68,7 +68,7 @@ public enum CodexProblem: LocalizedError, Equatable, Sendable {
       return " Run `codex login` with your ChatGPT account."
     }
     if text.contains(/\bplan\b|realtime[^.]*\b(not available|unavailable|not enabled)\b/) {
-      return " Your ChatGPT plan may not include realtime voice in Codex."
+      return " Your ChatGPT plan's Codex may not include voice."
     }
     return ""
   }
