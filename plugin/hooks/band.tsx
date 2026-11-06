@@ -8,7 +8,7 @@ import type { Band, BandStatus } from '../types'
 import type { CallPhase, SessionId, StatusReply } from './wire.ts'
 
 /** `start` makes this session the target first and loads its context; `target` is "Talk here". */
-export type BandActions = { start(): void; stop(): void; target(): void }
+export type BandActions = { start(): void; stop(): void; mute(): void; unmute(): void; target(): void }
 
 /** What the band and `/live status` say before the app's first reply. */
 export const JOINING = 'LiveBridge: joining…'
@@ -25,10 +25,11 @@ const PHASE: Record<CallPhase, [color: string, label: string]> = {
 /** The band's view of a poll reply, as this session sees it. */
 export function bandStatus(status: StatusReply, self: SessionId): BandStatus {
   const target = status.sessions.find(row => row.isTarget)
-  const { call, unheard, minutesToday, problem } = status
+  const { call, unheard, minutesToday, problem, isMuted } = status
   return {
     call, target: target?.label ?? 'none', isTarget: target?.sessionId === self, unheard, minutesToday,
     ...(problem && { problem }),
+    ...(isMuted !== undefined && { isMuted }),
   }
 }
 
@@ -51,6 +52,7 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, stat
               <Box flexDirection="row" alignItems="center" columnGap={space} flexShrink={1}>
                 <Text color={color}>●</Text>
                 <Text weight="semibold">{label}</Text>
+                {status.isMuted === true && <Text dimColor>· muted</Text>}
                 <Text dimColor wrap="truncate-end">{`target: ${status.target}${unheard}`}</Text>
                 {state.context !== undefined && (
                   <Text dimColor wrap="truncate-end">{CONTEXT_NOTE[state.context]}</Text>
@@ -65,6 +67,13 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, stat
               label={status.call === 'off' ? 'Start' : 'Stop'}
               onPress={() => (status.call === 'off' ? act.start() : act.stop())}
             />
+            {status.call !== 'off' && status.isMuted !== undefined && (
+              <Button
+                key="mute"
+                label={status.isMuted ? 'Unmute' : 'Mute'}
+                onPress={() => (status.isMuted ? act.unmute() : act.mute())}
+              />
+            )}
             {status.call !== 'off' && !status.isTarget && (
               <Button key="target" label="Talk here" onPress={() => act.target()} />
             )}

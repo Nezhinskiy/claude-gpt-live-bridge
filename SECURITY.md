@@ -67,7 +67,10 @@ voices.
   - join as a session, make itself the target, and receive every handoff the voice makes;
   - answer those handoffs with any text, which the voice then reads out;
   - start a call, which turns on the microphone under LiveBridge's permission (macOS shows its
-    microphone indicator in the menu bar);
+    microphone indicator in the menu bar), and unmute a muted call, which takes it again. Mute
+    releases the microphone, so while muted LiveBridge captures nothing and the indicator shows
+    it; that protects against being heard by accident, and is not a control against these
+    processes;
   - read the status, which names every joined session and its id;
   - post a `[CONTEXT]` line for any joined session. It is saved and seeds every later call with
     that session, long after the process has exited (see "A loaded context persists" below);

@@ -555,6 +555,8 @@ export const register: Register = on => {
     return drawBand($, e, state, {
       start: () => void startHere(),
       stop: () => void link?.call('stop'),
+      mute: () => void link?.call('mute'),
+      unmute: () => void link?.call('unmute'),
       target: () => void link?.target(),
     })
   })

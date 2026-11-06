@@ -65,7 +65,8 @@ struct MenuContentTests {
 
   static func status(
     _ call: CallPhase = .off, sessions count: Int, target: Int = 0, problem: Problem? = nil,
-    lines: [Conversation.Line] = [], context: String? = nil, unheard: Int = 0
+    lines: [Conversation.Line] = [], context: String? = nil, unheard: Int = 0,
+    muted: Bool = false
   ) -> BridgeUpdate {
     BridgeUpdate(
       status: StatusReply(
@@ -75,7 +76,7 @@ struct MenuContentTests {
             sessionId: id($0), label: "Session \($0)", activity: $0 == 1 ? .working : .idle,
             isTarget: $0 == target)
         },
-        minutesToday: 31.4, problem: problem?.sentence, unheard: unheard),
+        minutesToday: 31.4, problem: problem?.sentence, unheard: unheard, isMuted: muted),
       problem: problem, minutesThisCall: 4.2, context: context, conversation: lines,
       labelsOnAnOlderMod: [])
   }
@@ -114,6 +115,21 @@ struct MenuContentTests {
       ])
   }
 
+  /// The card of a muted call with two results unheard.
+  static func mutedCard() -> MenuContent.CallCard? {
+    let menu = Self.menu(Self.status(.listening, sessions: 1, unheard: 2, muted: true))
+    guard case .call(let card) = menu.items.first else { return nil }
+    return card
+  }
+
+  @Test func aMutedCardOffersUnmute() {
+    #expect(Self.mutedCard()?.muteActionTitle == "Unmute")
+  }
+
+  @Test func aMutedCardSaysUnmuteToHear() {
+    #expect(Self.mutedCard()?.unheard == "2 unheard — unmute and speak to hear")
+  }
+
   @Test func anAvailableUpdateAddsItsInstallItem() {
     let outline = Self.menu(Self.status(sessions: 0), available: AppVersion("0.1.3")).outline
     let install = outline.firstIndex(of: "Install LiveBridge 0.1.3…")
@@ -133,7 +149,7 @@ struct MenuContentTests {
         lines: [Self.line(.voice, "Hello."), Self.line(.owner, "Hi.")]))
     #expect(
       menu.outline == [
-        "[call] Live · Stop",
+        "[call] Live · Stop · Mute",
         "---",
         "# Sessions",
         "( ) Session 0 — Idle",

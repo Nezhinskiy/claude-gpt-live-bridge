@@ -29,6 +29,9 @@ public enum AudioEvent: Sendable, Equatable {
 
 /// The audio page: microphone, voice detection, pre-roll and the WebRTC peer.
 public protocol AudioSide: Sendable {
+  /// macOS's answer for the microphone, asking the owner first if it never was (its prompt then
+  /// shows, for as long as the owner leaves it); nil when the page may open the microphone.
+  func microphoneProblem() async -> Problem?
   func startListening() async
   func stopListening() async
   /// `preroll`: the line starts with the 2 s before it opened; false for a line nobody spoke on.
@@ -42,4 +45,8 @@ public protocol AudioSide: Sendable {
   func chime() async
   /// The short sound that confirms a handoff was queued for a session (BR-001).
   func confirmHandoff() async
+  /// Releases the microphone; the call goes on.
+  func muteMicrophone() async
+  /// Takes the microphone again, once it is back.
+  func unmuteMicrophone() async
 }

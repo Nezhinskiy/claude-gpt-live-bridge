@@ -51,6 +51,10 @@ struct CallCardView: View {
             .capsule(prominent: action == .start)
             .disabled(!card.canAct)
         }
+        if let title = card.muteActionTitle, let action = card.muteAction {
+          Button(title) { menu.perform(action) }
+            .capsule(prominent: false)
+        }
       }
       if let problem = card.problem { banner(problem) }
     }

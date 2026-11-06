@@ -60,8 +60,42 @@ struct CallMachineTests {
   }
 
   static let table = [
-    row("startOpensOnlyTheMic", [], .start, .listening, [.startLocalVAD, .problem(nil)]),
+    row(
+      "startClearsTheProblemThenOpensOnlyTheMic", [], .start, .listening,
+      [.problem(nil), .startLocalVAD]),
     row("speechOpensTheVoice", [.start], .speechStarted, .connecting, [.openRealtime]),
+    row(
+      "muteWhileListeningReleasesTheMicrophone", [.start], .mute, .listening,
+      [.muteMicrophone]),
+    row("speechWhileMutedIsIgnored", [.start, .mute], .speechStarted, .listening, []),
+    row(
+      "speechWhileMutedOnALiveLineIsIgnored", live + [.mute], .speechStarted, .live, []),
+    row(
+      "aResultWhileMutedStillOpensTheLine", [.start, .mute], opening(result), .connecting,
+      [.openRealtimeForResult], pending: [result]),
+    row(
+      "muteWhileSpeakingOnALiveLineEndsTheSpeech", live + [.speechStarted], .mute, .live,
+      [.muteMicrophone, arm]),
+    row(
+      "muteWhileAResultIsHeldGivesItItsGrace", waiting + [.speechStarted, fromAlpha], .mute,
+      .live, [.muteMicrophone, arm, grace], pending: [result]),
+    row(
+      "muteWhileConnectingArmsTheSilenceOnConnect", connecting + [.mute], .connected, .live,
+      [.flushPreroll, arm, .problem(nil)]),
+    row(
+      "speechWhileMutedOnAConnectingLineDoesNotPinIt", connecting + [.mute, .speechStarted],
+      .connected, .live, [.flushPreroll, arm, .problem(nil)]),
+    row("muteOnAQuietLiveLineLeavesItsSilenceRunning", live, .mute, .live, [.muteMicrophone]),
+    row(
+      "muteOnALineAResultOpenedDoesNotExtendTheFirstWordWait",
+      [.start, opening(result), .connected], .mute, .live, [.muteMicrophone],
+      pending: [result]),
+    row("aSecondMuteDoesNothing", live + [.mute], .mute, .live, []),
+    row(
+      "unmuteTakesTheMicrophoneAgain", [.start, .mute], .unmute, .listening,
+      [.unmuteMicrophone]),
+    row("unmuteWhileUnmutedDoesNothing", [.start], .unmute, .listening, []),
+    row("muteWhileOffDoesNothing", [], .mute, .off, []),
     row(
       "deliverWhileListeningChimesAndWaits", [.start], deliver(a), .listening, [.chime],
       pending: [a]),
