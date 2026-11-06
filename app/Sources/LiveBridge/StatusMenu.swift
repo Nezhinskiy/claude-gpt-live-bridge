@@ -27,7 +27,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var card: HostedItem<CallCardView>?
   private var rows: [SessionID: HostedItem<SessionRowView>] = [:]
   private var transcript: ScrollingItem<TranscriptView>?
-  private var sent: HostedItem<SentView>?
   /// What a hosted session row's item is, for the menu's highlight.
   private var rowKeys: [ObjectIdentifier: String] = [:]
   /// Actions that wait until the menu has closed and its tracking has ended, as an alert does.
@@ -129,7 +128,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     submenus = submenus.filter { used.contains($0.key) }
     rows = rows.filter { used.contains("row|\($0.key.rawValue)") }
     if !used.contains("transcript") { transcript = nil }
-    if !used.contains("sent") { sent = nil }
     rowKeys = Dictionary(
       uniqueKeysWithValues: rows.map { (ObjectIdentifier($0.value.item), "row|\($0.key.rawValue)") }
     )
@@ -203,13 +201,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         if transcript != nil { shown.show(view) }
         transcript = shown
         return shown.item
-
-      case .sent(let text):
-        used.insert("sent")
-        let row = sent ?? HostedItem(SentView(text: text), enabled: false)
-        row.show(SentView(text: text))
-        sent = row
-        return row.item
 
       case .limit(let shown):
         let item = native("limit|\(shown.name)", used: &used) { NSMenuItem() }

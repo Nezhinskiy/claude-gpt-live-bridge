@@ -1343,9 +1343,9 @@ struct BridgeTests {
   /// The menu's Load context follows `needsContext`, for each cause and for a current voice.
   @Test func needsContextHoldsForEachCause() async throws {
     try await join(a, "Alpha")
-    #expect(await bridge.current.needsContext)  // no context
+    #expect(await bridge.current.contextNeed == .withTheLine)  // no context, nothing lost
     try await post("/v1/context", context())
-    #expect(await !bridge.current.needsContext)  // current
+    #expect(await bridge.current.contextNeed == .none)  // current
     try await join(a, "Alpha", missed: true)
     #expect(await bridge.current.needsContext)  // missed
     try await post("/v1/context", context())
@@ -1357,6 +1357,34 @@ struct BridgeTests {
     try await test.post("/v1/context", test.context())
     try await test.sync(test.a, "Private thing.")
     #expect(await test.bridge.current.needsContext)  // paused
+  }
+
+  /// No line loads a summary while the pause setting is on, so only a press can.
+  @Test func withThePauseSettingOnASessionWithNoSummaryNeedsAPress() async throws {
+    let test = try BridgeTests(pausesSync: true)
+    try await test.join(test.a, "Alpha")
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// More lines than the seed carries are lost to the voice, summary or none.
+  @Test func linesTheSeedCannotCarryNeedAPress() async throws {
+    try await join(a, "Alpha")
+    try await sync(a, "Hello.")
+    #expect(await bridge.current.contextNeed == .withTheLine)
+    for n in 0..<70 { try await sync(a, turn: "t\(n)", "Line \(n).") }
+    #expect(await bridge.current.contextNeed == .load)
+  }
+
+  /// A gap keeps the item enabled, even with no summary yet: a press need not wait for a line.
+  @Test func aGapWithNoSummaryNeedsAPress() async throws {
+    try await join(a, "Alpha", missed: true)
+    #expect(await bridge.current.contextNeed == .load)
+  }
+
+  /// A mod that does not sync loses turns, so a summary with the line does not cover it.
+  @Test func aModThatDoesNotSyncNeedsAPress() async throws {
+    try await join(a, "Alpha", syncs: nil)
+    #expect(await bridge.current.contextNeed == .load)
   }
 
   /// Review Focus 3: New conversation keeps the mark, so the next line asks for no summary of
@@ -1522,11 +1550,12 @@ struct BridgeTests {
     await live()
     let said = (1...5).map { "Remember line \($0)." }
     for line in said { voice.emit(.userUtterance(line)) }
-    #expect(await eventually { await lines().count == 5 })
-    #expect(await lines() == said.map { "You: \($0)" })
+    #expect(await eventually { await lines().count == 6 })
+    let summary = "Loaded context: [CONTEXT] Alpha: Alpha's work."
+    #expect(await lines() == [summary] + said.map { "You: \($0)" })
     var updates = bridge.updates.makeAsyncIterator()
     let update = await updates.next()
-    #expect(update?.conversation.map(\.text) == said)
+    #expect(update?.conversation.suffix(5).map(\.text) == said)
     #expect(update?.context == "[CONTEXT] Alpha: Alpha's work.")
     let reply = await bridge.handle(
       HTTPRequest(method: "GET", path: "/v1/next", query: ["sessionId": b.rawValue], body: Data()))

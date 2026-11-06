@@ -18,6 +18,41 @@ struct ContinuityTests {
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
+  @Test func aLoadedSummaryIsShownWhereItWasLoaded() {
+    var conversation = Conversation()
+    conversation.record(.owner, "Before.")
+    conversation.setContext("[CONTEXT] Alpha: x")
+    conversation.record(.claude, "After.")
+    #expect(
+      conversation.shownLines.map(\.speaker) == [.owner, .context, .claude])
+  }
+
+  @Test func theSameSummaryLoadedAgainAddsNoLine() {
+    var conversation = Conversation()
+    conversation.setContext("[CONTEXT] Alpha: x")
+    conversation.record(.owner, "Between.")
+    conversation.setContext("[CONTEXT] Alpha: x")
+    #expect(conversation.shownLines.map(\.speaker) == [.context, .owner])
+  }
+
+  /// Older than every kept line, or loaded by 0.4.0, which kept no place for it.
+  @Test func aSummaryNoKeptLineHoldsIsShownFirst() {
+    var conversation = Conversation()
+    conversation.setContext("[CONTEXT] Alpha: x")
+    for n in 0..<Conversation.keptLines { conversation.record(.owner, "\(n)") }
+    #expect(conversation.lines.allSatisfy { $0.speaker == .owner })
+    #expect(conversation.shownLines.first?.text == "[CONTEXT] Alpha: x")
+    #expect(conversation.shownLines.count == Conversation.keptLines + 1)
+  }
+
+  @Test func aLoadedSummarySeedsTheVoiceOnce() {
+    var conversation = Conversation()
+    conversation.record(.owner, "Before.")
+    conversation.setContext("[CONTEXT] Alpha: x")
+    #expect(
+      conversation.initialItems(tasks: []).map(\.text) == ["[CONTEXT] Alpha: x", "Before."])
+  }
+
   @Test func itemsKeepNewestWithinLimits() {
     var conversation = Conversation()
     for n in 0..<30 { conversation.record(.owner, "\(n)".padding(2_000)) }
@@ -76,7 +111,7 @@ struct ContinuityTests {
     #expect(continuity[b].context == "[CONTEXT] Beta: work")
     continuity.forget(a)
     #expect(continuity[a] == Conversation())
-    #expect(continuity[b].lines.map(\.text) == ["red"])
+    #expect(continuity[b].lines.map(\.text) == ["red", "[CONTEXT] Beta: work"])
   }
 
   /// After `/clear` the session's new id keeps its conversation.
@@ -355,7 +390,7 @@ extension ContinuityTests {
     var continuity = Continuity()
     continuity.setContext("[CONTEXT] Alpha: x", for: a)
     for n in 0..<30 { continuity.record(.owner, "\(n)".padding(2_000), in: a) }
-    #expect(continuity[a].lines.count == 30)
+    #expect(continuity[a].lines.count == 31)
     #expect(!continuity[a].isCurrent)
   }
 

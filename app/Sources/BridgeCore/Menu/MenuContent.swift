@@ -9,8 +9,6 @@ public struct MenuContent: Sendable, Equatable {
   /// Session rows in the menu itself; the rest go in a "More sessions" submenu, as a native menu
   /// scrolls only once it reaches the screen's height.
   public static let visibleSessions = 5
-  /// What was sent is cut to this many characters, so the submenu stays a readable size.
-  public static let sentCharacters = 600
 
   /// What a native item does.
   public enum Command: Sendable, Equatable {
@@ -66,8 +64,6 @@ public struct MenuContent: Sendable, Equatable {
     /// A custom view: every line of the target's conversation, whole and wrapped, oldest
     /// first; it scrolls inside the menu and opens at the newest.
     case transcript([Conversation.Line])
-    /// The target's context line as it was sent: a custom view, wrapped.
-    case sent(String)
     /// A source's usage: a row that only informs, its tooltip saying when the windows reset.
     case limit(LimitRow)
   }
@@ -133,11 +129,7 @@ public struct MenuContent: Sendable, Equatable {
       if let target { talk.append(.header(target)) }
       talk.append(.transcript(update.conversation))
     }
-    if let sent = update.context {
-      if !talk.isEmpty { talk.append(.separator) }
-      talk += [.header("What was sent"), .sent(Self.capped(sent))]
-    }
-    let load = target == nil ? contextLoad : contextLoad.shown(needsContext: update.needsContext)
+    let load = target == nil ? contextLoad : contextLoad.shown(update.contextNeed)
     let context: [Item] = [
       .command(.loadContext, title: load.title, isEnabled: target != nil && load.isEnabled),
       .command(.newConversation, title: "New conversation…", isEnabled: target != nil),
@@ -156,10 +148,6 @@ public struct MenuContent: Sendable, Equatable {
   private static func minutes(_ update: BridgeUpdate) -> String {
     let call = Int(update.minutesThisCall.rounded())
     return "\(call) min this call · \(Int(update.status.minutesToday.rounded())) min today"
-  }
-
-  private static func capped(_ text: String) -> String {
-    text.count <= sentCharacters ? text : text.prefix(sentCharacters - 1) + "…"
   }
 
   /// The menu as plain lines, one per item; a submenu's items follow it, indented. For tests and
@@ -188,7 +176,6 @@ public struct MenuContent: Sendable, Equatable {
       case .transcript(let lines):
         return [indent + "[transcript]"]
           + lines.map { indent + "| \($0.speaker.name): \($0.text)" }
-      case .sent(let text): return [indent + "[sent] \(text)"]
       case .limit(let row): return [indent + "[limit] \(row.name) — \(row.text)"]
       }
     }

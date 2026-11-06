@@ -1,5 +1,16 @@
 import Foundation
 
+/// Why the target's voice would want a summary, as far as the menu is concerned.
+public enum ContextNeed: Sendable, Equatable {
+  /// The voice has the whole session.
+  case none
+  /// It has no summary yet, nothing is lost, and the next line loads one by itself.
+  case withTheLine
+  /// A press is worth offering: a gap, a mod that does not sync or too many lines, which the next
+  /// line also asks for, or a pause, which only a press loads.
+  case load
+}
+
 /// Where the menu's Load context stands for one session.
 public enum ContextLoadState: Sendable, Equatable {
   /// Nothing pending: the button can be pressed.
@@ -10,6 +21,8 @@ public enum ContextLoadState: Sendable, Equatable {
   case loaded
   /// The voice has the whole session: there is nothing to load.
   case current
+  /// The next line loads the summary by itself.
+  case withTheLine
 
   public var title: String {
     switch self {
@@ -17,16 +30,22 @@ public enum ContextLoadState: Sendable, Equatable {
     case .loading: "Loading context…"
     case .loaded: "Context loaded"
     case .current: "Context up to date"
+    case .withTheLine: "Context loads with the line"
     }
   }
 
   /// Pressing again while a summary is on its way would only ask for it twice.
   public var isEnabled: Bool { self == .ready }
 
-  /// As the menu shows it: a summary just loaded, or on its way, is shown as that; otherwise a
-  /// voice that needs no context has nothing to load.
-  public func shown(needsContext: Bool) -> ContextLoadState {
-    self == .ready && !needsContext ? .current : self
+  /// As the menu shows it: a summary just loaded, or on its way, is shown as that; otherwise it
+  /// is what the voice needs.
+  public func shown(_ need: ContextNeed) -> ContextLoadState {
+    guard self == .ready else { return self }
+    switch need {
+    case .none: return .current
+    case .withTheLine: return .withTheLine
+    case .load: return .ready
+    }
   }
 }
 

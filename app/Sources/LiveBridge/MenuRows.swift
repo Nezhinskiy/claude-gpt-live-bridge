@@ -207,34 +207,35 @@ struct TranscriptView: View {
   }
 }
 
-/// One line of the conversation, whole and wrapped: who said it, then what.
+/// One line of the conversation, whole and wrapped: who said it, then what. A loaded summary is
+/// no one's words, so its mark goes above it and all of it is muted.
 struct LineView: View {
   let line: Conversation.Line
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 6) {
-      Text(line.speaker.name).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
-      Text(line.text.trimmingCharacters(in: .whitespacesAndNewlines)).fixedSize(
-        horizontal: false, vertical: true
-      )
-      .frame(maxWidth: .infinity, alignment: .leading)
+    Group {
+      if line.speaker == .context {
+        VStack(alignment: .leading, spacing: 2) {
+          Text(line.speaker.name).fontWeight(.medium)
+          words
+        }
+        .foregroundStyle(.secondary)
+      } else {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(line.speaker.name).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
+          words
+        }
+      }
     }
     .font(.system(size: 12))
     .padding(.horizontal, MenuStyle.inset)
     .padding(.vertical, 2)
   }
-}
 
-/// The target's context line, as the voice got it, wrapped.
-struct SentView: View {
-  let text: String
-
-  var body: some View {
-    Text(text).font(MenuStyle.subtitle).foregroundStyle(.secondary)
+  private var words: some View {
+    Text(line.text.trimmingCharacters(in: .whitespacesAndNewlines))
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, MenuStyle.inset)
-      .padding(.vertical, 2)
   }
 }
 

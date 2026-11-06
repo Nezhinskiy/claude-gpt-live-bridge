@@ -58,12 +58,13 @@ microphone or Claude:
 - `Continuity`: one conversation per Claude Code session, by session id: its last 64 lines
   (`keptLines`: the owner's speech and typing, the voice's, Claude's final answers to turns that
   were not voice requests, an answer a newer request superseded, the lines the session sent the
-  voice and the brief of each request its queue took), the context loaded from it, and whether the voice is out of sync with the
+  voice, the brief of each request its queue took and each summary where it was loaded), the context loaded from it, and whether the voice is out of sync with the
   session (`missed`: a turn did not arrive; `paused`: the pause setting kept text out) with the
   decision on the turn last offered. A conversation written before these fields still decodes.
   `isCurrent` is false when the lines since the summary are more than the seed can carry
   (`initialItems`: 128 items, 8,192 estimated tokens, counted in UTF-8 bytes). Each new realtime session is seeded with the
-  target's conversation, less those briefs (an open request goes in as its task), and only the
+  target's conversation, less those briefs and summaries (an open request goes in as its task,
+  the current summary as the context), and only the
   target's open tasks (`initialItems`), so the voice does not notice it was replaced and never
   mixes two sessions' conversations; a new target closes an open line. A result from another session is spoken in the open line and kept in its
   own session's conversation. New conversation forgets the target's, removing a session forgets
