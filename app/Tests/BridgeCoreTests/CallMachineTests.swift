@@ -19,6 +19,7 @@ struct CallMachineTests {
   static let unheard: [CallEvent] = [.start, deliver(a), .speechStarted]
   static let arm = CallEffect.armSilenceTimer(seconds: 20)
   static let r = Problem.other("r")
+  static let limit = Problem.codex(.realtimeError("You’ve hit your usage limit."))
   static let cap = CallEffect.armSilenceTimer(seconds: 90)
   /// A line a result opened waits this long for the voice's first word.
   static let firstWord = CallEffect.armSilenceTimer(seconds: 5)
@@ -81,10 +82,10 @@ struct CallMachineTests {
       .live, [.muteMicrophone, arm, grace], pending: [result]),
     row(
       "muteWhileConnectingArmsTheSilenceOnConnect", connecting + [.mute], .connected, .live,
-      [.flushPreroll, arm, .problem(nil)]),
+      [.problem(nil), .flushPreroll, arm]),
     row(
       "speechWhileMutedOnAConnectingLineDoesNotPinIt", connecting + [.mute, .speechStarted],
-      .connected, .live, [.flushPreroll, arm, .problem(nil)]),
+      .connected, .live, [.problem(nil), .flushPreroll, arm]),
     row("muteOnAQuietLiveLineLeavesItsSilenceRunning", live, .mute, .live, [.muteMicrophone]),
     row(
       "muteOnALineAResultOpenedDoesNotExtendTheFirstWordWait",
@@ -104,14 +105,14 @@ struct CallMachineTests {
       pending: [a]),
     row(
       "deliverWhileConnectingIsSentAfterConnect", connecting + [deliver(a)], .connected,
-      .live, [.flushPreroll, .addContext(a), cap, .problem(nil)], pending: [a]),
+      .live, [.problem(nil), .flushPreroll, .addContext(a), cap], pending: [a]),
     row(
       "pendingIsSpokenAfterOwnerSpeaks", unheard + [deliver(b)], .connected, .live,
-      [.flushPreroll, .addContext(a), .addContext(b), cap, .problem(nil)],
+      [.problem(nil), .flushPreroll, .addContext(a), .addContext(b), cap],
       pending: [a, b]),
     row(
       "connectAfterSpeechEndedArmsSilence", connecting + [.speechEnded], .connected, .live,
-      [.flushPreroll, arm, .problem(nil)]),
+      [.problem(nil), .flushPreroll, arm]),
     row(
       "failedConnectChimesForUnheardResults", unheard, .connectFailed(r), .listening,
       [.problem(r), .chime], pending: [a]),
@@ -119,16 +120,56 @@ struct CallMachineTests {
       "closeWhileConnectingChimesForUnheardResults", unheard, .remoteClosed(r), .listening,
       [.problem(r), .chime], pending: [a]),
     row(
+      "aUsageLimitAtOpenEndsTheCall", connecting, .connectFailed(limit), .off,
+      [.problem(limit), .stopLocalVAD, .endCodex]),
+    row(
+      "aUsageLimitMidLineEndsTheCall", live, .remoteClosed(limit), .off,
+      [.problem(limit), .stopLocalVAD, .endCodex]),
+    row(
+      "aUsageLimitKeepsWhatWaits", unheard, .connectFailed(limit), .off,
+      [.problem(limit), .stopLocalVAD, .endCodex, .chime], pending: [a]),
+    row(
+      "aHeldLineIsNoLongerHeldAfterALimit",
+      live + [
+        .handedOff(alpha), .speechStarted, fromAlpha, .remoteClosed(limit), .start,
+        .speechStarted, .connected, .speechEnded,
+      ],
+      .graceElapsed, .live, [], pending: [result]),
+    row(
+      "aLineAfterALimitIsKept", connecting + [.connectFailed(limit)], deliver(a), .off, [.chime],
+      pending: [a]),
+    row(
+      "aLineAfterStopIsDropped", connecting + [.stop], deliver(a), .off, []),
+    row(
+      "stopForgetsWhatALimitKept", unheard + [.connectFailed(limit)], .stop, .off,
+      [.closeRealtime, .stopLocalVAD]),
+    row(
+      "startTriesAgainAfterAUsageLimit", connecting + [.connectFailed(limit)], .start, .listening,
+      [.problem(nil), .startLocalVAD]),
+    row(
+      "aLineAfterStartIsNotKeptByThePause",
+      connecting + [.connectFailed(limit), .start, .stop], deliver(a), .off, []),
+    row(
+      "theServiceRefusingEndsALiveLine", live, .refused(limit), .off,
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
+    row(
+      "theServiceRefusingEndsAConnectingLine", connecting, .refused(limit), .off,
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
+    row(
+      "theServiceRefusingEndsAListeningCall", [.start], .refused(limit), .off,
+      [.problem(limit), .closeRealtime, .stopLocalVAD, .endCodex]),
+    row("theServiceRefusingAStoppedCallDoesNothing", [], .refused(limit), .off, []),
+    row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
       [.openRealtimeForResult], pending: [result]),
     row(
       "theOpenedLineGetsItAsContextAndWaitsBrieflyForTheVoice", [.start, opening(result)],
-      .connected, .live, [.flushPreroll, .addContext(result), firstWord, .problem(nil)],
+      .connected, .live, [.problem(nil), .flushPreroll, .addContext(result), firstWord],
       pending: [result]),
     row(
       "theOwnerSpeakingWhileAnOpenedLineConnectsGetsTheNoiseCap",
       [.start, opening(result), .speechStarted], .connected, .live,
-      [.flushPreroll, .addContext(result), cap, .problem(nil)], pending: [result]),
+      [.problem(nil), .flushPreroll, .addContext(result), cap], pending: [result]),
     row(
       "anotherLineBeforeTheFirstWordKeepsTheShortWait", [.start, opening(result), .connected],
       deliver(a), .live, [.addContext(a), firstWord], pending: [result, a]),

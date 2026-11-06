@@ -207,6 +207,9 @@ public actor Bridge: Router {
     case .failed(let reason):
       await send(.audioFailed(reason))
       await endCodex()
+    case .lineError(let code, let message):
+      // codex's sideband does not carry these: the service's usage gate reaches only the page
+      if let reason = Problem.refusal(code: code, message: message) { await send(.refused(reason)) }
     }
   }
 
@@ -275,6 +278,11 @@ public actor Bridge: Router {
       // a Mute meanwhile does not cancel a Start: the page records it, and listens muted
       if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
     case .stopLocalVAD: await audio.stopListening()
+    case .endCodex:
+      if !machine.pending.contains(where: { $0.session == questionRoute && $0.asks }) {
+        questionRoute = nil
+      }
+      await endCodex()
     case .flushPreroll: await audio.flushPreroll()
     case .muteMicrophone: await audio.muteMicrophone()
     case .unmuteMicrophone:
@@ -313,7 +321,9 @@ public actor Bridge: Router {
     guard notifies(), let notifier else { return }
     let labels = Dictionary(
       await registry.rows().map { ($0.sessionId, $0.label) }, uniquingKeysWith: { $1 })
-    if let notice = ResultNotice.waiting(machine.pending, labels: labels) {
+    if let notice = ResultNotice.waiting(
+      machine.pending, labels: labels, callIsOff: machine.phase == .off)
+    {
       await notifier.post(notice)
     }
   }
@@ -501,7 +511,7 @@ public actor Bridge: Router {
 
   private func deliver(_ delivery: Delivery) async {
     // only a question the call keeps (not one dropped while off) routes the next handoff
-    if delivery.status == .question, machine.phase != .off { questionRoute = delivery.session }
+    if delivery.status == .question, machine.keepsLines { questionRoute = delivery.session }
     await say(
       AnswerShaper.forVoice(
         delivery.text, status: delivery.status, label: delivery.label, session: delivery.session))
@@ -523,7 +533,7 @@ public actor Bridge: Router {
     switch (row.activity == .approval, body.state == .approval) {
     case (false, true):
       if let question = body.question {
-        if machine.phase != .off { questionRoute = body.sessionId }
+        if machine.keepsLines { questionRoute = body.sessionId }
         await say(
           AnswerShaper.line(
             .asking, label: row.label,

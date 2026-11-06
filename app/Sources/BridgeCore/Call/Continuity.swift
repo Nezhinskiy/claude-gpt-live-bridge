@@ -8,7 +8,7 @@ public struct InitialItem: Codable, Sendable, Equatable {
 /// the next, and across Stop and Start, so the owner does not notice the session was replaced.
 public struct Conversation: Codable, Sendable, Equatable {
   public static let keptLines = 24
-  /// codex's limits on `initialItems`; tokens are estimated at 4 characters each.
+  /// codex's limits on `initialItems`; tokens are estimated at 4 UTF-8 bytes each.
   public static let maxItems = 128
   public static let maxTokens = 8_192
 
@@ -73,7 +73,8 @@ public struct Conversation: Codable, Sendable, Equatable {
     return notes + talk
   }
 
-  static func estimatedTokens(_ text: String) -> Int { (text.count + 3) / 4 }
+  /// codex's own estimate: UTF-8 bytes over 4. Past its limits it refuses the line (ADR 0001 (o)).
+  static func estimatedTokens(_ text: String) -> Int { (text.utf8.count + 3) / 4 }
 }
 
 /// Every session's conversation, by session id, so the voice never mixes two sessions'. Saved

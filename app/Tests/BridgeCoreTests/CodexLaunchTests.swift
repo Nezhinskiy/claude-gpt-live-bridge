@@ -150,6 +150,73 @@ struct CodexLaunchTests {
     #expect(ContinuousClock.now - start < .seconds(5))
   }
 
+  /// codex's own sentences at `rust-v0.166.0` (`codex-rs/protocol/src/error.rs`): this path carries
+  /// no error code, so its wording is the only signal.
+  static let spent = [
+    "You’ve hit your usage limit. Visit https://chatgpt.com/settings/usage to purchase more "
+      + "credits or try again at 11:33 PM.",
+    "You've hit your usage limit. Try again later.",
+    "You’ve hit your usage limit for example-model. Switch to another model now, or try again "
+      + "later.",
+    "You hit your spend cap set in your workspace. Increase your spend cap to continue.",
+    "You hit your spend cap set by the owner of your workspace. Ask an owner to increase your "
+      + "spend cap to continue.",
+    "Your workspace is out of credits. Add credits to continue.",
+    "Your workspace is out of credits. Ask your workspace owner to refill in order to continue.",
+    "Quota exceeded. Check your plan and billing details.",
+  ]
+  static let refused = [
+    "exceeded retry limit, last status: 429 Too Many Requests",
+    "To use Codex with your ChatGPT plan, upgrade to Plus: https://chatgpt.com/explore/plus",
+  ]
+
+  @Test(arguments: spent) func aSpentBudgetIsSaidAsAUsageLimit(_ message: String) {
+    let problem = Problem.codex(.realtimeError(message))
+    #expect(problem.pausesCall)
+    #expect(problem.sentence.hasPrefix("Your ChatGPT plan's usage limit is reached"))
+    #expect(problem.sentence.contains(message))
+  }
+
+  /// Nothing shows these spent a budget: the sentence does not say they did.
+  @Test(arguments: refused) func aRefusalIsNotSaidAsAUsageLimit(_ message: String) {
+    let problem = Problem.codex(.realtimeError(message))
+    #expect(problem.pausesCall)
+    #expect(problem.sentence.hasPrefix("ChatGPT did not allow the voice"))
+    #expect(problem.sentence.contains(message))
+  }
+
+  @Test func thePageSaysItIsNoUsageLimit() {
+    let problem = Problem.lineRefused("Unable to verify usage availability.")
+    #expect(problem.sentence.hasPrefix("ChatGPT did not allow the voice"))
+    #expect(problem.sentence.contains("Unable to verify usage availability."))
+  }
+
+  /// The service's own names for a spent budget, in codex's list and in the two reports.
+  @Test(arguments: [
+    "usage_check_failed", "usage_limit_reached", "insufficient_quota", "credit_balance_exhausted",
+    "workspace_spend_limit_exceeded",
+  ]) func aCodeAboutUsageIsARefusal(_ code: String) {
+    #expect(Problem.refusal(code: code, message: "No.") == .lineRefused("No."))
+  }
+
+  @Test func anotherCodeIsNoRefusal() {
+    #expect(Problem.refusal(code: "invalid_request", message: "No.") == nil)
+  }
+
+  @Test func otherErrorsLeaveTheCallOn() {
+    for message in ["503 Service Unavailable", "AVAS realtime calls require realtime v1 or v3"] {
+      #expect(!Problem.codex(.realtimeError(message)).pausesCall, "\(message)")
+    }
+    #expect(!Problem.codex(.notLoggedIn).pausesCall)
+    #expect(!Problem.other("You’ve hit your usage limit.").pausesCall)
+  }
+
+  /// The engine refuses a band holding one, which takes Start and Stop with it.
+  @Test func aSentenceHoldsNoControlCharacters() {
+    #expect(Problem.other("one\u{0007}two\u{009B}three").sentence == "onetwothree")
+    #expect(Problem.lineRefused("one\u{0000}two").sentence.contains("onetwo"))
+  }
+
   /// No real "plan without realtime" error has been observed (ADR 0001 (k)); these messages are
   /// constructed. codex's own words stay in every sentence, so a wrong hint still shows the cause.
   @Test func realtimeErrorsKeepCodexWordsWithAHint() throws {
