@@ -149,6 +149,7 @@ scripts/build-app.sh --run                      # debug build, then open it
 scripts/build-app.sh --run --fake-mic say.wav   # the WAV plays as the microphone
 scripts/build-app.sh --run --fake-mic a.wav --fake-mic b.wav   # b plays when the voice has finished
 scripts/build-app.sh --run --record-call call.wav   # each call: you left, the voice right
+scripts/build-app.sh --run --voice-instructions f.txt   # the voice gets f.txt, not its rules
 CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of your home
 /usr/bin/log stream --info --predicate 'subsystem == "com.getlivebridge.livebridge"'
 ```

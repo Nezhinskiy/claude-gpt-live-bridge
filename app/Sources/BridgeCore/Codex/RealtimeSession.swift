@@ -43,8 +43,8 @@ public actor RealtimeSession: RealtimeControlling {
   private let cwd: URL
   /// The voice chosen in Settings, read at each open; nil leaves it to codex.
   private let voice: @Sendable () -> String?
-  /// The owner's prompt from Settings, read at each open like the voice.
-  private let prompt: @Sendable () -> String
+  /// What the voice is told, read at each open like the voice.
+  private let instructions: @Sendable () -> String
   private let timeout = Duration.seconds(20)
   /// More `mcpServerStatus/list` pages than this is a reply this version does not understand.
   static let maxStatusPages = 50
@@ -67,7 +67,8 @@ public actor RealtimeSession: RealtimeControlling {
   public nonisolated let events: AsyncStream<RealtimeEvent>
   private let emit: AsyncStream<RealtimeEvent>.Continuation
 
-  /// `cwd` is an empty directory the app owns (`<data dir>/codex-cwd`).
+  /// `cwd` is an empty directory the app owns (`<data dir>/codex-cwd`). `prompt` is the owner's
+  /// own, from Settings.
   public init(
     client: any RPCClient, cwd: URL, voice: @escaping @Sendable () -> String? = { nil },
     prompt: @escaping @Sendable () -> String = { "" }
@@ -75,9 +76,23 @@ public actor RealtimeSession: RealtimeControlling {
     self.client = client
     self.cwd = cwd
     self.voice = voice
-    self.prompt = prompt
+    instructions = { VoicePrompt.composed(owner: prompt()) }
     (events, emit) = AsyncStream.makeStream()
   }
+
+  #if DEBUG
+    /// `--voice-instructions`: the voice gets `instructions` and none of its rules.
+    public init(
+      client: any RPCClient, cwd: URL, voice: @escaping @Sendable () -> String? = { nil },
+      instructions: String
+    ) {
+      self.client = client
+      self.cwd = cwd
+      self.voice = voice
+      self.instructions = { instructions }
+      (events, emit) = AsyncStream.makeStream()
+    }
+  #endif
 
   public func open(offerSDP: String, items: [InitialItem]) async throws -> String {
     await close()
@@ -167,7 +182,7 @@ public actor RealtimeSession: RealtimeControlling {
       "threadId": .string(thread), "version": "v3", "outputModality": "audio",
       "transport": ["type": "webrtc", "sdp": .string(offerSDP)],
       "includeStartupContext": false, "clientManagedHandoffs": true, "delegationAckFiller": true,
-      "prompt": .string(VoicePrompt.composed(owner: prompt())),
+      "prompt": .string(instructions()),
       "initialItems": try JSONValue(encoding: items),
     ]
     fields["voice"] = voice().map(JSONValue.string)

@@ -486,8 +486,15 @@ final class AppModel {
   nonisolated private static func voice(cwd: URL, settings: SettingsStore)
     async throws -> any RealtimeControlling
   {
-    RealtimeSession(
-      client: try await launchCodex(cwd: cwd), cwd: cwd, voice: { settings.current.voice },
+    let client = try await launchCodex(cwd: cwd)
+    #if DEBUG
+      if let instructions = voiceInstructions {
+        return RealtimeSession(
+          client: client, cwd: cwd, voice: { settings.current.voice }, instructions: instructions)
+      }
+    #endif
+    return RealtimeSession(
+      client: client, cwd: cwd, voice: { settings.current.voice },
       prompt: { settings.current.prompt })
   }
 
@@ -529,6 +536,16 @@ final class AppModel {
       return []
     #endif
   }
+
+  #if DEBUG
+    /// `--voice-instructions <file>`: debug builds tell the voice the file's text, not its rules.
+    nonisolated private static var voiceInstructions: String? {
+      let arguments = CommandLine.arguments
+      guard let flag = arguments.firstIndex(of: "--voice-instructions"), flag + 1 < arguments.count
+      else { return nil }
+      return try? String(contentsOfFile: arguments[flag + 1], encoding: .utf8)
+    }
+  #endif
 
   /// `--record-call <wav>`: debug builds record both sides of each call there.
   private static var tapeFile: URL? {

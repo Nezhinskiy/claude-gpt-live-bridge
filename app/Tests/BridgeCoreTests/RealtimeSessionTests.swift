@@ -136,6 +136,14 @@ struct RealtimeSessionTests {
     #expect(await rpc.params("thread/realtime/start").map { $0["voice"] } == ["cedar", "viola"])
   }
 
+  /// `--voice-instructions`, in debug builds: the voice gets these and none of its rules.
+  @Test func debugInstructionsReplaceTheVoicesRules() async throws {
+    let session = RealtimeSession(client: rpc, cwd: cwd, instructions: "Read each line.")
+    _ = try await session.open(offerSDP: "offer", items: [])
+    let sent = await rpc.params("thread/realtime/start").map { $0["prompt"]?.string }
+    #expect(sent == ["Read each line."])
+  }
+
   /// The owner's prompt from Settings is read at each open and goes last in the instructions;
   /// an empty one sends the built-in instructions alone.
   @Test func openUsesTheOwnersPrompt() async throws {

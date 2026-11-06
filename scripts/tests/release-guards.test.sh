@@ -2,7 +2,8 @@
 # Two guards for a release: the marketplace pins the mod to the tag of the app's version, so an
 # update installs the mod that belongs to the app, and a release binary has no way to point the
 # update check elsewhere (LIVEBRIDGE_RELEASES_URL exists in debug builds only). Neither has it the
-# debug tools: --fake-mic, --record-call and the audio page's debug-*.js stay out of a release.
+# debug tools: --fake-mic, --record-call, --voice-instructions and the audio page's debug-*.js
+# stay out of a release.
 set -eu
 cd "$(dirname "$0")/../.."
 
@@ -28,7 +29,7 @@ if grep -a -q LIVEBRIDGE_RELEASES_URL "$binary"; then
   echo "the release binary contains LIVEBRIDGE_RELEASES_URL" >&2
   fail=1
 fi
-for flag in --fake-mic --record-call; do
+for flag in --fake-mic --record-call --voice-instructions; do
   if grep -a -q -- "$flag" "$binary"; then
     echo "the release binary contains $flag" >&2
     fail=1

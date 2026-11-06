@@ -2,7 +2,7 @@
 # Builds, installs and removes LiveBridge.app (built from the SwiftPM package in app/).
 #
 #   scripts/build-app.sh                          debug build: app/.build/app/LiveBridge.app, ad hoc
-#   scripts/build-app.sh --run [--fake-mic WAV]... [--record-call WAV]
+#   scripts/build-app.sh --run [--fake-mic WAV]... [--record-call WAV] [--voice-instructions FILE]
 #                                                 debug build, quit its running copy, open it
 #   scripts/build-app.sh --release                release build, signed, installed in
 #                                                 /Applications and opened; run it again to upgrade
@@ -17,7 +17,8 @@
 # --fake-mic (debug builds only) plays WAV as the microphone; given more than once, each next WAV
 # plays when the voice has finished speaking. --record-call (debug builds only) records each call
 # to WAV, the microphone on the left and the voice on the right, with its marks beside it in
-# WAV's name with .marks.jsonl. If CFFIXED_USER_HOME is set, the app keeps its files under that directory instead of your home folder. The disk image is
+# WAV's name with .marks.jsonl. --voice-instructions (debug builds only) tells the voice FILE's
+# text instead of its rules. If CFFIXED_USER_HOME is set, the app keeps its files under that directory instead of your home folder. The disk image is
 # dragged to /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS
 # names another folder for it (the uninstall test's scratch one).
 set -eu
@@ -101,7 +102,7 @@ debug() {
   count=$#
   while [ "$count" -gt 0 ]; do
     case "$1" in
-      --fake-mic | --record-call)
+      --fake-mic | --record-call | --voice-instructions)
         [ "$count" -ge 2 ] || usage
         flag=$1 wav=$2
         shift 2
