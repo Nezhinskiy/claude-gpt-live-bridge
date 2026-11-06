@@ -1,7 +1,9 @@
 # Usage limits in the menu
 
-Status: delivered, 2026-11-06. The data below was read that day on the
-owner's Plus login with codex 0.166.0, spending no voice. The wider research:
+Status: delivered in part, 2026-11-06. What remains is the lifecycle cases that were not seen in the
+real menu: a call live, codex missing or signed out, a read in flight when the menu closes, and an
+app restart with a joined session (pull request #40 lists which were and were not walked). The data
+below was read that day on the owner's Plus login with codex 0.166.0, spending no voice. The wider research:
 [`docs/research/2026-11-05-gpt-live-limits.md`](../research/2026-11-05-gpt-live-limits.md).
 
 ## Why

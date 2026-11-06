@@ -58,8 +58,8 @@ A, B and C landed with `fiveHour` and `week`; E replaces that shape before D use
 - **Final review:** one per PR, in a reviewer child session, before any merge: correctness, "what
   can be deleted, who does this refuse", plus the repo's `requesting-code-review`, `simplify` and
   `security-review`. One scoped re-review after fixes, then stop.
-- **Lifecycle matrix (checked in Task 9):** the menu opened with the call off, listening and live:
-  the Codex row shows and the call is not disturbed; codex missing or signed out: no row, no problem
+- **Lifecycle matrix (walked in part in Task 9; pull request #40 says what was and was not seen):**
+  the menu opened with the call off, listening and live: the Codex row shows and the call is not disturbed; codex missing or signed out: no row, no problem
   banner; a read in flight when the menu closes: the next open shows it; the app restarted with a
   joined session: the Claude row returns without a new turn; the last session leaving: the row stays.
 - **Parallelism:** read-only seats beside anything. B and C work in one worktree only in turn, or
