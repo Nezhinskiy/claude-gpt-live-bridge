@@ -399,12 +399,14 @@ public actor Bridge: Router {
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer(preroll: preroll)
-      let tasks = if let session { await registry.openTasks(of: session) } else { [String]() }
+      // `lineSession` from here: `/clear` during the awaits gives the session a new id.
+      let tasks =
+        if let lineSession { await registry.openTasks(of: lineSession) } else { [String]() }
       try Task.checkCancellation()
       // No await from here to `dropSynced()`: a synced line lands in the seed or in the hold,
       // never both, and a stale attempt cannot drop a newer line's hold. Only the session's own
       // conversation, context and open tasks: never another session's.
-      let conversation = session.map { continuity[$0] } ?? Conversation()
+      let conversation = lineSession.map { continuity[$0] } ?? Conversation()
       let items = conversation.initialItems(
         tasks: tasks, unheard: Set(machine.pending.map(\.text)))
       seededContext = conversation.context
@@ -414,7 +416,7 @@ public actor Bridge: Router {
       try await audio.applyAnswer(answer)
       try Task.checkCancellation()
       await send(.connected)
-      if let held = heldContext, held.session == session, held.text != seededContext,
+      if let held = heldContext, held.session == lineSession, held.text != seededContext,
         machine.phase == .live
       {
         try? await voice.addContext(held.text)

@@ -95,9 +95,22 @@ actor FakeAudio: AudioSide {
   }
   func startListening() { calls.append("startListening") }
   func stopListening() { calls.append("stopListening") }
+  /// While set, the next offer waits for `releaseOffer()`, as the page takes a moment to make one.
+  var holdsOffer = false
+  private var heldOffers: [CheckedContinuation<Void, Never>] = []
+  var offerWaiting: Int { heldOffers.count }
+  func holdOffer() { holdsOffer = true }
+  func releaseOffer() {
+    for wait in heldOffers { wait.resume() }
+    heldOffers = []
+  }
   /// Whether each offer carried the pre-roll.
   var offers: [Bool] = []
-  func makeOffer(preroll: Bool) -> String {
+  func makeOffer(preroll: Bool) async -> String {
+    if holdsOffer {
+      holdsOffer = false
+      await withCheckedContinuation { heldOffers.append($0) }
+    }
     offers.append(preroll)
     return "offer"
   }
@@ -2019,6 +2032,22 @@ struct BridgeTests {
     await live()
     try await sync(b, "Fix Beta's build.")
     #expect(await voice.added.isEmpty)
+  }
+
+  /// `/clear` while the line connects: the session has a new id, and the seed is still its
+  /// conversation.
+  @Test func aClearWhileTheLineConnectsKeepsTheSeed() async throws {
+    try await join(a, "Alpha")
+    try await sync(a, "Fix the build.")
+    await bridge.perform(.start)
+    await audio.holdOffer()
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await audio.offerWaiting == 1 })
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
+    await audio.releaseOffer()
+    await opening.value
+    #expect(await voice.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
   }
 
   /// Claude's line is a seed item although its speaker is `.claude`, as an unheard result's is not.
