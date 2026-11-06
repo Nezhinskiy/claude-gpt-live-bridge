@@ -234,7 +234,7 @@ async function tick($: EngineInterface): Promise<void> {
   if (!link?.session) return  // it left, or was removed, while this poll waited its turn
   const hadGap = link.hasGap
   const reply = await link.next()
-  if (reply === REMOVED) return  // the link queued `removed`
+  if (reply === REMOVED || !link.session) return  // the link queued `removed`; a join may have met it
   if (hadGap && !link.hasGap) await save($)  // a join said it: a reload must not say it again
   if (!reply) {
     const now = await $.clock.now()

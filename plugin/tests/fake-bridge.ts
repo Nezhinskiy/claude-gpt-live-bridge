@@ -178,9 +178,14 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (route === 'sync' && world.syncStatus !== 200) {
       return { value: { status: world.syncStatus, ok: false, headers: {}, text: '{"error":"unknown session"}' } }
     }
-    // The app answers every call from a removed session so, its own joins included, until the owner joins it again.
+    // The app answers a removed session's calls so, its own joins included, until the owner joins it
+    // again. Two routes look the session up among the joined instead: `sync` finds none, 404, and
+    // `activity` ignores it, 200.
     if (world.removed.has(body?.sessionId ?? new URL(e.url).searchParams.get('sessionId') ?? '')) {
-      return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
+      if (route === 'sync') return { value: { status: 404, ok: false, headers: {}, text: '{"error":"unknown session"}' } }
+      if (route !== 'activity') {
+        return { value: { status: 410, ok: false, headers: {}, text: '{"error":"this session was removed from LiveBridge","code":"removed"}' } }
+      }
     }
     if (route === 'sync') {
       const held = world.decision?.turnId === body.turnId ? world.decision : null

@@ -459,6 +459,7 @@ test('aRemovalTheAnswerMeetsTurnsTheSessionOff', async ($, on) => {
   expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
 })
 
+/** The app answers the line 404, so the gap's join is what meets the removal: nothing is reopened. */
 test('aRemovalALineMeetsTurnsTheSessionOff', async ($, on) => {
   const world = fakeWorld(on)
   world.modVersion = '0.3.1'
@@ -471,7 +472,8 @@ test('aRemovalALineMeetsTurnsTheSessionOff', async ($, on) => {
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Nothing.' })
   await world.clock.advance(3000)
   expect(world.logs).toEqual(['Removed from LiveBridge. /live on joins again.'])
-  expect(world.take('join')).toEqual([])
+  expect(world.take('join').map(body => body?.owner)).toEqual([undefined])
+  expect(world.launches).toEqual([])
   expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('Voice is off')
 })
 
