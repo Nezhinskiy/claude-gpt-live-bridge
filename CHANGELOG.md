@@ -18,7 +18,10 @@ All notable changes to this project are listed here. The format follows
   prompt settled without the voice, or a turn that ends without an answer, reaches the voice as a line saying so. Typing does not wait on a stuck codex: the mod's hooks hold
   at most 200 ms for their posts. A voice answer a newer request superseded is no longer dropped: it is kept in the
   conversation, unsaid, and added to the open line as context. An older mod's sessions are treated
-  as missing turns, so their lines load a summary as before. A newer mod on an older app works but
+  as missing turns, so their lines load a summary as before. On such
+  a mod a voice turn that outlives its 10-minute request and gets a spoken reply loses its answer:
+  the reply opens no request, the answer is refused, and the mod says so in the session (traced, not
+  run). A newer mod on an older app works but
   differs: a question from a turn you typed goes to the voice too, in other sessions as well, and a
   spoken reply to it goes with nothing in flight, so the line can wait up to 120 seconds, billed,
   for no result (traced in the code, not run). Sync is delivered in part: still unchecked are the
@@ -78,7 +81,7 @@ All notable changes to this project are listed here. The format follows
   the plan lacks voice, and a new failing line for every word spoken. Answers keep waiting, and
   Start tries once more. So does a plan without voice, and the service's usage check on the line's
   data channel, which codex does not report; those are not called a limit, as nothing shows one.
-- The requirements, the site and the app's sign-in help now ask for a ChatGPT plan whose Codex
+- The requirements, the site and the app's help and hint now ask for a ChatGPT plan whose Codex
   includes voice, and the README names the plans OpenAI's pricing page lists, instead of "realtime
   voice", which no OpenAI page says.
 - A long conversation in a language other than English could stop a line from opening: the app
