@@ -32,6 +32,9 @@ All notable changes to this project are listed here. The format follows
 
 ### Fixed
 
+- The requirements now say Claude Code 2.1.301 or later. They said 2.1.289, but the mod's hooks do
+  not load on 2.1.296, so `/live` is not there; 2.1.301 is the lowest version checked that loads
+  the mod.
 - At the ChatGPT plan's usage limit the app now says so, in codex's sentence with its reset time
   where codex gives one, and ends the call, instead of "Realtime voice failed" or a wrong hint that
   the plan lacks voice, and a new failing line for every word spoken. Answers keep waiting, and

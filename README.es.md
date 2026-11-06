@@ -52,7 +52,7 @@ exactamente qué llega a OpenAI y nombra las peticiones de la aplicación a GitH
 
 ## Inicio rápido
 
-Necesitas macOS 14+ en Apple Silicon, Claude Code 2.1.289+ y [codex](https://github.com/openai/codex)
+Necesitas macOS 14+ en Apple Silicon, Claude Code 2.1.301+ y [codex](https://github.com/openai/codex)
 con sesión iniciada (`codex login`) en un plan de ChatGPT con voz en tiempo real; para compilar la
 aplicación tú mismo, también Xcode con Swift 6.0+. Los detalles están en
 [Requisitos](#requisitos).
@@ -83,7 +83,7 @@ del micrófono entre recompilaciones y la desinstalación están en [Instalació
 ## Requisitos
 
 - macOS 14 o posterior en Apple Silicon.
-- Claude Code 2.1.289 o posterior (mods).
+- Claude Code 2.1.301 o posterior.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, probado con 0.166.0), instalado con
   Homebrew (`brew install --cask codex`) o npm (`npm install -g @openai/codex`), en el `PATH` que
   tu shell define en una ventana de Terminal, y con sesión iniciada mediante `codex login` en un
