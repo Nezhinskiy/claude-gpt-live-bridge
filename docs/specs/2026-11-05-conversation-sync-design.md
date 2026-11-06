@@ -134,7 +134,9 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   (up to 120 s, billed); so the mod then tracks that turn as a voice turn, and its final answer is
   spoken like any voice turn's. With another voice request already waiting behind that turn, the
   answer is spoken as an update to it. Either way the turn's later lines name that request. Answered
-  at the keyboard, the turn stays typed and its answer is context: the owner is at the Mac.
+  at the keyboard, the turn stays typed and its answer is context: the owner is at the Mac. A voice
+  turn whose request timed out or went with an app restart is the same case: the app holds the reply
+  as the request, and the mod moves the turn onto it.
 - **Text typed into a running turn** (a `prompt.submit` with a `turnId`, voice turns included) is
   the owner's words and is synced as a typed owner line (my call).
 - **Only the owner's words are the owner's** (my call). A prompt from another agent, plugin or
@@ -177,7 +179,8 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   An older mod against a newer app (its join does not say it syncs) is not marked at all: the
   app asks the registry whether the session syncs (`Bridge.needsContext`, `SessionRegistry.syncs`),
   so each of its lines loads a summary as it does now. It reports only its voice turns and names
-  no turn, so what it reports is said as ever, and no pause refuses it.
+  no turn, so what it reports is said as ever, and no pause refuses it. A spoken reply opens no
+  request in its session: it could not move its turn onto one, so nothing would close it.
 - **No change to the permission boundary.** The approval notice from a typed turn is a notice; the
   mod still declares no `tool.check` hook.
 

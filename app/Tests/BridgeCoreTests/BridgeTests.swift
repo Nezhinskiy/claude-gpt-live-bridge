@@ -1837,6 +1837,53 @@ struct BridgeTests {
     #expect(try test.saved()[test.a].outOfSync == nil)
   }
 
+  /// The app restarted under a voice turn, whose request it forgot, and Claude asks. The reply is
+  /// the request now, and the turn's answer, which the mod moves onto it, closes it.
+  @Test func aReplyAfterARestartIsClosedByItsTurnsAnswer() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    let restarted = try test.restart()
+    try await restarted.join(test.a, "Alpha")
+    try await restarted.post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: test.a, state: .approval, question: "Which?",
+        turn: TurnRef(id: "voice-turn", request: test.request(1).id)))
+    let reply = test.request(2)
+    try await restarted.registry.enqueue(reply, for: test.a)
+    #expect(try await restarted.registry.poll(test.a) == .reply(reply, forRequest: reply.id))
+    let answered = try await restarted.post(
+      "/v1/answer",
+      AnswerBody(sessionId: test.a, id: reply.id, status: .ok, text: "Done.", reason: nil))
+    #expect(answered.status == 200)
+    try await restarted.registry.enqueue(test.request(3), for: test.a)
+    #expect(try await restarted.registry.poll(test.a) == .request(test.request(3)))
+  }
+
+  /// The same restart under a released mod: its answer goes under the forgotten request and is
+  /// refused, as before this app, and the session's next request is not held behind the reply.
+  @Test func aReplyAfterARestartLeavesAReleasedModsQueueFree() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha", syncs: nil)
+    try await test.registry.enqueue(test.request(1), for: test.a)
+    _ = try await test.registry.poll(test.a)
+    let restarted = try test.restart()
+    try await restarted.join(test.a, "Alpha", syncs: nil)
+    try await restarted.post(
+      "/v1/activity", ActivityBody(sessionId: test.a, state: .approval, question: "Which?"))
+    try await restarted.registry.enqueue(test.request(2), for: test.a)
+    _ = try await restarted.registry.poll(test.a)
+    let answered = try await restarted.post(
+      "/v1/answer",
+      AnswerBody(sessionId: test.a, id: test.request(1).id, status: .ok, text: "Done.", reason: nil)
+    )
+    #expect(answered.status == 409)
+    try await restarted.registry.enqueue(test.request(3), for: test.a)
+    #expect(try await restarted.registry.poll(test.a) == .request(test.request(3)))
+  }
+
   /// A `start` refused under the pause says nothing of the owner's: no answer is withheld.
   @Test func aRefusedStartWithholdsNoAnswer() async throws {
     let test = try BridgeTests(pausesSync: true)

@@ -19,8 +19,12 @@ struct SessionRegistryTests {
 
   init() { registry = SessionRegistry(time: time) }
 
-  func join(_ id: SessionID, _ title: String = "Example session", modVersion: String? = nil) async {
-    try? await registry.join(JoinBody(sessionId: id, title: title, modVersion: modVersion))
+  func join(
+    _ id: SessionID, _ title: String = "Example session", modVersion: String? = nil,
+    syncs: Bool? = nil
+  ) async {
+    try? await registry.join(
+      JoinBody(sessionId: id, title: title, modVersion: modVersion, syncs: syncs))
   }
 
   func request(_ n: Int) -> VoiceRequest {
@@ -160,13 +164,28 @@ struct SessionRegistryTests {
   /// A reply to a question the request in flight did not ask (a typed turn's) is itself the
   /// request in flight: its answer closes it.
   @Test func aReplyWithNothingInFlightGoesInFlight() async throws {
-    await join(a)
+    await join(a, syncs: true)
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
     try await registry.enqueue(request(2), for: a)
     #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
     #expect(await registry.hasOpenRequests)
     #expect(try await registry.complete(answer(request(2))).delivery?.text == "done")
     #expect(await !registry.hasOpenRequests)
+  }
+
+  /// A released mod asks only in voice turns, and its answer goes under that turn's request, here
+  /// timed out: nothing would close the reply, which must not hold the queue for ten minutes.
+  @Test func aReplyToAModThatDoesNotSyncOpensNoRequest() async throws {
+    await join(a)
+    try await registry.enqueue(request(1), for: a)
+    _ = try await registry.poll(a)
+    _ = await run(600)
+    await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
+    try await registry.enqueue(request(2), for: a)
+    #expect(try await registry.poll(a) == .reply(request(2), forRequest: request(2).id))
+    #expect(await !registry.hasOpenRequests)
+    try await registry.enqueue(request(3), for: a)
+    #expect(try await registry.poll(a) == .request(request(3)))
   }
 
   /// With a request in flight the reply is for that request, which its answer still closes.
@@ -186,7 +205,7 @@ struct SessionRegistryTests {
 
   /// A request queued after the reply is the newer one: only its answer is delivered.
   @Test func aReplyLeavesLatestToANewerQueuedRequest() async throws {
-    await join(a)
+    await join(a, syncs: true)
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval, question: "Which?"))
     try await registry.enqueue(request(2), for: a)
     try await registry.enqueue(request(3), for: a)

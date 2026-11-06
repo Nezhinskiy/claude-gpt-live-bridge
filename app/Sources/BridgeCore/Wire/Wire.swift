@@ -39,7 +39,7 @@ public struct VoiceRequest: Codable, Sendable, Equatable {
 public enum Work: Sendable, Equatable {
   case request(VoiceRequest)
   /// `forRequest`: the request the turn's answer belongs to, the one in flight once this reply
-  /// goes out.
+  /// goes out. With none in flight, for a mod that does not sync and does not read it, the reply.
   case reply(VoiceRequest, forRequest: RequestID)
   case context
 }
