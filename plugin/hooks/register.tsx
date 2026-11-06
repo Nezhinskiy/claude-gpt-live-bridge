@@ -472,7 +472,12 @@ async function promptSettled($: EngineInterface, text: string): Promise<void> {
   await trySave($)
   const turn = tracker.current
   if (turn) await postSync($, { turn, kind: 'report', text })
-  await link?.activity('working', under(turn))
+  await worksOn($)
+}
+
+/** The session works on, unless a prompt or Claude's question still waits: the app has one row for them. */
+async function worksOn($: EngineInterface): Promise<void> {
+  if (!tracker.isPrompting && answerQuestion === null) await link?.activity('working', under(tracker.current))
 }
 
 /** The tool ran, or failed, so the prompt for that very run was allowed. */
@@ -633,6 +638,8 @@ export const register: Register = on => {
     const answered = next(e)
     const spoken = new Promise<Reply>(resolve => { answerQuestion = resolve })
     try {
+      // The app says what waits only on a change to `approval`.
+      if (tracker.isPrompting) await link.activity('working', { turn })
       await link.activity('approval', {
         question: askedText(e.questions), ...wrote(tracker.takeStepText()), turn,
       })
@@ -648,6 +655,7 @@ export const register: Register = on => {
       return first
     } finally {
       await link?.activity('working', under(tracker.current))
+      if (tracker.isPrompting) await link?.activity('approval', under(tracker.current))
     }
   }).catch(($, e, next) => next(e))
 
@@ -659,7 +667,10 @@ export const register: Register = on => {
     if (turn !== null && link?.session && e.tool_name !== 'AskUserQuestion') {
       tracker.promptOpened(e.tool_name, e.tool_input, e.agent_id)
       await trySave($)
-      await link.activity('approval', { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })
+      // A bare approval would take back the open question, and the app would say nothing for it.
+      if (answerQuestion === null) {
+        await link.activity('approval', { ...(e.agent_id === undefined && wrote(tracker.takeStepText())), turn })
+      }
     }
     return next(e)
   }).catch(($, e, next) => next(e))
@@ -668,7 +679,7 @@ export const register: Register = on => {
   on('classic.PostToolUseFailure', async ($, e, next) => (await toolRan($, e), next(e)))
     .catch(($, e, next) => next(e))
   // Auto mode's refusal, not the person's: nothing to tell the voice but that it goes on.
-  on('classic.PermissionDenied', async ($, e, next) => (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id) && (await link?.activity('working', under(tracker.current))), next(e)))
+  on('classic.PermissionDenied', async ($, e, next) => (tracker.promptRan(e.tool_name, e.tool_input, e.agent_id) && (await worksOn($)), next(e)))
     .catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {

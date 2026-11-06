@@ -167,6 +167,11 @@ export class TurnTracker {
     return text
   }
 
+  /** Whether a permission prompt is open, in any agent. */
+  get isPrompting(): boolean {
+    return this.#prompts.length > 0
+  }
+
   /** A permission prompt in `agent` (absent: the main loop) is open for the tool's run on `input`. */
   promptOpened(tool: string, input: unknown, agent?: string): void {
     this.#prompts.push({ tool, input: JSON.stringify(input), ...(agent !== undefined && { agent }) })

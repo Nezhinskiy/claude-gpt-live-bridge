@@ -302,7 +302,7 @@ test('aQuestionAfterAnApprovalInTheSameStepGoesAlone', async ($, on) => {
   world.take('activity')
   const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
   await world.clock.advance(1000)
-  expect(world.take('activity')).toEqual([{ sessionId: ID, state: 'approval', question: PLAIN, turn: VOICE }])
+  expect(world.take('activity').at(-1)).toEqual({ sessionId: ID, state: 'approval', question: PLAIN, turn: VOICE })
   world.answerDialog('build')
   await asked
 })
@@ -737,6 +737,72 @@ test('aPromptOpenThroughAReloadIsStillSettled', async ($, on) => {
   expect(held).toMatchObject({ prompts: [{ tool: 'Bash' }] })
   await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'rm -r build' }, tool_response: {}, tool_use_id: 'u1' })
   expect(world.take('sync')).toHaveLength(1)
+})
+
+/** In a typed turn with Claude's question open; the lines and activity so far are taken. */
+async function atAQuestion($: Engine, world: ReturnType<typeof fakeWorld>) {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Clean up', turnId: 't1' })
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  world.take('activity')
+  world.take('sync')
+  return { asked }
+}
+
+/** The app has one row: a bare approval would take the question back and leave a spoken reply no way in. */
+test('aSubagentsPromptLeavesAnOpenQuestionAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  const { asked } = await atAQuestion($, world)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  expect(world.take('activity')).toEqual([])
+  world.answerDialog('out')
+  await asked
+})
+
+test('aPromptSettledWhileAQuestionIsOpenLeavesItAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  const { asked } = await atAQuestion($, world)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' }, tool_response: {}, tool_use_id: 'u1', agent_id: 'a1' })
+  expect(world.take('sync')).toHaveLength(1)
+  expect(world.take('activity')).toEqual([])
+  world.answerDialog('out')
+  await asked
+})
+
+test('aPromptSettledWhileAnotherIsOpenLeavesTheNotice', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  world.take('activity')
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' }, tool_response: {}, tool_use_id: 'u1', agent_id: 'a1' })
+  expect(world.take('activity')).toEqual([])
+})
+
+/** The app says what waits only on a change to `approval`: with the row there already, the question would reach nobody. */
+test('aQuestionWhileAPromptIsOpenIsAsked', async ($, on) => {
+  const world = fakeWorld(on)
+  await atAPrompt($, world)
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await aMoment()
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'working', turn: TYPED }, { sessionId: ID, state: 'approval', question: PLAIN, turn: TYPED },
+  ])
+  world.answerDialog('out')
+  await asked
+})
+
+test('aQuestionClosedWithAPromptOpenLeavesTheNotice', async ($, on) => {
+  const world = fakeWorld(on)
+  const { asked } = await atAQuestion($, world)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1' })
+  world.answerDialog('out')
+  await asked
+  expect(world.take('activity')).toEqual([
+    { sessionId: ID, state: 'working', turn: TYPED }, { sessionId: ID, state: 'approval', turn: TYPED },
+  ])
 })
 
 /** A plain No: only the turn's end comes (ADR 0001, item i). */

@@ -178,7 +178,11 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
 - When the keyboard wins the AskUserQuestion race, the mod posts the answer as a synced line.
   When a permission prompt settles, it posts that it was settled: allowed when that very run of the
   tool ran (same tool, input and agent), and otherwise only settled, once the next model step or the
-  end of the loop that asked shows the dialog is gone.
+  end of the loop that asked shows the dialog is gone. The app has one activity row for what waits,
+  and the mod holds every open prompt, so it posts `working` only when nothing else waits, no
+  `approval` while Claude's question is open, which would take the question back, and `working`
+  first when a question opens over a prompt, as the app says what waits only on a change to
+  `approval`.
   That line is the mod's report (`report`), not the owner's typing, so it goes as Claude's and
   never refuses a turn under the pause. So does a question closed with no answer; a keyboard answer
   to Claude's question is the owner's (`typed`). So does a turn that ends without an answer
