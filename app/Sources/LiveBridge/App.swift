@@ -96,6 +96,10 @@ final class AppModel {
   @ObservationIgnored let settings: SettingsStore
   @ObservationIgnored private var settingsWindow: SettingsWindow?
   @ObservationIgnored private var codexCwd: URL?
+  /// When codex's usage is read, and the last reading.
+  private(set) var limitsPoll = LimitsPoll()
+  /// The search path of the first usage read; looked up again only if codex is not on it.
+  @ObservationIgnored private var limitsSearchPath: [String]?
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
@@ -441,6 +445,38 @@ final class AppModel {
         voices = .failed("Codex did not list its voices: \(error.localizedDescription)")
       }
     }
+  }
+
+  /// Reads codex's usage in the background when `limitsPoll` says it is time; the menu follows
+  /// the poll when the reading lands. A failed read keeps the last reading.
+  func refreshLimits() {
+    guard let codexCwd, limitsPoll.begin(at: Date()) else { return }
+    let known = limitsSearchPath
+    Task {
+      let read = try? await Self.readLimits(cwd: codexCwd, searchPath: known)
+      if let read { limitsSearchPath = read.searchPath }
+      limitsPoll.finish(read?.limits)
+    }
+  }
+
+  /// Codex's usage as last read, nil once it is stale.
+  func codexLimits(at now: Date) -> UsageLimits? { limitsPoll.reading(at: now) }
+
+  /// The usage, from a codex app-server started for the question and ended after it. The login
+  /// shell's search path is asked for once, not at every menu open.
+  nonisolated private static func readLimits(cwd: URL, searchPath known: [String]?) async throws
+    -> (limits: UsageLimits, searchPath: [String])
+  {
+    var path = known ?? []
+    var codex = known.flatMap { CodexLaunch.locate(searchPath: $0) }
+    if codex == nil {
+      path = await CodexLaunch.defaultSearchPath()
+      codex = CodexLaunch.locate(searchPath: path)
+    }
+    guard let codex else { throw CodexProblem.notInstalled }
+    let client = try await CodexLaunch.launch(codex: codex, cwd: cwd, searchPath: path)
+    defer { Task { await client.close() } }
+    return (try await CodexLimits.read(client: client, now: Date()), path)
   }
 
   /// A fresh codex app-server for the voice, launched with every feature but `CodexLaunch.allowed`

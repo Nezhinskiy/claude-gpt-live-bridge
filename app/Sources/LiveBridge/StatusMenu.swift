@@ -28,6 +28,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var rows: [SessionID: HostedItem<SessionRowView>] = [:]
   private var transcript: ScrollingItem<TranscriptView>?
   private var sent: HostedItem<SentView>?
+  private var limits: [String: HostedItem<LimitRowView>] = [:]
   /// What a hosted session row's item is, for the menu's highlight.
   private var rowKeys: [ObjectIdentifier: String] = [:]
   /// Actions that wait until the menu has closed and its tracking has ended, as an alert does.
@@ -71,7 +72,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var content: MenuContent {
     MenuContent(
       update: model.update, problem: model.problem, contextLoad: model.contextLoad,
-      available: model.available?.version)
+      available: model.available?.version, codexLimits: model.codexLimits(at: Date()),
+      claudeLimits: model.update?.claudeLimits)
   }
 
   /// Renders the model's current content, and again whenever it changes. Only the content is
@@ -95,6 +97,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     rows = rows.filter { used.contains("row|\($0.key.rawValue)") }
     if !used.contains("transcript") { transcript = nil }
     if !used.contains("sent") { sent = nil }
+    limits = limits.filter { used.contains("limit|\($0.key)") }
     rowKeys = Dictionary(
       uniqueKeysWithValues: rows.map { (ObjectIdentifier($0.value.item), "row|\($0.key.rawValue)") }
     )
@@ -176,11 +179,13 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         sent = row
         return row.item
 
-      case .limit(let row):
-        let item = native("\(path)|limit|\(row.name)", used: &used) { NSMenuItem() }
-        item.title = "\(row.name)  \(row.text)"
-        item.isEnabled = false
-        return item
+      case .limit(let shown):
+        used.insert("limit|\(shown.name)")
+        let view = LimitRowView(row: shown)
+        let row = limits[shown.name] ?? HostedItem(view, enabled: false)
+        row.show(view)
+        limits[shown.name] = row
+        return row.item
       }
     }
     sync(menu, built)
@@ -273,6 +278,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   func menuNeedsUpdate(_ menu: NSMenu) {
     guard menu === self.menu else { return }
+    model.refreshLimits()
     show(content)
   }
 

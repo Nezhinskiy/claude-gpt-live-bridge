@@ -238,6 +238,40 @@ struct SentView: View {
   }
 }
 
+/// One source's usage: its name, then a figure per window, orange when near its limit, then
+/// "blocked". A blocked row is orange whole. The tooltip has the reset times.
+struct LimitRowView: View {
+  let row: LimitRow
+
+  var body: some View {
+    line
+      .font(MenuStyle.subtitle)
+      .foregroundStyle(row.isBlocked ? Color.orange : .secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, MenuStyle.inset)
+      .padding(.vertical, 2)
+      .help(row.tooltip)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel("\(row.name) \(row.text)")
+  }
+
+  /// The name and the figures as one text, each figure its own colour.
+  private var line: Text {
+    var parts: [Text] = [Text(row.name + "  ")]
+    for (index, figure) in row.figures.enumerated() {
+      if index > 0 { parts.append(Text(" · ")) }
+      let hot = figure.isNear || row.isBlocked
+      parts.append(Text(figure.text).foregroundStyle(hot ? Color.orange : .secondary))
+    }
+    if row.isBlocked {
+      if !row.figures.isEmpty { parts.append(Text(" · ")) }
+      parts.append(Text("blocked"))
+    }
+    return parts.reduce(Text(""), +)
+  }
+}
+
 extension View {
   /// The card's buttons: Liquid Glass capsules where the system has them (macOS 26 and later),
   /// bordered capsules before. Small, as controls in a menu are.
