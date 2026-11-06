@@ -53,7 +53,7 @@ GitHub, нет ли нового выпуска (раз в день, а такж
 
 ## Быстрый старт
 
-Нужны macOS 14+ на Apple Silicon, Claude Code 2.1.289+ и
+Нужны macOS 14+ на Apple Silicon, Claude Code 2.1.301+ и
 [codex](https://github.com/openai/codex) с входом (`codex login`) в план ChatGPT с
 realtime-голосом; чтобы собрать приложение самому, ещё Xcode со Swift 6.0+. Подробности — в
 разделе [«Требования»](#требования).
@@ -84,7 +84,7 @@ scripts/build-app.sh --release
 ## Требования
 
 - macOS 14 или новее на Apple Silicon.
-- Claude Code 2.1.289 или новее (моды).
+- Claude Code 2.1.301 или новее (моды).
 - [Codex CLI](https://github.com/openai/codex) (`codex`, проверено с 0.166.0), установленный через
   Homebrew (`brew install --cask codex`) или npm (`npm install -g @openai/codex`), в `PATH`,
   который ваша оболочка задаёт в окне Terminal, с входом через `codex login` в план ChatGPT, в

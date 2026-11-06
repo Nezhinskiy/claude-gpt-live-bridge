@@ -44,7 +44,7 @@ Claude Code。应用与模组之间通过只有你的用户才能打开的 Unix 
 
 ## 快速开始
 
-你需要 Apple Silicon 上的 macOS 14+、Claude Code 2.1.289+，以及已登录（`codex login`）到包含实时语音的 ChatGPT 套餐的
+你需要 Apple Silicon 上的 macOS 14+、Claude Code 2.1.301+，以及已登录（`codex login`）到包含实时语音的 ChatGPT 套餐的
 [codex](https://github.com/openai/codex)；若要自行构建应用，还需要带 Swift 6.0+ 的 Xcode。详情见
 [系统要求](#系统要求)。
 
@@ -70,7 +70,7 @@ scripts/build-app.sh --release
 ## 系统要求
 
 - Apple Silicon 上的 macOS 14 或更高版本。
-- Claude Code 2.1.289 或更高版本（支持模组）。
+- Claude Code 2.1.301 或更高版本（支持模组）。
 - [Codex CLI](https://github.com/openai/codex)（`codex`，已在 0.166.0 上测试），通过
   Homebrew（`brew install --cask codex`）或 npm（`npm install -g @openai/codex`）安装，位于你的 shell 在终端窗口中设置的
   `PATH` 上，并已用 `codex login` 登录到包含实时语音的 ChatGPT 套餐。如果 LiveBridge 无法读取某个 codex 的

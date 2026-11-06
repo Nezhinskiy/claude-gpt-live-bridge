@@ -52,7 +52,7 @@ line खुली हो, और Claude का काम आपके Claude Cod
 
 ## त्वरित शुरुआत
 
-आपको चाहिए: Apple Silicon पर macOS 14+, Claude Code 2.1.289+, और [codex](https://github.com/openai/codex),
+आपको चाहिए: Apple Silicon पर macOS 14+, Claude Code 2.1.301+, और [codex](https://github.com/openai/codex),
 जिसमें `codex login` से ऐसे ChatGPT plan पर sign in किया गया हो जिसमें realtime voice शामिल है;
 app को खुद build करने के लिए Swift 6.0+ वाला Xcode भी। विवरण [आवश्यकताएँ](#आवश्यकताएँ) में हैं।
 
@@ -82,7 +82,7 @@ Update, अनुमतियाँ, नए build के बाद भी microp
 ## आवश्यकताएँ
 
 - Apple Silicon पर macOS 14 या उसके बाद का संस्करण।
-- Claude Code 2.1.289 या उसके बाद का संस्करण (mods)।
+- Claude Code 2.1.301 या उसके बाद का संस्करण (mods)।
 - [Codex CLI](https://github.com/openai/codex) (`codex`, 0.166.0 के साथ टेस्ट किया गया), जो
   Homebrew (`brew install --cask codex`) या npm (`npm install -g @openai/codex`) से install हो,
   Terminal window में आपके shell द्वारा सेट किए गए `PATH` पर हो, और `codex login` से ऐसे ChatGPT plan
