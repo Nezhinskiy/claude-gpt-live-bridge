@@ -83,7 +83,7 @@ del micrófono entre recompilaciones y la desinstalación están en [Instalació
 ## Requisitos
 
 - macOS 14 o posterior en Apple Silicon.
-- Claude Code 2.1.301 o posterior (mods).
+- Claude Code 2.1.301 o posterior.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, probado con 0.166.0), instalado con
   Homebrew (`brew install --cask codex`) o npm (`npm install -g @openai/codex`), en el `PATH` que
   tu shell define en una ventana de Terminal, y con sesión iniciada mediante `codex login` en un

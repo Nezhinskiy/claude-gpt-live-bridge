@@ -88,7 +88,7 @@ sous [Installation](#installation).
 ## Prérequis
 
 - macOS 14 ou ultérieur sur Apple Silicon.
-- Claude Code 2.1.301 ou ultérieur (mods).
+- Claude Code 2.1.301 ou ultérieur.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, testé avec 0.166.0), installé avec
   Homebrew (`brew install --cask codex`) ou npm (`npm install -g @openai/codex`), présent dans le
   `PATH` que votre shell définit dans une fenêtre Terminal, et connecté avec `codex login` à une

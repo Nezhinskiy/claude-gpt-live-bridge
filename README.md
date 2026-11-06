@@ -80,7 +80,7 @@ rebuilds and uninstalling are under [Install](#install).
 ## Requirements
 
 - macOS 14 or later on Apple Silicon.
-- Claude Code 2.1.301 or later (mods).
+- Claude Code 2.1.301 or later.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, tested with 0.166.0), installed with
   Homebrew (`brew install --cask codex`) or npm (`npm install -g @openai/codex`), on the `PATH`
   your shell sets in a Terminal window, and signed in with `codex login` to a ChatGPT plan that

@@ -84,7 +84,7 @@ scripts/build-app.sh --release
 ## Вимоги
 
 - macOS 14 або новіша на Apple Silicon.
-- Claude Code 2.1.301 або новіший (моди).
+- Claude Code 2.1.301 або новіший.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, перевірено з 0.166.0), встановлений через
   Homebrew (`brew install --cask codex`) або npm (`npm install -g @openai/codex`), у `PATH`,
   який ваша оболонка задає у вікні Terminal, з виконаним входом через `codex login` у план

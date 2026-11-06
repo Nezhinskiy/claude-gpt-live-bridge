@@ -82,7 +82,7 @@ Update, अनुमतियाँ, नए build के बाद भी microp
 ## आवश्यकताएँ
 
 - Apple Silicon पर macOS 14 या उसके बाद का संस्करण।
-- Claude Code 2.1.301 या उसके बाद का संस्करण (mods)।
+- Claude Code 2.1.301 या उसके बाद का संस्करण।
 - [Codex CLI](https://github.com/openai/codex) (`codex`, 0.166.0 के साथ टेस्ट किया गया), जो
   Homebrew (`brew install --cask codex`) या npm (`npm install -g @openai/codex`) से install हो,
   Terminal window में आपके shell द्वारा सेट किए गए `PATH` पर हो, और `codex login` से ऐसे ChatGPT plan
