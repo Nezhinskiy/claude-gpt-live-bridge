@@ -573,3 +573,259 @@ time" (R-33). The rest stand. The `isCurrent` one, tasks not counted, is real bu
 The wire change above is worth deciding before release, while the shape is free. It is not a
 condition of this merge, but R-13 and R-18 go with it. S-1 to S-8 and the duplicate tests are the
 cheap way to take about 150 lines off while those files are open.
+
+## Re-review at `677dbf9`
+
+Scope: `git diff c482d4b..677dbf9`, past PR 39's files: 14 source files, +557 -320, and 17 test
+files, +1305 -481. Report only.
+
+**Verdict: not ready. Three things block, all small: Re-1, Re-2, Re-3.** Nothing is Critical. The
+fix round did what it set out to do: R-1 to R-7 and R-11 hold, and the wire change is the right
+one. The blockers are one defect from the PR, a test gap on the moved route, and docs that now claim
+more than the code does.
+
+### How this was checked
+
+- Swift 581 pass on an export of `677dbf9`. On a copy, mod unit 70 and engine 176 pass.
+  `check` passes in CI at this head, and CodeQL's Swift analysis was still running when read.
+- My probes, ported to the new wire: `p1`, `p2`, `p3`, `p4`, `p5`, `p6`, `p7`, `p9`, `p10`, `p11`
+  now pass. `p8` still fails: eviction loses a paused mark, a limit `SECURITY.md` states.
+- `repro.test.tsx`, unchanged, on the harness: all fixed. A says "settled", not "allowed". B claims
+  nothing. C and D write a fresh summary after a gap. E keeps the poll's work. G fails the reply
+  and leaves the second question open. N sends no activity under an open question.
+- Redaction, through `AnswerShaper.synced`: 16 KB of hex takes 0.00 s, down from 18.67 s, and
+  128 KB takes 0.04 s. The worst text found at the mod's 32,000 limit is `eyJ-` repeated, 1.23 s,
+  then a PEM header repeated, 0.45 s. So the PR's 1.2 s and 0.4 s are right.
+- Mutations of the new lines: Swift 47 of 66 caught, mod 45 of 50. R-11's mutation is now caught
+  by `anOtherSessionsLineStaysOffTheOpenLine`.
+- Two independent readers, given the code and not this review, one on the app and wire and one on
+  the mod and the removed tests. I reran their probes. Each finding says if it was only read.
+- Not run: voice, `scripts/smoke.sh`, the desktop app, `/Applications`. One reader made a single
+  `claude -p --model haiku` call to compare real hook payloads, which spent a few tokens; nobody
+  asked for that, and it is disclosed here.
+
+### What the fix round settled
+
+| Finding | State at `677dbf9` |
+|---|---|
+| R-1, R-2 | Fixed, for the menu and `POST /v1/target` by one path (`pickTarget`). `p1`, `p2`, `p7` pass. A waiting question leaves the queue and stays recorded for its session's seed. |
+| Route at a pause | A pause keeps a route only while its question waits (`CallMachine.pause`). Behaviour right; its test cannot fail (Re-2). |
+| R-3 | Fixed: the voice is given it to say (`p10`). The owner's rerun shows it did not change line 6, which the PR says plainly. |
+| R-4 | Fixed: a `report` line for every non-voice turn with no answer. |
+| R-5 | Fixed for the app's own asks (`p3`, `p11`). The corner is in Re-5. |
+| R-6, R-19 | Fixed: prompts held by agent, tool and input. Reproductions A, B and N agree. |
+| R-7, R-47 | Fixed, see the timings above. |
+| R-11 | Fixed. |
+| R-12, R-13, R-18, R-40, R-41 | Closed by the wire change. `p5` passes. |
+| R-15, R-16, R-17 | Fixed; R-17 by half, as the PR says. |
+| S-1 to S-8 | All done, checked in the code. |
+
+**The wire.** `Wire.swift`, `wire.ts` and the fixtures agree. An older mod works as the spec says:
+`git show origin/main:plugin/hooks/register.tsx` reports only voice turns, with no `turn`, so
+nothing refuses it, and `syncs` false keeps asking for a summary. The exception is Re-1.
+
+**Permission prompts.** The boundary holds. No hook in `plugin/hooks` returns a decision, a
+`report` line cannot refuse or answer anything, and `AskUserQuestion` stays the only tool a spoken
+reply can resolve.
+
+**A local client on the socket.** Nothing new of weight. `kind: typed` with `turn.request` lets a
+peer withhold a request under the pause, and `POST /v1/target` lets it drop a waiting question.
+Both are within what a same-user peer could already do. Redaction's bound leaves a key name over
+64 characters past the keyword unmasked, which is fine.
+
+### Important
+
+**Re-1. A spoken reply can create a request nothing answers.** `SessionRegistry.swift:169`,
+`plugin/hooks/turns.ts:250`. CONFIRMED, by a reader's probe and its control, rerun here. New in this
+PR, not in this round: `main` has no such line, and my first review missed it.
+Scenario: a voice turn runs past the 10-minute request timeout, as a long turn does, then Claude
+asks and the owner answers by voice. `poll` finds nothing in flight, so the reply becomes the
+request in flight. `replied` returns at once because the turn is a voice turn, so the turn's answer
+still goes under the timed-out request and gets 409. The phantom then holds every later voice
+request in that session for up to 10 minutes, with nothing said. The control, with the request
+still in flight, passes. The tracker should take the new id when `forRequest` is not its own. A
+released mod has no `replied`, and fails the same way against this app (traced, not run). An app
+restart mid-turn should do the same (not run).
+
+**Re-2. The route moved into `CallMachine`, and its tests do not hold it.** `CallMachine.swift:178`,
+`BridgeTests.swift:1120,1135`, `Bridge.swift:640,653`. CONFIRMED by mutation, repeated serially.
+`CallMachineTests` has no route test at all. These survive all 581 tests:
+
+- Dropping `line.asks`: any result routes the next handoff to its session, the wrong-session bug
+  this round closed.
+- `endSaidQuestionRoutes()` removed from `pause`. `aQuestionAlreadySaidLeavesNoRoute` cannot fail:
+  `poll(a) != nil` at `:1135` is met by a `.context` poll before the handoff lands, and then
+  `poll(b) == nil` passes too. It must expect `.request(request(2))`.
+- `.first` for `.last`, no dedupe, popping one route instead of all, no `rename`: the stack's own
+  rules, and the survival of a route across `/clear`.
+- `Bridge.swift:653` without `turn.request == nil`: a voice turn's question in a non-target session
+  from today's mod would be recorded only. The spec says it keeps today's behaviour, and every test
+  of that path sends no `turn`, which only a released mod does.
+- `Bridge.swift:640` deciding on `working` and `idle` too, which could leave a settled question
+  unwithdrawn.
+
+These are this review's focus and the fix for R-1, so a pure test of each belongs in this PR. It
+is about 40 lines.
+
+**Re-3. The docs promise the behaviour the round removed.** `SECURITY.md:218-219`,
+`CHANGELOG.md:25-27`, `README.md:273-274`. CONFIRMED, `n5`. See "The pause" below. `SECURITY.md`
+says a waiting request "is withheld as well", the changelog says "(or waiting behind it)", and the
+README says typing fails a request "in flight in that session", which is what a waiting request is.
+`n5`: a request polled before Stop, a refused typed turn, and its answer quoting the paused text is
+recorded with the call off. AGENTS.md: docs never claim more than the code enforces. Also still open
+from the first review, and the orchestrator's to apply with this: R-9 (`README.md:301,311`,
+`CHANGELOG.md:16`), R-10 (`README.md:304`), and R-29's line, which the PR says the docs must carry
+and `SECURITY.md` does not.
+
+### The pause and a waiting request
+
+Consistent with the setting's promise once Re-3 is fixed. `SECURITY.md:212` already says a later
+turn's answer can quote paused text, and that is what this is: the session holds the text, whatever
+the voice was told. The difference from a later request is real, though. A later request is one
+the owner makes after the pause; a waiting one was made before the text was typed, so its answer
+arrives unasked and goes into the seed with the call off. I would keep the new behaviour: the old
+one cost a false failure (R-13). The docs should state that difference in one sentence.
+
+### Is R-5's corner described truthfully?
+
+Mostly, and it reaches a little further. Rerun as `n1` and `n2`.
+
+- The PR's "a 60 s window on an explicit command" is true.
+- `docs/specs/2026-11-05-conversation-sync-design.md:168` says the chain needs "a line, Stop and
+  typing". It does not: `n1` needs only the pause on, the call off, and typing during the owner's
+  own `/live context`.
+- It is also narrower than stated: a refused turn's later line marks `paused` again, so the mark
+  stays cleared only if the turn's last line lands before the summary.
+- It reaches further than the paused mark: `n2`, a `/live context` crossing **New conversation**,
+  brings back what was forgotten. The spec's general sentence covers this, but neither the PR nor
+  `SECURITY.md:228` says so.
+
+Accepting the corner is reasonable. These are Re-5, words only.
+
+### The removed tests
+
+No behaviour lost its only test to the deletions. A reader mapped all 19 to the test that still
+pins each (8 Swift, 9 tracker, 2 limits) and mutated each line; the table is in the proofs folder.
+The PR's claim holds. Five more went in the same round with successors or with their getter: four
+`aSnapshotThatFails…` and `onlyARunningVoiceTurnIsRunning`.
+
+Two near misses:
+
+- A rename, not a deletion, lost one: `aRefusedClaudeLineWithholdsNoAnswer` became
+  `aRefusedStartWithholdsNoAnswer`, so nothing pins `body.kind == .typed` at `Bridge.swift:706`
+  against `answer` or `report` (Re-11).
+- `aWeekOnlyListIsSent` was the only guard of `register.tsx:599`'s `five_hour` gate, for a line
+  that does not exist today. Harmless.
+
+### The PR's rejections
+
+| Finding | Rejection | My view |
+|---|---|---|
+| R-24 | Narrow | Agree on the code. `SECURITY.md:221-222` names slash commands only; a voice turn starting in between does the same. One clause. |
+| R-25 | Unobserved | Agree: a wrong guess withdraws a live question. |
+| R-29 | A change of its own | Agree it need not be fixed here, but the docs must list it, which is Re-3. |
+| R-42 | Taste | Half. The route-while-off mutant is now caught. `activity no decision save` still survives, and the rest moved into Re-2. |
+| R-44 | Price of the harness | Agree. `fake-bridge.ts` tracks the rewritten `admits` line for line at this head. |
+| R-45 | Taste | Agree. The new mod's only extra against an older app is an unknown field. |
+| R-46 | Taste | Mild disagreement: AGENTS.md says one behaviour, one test, so it is a rule. The three named tests remain. Not a blocker. |
+
+### Minor
+
+**Re-4. A second ask keeps the first's clock and stale bit.** `Continuity.swift:118-125`. CONFIRMED,
+`n3` and a reader's probes. An ask lives 120 s and the mod gives up at 60 s. Ask, gap, the mod drops
+its send, press again at 70 s: the fresh summary is ignored, a model call is spent, and the menu
+says Loading until it times out. Asks at 0 s and 100 s, gap at 125 s, summary at 130 s: taken,
+though asked before the gap. `/live context` meanwhile says "Sent a summary" for one the app
+dropped.
+
+**Re-5. R-5's corner is worded too narrowly and too widely.** See above.
+
+**Re-6. An ask is not saved.** `Bridge.swift:178`. CONFIRMED by probe. Press Load context, restart,
+type under the pause: the summary finds no ask, is taken and clears `paused`.
+
+**Re-7. A held summary is lost across `/clear`.** `Bridge.swift:419`. CONFIRMED by probe. This
+round's `lineSession` comparison: `heldContext.session` keeps the old id, so the line never gets the
+summary while the stored context says it has.
+
+**Re-8. A hook saves between reading state and taking its queue slot.** `register.tsx:499,704`.
+CONFIRMED on the harness, probes P1 and P2; engine timing not observed. A question's hook can run
+inside that save: the bare `approval` or a `working` then lands last and takes the question back,
+so a spoken reply queues behind the blocked turn. Take the slot first, then save.
+
+**Re-9. `/live off` can be undone by a save in flight.** `register.tsx:90-93`. CONFIRMED on the
+harness, P3. A regression from `6ee807c`: the key is read, `turnCount` is awaited, then `set` writes
+back a key the leave deleted, and a reload joins with no owner action. Read the count first.
+
+**Re-10. A fresh ask joins a send a gap ended.** `register.tsx:389`. CONFIRMED on the harness, P4.
+`sending` stays set until the dead send returns, so the ask fails with "could not summarise".
+
+**Re-11. Which request a refusal withholds.** `Bridge.swift:706`, `SessionRegistry.swift:204`.
+CONFIRMED by probe and mutation. See the near miss above. Also, a typed turn that names R0 after a
+spoken reply withholds R0, whose own answer then fails, where the spec's "the request the turn names
+closes" and "only waits behind keeps its answer" collide. Pick one sentence.
+
+**Re-12. A lost question can note no gap.** `Bridge.swift:637`, `link.ts:134`. Read, not run. An app
+just restarted answers `activity` 200 for a session it does not know, so the mod takes it as
+delivered. `6f893e8`'s "the app did not take it" holds only for an unreachable app.
+
+**Re-13. A reload drops queued posts with no gap.** `register.tsx:614,648-649`. Traced, not run. The
+snapshot is saved before the post is queued. The old code lost posts the same way, in a shorter
+window.
+
+**Re-14. `classic.PermissionDenied` is unpinned.** `register.tsx:716-722`. CONFIRMED. Rewritten this
+round, no `save` after `promptRan`, and a no-op of the handler fails no test; neither does removing
+the `PostToolUseFailure` settle at `:713`, or dropping `nothingWaits()`.
+
+**Re-15. The snapshot stores whole tool inputs.** `turns.ts:153`. Read. A large Write or a command
+with a secret sits in the mod's store until the prompt settles, and past the store's cap the
+`.catch` hides the failure. A hash matches as well. The input is in the session's transcript anyway.
+A prompt with its input rewritten keeps the row on `approval` through the run and then says
+"settled", as the PR says; one reader's real run saw Edit, Write and Bash inputs byte-identical on
+both hooks, so it takes a real rewrite.
+
+**Re-16. `hasOpenRequest` ignores `reply`.** `SessionRegistry.swift:81`. CONFIRMED by probe, new in
+this PR. A reply to a typed turn's question, not yet polled, and the session leaves: no failure is
+said, and by reading the line then waits out its 120 s.
+
+**Re-17. Other mutations that survive.** Waiting approvals of a dropped session (both ways); an auto
+ask not noted, so R-5's fix is pinned for the menu only; `askLife` halved; `lineKnowsSession` in
+`addSynced` and in `onOwnLine`; `tasks` by the old session; `promptGone` once; step text over a
+question; a saved snapshot's `at(-1)`. One mod survivor is equivalent: `post` and `sync` are never
+both set.
+
+### Is it elegant? Is anything redundant?
+
+**Yes, more than at `c482d4b`.** The app has a real turn now, which was the root of most findings:
+`typedTurn`, `isAnswerWithheld`, the `hasOpenRequest` guess and `activity`'s second check are gone,
+and a refusal names exactly its request. The route in the pure machine is at the right height. The
+wire cost net +39 lines, so my "likely a net deletion" was wrong, and the result is still worth it.
+
+One piece has the old disease: the summary has no date. `SummaryAsk`, `askLife` and the stale bit
+are about 35 lines of guessing which ask a summary answers, and Re-4, Re-5, Re-6 and the corner all
+come from that. The same cure as the turn: while the wire is free, the app puts a generation in
+what the mod reads, bumped at each gap and forget, and the mod echoes in `ContextBody` the value it
+read when it started writing. That dates `/live context` too, and all of the above goes. **Worth
+deciding before release, not a condition of this merge.**
+
+Redundant, small:
+
+- `sync`'s `guard admitted, await addSynced(…) else { save(); return }` hides a plain `if`.
+- `pause` carries `questionRoutes` around `end` as it does `unheard`; `end` could keep both.
+- `.deliver` has two facts the bridge computes. Fine for now; a third wants a struct.
+
+Nothing large is left to remove. The two queues, `inOrder` and `serial`, earn their place: the
+comment's reason is right.
+
+### Verdict at `677dbf9`
+
+**Not ready. Fix in this order:**
+
+1. Re-1, a few lines in the tracker and a test.
+2. Re-2, about 40 lines of tests, one of them correcting a test that cannot fail.
+3. Re-3 with R-9, R-10 and R-29's line, words.
+
+Worth taking with those, as each is a line or two: Re-8, Re-9, Re-6, Re-7. The rest can follow.
+
+Still open and the owner's alone, unchanged: one typed prompt in the real desktop app (R-10), a real
+model on this branch, Load context in the real menu, and the voice's announcement of a permission
+prompt, 0 of 3 before the keyboard answer.
