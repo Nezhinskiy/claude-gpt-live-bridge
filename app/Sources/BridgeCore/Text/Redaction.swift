@@ -18,7 +18,7 @@ public enum Redaction {
     (#"\b(Bearer|Basic)\s+(?=[A-Za-z]*[0-9._~+/=-])[A-Za-z0-9._~+/=-]{8,}"#, "$1 \(mask)"),
     (#"(://)[^/\s:@]+:[^/\s@]+@"#, "$1\(mask)@"),  // URL userinfo
     (
-      #"(?i)([A-Za-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*["']?)[^\s"',;]+"#,
+      #"(?i)([A-Za-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key)[A-Za-z0-9_-]*["']?\s*[:=]\s*["']?)[^\s"',;]+"#,
       "$1\(mask)"
     ),
   ].map { (try! NSRegularExpression(pattern: $0.0), $0.1) }

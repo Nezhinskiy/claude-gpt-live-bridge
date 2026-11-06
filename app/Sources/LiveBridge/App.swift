@@ -160,7 +160,8 @@ final class AppModel {
         continuityFile: data.appending(path: "continuity.json"), time: time, notifier: notifier,
         notifies: { settings.current.notifyResults },
         confirmsHandoffs: { settings.current.confirmHandoffs },
-        autoContext: { settings.current.autoContext }, appVersion: appVersion)
+        autoContext: { settings.current.autoContext },
+        pausesSync: { settings.current.pauseSyncWhileStopped }, appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge
       self.server = server

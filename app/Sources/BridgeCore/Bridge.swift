@@ -18,6 +18,8 @@ public actor Bridge: Router {
   private let confirmsHandoffs: @Sendable () -> Bool
   /// Settings' "Load context automatically", read each time a line opens.
   private let autoContext: @Sendable () -> Bool
+  /// Settings' "Pause sync while the call is stopped", read at each synced line and join.
+  private let pausesSync: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -64,13 +66,15 @@ public actor Bridge: Router {
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
-    autoContext: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
+    autoContext: @escaping @Sendable () -> Bool = { false },
+    pausesSync: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
     self.confirmsHandoffs = confirmsHandoffs
     self.autoContext = autoContext
+    self.pausesSync = pausesSync
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -228,6 +232,10 @@ public actor Bridge: Router {
           if questionRoute == old { questionRoute = body.sessionId }
           save()
         }
+        if body.missed == true {
+          continuity.markMissed(body.sessionId, asPaused: pausesSync())
+          save()
+        }
         if problem == .noSession { problem = nil }
       case ("POST", "/v1/leave"):
         let delivery = await registry.leave(try req.decodeBody(LeaveBody.self).sessionId)
@@ -237,6 +245,7 @@ public actor Bridge: Router {
         if let delivery = try await registry.complete(body) { await deliver(delivery) }
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
+      case ("POST", "/v1/sync"): try await sync(try req.decodeBody(SyncBody.self))
       case ("POST", "/v1/target"):
         try await registry.setTarget(try req.decodeBody(TargetBody.self).sessionId)
       case ("POST", "/v1/call"): await perform(try req.decodeBody(CallBody.self).action)
@@ -349,12 +358,16 @@ public actor Bridge: Router {
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer(preroll: preroll)
-      // only the session's own conversation, context and open tasks: never another session's
-      let conversation = session.map { continuity[$0] } ?? Conversation()
       let tasks = if let session { await registry.openTasks(of: session) } else { [String]() }
+      try Task.checkCancellation()
+      // No await from here to `dropSynced()`: a synced line lands in the seed or in the hold,
+      // never both, and a stale attempt cannot drop a newer line's hold. Only the session's own
+      // conversation, context and open tasks: never another session's.
+      let conversation = session.map { continuity[$0] } ?? Conversation()
       let items = conversation.initialItems(
         tasks: tasks, unheard: Set(machine.pending.map(\.text)))
       seededContext = conversation.context
+      machine.dropSynced()
       let answer = try await voice.open(offerSDP: offer, items: items)
       try Task.checkCancellation()
       try await audio.applyAnswer(answer)
@@ -570,6 +583,22 @@ public actor Bridge: Router {
     case .connecting: heldContext = line
     default: break
     }
+  }
+
+  /// A line of a turn that is not a voice request. It is kept in its session's conversation if
+  /// `Continuity.admits` takes it (the pause setting with the call off refuses it, and marks the
+  /// session paused); the open line about that session is given it at once, as context.
+  private func sync(_ body: SyncBody) async throws {
+    let id = body.sessionId
+    let row = try await label(of: id)
+    let pausing = pausesSync() && machine.phase == .off
+    let admitted = continuity.admits(turn: body.turnId, from: body.from, in: id, pausing: pausing)
+    defer { save() }  // the turn's decision persists, an empty line's included
+    guard admitted,
+      let line = AnswerShaper.synced(body.text, from: body.from, label: row.label, session: id)
+    else { return }
+    continuity.record(body.from == .owner ? .owner : .claude, line.text, in: id)
+    if lineKnowsSession, lineSession == id { await send(.synced(line)) }
   }
 
   private func sweep() async {

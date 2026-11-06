@@ -24,6 +24,15 @@ struct SettingsStoreTests {
     #expect(!SettingsStore(file: file).current.autoContext)
   }
 
+  @Test func pauseSyncDefaultsOff() throws {
+    #expect(!Settings().pauseSyncWhileStopped)
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
+    #expect(!SettingsStore(file: file).current.pauseSyncWhileStopped)
+    SettingsStore(file: file).update { $0.pauseSyncWhileStopped = true }
+    #expect(SettingsStore(file: file).current.pauseSyncWhileStopped)
+  }
+
   @Test func changesAreKeptAcrossRestarts() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     SettingsStore(file: file).update {

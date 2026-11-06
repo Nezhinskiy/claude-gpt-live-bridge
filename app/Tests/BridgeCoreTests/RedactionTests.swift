@@ -16,6 +16,9 @@ struct RedactionTests {
     ("clone https://user:hunter2@example.com/repo.git", "hunter2"),
     ("password: hunter2", "hunter2"), ("client_secret=abc123def", "abc123"),
     ("API_KEY = 'abc123def'", "abc123"), ("access_token: abc123def", "abc123"),
+    ("AWS_SECRET_ACCESS_KEY=abc123def456", "abc123"),
+    ("STRIPE_SECRET_KEY=sk_live_abc123def456", "sk_live"),
+    ("DB_PASSWORD_PROD=hunter2", "hunter2"),
   ])
   func redactsNamedPattern(text: String, secret: String) {
     let redacted = Redaction.redact(text)

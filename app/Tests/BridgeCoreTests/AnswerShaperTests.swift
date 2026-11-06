@@ -82,4 +82,36 @@ struct AnswerShaperTests {
       #expect(line.hasPrefix("[RESULT] Alpha"))
     }
   }
+
+  // MARK: Synced lines
+
+  @Test func aSyncedLineIsTaggedByWhoWroteIt() throws {
+    let id = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+    let typed = AnswerShaper.synced(
+      "Fix the build.", from: .owner, label: "Example session", session: id)
+    let claude = AnswerShaper.synced(
+      "It is fixed.", from: .claude, label: "Example session", session: id)
+    #expect(typed?.text == "[TYPED] Example session: Fix the build.")
+    #expect(claude?.text == "[CLAUDE] Example session: It is fixed.")
+    #expect(typed?.session == id && claude?.session == id)
+  }
+
+  @Test func aSyncedLineWithNothingToSayIsNil() {
+    let id = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+    for from in [SyncSource.owner, .claude] {
+      #expect(AnswerShaper.synced(" \n ", from: from, label: "Example session", session: id) == nil)
+      #expect(AnswerShaper.synced("", from: from, label: "Example session", session: id) == nil)
+    }
+  }
+
+  /// Claude's code-only answer says so, as a result does; the owner's has nothing to say.
+  @Test func aCodeOnlySyncedLineSaysSoForClaudeAndIsNilForTheOwner() throws {
+    let id = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
+    let code = "```swift\nlet x = 1\n```"
+    let claude = try #require(
+      AnswerShaper.synced(code, from: .claude, label: "Example session", session: id))
+    let result = AnswerShaper.forVoice(code, status: .ok, label: "Example session")
+    #expect(claude.body == result.body)
+    #expect(AnswerShaper.synced(code, from: .owner, label: "Example session", session: id) == nil)
+  }
 }
