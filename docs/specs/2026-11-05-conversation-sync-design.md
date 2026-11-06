@@ -28,8 +28,8 @@ R-9's real gap was that the voice is not told the keyboard answer, which this sp
 
 - Every joined session's conversation with the voice holds the owner's typed turns and Claude's
   final answers to them, as it already holds voice turns.
-- The target's open line learns them as they happen, as context: the voice knows, and says
-  nothing unprompted.
+- The target's open line learns them as they happen, as context. The voice may repeat them; it must
+  never fall behind.
 - Claude's questions and permission prompts in the target are said by the voice whatever started
   the turn, typed or voice. The owner may be away from the Mac while LiveBridge is on.
 - An answer given at the keyboard to Claude's question reaches the voice as context.
@@ -50,16 +50,17 @@ R-9's real gap was that the voice is not told the keyboard answer, which this sp
 
 ## Anti-goals
 
-Anything implicit or rough: the owner must never have to wonder whether the voice knows. A voice
-that interrupts keyboard work to comment on what was typed, or a sync that silently misses turns
-while the menu says it is current, is a failure even if every line technically arrives.
+Anything implicit or rough: the owner must never have to wonder whether the voice knows. A sync
+that silently misses turns while the menu says it is current is a failure even if every line
+technically arrives. A voice that opens a closed line to comment on what was typed is one too; on a
+line already open, repeating it is fine (the owner's decision, 2026-11-06).
 
 ## What the owner sees
 
 - While a session is joined, what the owner types in it and Claude's final answer go into that
   session's conversation with the voice. If that session is the target and its line is open, the
-  voice has them by the time the owner next speaks; otherwise the next line seeded with that
-  conversation has them.
+  voice gets them at once, and may say so; otherwise the next line seeded with that conversation
+  has them.
 - **By default the sync runs always**, also while the call is stopped: a stopped call keeps
   writing to the conversations on the Mac. Nothing leaves the Mac until a line opens with that
   session ([What leaves the Mac](#what-leaves-the-mac)).
@@ -88,15 +89,15 @@ while the menu says it is current, is a failure even if every line technically a
 
 ## Decisions
 
-- **Context, not speech, for synced turns.** A synced line never opens a line, never chimes and
-  never counts as unheard. Only questions and permission prompts are spoken, as today.
-- **On a live line, synced lines wait for the owner's next words** (my call, from the anti-goal).
-  codex's `appendText` is the only way to add context, and the voice has said appended text
-  unprompted (ADR 0001 (b); in (n), 3 of 4 runs once the session held an owner turn). So a synced
-  line that arrives while the line is open is kept and added when the owner next starts speaking,
-  before the voice answers them; a line opened later is seeded with it, as history. The plan
-  starts with a short probe of this on a real line, with the owner's yes (it spends realtime
-  minutes): if the voice still comments on the held lines, the design comes back here.
+- **Context, not delivery, for synced turns.** A synced line never opens a line, never chimes and
+  never counts as unheard. Only questions and permission prompts are delivered to be said, as today.
+- **On an open line, a synced line goes in at once** (the owner's decision, 2026-11-06). If the
+  owner talks to the voice and types to Claude at the same time, the voice must not fall behind; it
+  may repeat. codex's `appendText` is the only way to add context, and the voice reacts to appended
+  text (ADR 0001 (o): a filler in 3 of 6 runs while the owner spoke, the lines said aloud in 3 of 3
+  on sound alone, and a fragment at connect in 3 of 3). That is accepted. Holding lines for the
+  owner's next words failed its probe. While a line connects, its lines wait for the
+  connect; a line opened later is seeded with them, as history.
 - **Questions and permission prompts outside the target** (my call, from "sync without opening a
   call"): from a typed turn they are recorded as context only, with no chime and no unheard count;
   from a voice turn they keep today's behaviour. A question still open when its session becomes the
@@ -179,9 +180,9 @@ for the band.
 - A synced line is recorded in its session's conversation (`Bridge.record`, `Continuity`): owner
   lines as the owner's (marked typed), Claude's as Claude's. It is not an unheard result
   (`initialItems` must include it, unlike an unheard `.claude` line).
-- If its session is the open line's, it is kept and added with `addContext` when the owner next
-  starts speaking (see Decisions), whether the line is `connecting` or `live`; `CallMachine` keeps
-  them, and `heldContext` stays the summary's one slot. A line opened later is seeded with it.
+- If its session is the open line's, it goes in with `addContext` at once on a `live` line, and on
+  connect for a `connecting` one, which `CallMachine` keeps; `heldContext` stays the summary's one
+  slot. A line opened later is seeded with it.
 - With the pause setting on and the call `off`, a synced line is dropped and its session marked
   *paused*.
 - `openLine` requests a summary only when the session has no context or is *missed* (and not

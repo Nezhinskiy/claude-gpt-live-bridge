@@ -534,6 +534,16 @@ none waiting keeps the 20 s rule. The window is billed: up to two minutes of ope
 handoff. Since codex offers no way to make a V3 voice respond now (item (b)), whether the voice
 says the speakable text at once is the model's choice; the smoke run checks that it does.
 
+## Decision: an open line takes synced lines at once
+
+Decided by the owner on 2026-11-06, after item (o).
+
+What the owner types in a session, and Claude's answer, go into its open line as soon as they
+arrive; a closed line gets them as seed when it next opens, and is never opened for them. If the
+owner talks to the voice and types to Claude at once, the voice must not fall behind, and it may
+repeat what was typed. So the reactions in item (o) are accepted, and nothing waits for the owner's
+words.
+
 ## Decision: a result opens the closed line
 
 Decided by the owner on 2026-11-04, after item (n).

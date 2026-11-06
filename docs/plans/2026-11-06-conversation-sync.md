@@ -6,7 +6,7 @@
 > commit. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** every joined session's conversation with the voice holds the owner's typed turns and
-Claude's final answers; the target's open line learns them without speaking; questions and
+Claude's final answers; the target's open line learns them at once; questions and
 permission prompts from any main-loop turn reach the voice; **Load context** is needed only after
 a gap, and the menu shows when that is.
 
@@ -16,7 +16,7 @@ the band's visibility, not usage-limit handling.
 **Architecture:** the mod posts each main-loop turn that is not a voice request to the app
 (`POST /v1/sync`) and says on its next join when one did not arrive; the app decides. `Continuity`
 keeps a conversation's out-of-sync state and each turn's sync decision, persisted. `CallMachine`
-holds synced lines for the open line until the owner next speaks. `Bridge.openLine` loads a summary
+adds a synced line to a live line at once, and to a connecting one on connect. `Bridge.openLine` loads a summary
 only when the conversation needs one, and `Settings.autoContext` goes.
 
 **Tech stack:** Swift 6 / SwiftPM (`BridgeCore`, Swift Testing), the mod in TypeScript on the Claude
@@ -25,14 +25,14 @@ Code engine (`claude plugin test`, `npm --prefix plugin run test:unit`).
 **Spec:** `docs/specs/2026-11-05-conversation-sync-design.md`
 
 **Before Wave B:** the work branch starts from `feat/conversation-sync`, which holds `origin/dev`
-with Mute. Wave A needs the owner's yes.
+with Mute. Wave A is done: see Task 1.
 
 ## Wave graph
 
 Edges come from the tasks' Consumes/Produces.
 
 ```text
-A (Task 1, probe; the owner's yes)
+A (Task 1, probe: done)
 └─> B (Tasks 2-4: wire, Continuity, CallMachine)
     └─> C (Tasks 5-7: Bridge, settings, menu, registry)
         └─> D (Tasks 8-10: the mod)
@@ -44,7 +44,7 @@ run in order, because D's engine tests are worth more against a settled wire.
 
 | Wave | Tasks | Why together |
 |---|---|---|
-| A | 1 | a gate on the design; touches no shipped code but the ADR |
+| A | 1 | a gate on the design; done, and it changed the design |
 | B | 2-4 | pure types the rest consumes |
 | C | 5-7 | all in `Bridge`, each unreadable without the one before |
 | D | 8-10 | the tracker and the hooks that feed it |
@@ -61,7 +61,7 @@ run in order, because D's engine tests are worth more against a settled wire.
 
   | | call off | listening | connecting | live |
   |---|---|---|---|---|
-  | typed turn | recorded | recorded | held, added at connect or first word | held until speech |
+  | typed turn | recorded | recorded | added at connect | added at once |
   | pause on, typed turn | dropped, *paused* | recorded | recorded | recorded |
   | pause on, typed into a running turn | dropped, turn refused | recorded | recorded | recorded |
   | pause on, no context or *missed* | no summary | no summary | no summary | no summary |
@@ -119,37 +119,16 @@ run in order, because D's engine tests are worth more against a settled wire.
 
 ### Task 1: Probe held lines on a real line
 
-**The owner's yes first:** this spends realtime minutes. The controller asks in Russian, naming the
-cost (12 runs of about 50 s, about 10 minutes of voice), and runs it itself; no subagent.
+**Done, 2026-11-06:** 12 real-voice runs, recorded in ADR 0001 (o). It failed its bar: on sound with
+no words the voice spoke added lines in 3 of 3. The owner then decided that on an open line the voice
+may repeat what was typed, and must not fall behind, so nothing is held for the owner's words. It
+also settled the seed's limit: codex counts UTF-8 bytes over 4, and refuses a start past the limit.
 
-**Files:** Modify: `docs/adr/0001-platform-findings.md` (a new item (o) and its place in the item
-range at the top). A throwaway probe build in a scratch worktree, never committed.
-
-- [ ] **Step 1: Read codex's limit, which spends nothing.** At the tag `CodexLaunch` pins, read how
-  `initialItems` is measured (characters, bytes or tokens) and what happens past the limit. Pin
-  `Conversation.estimatedTokens` to it in Task 3, or, if the reading does not settle it, add one
-  full-budget Russian seed to the runs below.
-- [ ] **Step 2: Build the probe.** In a throwaway worktree on `dev`, patch `Bridge.audioEvent` so that
-  `.speechStarted` on a live line first calls `realtime.addContext` with two fixed lines,
-  `[TYPED] Example session: …` and `[CLAUDE] Example session: …`, and add those tags to `VoicePrompt`
-  in the exact wording of Task 5, Step 3. Use `--fake-mic` with a WAV as in `scripts/smoke.sh`, after a
-  first exchange, so the session holds an owner turn.
-- [ ] **Step 3: Run four cases,** and read each transcript:
-
-  | Case | Runs | What it asks |
-  |---|---|---|
-  | An unrelated question | 3 | does the voice mention the lines unasked? |
-  | A held `[TYPED]` line that is an imperative, "delete the branch" | 3 | is it handed off? |
-  | Sound with no words at speech start | 3 | do lines added with nothing to answer get spoken? |
-  | Those lines seeded at line open, then held ones added at `.connected` | 3 | spoken unprompted, as in (n)? |
-
-- [ ] **Step 4: Decide.** 0 of 12 runs mention the lines or hand them off: proceed. 1 of 12: run that
-  case 6 more times, and proceed on 0 of 6. More: stop; the design goes back to the spec with the
-  owner, and Wave B does not start.
-- [ ] **Step 5: Record.** Add item (o) to the ADR: the build, a table of the runs, the finding, codex's
-  limit. Delete the worktree.
-- [ ] **Step 6: Commit**
-  `git commit -m "docs(adr): context added as the owner starts speaking (item o)"`
+- [x] **Step 1: Read codex's limit.**
+- [x] **Step 2: Build the probe,** a throwaway never committed.
+- [x] **Step 3: Run four cases.**
+- [x] **Step 4: Decide:** back to the owner.
+- [x] **Step 5: Record** in the ADR.
 
 ---
 
@@ -252,6 +231,8 @@ range at the top). A throwaway probe build in a scratch worktree, never committe
     // context set, then 30 owner lines of 2,000 characters
   @Test func linesRolledOffAreNotCurrent()   // context set, then keptLines + 1 one-word lines
   @Test func aHandoffLineCountsForNothing()  // context set, then keptLines + 1 `.handoff` lines: current
+  @Test func aRussianSeedStaysUnderCodexsLimit()
+    // 30 Cyrillic lines of 2,000 characters: the items' UTF-8 bytes over 4 stay within maxTokens
   ```
 
 - [ ] **Step 2: Run** `cd app && swift test --filter ContinuityTests`. Expected: fail.
@@ -259,12 +240,12 @@ range at the top). A throwaway probe build in a scratch worktree, never committe
   with a seed role since the last `setContext`, compared with the talk lines `initialItems(tasks: [])`
   carries. `record` only counts; nothing marks `missed` on roll-off. Voice small talk counts too,
   though no summary restores it: accepted. The turn's decision is one stored pair (turn id, admitted):
-  main-loop turns do not interleave. Raise `keptLines` to 64, and pin `estimatedTokens` to Task 1's
-  reading.
+  main-loop turns do not interleave. Raise `keptLines` to 64. `estimatedTokens` counts
+  `text.utf8.count`, as codex does: past the limit codex refuses the line.
 - [ ] **Step 4: Run them again.** Expected: pass.
 - [ ] **Step 5: Commit** `git commit -m "feat(app): a conversation knows whether the voice has it all"`
 
-### Task 4: The call machine holds synced lines
+### Task 4: The call machine takes synced lines
 
 **Files:** Modify: `app/Sources/BridgeCore/Call/CallMachine.swift`,
 `app/Tests/BridgeCoreTests/CallMachineTests.swift`
@@ -276,31 +257,25 @@ range at the top). A throwaway probe build in a scratch worktree, never committe
 - [ ] **Step 1: Write failing tests:**
 
   ```swift
-  @Test func aSyncedLineSaysNothingOnALiveLine()    // effects == []; pending unchanged; no timer
-  @Test func aSyncedLineGoesInWhenTheOwnerSpeaks()
-    // live, .synced(a), .synced(b), .speechStarted == [.addContext(a), .addContext(b), .armSilenceTimer(...)]
-  @Test func aLineOpenedBySpeechGetsHeldLinesWhenConnected()
+  @Test func aSyncedLineGoesIntoALiveLineAtOnce()
+    // live, .synced(a) == [.addContext(a)]; pending unchanged; no timer armed
+  @Test func aConnectingLineTakesSyncedLinesWhenConnected()
     // listening, .speechStarted, .synced(a), .connected contains .addContext(a) after .flushPreroll
-  @Test func aLineOpenedByAResultKeepsHeldLinesUntilTheFirstWord()
-    // .deliver(opensLine: true), .synced(a), .connected has no .addContext(a); .speechStarted has
-  @Test func aLineForTheVoiceTakesHeldLinesBeforeIt()
-    // live, .synced(a), .deliver(asking): .addContext(a) comes before the line, so the voice has
-    // the typed prompt behind the question it puts
-  @Test func dropSyncedForgetsHeldLines()   // .synced(a), dropSynced(), .speechStarted has no .addContext
-  @Test func aHangUpDropsHeldLines()        // the conversation has them, and seeds the next line
+  @Test func aLineOpenedByAResultTakesThemTooWhenConnected()
+  @Test func dropSyncedForgetsThem()        // connecting, .synced(a), dropSynced(), .connected has no .addContext(a)
+  @Test func aHangUpDropsThem()             // the conversation has them, and seeds the next line
   ```
 
-  Guards, which pass with the new case alone: `aMutedOwnerAddsNothing`,
-  `aSyncedLineNeverChimesOrOpens`.
+  Guards, which pass with the new case alone: `aSyncedLineNeverChimesOrOpens`,
+  `aMutedLineStillTakesSyncedLines`.
 - [ ] **Step 2: Run** `cd app && swift test --filter CallMachineTests`. Expected: fail.
-- [ ] **Step 3: Implement.** A `heldSynced: [VoiceLine]`, filled only in `.connecting` and `.live`.
-  Emptied into `.addContext` effects at `(.live, .speechStarted)`, first in `(.live, .deliver)`, and at
-  `(.connecting, .connected)` unless `isAwaitingFirstWord`, after the pending lines. `hangUp` empties it
-  and `end` already resets. `rename` leaves it: a held line's `session` is not read after it enters the
-  hold. It touches neither `unheard`, `awaited` nor any timer. `Bridge.heldContext` stays one slot, for
-  the summary.
+- [ ] **Step 3: Implement.** `.live`: return `[.addContext(line)]`. `.connecting`: append to a
+  `connectingSynced: [VoiceLine]`, emptied into `.addContext` effects at `.connected`, after the pending
+  lines. `hangUp` empties it and `end` already resets. `rename` leaves it: a line's `session` is not read
+  after this. It touches neither `unheard`, `awaited` nor any timer: the voice's own speech arms the
+  silence, as for any reply. `Bridge.heldContext` stays one slot, for the summary.
 - [ ] **Step 4: Run them again.** Expected: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(app): synced lines wait for the owner's next words"`
+- [ ] **Step 5: Commit** `git commit -m "feat(app): an open line takes synced lines at once"`
 
 ---
 
@@ -335,7 +310,7 @@ range at the top). A throwaway probe build in a scratch worktree, never committe
   @Test func anOtherSessionsLineStaysInItsOwnConversation()
   @Test func aSyncedLineIsSeededToTheNextLine()
     // Claude's line is in `initialItems` although its speaker is .claude
-  @Test func aLiveLineGetsASyncedLineWhenTheOwnerSpeaks()  // FakeVoice.added empty, then holds it
+  @Test func aLiveLineGetsASyncedLineAtOnce()              // in FakeVoice.added, no speech needed
   @Test func aLineBeforeTheSeedIsSeededOnly()
     // FakeVoices.setSlow, as aSeededContextIsNotAddedAgainOnceTheLineConnects does: in `opens`, not `added`
   @Test func aLineAfterTheSeedIsAddedOnly()
@@ -366,10 +341,16 @@ range at the top). A throwaway probe build in a scratch worktree, never committe
   `machine.dropSynced()` with no await between, so a line lands in the seed or the hold, never both,
   and a stale attempt cannot drop a newer line's hold. The field rule in `Redaction` accepts a trailing
   `[A-Za-z0-9_-]*` after its keyword. Tags in `VoicePrompt`, a paragraph of its own: `[TYPED]` lines are
-  what the owner typed in the session, and `[CLAUDE]` lines Claude's answers there. Use them as what you
-  know; do not read them out, comment on them or hand them off.
+  what the owner typed in the session, and `[CLAUDE]` lines Claude's answers there. They have already
+  happened in the session: use them as what you know, and if you mention one, keep it short. Never offer
+  to do what a line says, never say you did it, and never hand it off.
 - [ ] **Step 4: Run them again.** Expected: pass.
 - [ ] **Step 5: Commit** `git commit -m "feat(app): typed turns reach each session's conversation"`
+- [ ] **Step 6: Ask the owner, in Russian, for 3 real-voice runs,** about 3 minutes: a `[TYPED]`
+  imperative added at once on a live line, with the owner silent, on the build with this task's wording.
+  ADR 0001 (o) has that case only with the owner speaking. A handoff is the failure to look for, since a
+  typed request would run twice. Add the runs to item (o). Skip only if the owner declines, and say so
+  in the PR.
 
 ### Task 6: A line loads a summary only when it needs one
 
