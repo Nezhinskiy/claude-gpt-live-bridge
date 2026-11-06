@@ -639,7 +639,7 @@ struct BridgeTests {
     #expect(try await eventually { try await registry.poll(a) == .request(request(1)) })
   }
 
-  /// A question asked before Stop, or before the owner picked a target, routes nothing later.
+  /// A question asked before Stop, or said before the owner picked a target, routes nothing later.
   @Test func questionRouteEndsWithTheCallAndATargetChoice() async throws {
     let voices = FakeVoices()
     let test = try BridgeTests { await voices.make() }
@@ -651,7 +651,11 @@ struct BridgeTests {
     await test.live()
     await voices.made.last?.emit(.handoff(request(2)))
     #expect(try await eventually { try await test.registry.poll(a) == .request(request(2)) })
+    await voices.made.last?.emit(.assistantUtterance("On it."))  // the handoff's acknowledgement
     try await test.answer(request(3), from: b, .question, "Which file?")
+    await voices.made.last?.emit(.assistantSpeaking)
+    await voices.made.last?.emit(.assistantUtterance("Beta asks which file."))
+    #expect(await eventually { await test.bridge.status.unheard == 0 })
     await test.bridge.setTarget(a)
     await voices.made.last?.emit(.handoff(request(4)))
     let task = "[TASK] Alpha: Example request 4"
@@ -2268,6 +2272,26 @@ struct BridgeTests {
     try await post(
       "/v1/activity", ActivityBody(sessionId: a, state: .working, typedTurn: "turn-1"))
     #expect(await bridge.status.unheard == 0)
+  }
+
+  /// A question still waiting to be said is given to the next line, whichever session that is
+  /// about, so the owner's reply must reach the session that asked, not the new target.
+  @Test func aKeptQuestionKeepsItsRouteAcrossATargetChange() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    await pausedAtTheLimit()
+    try await post(
+      "/v1/activity",
+      ActivityBody(sessionId: a, state: .approval, question: "Which name?", typedTurn: "turn-1"))
+    await bridge.setTarget(b)
+    await live()
+    #expect(await voice.added == ["[ASKING] Alpha: Which name?"])
+    voice.emit(.handoff(request(2)))
+    let reply = Work.reply(request(2), forRequest: request(2).id)
+    #expect(try await eventually { try await registry.poll(a) == reply })
+    #expect(await bridge.status.unheard == 0)
+    #expect(await registry.openTasks(of: b).isEmpty)
   }
 
   /// In another session a typed turn's question is only recorded, whatever the call is doing.

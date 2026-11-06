@@ -172,10 +172,10 @@ public actor Bridge: Router {
     await registry.requestContext(for: target)
   }
 
-  /// The menu's choice of target, which also ends a question's route; a session that left is
-  /// ignored.
+  /// The menu's choice of target, which also ends a question's route, unless that question still
+  /// waits to be said; a session that left is ignored.
   public func setTarget(_ id: SessionID) async {
-    questionRoute = nil
+    endRouteUnlessKept()
     try? await registry.setTarget(id)
     await changed()
   }
@@ -291,9 +291,7 @@ public actor Bridge: Router {
       if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
     case .stopLocalVAD: await audio.stopListening()
     case .endCodex:
-      if !machine.pending.contains(where: { $0.session == questionRoute && $0.asks }) {
-        questionRoute = nil
-      }
+      endRouteUnlessKept()
       await endCodex()
     case .flushPreroll: await audio.flushPreroll()
     case .muteMicrophone: await audio.muteMicrophone()
@@ -326,6 +324,15 @@ public actor Bridge: Router {
       return false
     }
     return true
+  }
+
+  /// Ends a question's route, unless the question still waits to be said: every waiting line is
+  /// given to the next line, whichever session it is about, and the reply must reach the session
+  /// that asked.
+  private func endRouteUnlessKept() {
+    if !machine.pending.contains(where: { $0.session == questionRoute && $0.asks }) {
+      questionRoute = nil
+    }
   }
 
   /// A chime's notification, naming the sessions whose results wait.
