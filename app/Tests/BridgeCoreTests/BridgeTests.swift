@@ -2012,6 +2012,15 @@ struct BridgeTests {
     #expect(await lines() == ["You: [TYPED] Beta: Fix Beta's build."])
   }
 
+  /// A line on Alpha: what is typed in Beta is kept in Beta's conversation and goes nowhere.
+  @Test func anOtherSessionsLineStaysOffTheOpenLine() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    try await sync(b, "Fix Beta's build.")
+    #expect(await voice.added.isEmpty)
+  }
+
   /// Claude's line is a seed item although its speaker is `.claude`, as an unheard result's is not.
   @Test func aSyncedLineIsSeededToTheNextLine() async throws {
     try await join(a, "Alpha")
