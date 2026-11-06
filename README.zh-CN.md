@@ -27,6 +27,7 @@
 LiveBridge 是一款 macOS 菜单栏应用，它通过 `codex app-server`，使用你的 ChatGPT 登录（无需 API 密钥）保持一条随时可用的
 GPT-Live 语音线路。语音相当于前台接待：它负责闲聊、询问你的意思，并通过一个小型 Claude Code 模组 `livebridge`
 把真正的工作交给你的 Claude Code 会话。Claude 用自己的模型、工具和权限模式完成工作，再由语音把结果告诉你。
+Claude 工作时你不必让线路一直打开：它的答复会重新打开已关闭的线路，并由语音说出。语音还会跟进你在会话中输入的内容和 Claude 的答复，所以你可以在说话和打字之间随意切换。
 
 *英文原文为准（[README.md](README.md)）；本译文可能滞后。*
 
@@ -44,7 +45,7 @@ Claude Code。应用与模组之间通过只有你的用户才能打开的 Unix 
 
 ## 快速开始
 
-你需要 Apple Silicon 上的 macOS 14+、Claude Code 2.1.301+，以及已登录（`codex login`）到包含实时语音的 ChatGPT 套餐的
+你需要 Apple Silicon 上的 macOS 14+、Claude Code 2.1.301+，以及已登录（`codex login`）到其 Codex 包含语音的 ChatGPT 套餐的
 [codex](https://github.com/openai/codex)；若要自行构建应用，还需要带 Swift 6.0+ 的 Xcode。详情见
 [系统要求](#系统要求)。
 
@@ -73,7 +74,7 @@ scripts/build-app.sh --release
 - Claude Code 2.1.301 或更高版本。
 - [Codex CLI](https://github.com/openai/codex)（`codex`，已在 0.166.0 上测试），通过
   Homebrew（`brew install --cask codex`）或 npm（`npm install -g @openai/codex`）安装，位于你的 shell 在终端窗口中设置的
-  `PATH` 上，并已用 `codex login` 登录到包含实时语音的 ChatGPT 套餐。如果 LiveBridge 无法读取某个 codex 的
+  `PATH` 上，并已用 `codex login` 登录到其 Codex 包含语音的 ChatGPT 套餐（Plus、Pro、Business、Enterprise 或 Education，见 [OpenAI 的 Codex 定价](https://learn.chatgpt.com/docs/pricing)）。如果 LiveBridge 无法读取某个 codex 的
   `codex features list`，它会拒绝使用该 codex，因此其他版本可能要等 LiveBridge 更新后才能启动。
 - 构建应用：Xcode，Swift 6.0 或更高版本的工具链。已测试的版本见
   [CONTRIBUTING.md](CONTRIBUTING.md#toolchain)。构建出的应用可在 macOS 14 或更高版本上运行。
@@ -187,7 +188,7 @@ claude plugin uninstall livebridge@livebridge
 - **状态条上的 Start** 会让它所属的会话成为目标并开始通话；它打开的线路会带上该会话的对话，并且在语音会缺少该会话的一部分时（尚无摘要、某一轮没有送达、摘要之后的行数超出语音所能承载、或模组早于同步功能）另外加载摘要，但在 **Pause sync** 开启期间或暂停之后绝不加载（[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
   状态条，`/live on` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
-  **Load context**、LiveBridge 保存的目标会话 **Conversation**、用量限额、分钟数、
+  **Load context**、LiveBridge 保存的目标会话 **Conversation**（语音交给 Claude 的每个请求都有一行 **Task**）、用量限额、分钟数、
   **Star LiveBridge on GitHub**（打开仓库页面）、**Settings…** 和 **Quit LiveBridge**。
 - **Mute**（在 **Stop** 旁边，位于状态条和菜单的通话卡片中；Mute 后显示 **Unmute**）会在通话继续时释放你的麦克风：Claude 的答复仍会打开线路，语音仍会说出它。状态条保留阶段并加上 `· muted`；没有线路打开时，菜单显示 “Muted — line closed”。Mute 不会关闭线路：已打开的线路会在通常的无声时长后关闭：若你当时在说话，则从 Mute 起算；若线路本来就安静，Mute 不会改变它何时关闭，计费与任何无声时段相同，因此 Mute 不会节省实时分钟数。**Unmute** 会重新使用麦克风，若无法使用（被拒绝、被占用、缺失），通话会带着原因结束。**Stop** 会结束通话和 Mute；下一次 **Start** 从未 Mute 开始。Mute 不是锁：任何以你的用户身份运行的进程都可以解除它（[SECURITY.md](SECURITY.md#who-can-drive-the-bridge)）。
 - **Load context** 只在语音缺少目标的一部分时可用：没有摘要、某一轮没有送达、摘要之后的行数已超出语音所能承载（较长的对话会超出）、该会话曾被暂停，或其模组不同步。否则该项显示为 **Context up to date** 且不可用，因为语音已经有了这段对话。`/live context` 始终可用。
@@ -214,7 +215,8 @@ claude plugin uninstall livebridge@livebridge
 - 在交办任何具有破坏性或对外影响的操作（删除、推送、发布、发送、部署、付款）之前，它会复述请求并询问“确认吗？”。
   这是语音被要求遵守的习惯，而不是一道安全保障；哪些才算保障，见 [SECURITY.md](SECURITY.md)。
 - 它用一两句话念出结果，并带上会话名称。代码块和表格留在会话中，它能识别的凭据会被遮蔽。
-- 当 Claude 提出问题时，语音会向你转述，并把你的回答发回该会话。Claude 之后在后台完成的工作会作为更新播报。
+- Claude 完成后它会回来。你不必让线路一直打开：谈话安静下来后线路就会关闭，而 Claude 对你请求的答复、它向你提出的问题或它正在等待的权限提示会重新打开线路，并由语音说出，所以 Claude 工作时你可以走开。这适用于你正在对话的会话；其他会话的结果会发出提示音并等待（[如何计费](#按需计费的设计)）。如果语音在重新打开的线路上保持沉默，答复同样会发出提示音并等待，因此不会丢失（[已知限制](#已知限制)）。
+- 当 Claude 提出问题时，语音会向你转述，并把你的回答发回该会话。对于 Claude 在工作中提出的问题（带选项的对话框）也是如此：语音会告诉你这个问题，用自己的话解释各个选项，并按你的需要与你讨论多久都可以，而不去询问 Claude。你的决定，无论是某个选项还是反问 Claude 的问题，都会作为对话框的回答；你也仍然可以在键盘上回答。Claude 之后在后台完成的工作会作为更新播报。
 - 当 Claude 正在等待权限提示时，语音会告诉你，但[由组织管理 Claude Code 的环境](#已知限制)除外。你需要在 Claude Code 中回应该提示；LiveBridge 绝不会替你回答。
 - 它知道你输入了什么。会话处于加入状态时，你在其中输入的内容，以及 Claude 对每个非语音请求轮次的最终答复，都会作为上下文进入该会话与语音的对话：语音可以提到它们，但不会为它们发出提示音，也不会为它们打开已关闭的线路。已打开的线路会立即收到它们；之后打开的线路则以它们为开头。被更新的请求取代的语音答复不会被说出，但会以同样方式保留并加入。Claude 在一轮中途的文字不会同步，只有它在提问或权限提示之前刚写下的内容会随之而去；子代理和工具输出不会同步。目标会话中 Claude 的提问或权限提示，无论由哪一轮引起，语音都会说出；在其他会话中，它像那里的结果一样被说出或发出提示音，但若那一轮是你输入的，则只做记录。被暂停挡在外面的一轮没有这些。当你在键盘上回答了 Claude 的提问或权限提示，语音会得到通知。
 
@@ -233,7 +235,7 @@ claude plugin uninstall livebridge@livebridge
   （[何时算作已听取](docs/architecture/overview.md#a-result-while-the-line-is-closed)）。
 - 每个 Claude Code 会话都与语音有各自的对话。它会延续到下一个实时会话中，并在 Stop 和 Start 之间保留，因此语音记得你一分钟前说过的话。
   切换目标会同时切换对话：已打开的线路会关闭，你接下来说的话会带着新目标的对话重新打开它。
-- 菜单显示线路打开的分钟数，由应用测量；你的套餐如何对实时语音计量，并未公布。
+- 菜单显示线路打开的分钟数，由应用从语音连接时开始计算，因此你的套餐计入的可能略多一些。OpenAI 按你的 Codex 用量预算的分钟数为桌面语音计价，其 API 上同一模型系列也对静默计费（[详情](docs/research/2026-11-04-gpt-live-billing.md)，[限额](docs/research/2026-11-05-gpt-live-limits.md)）；以你的套餐自身的用量页面为准。
 - 菜单显示你的 Codex 和 Claude 用量已用多少：各一行，按套餐所报告的每个窗口给出已用百分比（每行最多三个，例如 `7% of 5 h · 19% of week`），达到 90% 时显示为橙色；悬停在某一行上可看到各窗口何时重置。Codex 的数字在每次打开菜单时读取，最多每分钟一次，由一个短时运行的 codex 读取；Claude 的数字来自已加入且已回答过的会话。没有可显示内容的行不会出现；当 codex 报告不允许普通用量时，Codex 的那一行会显示 `blocked`。Codex 的上一次读数会立即显示，几秒后由新读数替换，所以菜单打开时数字可能变化；应用刚启动时，那一行在首次读数到达时才出现；如果读取失败，读数会在 15 分钟后消失。哪一项限额最先让语音停下，并未公布（[详情](docs/research/2026-11-05-gpt-live-limits.md)）。
 
 ## 隐私
@@ -275,16 +277,17 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
 
 ## 已知限制
 
-- 通过 Remote Control 发给会话的提示，不会作为你的话记录到语音的对话中，但 Claude 对它的答复会被记录（哪些提示算作你的，见 [SECURITY.md](SECURITY.md#what-session-text-can-do)）。
 - 语音有时会说它在查看（“On it”“Looking now”），却没有转交请求，于是什么也没有送到 Claude：在[测试](docs/bugs/BR-001.md)中，
   即使语音的规则禁止这样做，仍约有五分之一的请求如此。应用把请求放入 Claude 的队列时会播放一声短音；如果语音说它在查看却没有这声短音，
   请再说一遍。应用无法凭措辞区分这种承诺和回答，因为语音说的是你的语言。
 - 在线路等待期间到达的结果，会作为待说出的文本交给语音；codex 没有能让语音立即开口的调用，因此由模型决定何时说。
   测试中它在几秒内就说了。如果没有说，结果仍保持未听取：语音会在你接下来说话之后说出它，或在线路关闭时发出提示音。
-- 当 Claude 的答复重新打开线路时，语音有时会保持沉默（[实测](docs/adr/0001-platform-findings.md)）。
-  此时线路会在 5 秒后关闭，答复会像下文所述那样发出提示音并等待。
+- 当 Claude 的答复重新打开线路时，语音可能保持沉默：实测的 14 次运行中有 4 次如此，样本较小（[ADR 0001 (n)](docs/adr/0001-platform-findings.md)）。
+  此时线路会在连接 5 秒后关闭，答复会像下文所述那样发出提示音并等待。语音开口时，都是在连接后约 2 秒内开始；若在这 5 秒之后才开始，则会被截断。
 - 当你接下来说的话重新打开线路时，语音有时只回应这些话，而不说出等待中的结果。结果并没有丢失：它仍在等待，
   会在线路关闭时发出提示音并推送通知，并在线路下次打开时再次交给语音。
+- 达到你的 ChatGPT 套餐的用量限额时，语音会停止，直到限额重置。菜单和状态条会说明这一点，使用 codex 的原句，并在 codex 给出时附上重置时间；通话随之结束，这样说话就不会再打开注定失败的线路。Claude Code 继续工作，答复继续等待，Start 会再试一次。应用只能靠 codex 的措辞或服务的错误代码识别限额，因为没有别的信号（[详情](docs/research/2026-11-05-gpt-live-limits.md)）。它无法识别的拒绝，例如没有说明原因就断开的线路（“The voice session closed (transport_closed).”），通话会保持开启，你接下来说的话会再次尝试；在限额重置之前请按 **Stop**。
+- 通过 Remote Control 发给会话的提示，不会作为你的话记录到语音的对话中，但 Claude 对它的答复会被记录（哪些提示算作你的，见 [SECURITY.md](SECURITY.md#what-session-text-can-do)）。
 - 在模组加载之前就已打开的 Claude Code 会话，可能需要重新打开，`/live` 才能在其中使用。
 - 在 Claude 桌面应用中，如果在其 Claude Code 进程尚未启动的会话（新建的会话，或刚重新打开的会话）里输入 `/live`，
   可能会显示“/live isn't a command here.”，但命令仍会执行。桌面应用是通过一次关闭了 hooks 的检查来列出这类会话的命令的，

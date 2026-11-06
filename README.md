@@ -28,7 +28,9 @@ LiveBridge is a macOS menu bar app that keeps a GPT-Live voice line ready throug
 `codex app-server` on your ChatGPT login (no API key). The voice is the front desk: it chats,
 asks what you mean, and hands real work to your Claude Code session through a small Claude Code
 mod, `livebridge`. Claude does the work with its own model, tools and permission mode, and the
-voice tells you the result.
+voice tells you the result. You do not have to hold the line open while Claude works: its answer
+opens the closed line again and the voice says it. The voice also follows what you type in the
+session and what Claude answers, so you can switch between speaking and typing.
 
 <p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 
@@ -51,8 +53,8 @@ says what this does and does not protect against.
 ## Quick start
 
 You need macOS 14+ on Apple Silicon, Claude Code 2.1.301+, and
-[codex](https://github.com/openai/codex) signed in (`codex login`) to a ChatGPT plan with
-realtime voice; to build the app yourself, also Xcode with Swift 6.0+. The details are under
+[codex](https://github.com/openai/codex) signed in (`codex login`) to a ChatGPT plan whose Codex
+includes voice; to build the app yourself, also Xcode with Swift 6.0+. The details are under
 [Requirements](#requirements).
 
 ```sh
@@ -84,9 +86,11 @@ rebuilds and uninstalling are under [Install](#install).
 - Claude Code 2.1.301 or later.
 - [Codex CLI](https://github.com/openai/codex) (`codex`, tested with 0.166.0), installed with
   Homebrew (`brew install --cask codex`) or npm (`npm install -g @openai/codex`), on the `PATH`
-  your shell sets in a Terminal window, and signed in with `codex login` to a ChatGPT plan that
-  includes realtime voice. LiveBridge refuses a codex whose `codex features list` it cannot
-  read, so another version may not start until LiveBridge is updated.
+  your shell sets in a Terminal window, and signed in with `codex login` to a ChatGPT plan whose
+  Codex includes voice (Plus, Pro, Business, Enterprise or Education, per
+  [OpenAI's Codex pricing](https://learn.chatgpt.com/docs/pricing)). LiveBridge refuses a codex
+  whose `codex features list` it cannot read, so another version may not start until LiveBridge
+  is updated.
 - To build the app: Xcode with a Swift 6.0 toolchain or later. The tested versions are in
   [CONTRIBUTING.md](CONTRIBUTING.md#toolchain). The built app runs on macOS 14 or later.
 
@@ -292,6 +296,12 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   safeguard; [SECURITY.md](SECURITY.md) says what is one.
 - It reads results back in a sentence or two, with the session's name. Code blocks and tables
   stay in the session, and credentials it recognises are redacted.
+- It comes back when Claude is done. You need not keep the line open: the line closes when the talk
+  goes quiet, and Claude's answer to your request, a question it asks you or a permission prompt it
+  waits on opens the line again and the voice says it, so you can walk away while Claude works. That
+  holds for the session you are talking to; another session's result chimes and waits ([how it is
+  billed](#billing-aware-by-design)). If the voice stays silent on the reopened line, the answer
+  chimes and waits too, so it is not lost ([known limitations](#known-limitations)).
 - When Claude asks a question, the voice puts it to you and sends your answer back to that
   session. So it does with a question Claude asks while it works (the dialog with options): the
   voice tells you about it, explains the options in its own words and talks them over with you
@@ -340,9 +350,11 @@ a question Claude asks you, or that Claude waits for your approval:
   next realtime session, and across Stop and Start, so the voice remembers what you said a minute
   ago. A new target switches the conversation: an open line closes, and your next words open it
   with the new target's.
-- The menu shows the minutes the line was open, as measured by the app. OpenAI prices desktop
-  voice per minute of your Codex budget, and on its API the same model family bills silence too
-  ([details](docs/research/2026-11-04-gpt-live-billing.md)); your plan's own usage page is the
+- The menu shows the minutes the line was open, counted by the app from when the voice connects, so
+  your plan may count a little more. OpenAI prices desktop voice per minute of your Codex usage
+  budget, and on its API the same model family bills silence too
+  ([details](docs/research/2026-11-04-gpt-live-billing.md),
+  [limits](docs/research/2026-11-05-gpt-live-limits.md)); your plan's own usage page is the
   authority.
 - The menu shows how much of your Codex and Claude usage is used, a row each, as the percent used
   of every window the plan reports (up to three a row, for example `7% of 5 h · 19% of week`),
@@ -440,12 +452,22 @@ can become a request that Claude runs under the session's own permission mode.
   no call that makes the voice speak at once, so the model decides when. In testing it spoke
   within a few seconds. If it does not, the result stays unheard: the voice says it after your
   next words, or it chimes when the line closes.
-- When Claude's answer opens the line again, the voice sometimes stays silent
-  ([measured](docs/adr/0001-platform-findings.md)). The line then closes after 5 seconds and
-  the answer chimes and waits, as below.
+- When Claude's answer opens the line again, the voice can stay silent: it did in 4 of 14 measured
+  runs, a small sample ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). The line then closes 5
+  seconds after it connects, and the answer chimes and waits, as below. Where the voice spoke, it
+  started within about 2 seconds of the connect; one that would start after the 5 seconds is cut
+  off.
 - When your next words reopen the line, the voice sometimes answers only them and does not say
   the waiting result. The result is not lost: it stays waiting, chimes and posts a notification
   when the line closes, and goes to the voice again the next time the line opens.
+- At your ChatGPT plan's usage limit the voice stops until the limit resets. The menu and the band
+  say so, in codex's sentence with its reset time where codex gives one, and the call ends, so
+  speech does not open lines that fail. Claude Code keeps working, answers keep waiting, and Start
+  tries once more. The app recognises a limit only by codex's wording or the service's error code,
+  as nothing else reports it ([details](docs/research/2026-11-05-gpt-live-limits.md)). A refusal it
+  does not recognise, such as a line that drops with no reason given ("The voice session closed
+  (transport_closed)."), leaves the call on, so your next words try again; press **Stop** until the
+  limit resets.
 - A prompt sent to a session through Remote Control is not recorded in the voice's conversation
   as your words, though Claude's answer to it is
   ([SECURITY.md](SECURITY.md#what-session-text-can-do) says which prompts count as yours).

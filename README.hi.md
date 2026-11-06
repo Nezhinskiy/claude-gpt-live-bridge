@@ -28,7 +28,10 @@ LiveBridge एक macOS menu bar app है, जो आपके ChatGPT login �
 GPT-Live voice line तैयार रखता है (API key की ज़रूरत नहीं)। Voice फ्रंट डेस्क की तरह काम करता है:
 वह बातचीत करता है, पूछता है कि आपका मतलब क्या है, और असली काम एक छोटे Claude Code mod,
 `livebridge`, के ज़रिए आपके Claude Code session को सौंप देता है। Claude अपने model, tools और
-permission mode से काम करता है, और voice आपको नतीजा बताता है।
+permission mode से काम करता है, और voice आपको नतीजा बताता है। Claude के काम करते समय line खुली रखने
+की ज़रूरत नहीं: उसका जवाब बंद line को फिर से खोलता है और voice उसे बोलता है। Voice यह भी जानता
+रहता है कि आप session में क्या टाइप करते हैं और Claude क्या जवाब देता है, इसलिए आप बोलने और टाइप
+करने के बीच आ-जा सकते हैं।
 
 *मूल पाठ अंग्रेज़ी में है ([README.md](README.md)); यह अनुवाद पीछे रह सकता है।*
 
@@ -54,7 +57,7 @@ line खुली हो, और Claude का काम आपके Claude Cod
 ## त्वरित शुरुआत
 
 आपको चाहिए: Apple Silicon पर macOS 14+, Claude Code 2.1.301+, और [codex](https://github.com/openai/codex),
-जिसमें `codex login` से ऐसे ChatGPT plan पर sign in किया गया हो जिसमें realtime voice शामिल है;
+जिसमें `codex login` से ऐसे ChatGPT plan पर sign in किया गया हो जिसके Codex में voice शामिल है;
 app को खुद build करने के लिए Swift 6.0+ वाला Xcode भी। विवरण [आवश्यकताएँ](#आवश्यकताएँ) में हैं।
 
 ```sh
@@ -87,7 +90,8 @@ Update, अनुमतियाँ, नए build के बाद भी microp
 - [Codex CLI](https://github.com/openai/codex) (`codex`, 0.166.0 के साथ टेस्ट किया गया), जो
   Homebrew (`brew install --cask codex`) या npm (`npm install -g @openai/codex`) से install हो,
   Terminal window में आपके shell द्वारा सेट किए गए `PATH` पर हो, और `codex login` से ऐसे ChatGPT plan
-  पर sign in हो जिसमें realtime voice शामिल है। जिस codex की `codex features list` LiveBridge पढ़
+  पर sign in हो जिसके Codex में voice शामिल है (Plus, Pro, Business, Enterprise या Education,
+  [OpenAI की Codex pricing](https://learn.chatgpt.com/docs/pricing) के अनुसार)। जिस codex की `codex features list` LiveBridge पढ़
   नहीं पाता, उसे वह अस्वीकार कर देता है, इसलिए कोई दूसरा संस्करण तब तक शुरू नहीं हो सकता जब तक
   LiveBridge अपडेट न हो।
 - App build करने के लिए: Swift 6.0 या उसके बाद के toolchain वाला Xcode। टेस्ट किए गए संस्करण
@@ -233,7 +237,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   हो, तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे
   वापस ले आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
-  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है), उपयोग की सीमाएँ, मिनट,
+  **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है, voice के Claude को सौंपे
+  हर अनुरोध के लिए एक **Task** पंक्ति के साथ), उपयोग की सीमाएँ, मिनट,
   **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
   चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice उसे
@@ -295,8 +300,19 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   [SECURITY.md](SECURITY.md) बताता है कि सुरक्षा उपाय क्या है।
 - वह नतीजे session के नाम के साथ एक-दो वाक्यों में पढ़कर सुनाता है। Code blocks और tables session में
   ही रहते हैं, और जो credentials वह पहचान लेता है उन्हें छिपा (redact) दिया जाता है।
+- Claude का काम पूरा होने पर वह लौट आता है। line खुली रखने की ज़रूरत नहीं: बातचीत शांत होने पर line
+  बंद हो जाती है, और आपके अनुरोध पर Claude का जवाब, आपसे पूछा गया उसका सवाल या जिस permission prompt
+  का वह इंतज़ार कर रहा है, वह line को फिर से खोलता है और voice उसे बोलता है, इसलिए Claude के काम
+  करते समय आप जा सकते हैं। यह उस session के लिए है जिससे आप बात कर रहे हैं; दूसरे session का नतीजा
+  chime बजाकर इंतज़ार करता है ([billing कैसे होती है](#बिलिंग-का-ध्यान-रखने-वाला-डिज़ाइन))। अगर फिर
+  से खुली line पर voice चुप रहे, तो जवाब भी chime बजाकर इंतज़ार करता है, इसलिए वह खोता नहीं ([ज्ञात
+  सीमाएँ](#ज्ञात-सीमाएँ))।
 - जब Claude कोई सवाल पूछता है, तो voice उसे आपके सामने रखता है और आपका जवाब उसी session को वापस
-  भेजता है। Claude जो काम बाद में background में पूरा करता है, उसकी रिपोर्ट update के रूप में दी जाती है।
+  भेजता है। Claude काम करते हुए जो सवाल पूछता है (विकल्पों वाला dialog), उसके साथ भी ऐसा ही होता है:
+  voice आपको उसके बारे में बताता है, विकल्पों को अपने शब्दों में समझाता है और जब तक आप चाहें आपसे उन
+  पर बात करता है, Claude से पूछे बिना। आप जो तय करते हैं, कोई विकल्प या Claude से वापस कोई सवाल, वही
+  dialog का जवाब बनता है; आप चाहें तो keyboard पर भी जवाब दे सकते हैं। Claude जो काम बाद में
+  background में पूरा करता है, उसकी रिपोर्ट update के रूप में दी जाती है।
 - जब Claude किसी permission prompt का इंतज़ार कर रहा हो, तो voice यह बताता है, सिवाय
   [वहाँ जहाँ कोई organization Claude Code को manage करता है](#ज्ञात-सीमाएँ)। Prompt का जवाब आप
   Claude Code में देते हैं; LiveBridge उसका जवाब कभी आपकी जगह नहीं देता।
@@ -338,8 +354,12 @@ Realtime voice session खुली रहने तक खर्च होत�
   आगे ले जाई जाती है, और Stop और Start के पार भी, ताकि voice को याद रहे कि आपने एक मिनट पहले क्या
   कहा था। नया target conversation बदल देता है: खुली line बंद हो जाती है, और आपके अगले शब्द उसे नए target
   की conversation के साथ खोलते हैं।
-- Menu वे मिनट दिखाता है जितनी देर line खुली रही, जैसा app ने नापा; आपका plan realtime voice को कैसे
-  मीटर करता है, यह प्रकाशित नहीं है।
+- Menu वे मिनट दिखाता है जितनी देर line खुली रही, जिन्हें app voice के connect होने से गिनता है,
+  इसलिए आपका plan थोड़ा ज़्यादा गिन सकता है। OpenAI desktop voice की कीमत आपके Codex usage budget के
+  प्रति मिनट के हिसाब से तय करता है, और उसके API पर मॉडल का वही परिवार मौन का भी बिल बनाता है
+  ([विवरण](docs/research/2026-11-04-gpt-live-billing.md),
+  [सीमाएँ](docs/research/2026-11-05-gpt-live-limits.md)); आपके plan का अपना usage page ही प्रामाणिक
+  है।
 - Menu दिखाता है कि आपके Codex और Claude usage का कितना हिस्सा इस्तेमाल हो चुका है: हर एक की एक
   पंक्ति, plan जितनी windows बताता है उनमें से हर एक का इस्तेमाल हुआ प्रतिशत (हर पंक्ति में अधिकतम
   तीन, जैसे `7% of 5 h · 19% of week`), 90 % या उससे अधिक होने पर नारंगी; किसी पंक्ति पर hover करने
@@ -423,7 +443,6 @@ Uninstall करने से वे सब हट जाती हैं।
 
 ## ज्ञात सीमाएँ
 
-- Remote Control से किसी session को भेजा गया prompt voice की conversation में आपके शब्दों के रूप में दर्ज नहीं होता, हालाँकि उस पर Claude का जवाब दर्ज होता है ([SECURITY.md](SECURITY.md#what-session-text-can-do) बताता है कि कौन-से prompt आपके माने जाते हैं)।
 - voice कभी-कभी कहता है कि वह देख रहा है ("On it", "Looking now"), पर अनुरोध Claude को नहीं सौंपता,
   इसलिए Claude तक कुछ नहीं पहुँचता: [टेस्टिंग](docs/bugs/BR-001.md) में लगभग पाँच में से एक अनुरोध,
   जबकि voice का नियम इसकी मनाही करता है। जब app किसी अनुरोध को Claude की queue में डालता है, तो एक
@@ -433,12 +452,23 @@ Uninstall करने से वे सब हट जाती हैं।
   codex में ऐसा कोई call नहीं है जो voice को तुरंत बुलवाए, इसलिए कब बोलना है यह model तय करता है।
   टेस्टिंग में वह कुछ सेकंड के भीतर बोल गया। अगर नहीं बोलता, तो नतीजा न सुना हुआ रहता है: voice उसे आपके
   अगले शब्दों के बाद सुनाता है, या line बंद होने पर chime बजती है।
-- जब Claude का जवाब line को फिर से खोलता है, तो voice कभी-कभी चुप रहता है
-  ([माप](docs/adr/0001-platform-findings.md))। तब line 5 सेकंड बाद बंद हो जाती है और जवाब chime
-  बजाकर इंतज़ार करता है, जैसा नीचे बताया गया है।
+- जब Claude का जवाब line को फिर से खोलता है, तो voice चुप रह सकता है: मापे गए 14 में से 4 runs में
+  ऐसा हुआ, जो छोटा नमूना है ([ADR 0001 (n)](docs/adr/0001-platform-findings.md))। तब line connect
+  होने के 5 सेकंड बाद बंद हो जाती है और जवाब chime बजाकर इंतज़ार करता है, जैसा नीचे बताया गया है।
+  जहाँ voice बोला, वहाँ उसने connect के लगभग 2 सेकंड के भीतर बोलना शुरू किया; जो voice उन 5 सेकंड के
+  बाद शुरू होता, वह कट जाता है।
 - जब आपके अगले शब्द line को फिर से खोलते हैं, तो voice कभी-कभी सिर्फ़ उन्हीं का जवाब देता है और
   इंतज़ार कर रहा नतीजा नहीं सुनाता। नतीजा खोता नहीं है: वह इंतज़ार में रहता है, line बंद होने पर chime
   बजाता है और notification भेजता है, और अगली बार line खुलने पर फिर से voice को जाता है।
+- आपके ChatGPT plan की usage limit पर voice तब तक रुक जाता है जब तक limit reset न हो। Menu और band
+  यह बताते हैं, codex के वाक्य में और जहाँ codex दे वहाँ reset के समय के साथ, और call खत्म हो जाती
+  है, ताकि बोलने से विफल होने वाली lines न खुलें। Claude Code काम करता रहता है, जवाब इंतज़ार करते
+  रहते हैं, और Start एक बार फिर कोशिश करता है। app किसी limit को सिर्फ़ codex के शब्दों या service
+  के error code से पहचानता है, क्योंकि और कुछ यह नहीं बताता
+  ([विवरण](docs/research/2026-11-05-gpt-live-limits.md))। जिस इनकार को वह नहीं पहचानता, जैसे बिना
+  कारण बताए गिरी हुई line ("The voice session closed (transport_closed)."), उसमें call चालू रहती है,
+  इसलिए आपके अगले शब्द फिर कोशिश करते हैं; limit reset होने तक **Stop** दबाएँ।
+- Remote Control से किसी session को भेजा गया prompt voice की conversation में आपके शब्दों के रूप में दर्ज नहीं होता, हालाँकि उस पर Claude का जवाब दर्ज होता है ([SECURITY.md](SECURITY.md#what-session-text-can-do) बताता है कि कौन-से prompt आपके माने जाते हैं)।
 - जो Claude Code session mod के load होने से पहले ही खुला था, उसमें `/live` चलने से पहले उसे दोबारा
   खोलना पड़ सकता है।
 - Claude desktop app में, ऐसे session में टाइप किया गया `/live` जिसका Claude Code process अभी शुरू

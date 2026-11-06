@@ -29,7 +29,9 @@ prête à l'emploi via `codex app-server`, avec votre connexion ChatGPT (sans cl
 fait office d'accueil : elle discute, demande ce que vous voulez dire, et confie le vrai travail
 à votre session Claude Code par l'intermédiaire d'un petit mod Claude Code, `livebridge`. Claude
 fait le travail avec son propre modèle, ses propres outils et son propre mode de permissions, et
-la voix vous annonce le résultat.
+la voix vous annonce le résultat. Inutile de garder la ligne ouverte pendant que Claude travaille :
+sa réponse rouvre la ligne fermée et la voix la dit. La voix suit aussi ce que vous tapez dans la
+session et ce que Claude répond, vous pouvez donc passer de la parole au clavier.
 
 *Le texte anglais fait foi ([README.md](README.md)) ; cette traduction peut avoir du retard.*
 
@@ -58,8 +60,8 @@ et ce que cela ne protège pas.
 ## Démarrage rapide
 
 Il vous faut macOS 14+ sur Apple Silicon, Claude Code 2.1.301+, et
-[codex](https://github.com/openai/codex) connecté (`codex login`) à une offre ChatGPT incluant la
-voix en temps réel ; pour compiler l'application vous-même, il faut aussi Xcode avec Swift 6.0+.
+[codex](https://github.com/openai/codex) connecté (`codex login`) à une offre ChatGPT dont le Codex
+inclut la voix ; pour compiler l'application vous-même, il faut aussi Xcode avec Swift 6.0+.
 Le détail se trouve sous [Prérequis](#prérequis).
 
 ```sh
@@ -93,7 +95,8 @@ sous [Installation](#installation).
 - [Codex CLI](https://github.com/openai/codex) (`codex`, testé avec 0.166.0), installé avec
   Homebrew (`brew install --cask codex`) ou npm (`npm install -g @openai/codex`), présent dans le
   `PATH` que votre shell définit dans une fenêtre Terminal, et connecté avec `codex login` à une
-  offre ChatGPT incluant la voix en temps réel. LiveBridge refuse un codex dont il ne peut pas
+  offre ChatGPT dont le Codex inclut la voix (Plus, Pro, Business, Enterprise ou Education, selon
+  les [tarifs de Codex d'OpenAI](https://learn.chatgpt.com/docs/pricing)). LiveBridge refuse un codex dont il ne peut pas
   lire le `codex features list`, donc une autre version peut ne pas démarrer tant que LiveBridge
   n'a pas été mis à jour.
 - Pour compiler l'application : Xcode avec une chaîne d'outils Swift 6.0 ou ultérieure. Les
@@ -255,7 +258,9 @@ parlez.
   `/live on` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
-  la conserve, les limites d'utilisation, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt), **Settings…** et
+  la conserve (avec une ligne **Task** pour chaque demande que la voix a transmise à Claude), les
+  limites d'utilisation, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt),
+  **Settings…** et
   **Quit LiveBridge**.
 - **Mute** (à côté de **Stop**, dans la bande et dans la carte d'appel du menu ; **Unmute** quand le
   micro est coupé) libère votre microphone pendant que l'appel continue : une réponse de Claude
@@ -324,8 +329,21 @@ parlez.
   [SECURITY.md](SECURITY.md) explique ce qui en est une.
 - Elle relit les résultats en une phrase ou deux, avec le nom de la session. Les blocs de code et
   les tableaux restent dans la session, et les identifiants qu'elle reconnaît sont masqués.
-- Quand Claude pose une question, la voix vous la pose et renvoie votre réponse à cette session.
-  Le travail que Claude termine plus tard en arrière-plan est signalé comme une mise à jour.
+- Elle revient quand Claude a fini. Inutile de garder la ligne ouverte : elle se ferme quand la
+  conversation retombe, et la réponse de Claude à votre demande, une question qu'il vous pose ou une
+  demande de permission qu'il attend la rouvre et la voix le dit, vous pouvez donc vous éloigner
+  pendant que Claude travaille. Cela vaut pour la session à laquelle vous parlez ; un résultat d'une
+  autre session joue un carillon et attend ([comment c'est
+  facturé](#facturation-maîtrisée-par-conception)). Si la voix reste muette sur la ligne rouverte,
+  la réponse joue aussi un carillon et attend, elle n'est donc pas perdue ([limitations
+  connues](#limitations-connues)).
+- Quand Claude pose une question, la voix vous la pose et renvoie votre réponse à cette session. Il
+  en va de même d'une question que Claude pose pendant qu'il travaille (la boîte de dialogue à
+  options) : la voix vous en parle, explique les options avec ses propres mots et en discute avec
+  vous aussi longtemps que vous voulez, sans interroger Claude. Ce que vous décidez, une option ou
+  une question en retour à Claude, répond à la boîte de dialogue ; vous pouvez toujours y répondre
+  au clavier. Le travail que Claude termine plus tard en arrière-plan est signalé comme une mise à
+  jour.
 - Quand Claude attend une demande de permission, la voix le dit, sauf
   [là où une organisation administre Claude Code](#limitations-connues). Vous répondez à la
   demande dans Claude Code ; LiveBridge n'y répond jamais à votre place.
@@ -373,8 +391,13 @@ attend votre autorisation :
   session temps réel suivante, et d'un Stop à un Start, de sorte que la voix se souvient de ce que
   vous avez dit il y a une minute. Une nouvelle cible change de conversation : une ligne ouverte
   se ferme, et vos prochains mots l'ouvrent avec la conversation de la nouvelle cible.
-- Le menu affiche les minutes pendant lesquelles la ligne a été ouverte, mesurées par
-  l'application ; la manière dont votre offre mesure la voix en temps réel n'est pas publiée.
+- Le menu affiche les minutes pendant lesquelles la ligne a été ouverte, comptées par l'application
+  à partir du moment où la voix se connecte, donc votre offre peut compter un peu plus. OpenAI
+  facture la voix sur ordinateur à la minute de votre budget d'usage Codex, et sur son API la même
+  famille de modèles facture aussi le silence
+  ([détails](docs/research/2026-11-04-gpt-live-billing.md),
+  [limites](docs/research/2026-11-05-gpt-live-limits.md)) ; la page d'usage de votre offre fait
+  autorité.
 - Le menu indique quelle part de votre usage de Codex et de Claude est consommée, une ligne chacun,
   en pourcentage utilisé de chaque fenêtre que l'offre signale (jusqu'à trois par ligne, par
   exemple `7% of 5 h · 19% of week`), en orange à partir de 90 % ; survolez une ligne pour voir
@@ -470,7 +493,6 @@ session.
 
 ## Limitations connues
 
-- Un prompt envoyé à une session par Remote Control n'est pas enregistré dans la conversation de la voix comme vos mots, mais la réponse de Claude l'est ([SECURITY.md](SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les vôtres).
 - La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande,
   si bien que rien n'arrive à Claude : environ une demande sur cinq lors des
   [tests](docs/bugs/BR-001.md), alors que la règle de la voix l'interdit. L'application joue un
@@ -482,13 +504,26 @@ session.
   décide du moment. Lors des tests, elle a parlé en quelques secondes. Si ce n'est pas le cas, le
   résultat reste non entendu : la voix le dit après vos prochains mots, ou un carillon retentit
   à la fermeture de la ligne.
-- Quand la réponse de Claude rouvre la ligne, la voix reste parfois muette
-  ([mesuré](docs/adr/0001-platform-findings.md)). La ligne se ferme alors au bout de 5 secondes,
-  et la réponse joue un carillon et attend, comme ci-dessous.
+- Quand la réponse de Claude rouvre la ligne, la voix peut rester muette : c'est arrivé dans 4 des
+  14 essais mesurés, un petit échantillon ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). La
+  ligne se ferme alors 5 secondes après sa connexion, et la réponse joue un carillon et attend,
+  comme ci-dessous. Quand la voix a parlé, elle a commencé dans les 2 secondes environ après la
+  connexion ; une voix qui commencerait après ces 5 secondes est coupée.
 - Quand vos prochains mots rouvrent la ligne, la voix répond parfois uniquement à ceux-ci sans
   dire le résultat en attente. Le résultat n'est pas perdu : il reste en attente, déclenche un
   carillon et publie une notification à la fermeture de la ligne, et il est de nouveau transmis à
   la voix à la prochaine ouverture de la ligne.
+- À la limite d'utilisation de votre offre ChatGPT, la voix s'arrête jusqu'à ce que la limite se
+  réinitialise. Le menu et la bande le disent, dans la phrase de codex avec son heure de
+  réinitialisation quand codex la donne, et l'appel se termine, pour que la parole n'ouvre pas de
+  lignes qui échouent. Claude Code continue de travailler, les réponses continuent d'attendre, et
+  Start réessaie une fois. L'application ne reconnaît une limite qu'à la formulation de codex ou au
+  code d'erreur du service, car rien d'autre ne la signale
+  ([détails](docs/research/2026-11-05-gpt-live-limits.md)). Un refus qu'elle ne reconnaît pas, comme
+  une ligne qui tombe sans raison donnée (« The voice session closed (transport_closed). »), laisse
+  l'appel actif, et vos prochains mots réessaient ; appuyez sur **Stop** jusqu'à la réinitialisation
+  de la limite.
+- Un prompt envoyé à une session par Remote Control n'est pas enregistré dans la conversation de la voix comme vos mots, mais la réponse de Claude l'est ([SECURITY.md](SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les vôtres).
 - Une session Claude Code déjà ouverte avant le chargement du mod peut devoir être rouverte pour
   que `/live` y fonctionne.
 - Dans l'application de bureau Claude, `/live` saisi dans une session dont le processus Claude
