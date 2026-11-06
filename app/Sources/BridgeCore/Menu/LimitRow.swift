@@ -48,10 +48,17 @@ public struct LimitRow: Sendable, Equatable {
     }
     let timeOnly = formatted("jmm")
     let dayAndTime = formatted("EEEjmm")
-    /// The time on today's date, else the short weekday and the time.
+    let dateAndTime = formatted("dMMMjmm")
+    /// The time on today's date; within six days of today the short weekday and the time; further
+    /// off, either way, the date and the time (a weekday alone could mean any week).
     func when(_ date: Date) -> (text: String, isToday: Bool) {
       let isToday = calendar.isDate(date, inSameDayAs: now)
-      return ((isToday ? timeOnly : dayAndTime).string(from: date), isToday)
+      let days =
+        calendar.dateComponents(
+          [.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)
+        ).day ?? 0
+      let formatter = isToday ? timeOnly : abs(days) <= 6 ? dayAndTime : dateAndTime
+      return (formatter.string(from: date), isToday)
     }
 
     var lines: [String] = []

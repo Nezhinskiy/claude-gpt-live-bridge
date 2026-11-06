@@ -369,6 +369,24 @@ struct LimitRowTests {
     #expect(row?.tooltip.hasSuffix("Read at Mon 05:08") == true)
   }
 
+  @Test func aFarDateShowsTheDate() {
+    func tooltip(reset: Date, readAt: Date) -> String? {
+      let limits = UsageLimits(
+        windows: [LimitWindow(span: .minutes(43200), usedPercent: 6, resetsAt: reset)],
+        readAt: readAt)
+      return Self.row(limits)?.tooltip
+    }
+    let october = Self.utc.date(from: DateComponents(year: 2026, month: 10, day: 30, hour: 5))!
+    // Six days either way keeps the weekday.
+    #expect(
+      tooltip(reset: Self.at(12, 8, 1), readAt: Self.at(1, 5, 8))
+        == "30-day window resets Thu 08:01\nRead at Sun 05:08")
+    // Seven days either way shows the date.
+    #expect(
+      tooltip(reset: Self.at(13, 8, 1), readAt: october)
+        == "30-day window resets 13 Nov at 08:01\nRead at 30 Oct at 05:00")
+  }
+
   @Test func aBlockedTooltipOpensWithTheBlock() {
     let row = Self.row(Self.limits(blocked: true))
     #expect(

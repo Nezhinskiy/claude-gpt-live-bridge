@@ -41,8 +41,9 @@ Claude  40% of 5 h · 22% of week
   Read at 05:08
   ```
 
-  A time today shows as the time, on another day as the short weekday and the time, for resets and
-  "Read at" alike, in the Mac's locale and time zone.
+  A time today shows as the time, on another day within six days as the short weekday and the
+  time, and further off, either way, as the date and the time (`13 Nov at 08:01` in en_GB), for
+  resets and "Read at" alike, in the Mac's locale and time zone.
 - If codex says ordinary usage is not allowed right now (`ordinaryUsageAllowed: false`), the Codex
   row is orange, ends with the word `blocked`, and its tooltip opens with "Codex reports usage is
   blocked right now." The figures may be well under 100 % then: `account.rs` tells clients not to
