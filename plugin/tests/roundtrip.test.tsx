@@ -399,7 +399,7 @@ test('aKeyboardAnswerIsSynced', async ($, on) => {
   world.answerDialog('out')
   await typed
   const said = keyboardAnswer({ answers: { [ASKED[0]!.question]: 'out' } })
-  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'owner', text: said }])
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', ...said }])
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed.' })
   // In a voice turn too.
   world.take('sync')
@@ -410,7 +410,7 @@ test('aKeyboardAnswerIsSynced', async ($, on) => {
   await world.clock.advance(1000)
   world.answerDialog('out')
   await spoken
-  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't2', from: 'owner', text: said }])
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't2', ...said }])
 })
 
 test('aQuestionCancelledAtTheKeyboardSaysItWasClosed', async ($, on) => {
@@ -423,7 +423,37 @@ test('aQuestionCancelledAtTheKeyboardSaysItWasClosed', async ($, on) => {
   await world.clock.advance(1000)
   world.cancelDialog()
   await asked
-  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', from: 'owner', text: keyboardAnswer(undefined) }])
+  expect(world.take('sync')).toEqual([{ sessionId: ID, turnId: 't1', ...keyboardAnswer(undefined) }])
+})
+
+/** A question cancelled under the pause: the owner typed nothing, so the turn keeps its answer. */
+test('aClosedQuestionDoesNotRefuseASyncedTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.isPausing = true
+  world.cancelDialog()
+  await asked
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Left as it was.' })
+  expect(world.kept).toContain('Left as it was.')
+})
+
+/** A real answer is what the owner typed: under the pause it refuses the rest of the turn. */
+test('aKeyboardAnswerUnderThePauseRefusesTheTurn', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...LIVE, args: 'on' })
+  await $.turn.start({ text: 'Rename the folder', turnId: 't1' })
+  const asked = $.tool.call({ tool: 'AskUserQuestion', questions: ASKED })
+  await world.clock.advance(1000)
+  world.isPausing = true
+  world.answerDialog('out')
+  await asked
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Renamed to out.' })
+  expect(world.kept).toEqual([])
 })
 
 test('aSpokenReplyMakesTheTurnAVoiceTurn', async ($, on) => {

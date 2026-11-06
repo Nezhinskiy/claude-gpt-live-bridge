@@ -89,24 +89,31 @@ test('claudesQuestionIsToldWithItsOptions', () => {
 })
 
 test('aKeyboardAnswerSaysWhatWasChosen', () => {
-  const said = keyboardAnswer({ answers: { 'Which name?': 'out' } })
-  assert.match(said, /out/)
-  assert.doesNotMatch(said, /Which name/)
+  const { text } = keyboardAnswer({ answers: { 'Which name?': 'out' } })
+  assert.match(text, /out/)
+  assert.doesNotMatch(text, /Which name/)
 })
 
 test('aKeyboardAnswerHoldsEveryLabel', () => {
-  const said = keyboardAnswer({ answers: { 'Which name?': 'out', 'Which folder?': 'src' } })
-  assert.match(said, /out/)
-  assert.match(said, /src/)
+  const { text } = keyboardAnswer({ answers: { 'Which name?': 'out', 'Which folder?': 'src' } })
+  assert.match(text, /out/)
+  assert.match(text, /src/)
 })
 
 test('aKeyboardAnswerHoldsTheFreeText', () => {
-  assert.match(keyboardAnswer({ answers: {}, response: 'neither, ask me later' }), /neither, ask me later/)
+  assert.match(keyboardAnswer({ answers: {}, response: 'neither, ask me later' }).text, /neither, ask me later/)
 })
 
-test('aQuestionClosedWithNoAnswerSaysSo', () => {
+test('aKeyboardAnswerIsTheOwners', () => {
+  assert.equal(keyboardAnswer({ answers: { 'Which name?': 'out' } }).from, 'owner')
+  assert.equal(keyboardAnswer({ answers: {}, response: 'neither' }).from, 'owner')
+})
+
+/** The owner wrote nothing: under the pause an owner's line would refuse the turn. */
+test('aQuestionClosedWithNoAnswerIsClaudes', () => {
   const closed = keyboardAnswer(undefined)
-  assert.notEqual(closed, '')
-  assert.equal(keyboardAnswer({ answers: {} }), closed)
-  assert.equal(keyboardAnswer({ answers: { 'Which name?': ' ' }, response: '' }), closed)
+  assert.equal(closed.from, 'claude')
+  assert.notEqual(closed.text, '')
+  assert.deepEqual(keyboardAnswer({ answers: {} }), closed)
+  assert.deepEqual(keyboardAnswer({ answers: { 'Which name?': ' ' }, response: '' }), closed)
 })

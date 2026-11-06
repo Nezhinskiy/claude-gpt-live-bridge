@@ -481,7 +481,8 @@ also settled the seed's limit: codex counts UTF-8 bytes over 4, and refuses a st
     // no-op with no turn, a voice turn, or an older app's undefined. forRequest === replyId: the rest
     // of the turn is a voice turn, with its follow-up window. Otherwise: an update to forRequest
   // prompt.ts
-  export function keyboardAnswer(result: { answers?: Record<string, string>; response?: string } | undefined): string
+  export function keyboardAnswer(result: { answers?: Record<string, string>; response?: string } | undefined): { from: SyncSource; text: string }
+    // `from` is 'owner' for a real answer and 'claude' for a question closed with none
   ```
 
   `running` keeps its meaning. `Tracked.id` may be null: a turn with no voice request behind it. A
@@ -603,7 +604,7 @@ also settled the seed's limit: codex counts UTF-8 bytes over 4, and refuses a st
   `tracker.current !== null`, and each `activity('approval')` carries `typedTurn` unless
   `current.isVoice`. `answerQuestion` resolves with the reply work item, so the race can tell a spoken
   reply from the dialog's result: a reply calls `tracker.replied` and saves; the dialog's result posts
-  `keyboardAnswer(first.result)` as `from: 'owner'`, in every turn. `tick`, finding no question open for a
+  `keyboardAnswer(first.result)`, with the `from` it gives, in every turn. `tick`, finding no question open for a
   `reply`, posts `failed` for its id with the reason `the question was answered at the keyboard`: a 409
   for a voice turn is harmless. `settles(e)` keeps its job. Lines are `from: 'claude'`, the mod's report
   and not the owner's typing:

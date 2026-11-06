@@ -164,7 +164,8 @@ line already open, repeating it is fine (the owner's decision, 2026-11-06).
   When a permission prompt settles, it posts that it was settled: allowed when the tool ran, and
   otherwise only settled, once the next model step or the turn's end shows the dialog is gone.
   That line is the mod's report, not the owner's typing, so it goes as Claude's and never refuses
-  a turn under the pause; a keyboard answer to Claude's question is the owner's.
+  a turn under the pause. So does a question closed with no answer; a keyboard answer to Claude's
+  question is the owner's.
 - The mod tracks whether every turn since the last delivered summary reached the app. When one did
   not (no link, a refused post, a lost voice answer, a turn before joining), its next join says the
   session is *missed*.

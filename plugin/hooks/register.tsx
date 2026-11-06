@@ -615,7 +615,7 @@ export const register: Register = on => {
         return { result: { questions: e.questions, answers: {}, response: spokenReply(first) } }
       }
       const result = first.isError === true ? undefined : first.result
-      await postSync($, { turnId: turn.turnId, from: 'owner', text: keyboardAnswer(result) })
+      await postSync($, { turnId: turn.turnId, ...keyboardAnswer(result) })
       return first
     } finally {
       await link?.activity('working')
