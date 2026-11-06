@@ -227,6 +227,13 @@ extension ContinuityTests {
     #expect(!continuity[b].isCurrent)
   }
 
+  @Test func forgetKeepsAnAdmittedDecisionToo() {
+    var continuity = Continuity()
+    #expect(admit(&continuity, "t1", .owner, a, pausing: false))
+    continuity.forget(a)
+    #expect(admit(&continuity, "t1", .claude, a, pausing: true))
+  }
+
   @Test func noContextIsNotCurrent() {
     var continuity = Continuity()
     continuity.record(.owner, "hi", in: a)
@@ -250,6 +257,14 @@ extension ContinuityTests {
     for n in 0..<30 { continuity.record(.owner, "\(n)".padding(2_000), in: a) }
     #expect(continuity[a].lines.count == 30)
     #expect(!continuity[a].isCurrent)
+  }
+
+  /// A summary covers the lines before it: the count starts again.
+  @Test func aSummaryAfterManyLinesIsCurrent() {
+    var continuity = Continuity()
+    for n in 0..<30 { continuity.record(.owner, "\(n)".padding(2_000), in: a) }
+    continuity.setContext("[CONTEXT] Alpha: x", for: a)
+    #expect(continuity[a].isCurrent)
   }
 
   @Test func linesRolledOffAreNotCurrent() {
