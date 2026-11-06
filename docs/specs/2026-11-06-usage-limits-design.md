@@ -135,7 +135,8 @@ process on the same lockdown argv.
 
 **Past its reset.** A window whose `resetsAt` has passed says nothing about the new window, so it is
 left out until a new reading comes. A window with no `resetsAt` is left out 15 minutes after the
-reading it came from, the same number as Codex's own staleness limit. That matters for Claude, whose readings arrive only with a turn.
+reading it came from, the same number as Codex's own staleness limit. Held windows that have expired are dropped before a new report is merged, so they take
+no slot from a live one. That matters for Claude, whose readings arrive only with a turn.
 
 **The menu.** `MenuContent` gets a limit item carrying the row's parts, tooltip and which windows are
 near the limit; `outline` prints it for the tests. All rules are pure and tested there. The

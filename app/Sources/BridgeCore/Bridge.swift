@@ -529,8 +529,9 @@ public actor Bridge: Router {
   }
 
   /// A joined session's reading of Claude's usage windows, merged into what is held: a session
-  /// that sat idle may report figures older than another's. A reset that is not an ISO 8601 time
-  /// is no reset.
+  /// that sat idle may report figures older than another's. What is held counts only while it is
+  /// current: an expired window takes no slot from a live one. A reset that is not an ISO 8601
+  /// time is no reset.
   private func limits(_ body: LimitsBody) async {
     guard (try? await label(of: body.sessionId)) != nil else { return }
     let windows = body.windows.compactMap { one -> LimitWindow? in
@@ -541,7 +542,7 @@ public actor Bridge: Router {
     }
     let reading = UsageLimits(windows: windows, readAt: time.now)
     guard !reading.windows.isEmpty else { return }
-    claudeLimits = claudeLimits?.merging(reading) ?? reading
+    claudeLimits = claudeLimits?.current(at: time.now).merging(reading) ?? reading
   }
 
   /// The span of a Claude window kind: `five_hour` and `seven_day` are the two lengths the app

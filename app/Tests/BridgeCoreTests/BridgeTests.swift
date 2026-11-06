@@ -1540,6 +1540,16 @@ struct BridgeTests {
     #expect(await bridge.current.claudeLimits?.windows.first?.usedPercent == 40)
   }
 
+  @Test func anExpiredWindowDoesNotTakeASlot() async throws {
+    try await join(a, "Alpha")
+    try await limits([LimitWindowBody(kind: "five_hour", percentUsed: 40, resetsAt: Self.reset)])
+    time.advance(by: .seconds(Self.resetDate.timeIntervalSince(time.now) + 60))
+    try await limits(
+      ["seven_day", "a", "b"].map { LimitWindowBody(kind: $0, percentUsed: 5, resetsAt: nil) })
+    let spans = try #require(await bridge.current.claudeLimits).windows.map(\.span)
+    #expect(spans == [.minutes(10080), .kind("a"), .kind("b")])
+  }
+
   @Test func anUnjoinedSessionIsIgnored() async throws {
     try await join(a, "Alpha")
     let reply = try await limits(
