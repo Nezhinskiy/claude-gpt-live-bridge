@@ -28,11 +28,11 @@ const UNDRAWN_MS = 3_000
 const HOOK_HOLD_MS = 200
 const LOST_ANSWER = 'LiveBridge did not get the last answer, so the voice will not say it; it is in this session.'
 const NO_SUMMARY = 'LiveBridge could not summarise this session; the voice has no new context.'
-const REMOVED_NOTE = 'Removed from LiveBridge. /live on joins again.'
+const REMOVED_NOTE = 'Removed from LiveBridge. /live joins again.'
 const LATE_REPLY = 'LiveBridge: the reply said by voice came after the question was answered here; Claude did not get it.'
 const ANSWERED_HERE = 'the question was answered at the keyboard'
 const UNREAD_VERSION = 'LiveBridge: the mod could not read its version from its plugin.json; Settings will list this session as on the old mod.'
-const USAGE = 'Usage: /live on | off | target | status | context'
+const USAGE = 'Usage: /live | /live off'
 
 type Reply = Extract<Work, { kind: 'reply' }>
 
@@ -196,7 +196,7 @@ async function ownVersion($: EngineInterface): Promise<string | undefined> {
   return undefined
 }
 
-/** Joins; `byOwner` when the owner typed /live on (a reload's resume is not their decision). */
+/** Joins; `byOwner` when the owner typed /live (a reload's resume is not their decision). */
 async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   // What the last join learnt about the app is stale: the owner may have opened or installed it.
   offlineSince = null
@@ -382,22 +382,21 @@ async function hasTurns($: EngineInterface): Promise<boolean> {
 }
 
 /**
- * Sends the session's summary to the app; says what happened and never rejects. `isFresh` asks
- * the model again even when no turn has completed since its last summary. While one is on its
- * way a second ask joins it.
+ * Sends the session's summary to the app; says what happened and never rejects. While one is on
+ * its way a second ask joins it.
  */
-function sendContext($: EngineInterface, isFresh: boolean): Promise<ContextOutcome> {
-  sending ??= deliverContext($, isFresh).finally(() => { sending = null })
+function sendContext($: EngineInterface): Promise<ContextOutcome> {
+  sending ??= deliverContext($).finally(() => { sending = null })
   return sending
 }
 
-async function deliverContext($: EngineInterface, isFresh: boolean): Promise<ContextOutcome> {
+async function deliverContext($: EngineInterface): Promise<ContextOutcome> {
   if (!(await hasTurns($))) return 'empty'
   const send = ++sendCount
   await showContext($, 'loading')
   let timer: { cancel(): void } | undefined
   const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
-  const outcome = await Promise.race([writeAndPost($, isFresh, send), late])
+  const outcome = await Promise.race([writeAndPost($, send), late])
   timer?.cancel()
   if (outcome !== 'sent') sendCount += 1  // a summary this send writes after its time is dropped
   await showContext($, outcome === 'sent' ? 'sent' : undefined)
@@ -407,10 +406,10 @@ async function deliverContext($: EngineInterface, isFresh: boolean): Promise<Con
   return outcome
 }
 
-async function writeAndPost($: EngineInterface, isFresh: boolean, send: number): Promise<ContextOutcome> {
+async function writeAndPost($: EngineInterface, send: number): Promise<ContextOutcome> {
   try {
     const turns = turnsDone
-    const text = !isFresh && summary !== null ? summary : await summarize($)
+    const text = summary ?? (await summarize($))
     if (send !== sendCount) return 'failed'
     if (text === '') return 'empty'
     if (turns === turnsDone) summary = text
@@ -423,12 +422,12 @@ async function writeAndPost($: EngineInterface, isFresh: boolean, send: number):
 /** The summary asked for by the app, which has no reply line of its own. */
 async function contextAsked($: EngineInterface): Promise<void> {
   // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
-  if ((await sendContext($, false)) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
+  if ((await sendContext($)) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
 }
 
 async function statusText($: EngineInterface): Promise<string> {
   const state = await read($, band)
-  if (state === null) return 'Voice is off for this session. /live on joins LiveBridge.'
+  if (state === null) return 'Voice is off for this session. /live joins LiveBridge.'
   const status = state.status
   if (!state.isOffline && status === undefined) return JOINING
   if (state.isOffline || status === undefined) return `LiveBridge is not reachable. ${state.problem ?? ''}`.trim()
@@ -436,37 +435,29 @@ async function statusText($: EngineInterface): Promise<string> {
     `${Math.round(status.minutesToday)} min today.${status.problem ? ` ${status.problem}` : ''}`
 }
 
-/** `/live on|off|target|status|context`. */
+/**
+ * `/live` joins, and in a joined session answers the status; `/live off` leaves. Not a toggle, so a
+ * repeated `/live` never leaves. `on` is `/live` under its old name.
+ */
 async function live($: EngineInterface, args: string): Promise<string> {
-  // ''.split(/\s+/) is [''], which would leave the default unused.
-  const [verb = 'status', option] = args.trim() === '' ? [] : args.trim().split(/\s+/)
-  const joined = link?.session
-  if (verb === 'status') return statusText($)
-  if (verb === 'on') {
-    return serial(async () => {
-      if (link?.session) {
-        redrawBand($)  // the owner's way back to a band the surface lost
-        return 'This session has already joined LiveBridge.'
-      }
-      // No title here: a new session's is still the one Claude Code derives from its folder, and
-      // the app shows the name the session is given next, once the poll follows it.
-      return (await turnOn($, true))
-        ? 'Joined LiveBridge.'
-        : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
-    })
-  }
-  if (!['off', 'target', 'context'].includes(verb) || option !== undefined) return USAGE
-  if (!joined) return 'This session has not joined LiveBridge.'
+  const verb = args.trim()
   if (verb === 'off') {
+    if (!link?.session) return 'This session has not joined LiveBridge.'
     await serial(() => turnOff($))
     return 'Left LiveBridge.'
   }
-  if (verb === 'target') {
-    await link?.target()
-    return 'This session is now the voice target.'
-  }
-  const sent = await sendContext($, true)
-  return sent === 'sent' ? 'Sent a summary of this session to LiveBridge.' : sent === 'empty' ? 'Nothing to summarise yet.' : NO_SUMMARY
+  if (verb !== '' && verb !== 'on') return USAGE
+  return serial(async () => {
+    if (link?.session) {
+      redrawBand($)  // the owner's way back to a band the surface lost
+      return statusText($)
+    }
+    // No title here: a new session's is still the one Claude Code derives from its folder, and
+    // the app shows the name the session is given next, once the poll follows it.
+    return (await turnOn($, true))
+      ? 'Joined LiveBridge.'
+      : 'LiveBridge is not running; the mod opens it and joins as soon as it is up.'
+  })
 }
 
 /**
@@ -535,7 +526,7 @@ async function declareCommand($: EngineInterface): Promise<void> {
     await $.command.register({
       name: 'live',
       description: 'Talk to this session by voice through LiveBridge',
-      argumentHint: 'on|off|target|status|context',
+      argumentHint: '[off]',
     })
   } catch (error) {
     $.ui.log(`LiveBridge could not declare /live: ${String(error)}`)

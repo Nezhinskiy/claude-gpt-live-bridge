@@ -1,7 +1,7 @@
 {
   "name": "livebridge",
   "version": "0.4.1",
-  "description": "Talk to a Claude Code session by voice through the LiveBridge menu bar app: /live on|off|target|status|context.",
+  "description": "Talk to a Claude Code session by voice through the LiveBridge menu bar app: /live joins, /live off leaves.",
   "author": {
     "name": "getLiveBridge"
   },

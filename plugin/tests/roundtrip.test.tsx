@@ -20,7 +20,7 @@ const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
 test('roundtrip', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true })
-  const reply = await $.command.run({ ...LIVE, args: 'on' })
+  const reply = await $.command.run({ ...LIVE, args: '' })
   expect(reply.text).toContain('Joined')
   expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, missed: true }])
   expect(world.read.every(path => path.endsWith('.json'))).toBe(true)
@@ -41,8 +41,8 @@ test('roundtrip', async ($, on) => {
 test('rejectedAnswerIsShownNotDropped', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('Joined')
-  expect((await $.command.run({ ...LIVE, args: 'status' })).text).toContain('joining')
+  expect((await $.command.run({ ...LIVE, args: '' })).text).toContain('Joined')
+  expect((await $.command.run({ ...LIVE, args: '' })).text).toContain('joining')
   world.work.push({ kind: 'request', ...REQUEST })
   await world.clock.advance(1000)
   world.answerStatus = 409
@@ -186,7 +186,7 @@ test('aPermissionPromptBeforeJoiningIsNotSettled', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.turn.start({ text: 'Remove the build folder', turnId: 't1' })
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: '' })
   await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
   expect(world.take('sync')).toEqual([])
   expect(world.take('activity')).toEqual([])
@@ -1262,7 +1262,6 @@ test('aFailedSummaryIsReportedNotThrown', async ($, on) => {
   const world = fakeWorld(on)
   await liveOn($)
   world.forkFails = 'api-error'
-  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('could not summarise')
   world.work.push({ kind: 'context' })
   await world.clock.advance(1000)
   expect(world.take('context')).toEqual([])
@@ -1275,6 +1274,7 @@ test('theSummaryIsSentWholeForTheAppToRedactAndCap', async ($, on) => {
   const world = fakeWorld(on)
   await liveOn($)
   world.summary = `${'x'.repeat(1495)} sk-${'a'.repeat(30)}`
-  await $.command.run({ ...LIVE, args: 'context' })
+  world.work.push({ kind: 'context' })
+  await world.clock.advance(1000)
   expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary }])
 })
