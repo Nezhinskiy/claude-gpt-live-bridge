@@ -362,6 +362,28 @@ test('twoCommandsBehindALeaveJoinOnce', async ($, on) => {
   expect(world.take('join')).toHaveLength(1)
 })
 
+/** What the last join drew is gone: a status from before off must not answer for the new join. */
+test('aJoinAfterOffStartsFromNoBand', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await world.clock.advance(1000)
+  await $.command.run({ ...LIVE, args: 'off' })
+  await $.command.run({ ...LIVE, args: '' })
+  expect((await $.command.run({ ...LIVE, args: '' })).text).toBe('LiveBridge: joining…')
+})
+
+/** As after off: the removal takes the band with it. */
+test('aJoinAfterARemovalStartsFromNoBand', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await world.clock.advance(1000)
+  world.joined.delete(ID)
+  world.removed.add(ID)
+  await world.clock.advance(1000)
+  await $.command.run({ ...LIVE, args: '' })
+  expect((await $.command.run({ ...LIVE, args: '' })).text).toBe('LiveBridge: joining…')
+})
+
 test('aRepeatedCommandNeverLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await liveOn($)
