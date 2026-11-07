@@ -28,9 +28,12 @@ jobs:
         with:
           node-version: '26'
       - name: Install Claude Code
-        # Pinned: its API types and its test kit are what the mod is checked against. No login is
-        # needed for validate, test, or the mod's own command that lays the types.
-        run: npm install -g --no-audit --no-fund @anthropic-ai/claude-code@2.1.309
+        # Pinned by version and hash in .github/claude-code: its API types and its test kit are what
+        # the mod is checked against. No login is needed for validate, test, or the mod's own
+        # command that lays the types.
+        run: |
+          npm ci --prefix .github/claude-code --no-audit --no-fund
+          echo "$GITHUB_WORKSPACE/.github/claude-code/node_modules/.bin" >>"$GITHUB_PATH"
       - name: Select Xcode 27.2
         run: sudo xcode-select -s /Applications/Xcode_27.2.app
       - name: Show the toolchain

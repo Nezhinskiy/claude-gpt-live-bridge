@@ -2,7 +2,9 @@
 # Runs the mod's engine-facing checks on the lowest Claude Code the README promises, so the type
 # check, validation and tests must pass on that version; a need none of them reach still passes.
 # A mod cannot declare a minimum (ADR 0001, item p), so this run is what holds the number to the
-# code. README.md's Requirements line is the number's home: change it there and this run follows.
+# code. README.md's Requirements line is the number's home. The run installs it with npm ci from
+# .github/claude-code-floor, pinned by hash, so a new floor also needs that package.json's version
+# and `npm install --package-lock-only` there; the run refuses a lockfile that installs another.
 # CI runs this after check.sh, which installs plugin/node_modules. It downloads that Claude Code,
 # so check.sh does not run it. --print prints the number and stops.
 set -eu
@@ -25,7 +27,8 @@ fi
 dir=$(mktemp -d "${TMPDIR:-/tmp}/livebridge-floor.XXXXXX")
 trap 'rm -rf "$dir"' EXIT
 
-npm install --prefix "$dir" --no-audit --no-fund "@anthropic-ai/claude-code@$floor"
+cp .github/claude-code-floor/package.json .github/claude-code-floor/package-lock.json "$dir/"
+npm ci --prefix "$dir" --no-audit --no-fund
 PATH="$dir/node_modules/.bin:$PATH"
 found=$(claude --version)
 case "$found" in
