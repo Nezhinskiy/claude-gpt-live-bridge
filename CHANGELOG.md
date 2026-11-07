@@ -6,6 +6,12 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The sound for a waiting result is now LiveBridge's own instead of macOS's Glass, made to pair
+  with the sound for a queued request. It is shorter, 0.82 s instead of 1.65 s, and louder at its
+  peak.
+
 ## [0.4.1]
 
 ### Changed
