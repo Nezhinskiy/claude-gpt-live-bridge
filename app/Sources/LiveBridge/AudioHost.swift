@@ -134,7 +134,12 @@ final class AudioHost: NSObject, AudioSide {
 
   func flushPreroll() async { _ = try? await call("LB.flushPreroll()") }
 
-  func closePeer() async { _ = try? await call("LB.closePeer()") }
+  func closePeer() async {
+    #if DEBUG
+      tape?.mark("lineClosed")
+    #endif
+    _ = try? await call("LB.closePeer()")
+  }
 
   func chime() async { chimeSound?.play() }
 
