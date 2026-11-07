@@ -229,8 +229,9 @@ those shapes goes to OpenAI as typed, personal text included.
   also refuses the rest of a turn that began synced: Claude's later lines of it stay out too.
   While
   the setting is on, no line loads a summary by itself (`Bridge.openLine`), and none does for a
-  session marked paused after the setting is off again: only **Load context** or `/live context`
-  does, because a summary is written from the whole transcript and carries the paused text.
+  session marked paused after the setting is off again: only **Load context**
+  does, because a summary is written from the whole transcript and carries the paused text. An
+  older mod's `/live context` does too; the last point below says what that can do.
   What the pause does not do:
   - It removes nothing already recorded, in the data folder or in a line that is open.
   - It cannot stop Claude's later answers from repeating paused text: a Claude line of a turn
@@ -266,11 +267,15 @@ those shapes goes to OpenAI as typed, personal text included.
     turn admitted before Stop stays admitted, and its answer, which may repeat that prompt, is
     recorded. So may text typed as feedback at a permission dialog, which as far as the hooks show
     reaches none of them; that was not run.
-  - A `/live context` summary can reach past the pause and past a forget. It takes no more than the
-    pause on, the call off and typing during the command to clear the *paused* mark, and the paused
-    text may be in that summary; one written across **New conversation** brings back what was
-    forgotten ([BR-002](docs/bugs/BR-002.md)). This is accepted, as a 60 second window on an
-    explicit command.
+  - A summary nobody asked for can reach past the pause and past a forget. From 0.4.2 the mod sends
+    a summary only when the app asks for one, but the app still takes one it did not ask for, as it
+    cannot date it (`Bridge.context`): mods update separately from the app, so a session on an older
+    mod can send one with `/live context`. It takes no more than the pause on, the call off and
+    typing during that command to clear the *paused* mark, and the paused text may be in that
+    summary; one written across **New conversation** brings back what was forgotten
+    ([BR-002](docs/bugs/BR-002.md)). This is accepted, as a 60 second window on an explicit command.
+    The current mod can land there too, for about a second: the reply to a second ask that came
+    after a poll took the first and before that summary landed finds no ask open.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
   conversation** with the session as the target, or remove it with ×, or when 20 sessions used since
   push them out (which also loses a paused mark); a load of a new summary replaces the old one for

@@ -70,7 +70,7 @@ cd livebridge
 scripts/build-app.sh --release
 ```
 
-3. जिस Claude Code session से बात करनी है, उसमें `/live on` टाइप करें।
+3. जिस Claude Code session से बात करनी है, उसमें `/live` टाइप करें।
 4. prompt के ऊपर वाले band में **Start** दबाएँ, microphone की अनुमति दें, और बोलें।
 
 खुद build नहीं करना चाहते? हर [release](https://github.com/getLiveBridge/LiveBridge/releases/latest)
@@ -218,11 +218,8 @@ claude plugin uninstall livebridge@livebridge
 
 | Command | क्या करता है |
 |---|---|
-| `/live on` | session के title के नाम से LiveBridge से जुड़ता है, और app चल नहीं रहा हो तो उसे खोलता है। |
+| `/live` | session के title के नाम से LiveBridge से जुड़ता है, और app चल नहीं रहा हो तो उसे खोलता है। जुड़े हुए session में band वापस लाता है और एक पंक्ति में जवाब देता है: call, target, न सुने गए नतीजे, आज के मिनट। |
 | `/live off` | LiveBridge से अलग हो जाता है। |
-| `/live target` | इस session को वह session बनाता है जिसे voice काम सौंपता है। |
-| `/live status` (या सिर्फ़ `/live`) | एक पंक्ति: call, target, न सुने गए नतीजे, आज के मिनट। |
-| `/live context` | voice को इस session का नया सारांश भेजता है, जिसे session का model लिखता है। |
 
 Command `/live` है, `/voice` नहीं, क्योंकि `/voice` Claude Code का अपना voice mode है। call रुकी होने पर session में टाइप किया
 हुआ voice से बाहर रखा जाए या नहीं, यह कोई command नहीं है: यह सभी sessions के लिए एक
@@ -236,7 +233,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
   हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद कभी नहीं
   ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही हो,
-  तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे वापस ले
+  तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live` उसे वापस ले
   आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है, voice के Claude को सौंपे
@@ -261,8 +258,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   जाती है), session paused रहा है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
   date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर सारांश अभी नहीं है और कुछ खोया नहीं है, तो यह
   **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। सारांश पर कोई तारीख
-  नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है, और `/live context` विफल हो सकता है,
-  भूली हुई बात वापस ला सकता है या paused का निशान हटा सकता है ([BR-002](docs/bugs/BR-002.md))।
+  नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है ([BR-002](docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
   line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े
@@ -270,7 +266,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   ([विवरण](SECURITY.md#residual-risk-by-design))। **Pause sync** बंद हो और session paused न हो, तो
   अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें वह भी है जो session ने
   पढ़ा; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
-  session में `/live on` उसे फिर से जोड़ देता है।
+  session में `/live` उसे फिर से जोड़ देता है।
 
 ### सेटिंग्स
 
@@ -287,7 +283,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   तक Mac से कुछ बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू
   करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
   session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
-  के बाद भी नहीं: यह सिर्फ़ **Load context** या `/live context` करता है, और वह सारांश पूरे
+  के बाद भी नहीं: यह सिर्फ़ **Load context** करता है, और वह सारांश पूरे
   transcript से लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था। जिस turn में voice
   अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
@@ -459,7 +455,7 @@ release मिलने पर app `gh auth status` चलाता है, य�
 ([यह कैसे रखी जाती है](SECURITY.md#residual-risk-by-design))। किसी session की पंक्तियाँ तब जाती हैं जब आप
 उसे target रखकर **New conversation** दबाते हैं या उसे × से हटाते हैं। जो session चला गया है, उसकी
 पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए 20 sessions उन्हें बाहर न धकेल दें; उन्हें
-जल्दी मिटाने के लिए, उसी session में फिर से `/live on` चलाएँ और **New conversation** दबाएँ।
+जल्दी मिटाने के लिए, उसी session में फिर से `/live` चलाएँ और **New conversation** दबाएँ।
 Uninstall करने से वे सब हट जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](SECURITY.md#residual-risk-by-design))।
 
 [SECURITY.md](SECURITY.md) में threat model है: संक्षेप में, जो कुछ भी आपका microphone सुन सकता है

@@ -62,7 +62,7 @@ struct SettingsView: View {
         Toggle("Pause sync while the call is stopped", isOn: setting(\.pauseSyncWhileStopped))
         Text(
           "What you type while the call is off stays out of the voice's conversation, and "
-            + "context loads only from the menu or /live context."
+            + "context loads only from the menu."
         )
         .font(.caption).foregroundStyle(.secondary)
       }

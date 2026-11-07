@@ -3,7 +3,7 @@
 LiveBridge lets you talk to an open Claude Code session by voice. It has two halves: a macOS
 menu bar app (Swift, `app/`) that runs a GPT-Live voice line through `codex app-server`, and a
 Claude Code mod, `livebridge` (TypeScript, `plugin/`), that joins a session to the app with
-`/live on` and turns the voice's handoffs into prompts. They talk HTTP over a Unix socket. This
+`/live` and turns the voice's handoffs into prompts. They talk HTTP over a Unix socket. This
 file is loaded into every agent session, so it stays short (at most 300 lines and 3,000 words,
 the status section at most 50 lines); detail lives in the documents it links to.
 
