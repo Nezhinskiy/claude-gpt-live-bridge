@@ -111,8 +111,8 @@ scripts/check-floor.sh
 ```
 
 It reads the version from the `Claude Code` line under Requirements in `README.md`, the number's
-home, and installs it to a temporary folder with `npm ci` from `.github/claude-code-floor`, pinned
-by hash. To change the floor, change that line, set the same version in that folder's
+home, and installs it in `.github/claude-code-floor` with `npm ci` from that folder's lockfile,
+pinned by hash. To change the floor, change that line, set the same version in that folder's
 `package.json` and run `npm install --package-lock-only` there; `check.sh` fails until every copy
 says the same.
 

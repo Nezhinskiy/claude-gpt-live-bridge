@@ -24,12 +24,9 @@ if [ "${1:-}" = --print ]; then
   exit 0
 fi
 
-dir=$(mktemp -d "${TMPDIR:-/tmp}/livebridge-floor.XXXXXX")
-trap 'rm -rf "$dir"' EXIT
-
-cp .github/claude-code-floor/package.json .github/claude-code-floor/package-lock.json "$dir/"
+dir=.github/claude-code-floor
 npm ci --prefix "$dir" --no-audit --no-fund
-PATH="$dir/node_modules/.bin:$PATH"
+PATH="$PWD/$dir/node_modules/.bin:$PATH"
 found=$(claude --version)
 case "$found" in
   "$floor "*) ;;
