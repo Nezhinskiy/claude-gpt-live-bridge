@@ -12,6 +12,9 @@
     /// `--fake-mic <wav>`, once per line: played as the microphone, each next one when the voice
     /// has finished speaking.
     public var fakeMic: [URL] = []
+    /// `--fake-mic-cut <seconds>`, before a `--fake-mic`: that line plays this far into the voice's
+    /// reply, over it, instead of after it. One entry per line, nil for a line that waits.
+    public var fakeMicCuts: [Double?] = []
     /// `--record-call <wav>`: both sides of the call, each call starting the tape over.
     public var tape: URL?
     /// `--voice-instructions <file>`: the file's text, and not the voice's rules.
@@ -24,6 +27,7 @@
 
     /// A tool that cannot work is refused here: a take must not run for a minute without it.
     public init(arguments: [String]) throws {
+      var cut: Double?
       for (index, flag) in arguments.enumerated() where flag.hasPrefix("--") {
         if flag == "--film-menu" { filmMenu = true }
         guard Self.names.contains(flag) else { continue }
@@ -37,6 +41,13 @@
             throw Refused(description: "--fake-mic cannot read \(value)")
           }
           fakeMic.append(URL(filePath: value))
+          fakeMicCuts.append(cut)
+          cut = nil
+        case "--fake-mic-cut":
+          guard let seconds = Double(value) else {
+            throw Refused(description: "--fake-mic-cut needs seconds, not \(value)")
+          }
+          cut = seconds
         case "--record-call":
           let folder = URL(filePath: value).deletingLastPathComponent().path
           guard FileManager.default.isWritableFile(atPath: folder) else {
@@ -52,7 +63,9 @@
       }
     }
 
-    private static let names = ["--fake-mic", "--record-call", "--voice-instructions"]
+    private static let names = [
+      "--fake-mic", "--fake-mic-cut", "--record-call", "--voice-instructions",
+    ]
 
     /// This launch's flags. Only a person running a debug build reaches the stop.
     public static let current: DebugFlags = {

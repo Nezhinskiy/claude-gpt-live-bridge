@@ -21,6 +21,19 @@
       #expect(try DebugFlags(arguments: ["LiveBridge"]) == DebugFlags())
     }
 
+    @Test func aCutFlagBelongsToTheLineAfterIt() throws {
+      let flags = try DebugFlags(arguments: [
+        "LiveBridge", "--fake-mic", wav.path, "--fake-mic-cut", "4.5", "--fake-mic", wav.path,
+      ])
+      #expect(flags.fakeMicCuts == [nil, 4.5])
+    }
+
+    @Test func aCutThatIsNoNumberIsRefused() {
+      #expect(throws: DebugFlags.Refused.self) {
+        try DebugFlags(arguments: ["LiveBridge", "--fake-mic-cut", "soon"])
+      }
+    }
+
     @Test func theFilmMenuFlagTakesNoValue() throws {
       let flags = try DebugFlags(arguments: [
         "LiveBridge", "--film-menu", "--record-call", wav.path,

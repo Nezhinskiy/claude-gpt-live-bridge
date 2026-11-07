@@ -148,6 +148,7 @@ install.
 scripts/build-app.sh --run                      # debug build, then open it
 scripts/build-app.sh --run --fake-mic say.wav   # the WAV plays as the microphone
 scripts/build-app.sh --run --fake-mic a.wav --fake-mic b.wav   # b plays when the voice has finished
+scripts/build-app.sh --run --fake-mic a.wav --fake-mic-cut 4 --fake-mic b.wav   # b cuts in 4 s into its reply
 scripts/build-app.sh --run --record-call call.wav   # you left, the voice right; each call starts it over
 scripts/build-app.sh --run --voice-instructions f.txt   # the voice gets f.txt, not its rules
 scripts/build-app.sh --run --film-menu   # SIGUSR1 opens the menu, SIGUSR2 its conversation

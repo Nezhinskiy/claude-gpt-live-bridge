@@ -108,3 +108,43 @@ test('a reply finished while muted owes no line after the replay', () => {
   lines.voice(false, 5000);
   assert.deepEqual(played, [0, 0]);
 });
+
+/** Lines where line 1 cuts in 3000 ms into the voice's reply. */
+function cutRig() {
+  const played = [];
+  const lines = createFakeLines({ count: 3, play: (index) => played.push(index), quietMs: 1000, cuts: [null, 3000] });
+  lines.start();
+  lines.ended();
+  return { lines, played };
+}
+
+test('a cut line plays over the voice, that long into its reply', () => {
+  const { lines, played } = cutRig();
+  lines.voice(true, 1000);
+  lines.voice(true, 3900);
+  assert.deepEqual(played, [0]);
+  lines.voice(true, 4000);
+  assert.deepEqual(played, [0, 1]);
+});
+
+test('the reply that was cut off owes no line when it finishes', () => {
+  const { lines, played } = cutRig();
+  lines.voice(true, 1000);
+  lines.voice(true, 4000);
+  lines.voiceFinished(4200);
+  lines.ended();
+  lines.voice(false, 9000);
+  assert.deepEqual(played, [0, 1]);
+});
+
+test('the reply to a cut line owes the next line', () => {
+  const { lines, played } = cutRig();
+  lines.voice(true, 1000);
+  lines.voice(true, 4000);
+  lines.voiceFinished(4200);
+  lines.ended();
+  lines.voice(true, 6000);
+  lines.voiceFinished(8000);
+  lines.voice(false, 9000);
+  assert.deepEqual(played, [0, 1, 2]);
+});

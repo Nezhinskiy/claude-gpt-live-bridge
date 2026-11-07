@@ -16,7 +16,8 @@
 #                                                 nothing installed (the release guards' copy)
 #
 # --fake-mic (debug builds only) plays WAV as the microphone; given more than once, each next WAV
-# plays when the voice has finished speaking. --record-call (debug builds only) records a call
+# plays when the voice has finished speaking; --fake-mic-cut SECONDS before one plays it that far
+# into the voice's reply, over it. --record-call (debug builds only) records a call
 # to WAV, the microphone on the left and the voice on the right, with its marks beside it in
 # WAV's name with .marks.jsonl; each call starts the tape over. --voice-instructions (debug builds
 # only) tells the voice FILE's text instead of its rules. --film-menu (debug builds only) opens

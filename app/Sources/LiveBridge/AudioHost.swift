@@ -83,8 +83,17 @@ final class AudioHost: NSObject, AudioSide {
 
   func startListening() async {
     await run(
-      "return await LB.listen(lines, record)", ["lines": fakeMic.count, "record": recordsCall],
-      failing: "start")
+      "return await LB.listen(lines, record, cuts)",
+      ["lines": fakeMic.count, "record": recordsCall, "cuts": lineCuts], failing: "start")
+  }
+
+  /// Milliseconds into the voice's reply, by line; `NSNull` for a line that waits for it.
+  private var lineCuts: [Any] {
+    #if DEBUG
+      DebugFlags.current.fakeMicCuts.map { $0.map { $0 * 1000 } ?? NSNull() }
+    #else
+      []
+    #endif
   }
 
   private var recordsCall: Bool {

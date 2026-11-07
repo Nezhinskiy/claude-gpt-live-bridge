@@ -120,7 +120,7 @@ function failMicrophone(error) {
 
 /** `lines`, the debug WAVs standing in for the microphone (0: the microphone itself), and
  * `record`, the call tape, stay 0 and false outside a debug build. */
-async function listen(lines, record) {
+async function listen(lines, record, cuts) {
   if (ctx) return;
   const mine = (ctx = new AudioContext({ sampleRate: 48000 }));
   fake = lines > 0;
@@ -134,7 +134,7 @@ async function listen(lines, record) {
   try {
     if (fake || record) {
       const { createCallTools } = await import('./debug-tools.js');
-      const made = await createCallTools({ context: mine, lines, record });
+      const made = await createCallTools({ context: mine, lines, cuts, record });
       if (ctx !== mine) return;
       tools = made;
     }

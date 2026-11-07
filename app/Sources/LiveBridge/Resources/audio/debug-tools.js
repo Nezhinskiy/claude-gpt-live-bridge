@@ -15,7 +15,7 @@ async function fakeLine(context, index) {
   return context.decodeAudioData(data);
 }
 
-export async function createCallTools({ context, lines, record }) {
+export async function createCallTools({ context, lines, cuts, record }) {
   const buffers = await Promise.all(
     Array.from({ length: lines }, (_, index) => fakeLine(context, index)),
   );
@@ -33,6 +33,7 @@ export async function createCallTools({ context, lines, record }) {
 
   const sequence = createFakeLines({
     count: lines,
+    cuts,
     play(index) {
       const line = (playing = context.createBufferSource());
       line.buffer = buffers[index];
