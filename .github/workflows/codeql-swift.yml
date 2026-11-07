@@ -1,0 +1,49 @@
+# CodeQL for the app (Swift). The analysis builds the app and takes about a quarter of an hour, so
+# a change that touches only prose or images skips it; the weekly run still scans main whatever
+# changed. Comment-only edits inside code files are not told apart and run it. The workflows and
+# the JavaScript/TypeScript are scanned on every change by codeql.yml.
+name: CodeQL (Swift)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: &prose
+      - "**/*.md"
+      - "docs/**"
+      - "site/assets/**"
+      - "LICENSE"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/pull_request_template.md"
+  pull_request:
+    paths-ignore: *prose
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-swift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (swift)
+    runs-on: xcode-27  # the image ci.yml builds the app on
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: swift
+          build-mode: manual
+      # SwiftPM's manifest sandbox (sandbox-exec) cannot start under CodeQL's tracer.
+      - run: swift build --package-path app --disable-sandbox
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:swift

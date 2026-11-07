@@ -5,8 +5,10 @@
 #     --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners
 # That proves this workflow built the image from that tag of this repository, on a GitHub-hosted
 # runner, and that it is unchanged since; it does not prove that anyone reviewed the code. The
-# app's in-app update runs the same check. The image is signed ad hoc and not notarized; no
-# secret is used.
+# app's in-app update runs the same check. The Release also carries the attestation itself, as
+# LiveBridge.dmg.sigstore.json: `--bundle LiveBridge.dmg.sigstore.json` checks against that file
+# instead of the copy GitHub stores, and Scorecard counts the Release as signed. The image is
+# signed ad hoc and not notarized; no secret is used.
 name: Release
 
 on:
@@ -47,10 +49,15 @@ jobs:
           fi
       - name: Package
         run: scripts/build-app.sh --package
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/LiveBridge.dmg
       - name: Create the Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/LiveBridge.dmg --verify-tag --generate-notes
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" dist/LiveBridge.dmg.sigstore.json
+          gh release create "$GITHUB_REF_NAME" dist/LiveBridge.dmg dist/LiveBridge.dmg.sigstore.json \
+            --verify-tag --generate-notes
