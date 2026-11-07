@@ -14,8 +14,10 @@ sh scripts/tests/claude-code-floor.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
 node --test 'app/Tests/AudioJSTests/*.test.mjs'
 
-# The mod's pure modules and their unit tests: TypeScript and @types/node, its dev dependencies.
-[ -d plugin/node_modules/@types/node ] || npm --prefix plugin ci --no-audit --no-fund
+# The mod's pure modules and their unit tests, with its dev dependencies (plugin/package.json),
+# installed again whenever the lockfile is newer than the last install.
+[ plugin/node_modules/.package-lock.json -nt plugin/package-lock.json ] ||
+  npm --prefix plugin ci --no-audit --no-fund
 npm --prefix plugin run typecheck:pure
 npm --prefix plugin run test:unit
 # The mod and the app ship as one release under one version.

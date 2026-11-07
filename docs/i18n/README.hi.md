@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="लाइसेंस: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="प्लेटफ़ॉर्म: Apple Silicon पर macOS 14+">
 </p>
@@ -585,6 +586,7 @@ label लगा होता है; [CONTRIBUTING.md](../../CONTRIBUTING.md#whe
 issues, [ज्ञात सीमाएँ](#ज्ञात-सीमाएँ) और [ऊपर](#रोडमैप-और-सहयोग-चाहिए) बताई गई दिशाएँ।
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): layout, toolchain, checks (`scripts/check.sh`) और conventions।
+- [Issue forms](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): bug की रिपोर्ट करें या कोई feature माँगें।
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): यहाँ हम एक-दूसरे के साथ कैसे पेश आते हैं।
 - [SECURITY.md](../../SECURITY.md): vulnerability की रिपोर्ट निजी तौर पर करें, public issue में नहीं।
 - [CHANGELOG.md](../../CHANGELOG.md): हर release में क्या बदला।

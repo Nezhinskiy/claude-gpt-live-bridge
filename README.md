@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Platform: macOS 14+ on Apple Silicon">
 </p>
@@ -607,6 +608,7 @@ issues, the [known limitations](#known-limitations) and the directions
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): the layout, the toolchain, the checks (`scripts/check.sh`)
   and the conventions.
+- [Issue forms](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): report a bug or ask for a feature.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): how we treat each other here.
 - [SECURITY.md](SECURITY.md): report a vulnerability privately, not in a public issue.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each release.

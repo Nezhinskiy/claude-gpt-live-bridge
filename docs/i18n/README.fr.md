@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence : MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plateforme : macOS 14+ sur Apple Silicon">
 </p>
@@ -649,6 +650,7 @@ les [limitations connues](#limitations-connues) et les directions
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) : l'organisation du dépôt, la chaîne d'outils, les
   vérifications (`scripts/check.sh`) et les conventions.
+- [Formulaires de tickets](https://github.com/getLiveBridge/LiveBridge/issues/new/choose) : signalez un bug ou demandez une fonctionnalité.
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md) : comment nous nous traitons ici.
 - [SECURITY.md](../../SECURITY.md) : signalez une vulnérabilité en privé, pas dans un ticket public.
 - [CHANGELOG.md](../../CHANGELOG.md) : ce qui a changé dans chaque version.

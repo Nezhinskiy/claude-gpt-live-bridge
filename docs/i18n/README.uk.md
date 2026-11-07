@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Ліцензія: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Платформа: macOS 14+ на Apple Silicon">
 </p>
@@ -602,6 +603,7 @@ GitHub, а `gh` ще й до Sigstore по корінь довіри, під в�
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): структура репозиторію, інструментарій, перевірки
   (`scripts/check.sh`) та конвенції.
+- [Форми задач](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): повідомте про помилку або запропонуйте функцію.
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): як ми поводимося одне з одним тут.
 - [SECURITY.md](../../SECURITY.md): про вразливість повідомляйте приватно, а не у публічній задачі.
 - [CHANGELOG.md](../../CHANGELOG.md): що змінилося в кожному випуску.

@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licencia: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plataforma: macOS 14+ en Apple Silicon">
 </p>
@@ -621,6 +622,7 @@ las [limitaciones conocidas](#limitaciones-conocidas) y las direcciones de la
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): la estructura, la toolchain, las comprobaciones
   (`scripts/check.sh`) y las convenciones.
+- [Formularios de incidencias](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): informa de un error o pide una función.
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): cómo nos tratamos aquí.
 - [SECURITY.md](../../SECURITY.md): informa de una vulnerabilidad en privado, no en una incidencia
   pública.

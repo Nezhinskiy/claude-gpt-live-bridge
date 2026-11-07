@@ -58,6 +58,10 @@ struct ReleaseTests {
     #expect(throws: UpdateProblem.noImage) {
       try Release.parse(Data(#"{"tag_name":"v0.2.0"}"#.utf8))
     }
+    // The attestation the release carries next to the image is not the image.
+    let bundleOnly = Data(
+      #"{"tag_name":"v0.2.0","assets":[{"name":"LiveBridge.dmg.sigstore.json"}]}"#.utf8)
+    #expect(throws: UpdateProblem.noImage) { try Release.parse(bundleOnly) }
   }
 
   @Test func aReplyThatIsNotJSONIsRefused() {
