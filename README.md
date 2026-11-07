@@ -37,10 +37,11 @@ prices voice by the minute, so after 20 seconds of quiet the line closes, and it
 speak, with the conversation where you left it ([Billing](#billing-aware-by-design)).
 
 - **Claude's turns go to the work.** Ask "what did you mean?" or "what is the risk with B?" and
-  the voice answers from the conversation it shares with the session, so the question does not
-  become a turn in Claude's session or sit in its context. Claude gets one brief when you have
-  decided; a question that needs the code still goes to Claude. When the voice lacks part of the
-  session, the line first loads a short summary that the session's own model writes on the side.
+  the voice is told to answer it from the conversation it shares with the session, so the
+  question does not start a turn of Claude's. Once you have decided, it hands Claude a brief, with
+  what was said since the last request quoted after it; a question that needs the code still goes
+  to Claude. When the voice lacks part of the session, the line asks the session's own model for a
+  short summary on the side (not while **Pause sync** is on).
 - **Walk away while Claude works.** Claude's answer to your request opens the closed line again
   and the voice says it. If the voice stays silent, the answer chimes and waits, so it is not lost
   ([what can go wrong](#known-limitations)).
@@ -49,8 +50,10 @@ speak, with the conversation where you left it ([Billing](#billing-aware-by-desi
   as you like, and your choice goes back as the answer. It may not bring the question up by itself
   ([known limitations](#known-limitations)).
 - **One voice for all your sessions.** Join several sessions and pick the one to talk to from the
-  menu; another session's result chimes and waits until you next speak.
-- **Your language.** The voice answers in the language you speak.
+  menu; another session's result that arrives while the line is closed chimes and waits until you
+  next speak.
+- **Your language.** The voice is told to answer in the language you speak
+  ([one limit](#known-limitations)).
 
 Claude Code's own `/voice` turns what you say into a prompt for Claude. LiveBridge is someone to
 talk it over with first, while Claude keeps working or waits.
@@ -60,14 +63,15 @@ talk it over with first, while Claude keeps working or waits.
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
 between your own codex and your own Claude Code. The mod talks to the app over a Unix socket only
 your user can open, and the app listens on no network port. Your voice, and what you type in a joined
-session, go to OpenAI through your codex, only while a line is open; Claude's work goes to
+session, and Claude's answers and summaries go to OpenAI through your codex, only while a line is
+open; Claude's work goes to
 Anthropic through your Claude Code. The app's only traffic of its own is a usage read through
 your codex when you open the menu, and [updates](#updating) from GitHub, whose automatic check
 you can turn off. [Privacy](#privacy) lists exactly what reaches OpenAI and every request to
 GitHub; [SECURITY.md](SECURITY.md) says what this does and does not protect against.
 
-Free and open source under the [MIT license](LICENSE). The voice runs on the ChatGPT plan you
-already have, so there is no API key and no separate bill: its minutes come out of your plan's
+Free and open source under the [MIT license](LICENSE). The voice runs on your ChatGPT plan, so
+there is no API key and no separate bill: its minutes come out of your plan's
 Codex usage ([Billing](#billing-aware-by-design)).
 
 > **Unofficial.** Not affiliated with, endorsed by or supported by Anthropic or OpenAI. It relies
@@ -97,7 +101,7 @@ claude plugin install livebridge@livebridge
 No Homebrew? Each [release](https://github.com/getLiveBridge/LiveBridge/releases/latest) has
 the app as a disk image, built and attested by GitHub Actions
 ([From the disk image](#from-the-disk-image)), or build it yourself
-([From source](#from-source)). The mod is installed the same way either way.
+([From source](#from-source)). The mod is installed the same way whichever you choose.
 
 If `/live` is not found in a session that was already open, reopen the session
 ([why](#known-limitations)). Updating, permissions, keeping the microphone permission across
@@ -122,8 +126,7 @@ rebuilds and uninstalling are under [Install](#install).
 The mod comes from this repository's marketplace (the [Quick start](#quick-start) commands),
 which names the latest release's tag, so the mod you install is that release's. The app goes in
 `/Applications` whichever way you install it: with Homebrew, from the disk image, or built from
-source. Either way it is signed
-ad hoc and not notarized.
+source. Whichever way, it is signed ad hoc and not notarized.
 
 ### From the disk image
 

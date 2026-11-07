@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LiveBridge: talk to Claude Code by voice</title>
-  <meta name="description" content="Talk a decision through with GPT-Live, and it hands your open Claude Code session one clear task and tells you the result. Free, open source, on your ChatGPT plan, no telemetry. Unofficial; not affiliated with Anthropic or OpenAI.">
+  <meta name="description" content="Talk a decision through with GPT-Live, and it hands your open Claude Code session a clear brief and tells you the result. Free, open source, on your ChatGPT plan, no telemetry. Unofficial; not affiliated with Anthropic or OpenAI.">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#1f5d65">
   <link rel="canonical" href="https://getlivebridge.com/">
@@ -17,14 +17,14 @@
   <meta property="og:site_name" content="LiveBridge">
   <meta property="og:url" content="https://getlivebridge.com/">
   <meta property="og:title" content="LiveBridge: talk to Claude Code by voice">
-  <meta property="og:description" content="Talk a decision through with GPT-Live; it hands your Claude Code session one clear task and tells you the result. Free, open source, no API key, no telemetry.">
+  <meta property="og:description" content="Talk a decision through with GPT-Live; it hands your Claude Code session a clear brief and tells you the result. Free, open source, no API key, no telemetry.">
   <meta property="og:image" content="https://getlivebridge.com/assets/social-preview.png">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta property="og:image:alt" content="The LiveBridge icon and the line: Talk to your Claude Code sessions out loud.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="LiveBridge: talk to Claude Code by voice">
-  <meta name="twitter:description" content="Talk a decision through with GPT-Live; it hands your Claude Code session one clear task and tells you the result. Free, open source, no API key, no telemetry.">
+  <meta name="twitter:description" content="Talk a decision through with GPT-Live; it hands your Claude Code session a clear brief and tells you the result. Free, open source, no API key, no telemetry.">
   <meta name="twitter:image" content="https://getlivebridge.com/assets/social-preview.png">
   <meta name="twitter:image:alt" content="The LiveBridge icon and the line: Talk to your Claude Code sessions out loud.">
 </head>
@@ -36,7 +36,7 @@
     <img class="hero-icon" src="assets/icon.png" width="112" height="112" alt="LiveBridge app icon: white bars standing on a bridge deck, on a teal tile">
     <h1>LiveBridge</h1>
     <p class="tagline">Talk to Claude Code out loud. A conversation, not dictation.</p>
-    <p class="lede">LiveBridge puts a GPT-Live voice on the line with your open Claude Code session, on your ChatGPT login, with no API key. Think out loud with it, cut in whenever you like, and when you have decided it hands Claude one clear task. Claude works with its own model, tools and permission mode, and the voice tells you the result. You do not have to hold the line open while Claude works: its answer opens the line again. And you stop paying for silence: when the talk goes quiet, the line closes.</p>
+    <p class="lede">LiveBridge puts a GPT-Live voice on the line with your open Claude Code session, on your ChatGPT login, with no API key. Think out loud with it, cut in whenever you like, and when you have decided it hands Claude a clear brief. Claude works with its own model, tools and permission mode, and the voice tells you the result. You do not have to hold the line open while Claude works: its answer opens the line again. And you stop paying for silence: when the talk goes quiet, the line closes.</p>
     <div class="actions">
       <a class="button primary" href="https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg">
         <svg class="button-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -117,15 +117,19 @@
     <dl class="highlights">
       <div>
         <dt>A conversation, not dictation</dt>
-        <dd>GPT-Live listens while it talks. Cut in at any moment and it stops and hears you out; think out loud and it can drop in a quick “mm-hmm”. It answers in the language you speak. Claude Code’s own <code>/voice</code> and voice typing turn what you say into a prompt; this is someone to talk it over with first.</dd>
+        <dd>GPT-Live listens while it talks. Cut in at any moment and it stops and hears you out; think out loud and it can drop in a quick “mm-hmm”. It is told to answer in the language you speak. Claude Code’s own <code>/voice</code> and voice typing turn what you say into a prompt; this is someone to talk it over with first.</dd>
       </div>
       <div>
         <dt>Claude’s turns go to the work</dt>
-        <dd>Ask “what did you mean?” or “what is the risk with B?” and the voice answers from the conversation it shares with the session, so the question does not become a turn in Claude’s session or sit in its context. Claude gets one brief once you have decided; a question that needs the code still goes to Claude. When the voice lacks part of the session, the line first loads a short summary that the session’s own model writes on the side.</dd>
+        <dd>Ask “what did you mean?” or “what is the risk with B?” and the voice is told to answer it from the conversation it shares with the session, so the question does not start a turn of Claude’s. Once you have decided, it hands Claude a brief, with what was said since the last request quoted after it; a question that needs the code still goes to Claude. When the voice lacks part of the session, the line asks the session’s own model for a short summary on the side (not while Pause sync is on).</dd>
       </div>
       <div>
         <dt>Walk away while Claude works</dt>
-        <dd>The line closes while Claude works, and Claude’s answer to your request opens it again for the voice to say. When Claude stops to ask you something with options, the voice is given the question to explain and talk through, and your choice goes back as the answer. If the voice stays silent, the answer chimes and waits, so it is not lost; the README’s <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">known limitations</a> say when that happens.</dd>
+        <dd>After a handoff the line waits up to 2 minutes for Claude. If Claude takes longer, the line closes, and Claude’s answer to your request opens it again for the voice to say. If the voice stays silent, the answer chimes and waits, so it is not lost; the README’s <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">known limitations</a> say when that happens.</dd>
+      </div>
+      <div>
+        <dt>Claude’s questions, talked through</dt>
+        <dd>When Claude stops to ask you something with options, the voice is given the question to put to you: it explains the options in its own words for as long as you like, and your choice goes back as the answer. It may not bring the question up by itself, so do not count on it when you are away from the Mac.</dd>
       </div>
       <div>
         <dt>You stop paying for silence</dt>
@@ -133,11 +137,11 @@
       </div>
       <div>
         <dt>Free, open, no telemetry</dt>
-        <dd>Free and open source under the MIT license, and the voice runs on the ChatGPT plan you already have: no API key and no separate bill. The app has no telemetry and no server of its own, and listens on no network port. Your voice, and what you type in a joined session, go to OpenAI through your own codex while a line is open; Claude’s work goes to Anthropic through your own Claude Code. The app’s only traffic of its own is a usage read through your codex when you open the menu, and updates from GitHub, whose automatic check you can turn off. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists every request.</dd>
+        <dd>Free and open source under the MIT license, and the voice runs on your ChatGPT plan: no API key and no separate bill. The app has no telemetry and no server of its own, and listens on no network port. Your voice, what you type in a joined session, and Claude’s answers and summaries go to OpenAI through your own codex while a line is open; Claude’s work goes to Anthropic through your own Claude Code. The app’s only traffic of its own is a usage read through your codex when you open the menu, and updates from GitHub, whose automatic check you can turn off. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists every request.</dd>
       </div>
       <div>
         <dt>Every session, spoken or typed</dt>
-        <dd>Join several sessions and pick the one to talk to from the menu; another session’s result chimes and waits until you next speak. Each Claude Code session has its own conversation with the voice, carried across Stop and Start. What you type in a joined session and Claude’s final answers go into it too, so you can switch between speaking and typing. Nothing leaves your Mac until a line opens, and a setting pauses this while the call is stopped.</dd>
+        <dd>Join several sessions and pick the one to talk to from the menu; another session’s result that arrives while the line is closed chimes and waits until you next speak. Each Claude Code session has its own conversation with the voice, carried across Stop and Start. What you type in a joined session and Claude’s final answers go into it too, so you can switch between speaking and typing. Nothing leaves your Mac until a line opens, and a setting pauses this while the call is stopped.</dd>
       </div>
       <div>
         <dt>Your Claude keeps its permissions</dt>
