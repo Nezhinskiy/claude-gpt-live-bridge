@@ -316,8 +316,10 @@ parlez.
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](SECURITY.md#residual-risk-by-design).
-- **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
-  chaque demande que la voix transmet à Claude ([pourquoi](#limitations-connues)).
+- **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la voix transmet
+  à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse de Claude qui arrive sur une
+  ligne ouverte ou en cours d'ouverture quand personne ne parle. Le signal d'un résultat en attente
+  retentit dans tous les cas.
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
   attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
   new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de

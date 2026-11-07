@@ -14,8 +14,8 @@ public actor Bridge: Router {
   private let notifier: (any ResultNotifying)?
   /// Settings' "Notify when a result is waiting", read at each chime.
   private let notifies: @Sendable () -> Bool
-  /// Settings' "Play a sound when a request is queued for Claude", read at each handoff.
-  private let confirmsHandoffs: @Sendable () -> Bool
+  /// Settings' "Play sounds for requests and answers", read at each sound.
+  private let confirmsWithSound: @Sendable () -> Bool
   /// Settings' "Pause sync while the call is stopped", read at each synced line, join and line
   /// that opens.
   private let pausesSync: @Sendable () -> Bool
@@ -67,13 +67,13 @@ public actor Bridge: Router {
     realtime: @escaping @Sendable () async throws -> any RealtimeControlling, audio: any AudioSide,
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
+    confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
-    self.confirmsHandoffs = confirmsHandoffs
+    self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
     self.registry = registry
     makeRealtime = realtime
@@ -325,7 +325,8 @@ public actor Bridge: Router {
     case .chime:
       await audio.chime()
       await notifyWaiting()
-    case .confirmHandoff: if confirmsHandoffs() { await audio.confirmHandoff() }
+    case .confirmHandoff: if confirmsWithSound() { await audio.confirmHandoff() }
+    case .confirmAnswer: if confirmsWithSound() { await audio.confirmAnswer() }
     case .problem(let shown): problem = shown
     }
   }

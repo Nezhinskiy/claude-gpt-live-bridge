@@ -93,6 +93,9 @@ public enum CallEffect: Equatable, Sendable {
   /// A handoff was queued for a session; without this sound the owner cannot tell it from a
   /// voice that only said it would look (BR-001).
   case confirmHandoff
+  /// A session's answer reached the call, and nobody is speaking over it: the owner hears that
+  /// Claude has finished before the voice says it. No notification comes with it.
+  case confirmAnswer
   case problem(Problem?)
 }
 
@@ -102,7 +105,8 @@ public enum CallEffect: Equatable, Sendable {
 /// handoff the line waits up to `resultWindowSeconds` from the latest one for that session's
 /// result, and says it as soon as nobody is speaking. Any other line that arrives while the line
 /// is closed, and one an opened line left unsaid, is announced by a chime and waits until the
-/// owner next speaks. Pure: the bridge runs the effects.
+/// owner next speaks. An answer that does not wait has the same sound, without the notification.
+/// Pure: the bridge runs the effects.
 public struct CallMachine: Sendable {
   public static let noise = Problem.other(
     "The voice hung up: the microphone heard sound but no words for 90 seconds.")
@@ -219,10 +223,10 @@ public struct CallMachine: Sendable {
       guard opensLine else { return [.chime] }
       phase = .connecting
       isAwaitingFirstWord = true
-      return [.openRealtimeForResult]
+      return arrival(of: result) + [.openRealtimeForResult]
     case (.connecting, .deliver(let result, _, _)):
       unheard.append(Unheard(line: result))
-      return []
+      return arrival(of: result)
     case (.connecting, .synced(let line)):
       connectingSynced.append(line)
       return []
@@ -243,14 +247,15 @@ public struct CallMachine: Sendable {
     case (.live, .deliver(let result, _, let onOwnLine)):
       // a result the voice never speaks still hangs up
       let isAwaited = result.session.map(awaited.contains) ?? false
+      let sound = arrival(of: result)
       guard isAwaited || (onOwnLine && [.asking, .approval].contains(result.kind)) else {
         unheard.append(Unheard(line: result))
-        return [.addContext(result), armSilence()]
+        return sound + [.addContext(result), armSilence()]
       }
       if result.kind.answers, let session = result.session { awaited.remove(session) }
       let isHeld = isSoundOn || isVoiceSpeaking
       unheard.append(Unheard(line: result, isHeld: isHeld))
-      return isHeld ? [armSilence()] : [.speak(result), armSilence()]
+      return sound + (isHeld ? [armSilence()] : [.speak(result), armSilence()])
     case (.connecting, .speechStarted):
       isSoundOn = true
       isAwaitingFirstWord = false
@@ -367,6 +372,13 @@ public struct CallMachine: Sendable {
       connectingSynced = []
     }
     return pending.isEmpty ? [] : [.chime]
+  }
+
+  /// The sound for a line that reached a line opening or open: a session's answer, unless someone
+  /// is speaking over it.
+  private func arrival(of line: VoiceLine) -> [CallEffect] {
+    line.session != nil && line.kind.answers && !isSoundOn && !isVoiceSpeaking
+      ? [.confirmAnswer] : []
   }
 
   /// A new line would fail the same way, so the call ends, as Stop does, and keeps what waits to

@@ -75,7 +75,7 @@ struct CallMachineTests {
       "speechWhileMutedOnALiveLineIsIgnored", live + [.mute], .speechStarted, .live, []),
     row(
       "aResultWhileMutedStillOpensTheLine", [.start, .mute], opening(result), .connecting,
-      [.openRealtimeForResult], pending: [result]),
+      [.confirmAnswer, .openRealtimeForResult], pending: [result]),
     row(
       "muteWhileSpeakingOnALiveLineEndsTheSpeech", live + [.speechStarted], .mute, .live,
       [.muteMicrophone, arm]),
@@ -163,7 +163,7 @@ struct CallMachineTests {
     row("theServiceRefusingAStoppedCallDoesNothing", [], .refused(limit), .off, []),
     row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
-      [.openRealtimeForResult], pending: [result]),
+      [.confirmAnswer, .openRealtimeForResult], pending: [result]),
     row(
       "theOpenedLineGetsItAsContextAndWaitsBrieflyForTheVoice", [.start, opening(result)],
       .connected, .live, [.problem(nil), .flushPreroll, .addContext(result), firstWord],
@@ -284,8 +284,8 @@ struct CallMachineTests {
       "aResultAfterTheWindowIsOnlyContext", waiting + [.speechStarted, .resultWindowElapsed],
       fromAlpha, .live, [.addContext(result), cap], pending: [result]),
     row(
-      "earlyResultIsSpokenAtOnce", waiting, fromAlpha, .live, [.speak(result), arm],
-      pending: [result]),
+      "earlyResultIsSpokenAtOnce", waiting, fromAlpha, .live,
+      [.confirmAnswer, .speak(result), arm], pending: [result]),
     row(
       "anApprovalIsSaidAtOnce", waiting, deliver(approval), .live, [.speak(approval), arm],
       pending: [approval]),
@@ -300,7 +300,7 @@ struct CallMachineTests {
       [.addContext(asking), arm], pending: [asking]),
     row(
       "aResultNobodyWaitsForOnItsOwnLineIsContext", live, onItsLine(result), .live,
-      [.addContext(result), arm], pending: [result]),
+      [.confirmAnswer, .addContext(result), arm], pending: [result]),
     row(
       "aQuestionOnItsOwnLineWaitsWhileTheOwnerSpeaks", live + [.speechStarted], onItsLine(asking),
       .live, [cap], pending: [asking]),
@@ -321,7 +321,7 @@ struct CallMachineTests {
       pending: [update]),
     row(
       "theResultAfterAnApprovalIsSaid", waiting + [deliver(approval)], fromAlpha, .live,
-      [.speak(result), arm], pending: [approval, result]),
+      [.confirmAnswer, .speak(result), arm], pending: [approval, result]),
     row(
       "earlyResultEndsTheWindow", waiting + [fromAlpha], .silenceElapsed, .listening,
       [.closeRealtime, .chime], pending: [result]),
@@ -376,6 +376,39 @@ struct CallMachineTests {
       [.closeRealtime, .stopLocalVAD, .problem(r)]),
     row("deliverWhileOffIsIgnored", [], deliver(a), .off, []),
     row(
+      "anAnswerNobodyAwaitsStillSounds", live, deliver(result), .live,
+      [.confirmAnswer, .addContext(result), arm], pending: [result]),
+    row(
+      "anAnswerWhileAnAnswerOpensTheLineSounds", [.start, opening(result)], deliver(done),
+      .connecting, [.confirmAnswer], pending: [result, done]),
+    row(
+      "aQuestionSoundsToo", waiting + [.handedOff(alpha)], deliver(alphas(.question, "Which?")),
+      .live, [.confirmAnswer, .speak(alphas(.question, "Which?")), arm],
+      pending: [alphas(.question, "Which?")]),
+    row(
+      "aFailureSoundsToo", waiting, deliver(alphas(.failed, "It broke.")), .live,
+      [.confirmAnswer, .speak(alphas(.failed, "It broke.")), arm],
+      pending: [alphas(.failed, "It broke.")]),
+    row(
+      "noSoundOverTheOwner", live + [.speechStarted], deliver(result), .live,
+      [.addContext(result), cap], pending: [result]),
+    row(
+      "noSoundOverTheVoice", live + [.assistantSpeaking], deliver(result), .live,
+      [.addContext(result), arm], pending: [result]),
+    row(
+      "noSoundOverTheOwnerWhileConnecting", connecting, deliver(result), .connecting, [],
+      pending: [result]),
+    row(
+      "aWaitingAnswerOnlyChimes", [.start], deliver(result), .listening, [.chime],
+      pending: [result]),
+    row("noSoundWithTheCallOff", [], deliver(result), .off, []),
+    row(
+      "noSoundForAnUpdate", waiting, deliver(update), .live, [.speak(update), arm],
+      pending: [update]),
+    row(
+      "noSoundForTheBridgesOwnLine", live, deliver(a), .live, [.addContext(a), arm],
+      pending: [a]),
+    row(
       "targetChangeClosesTheOpenLine", live + [deliver(a)], .conversationChanged, .listening,
       [.closeRealtime, .chime], pending: [a]),
     row(
@@ -402,7 +435,7 @@ struct CallMachineTests {
     #expect(machine.awaited == [cleared] && machine.pending.map(\.session) == [cleared])
     var answer = Self.result
     answer.session = cleared
-    #expect(machine.handle(.deliver(answer)) == [.speak(answer), Self.arm])
+    #expect(machine.handle(.deliver(answer)) == [.confirmAnswer, .speak(answer), Self.arm])
   }
 
   /// A question withdrawn while the line it opened still connects leaves nothing to say: the

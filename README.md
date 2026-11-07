@@ -284,8 +284,9 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
   it does and does not do.
-- **Play a sound when a request is queued for Claude** (on by default): a short sound for each
-  request the voice hands off ([why](#known-limitations)).
+- **Play sounds for requests and answers** (on by default): a short sound for each request the voice hands off
+  ([why](#known-limitations)), and one for each answer from Claude that reaches an open or opening
+  line while nobody is speaking. The chime for a result that waits plays either way.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.

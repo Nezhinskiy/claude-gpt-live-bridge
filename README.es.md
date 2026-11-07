@@ -300,8 +300,9 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
   de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
   [SECURITY.md](SECURITY.md#residual-risk-by-design).
-- **Play a sound when a request is queued for Claude** (activado por defecto): un sonido breve por
-  cada petición que la voz pasa a Claude ([por qué](#limitaciones-conocidas)).
+- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que la voz pasa
+  a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta de Claude que llega a una línea
+  abierta o abriéndose mientras nadie habla. El aviso de un resultado en espera suena de todos modos.
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el

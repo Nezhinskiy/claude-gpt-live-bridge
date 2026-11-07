@@ -204,7 +204,7 @@ claude plugin uninstall livebridge@livebridge
 - **Prompt**（默认为空）：你给语音的自定义指令，例如“用西班牙语和我说话”，最多 2,000 个字符。它们会追加在 LiveBridge
   为语音设定的规则之后；两者冲突时以 LiveBridge 的规则为准。从线路下次打开起生效。
 - **Pause sync while the call is stopped**（默认关闭）：默认情况下，你在已加入的会话中输入的内容以及 Claude 对此的最终答复，即使通话已停止，也会保存到该会话与语音的对话中，下一条线路打开时语音就拥有它们。在线路打开之前，没有任何内容离开这台 Mac。若不想让某些文字到达 OpenAI，请开启此项，按下 Stop，然后再输入：通话停止期间你输入的内容都不会被记录，该会话会被标记为已暂停。开启期间，没有任何线路会自行加载摘要，暂停之后也是如此：只有 **Load context** 或 `/live context` 才会加载，而该摘要由整份会话记录写成，因此会带上你暂停的内容。向正在运行语音请求的那一轮输入，会使它的答复失败，其中的任何内容都不会被记录或说出。此项不会删除已记录的任何内容，Claude 之后的答复也可能重复被暂停的文字；它做什么、不做什么，见 [SECURITY.md](SECURITY.md#residual-risk-by-design)。
-- **Play a sound when a request is queued for Claude**（默认开启）：语音每转交一个请求给 Claude，就播放一声短音（[原因](#已知限制)）。
+- **Play sounds for requests and answers**（默认开启）：语音每转交一个请求给 Claude，就播放一声短音（[原因](#已知限制)）；无人说话时，Claude 的每个回答到达已打开或正在打开的线路，也会播放一声。等待中结果的提示音始终播放。
 - **Notify when a result is waiting**（默认开启）：当线路关闭期间有结果在等待时，除提示音外，还会弹出一条 macOS 通知，其中写明会话名称
   （“Alpha has a new result — speak to hear it”），但绝不包含结果本身。点击通知会打开菜单栏菜单。
 - **Open at login**（默认关闭）。

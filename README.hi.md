@@ -289,8 +289,9 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
   हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](SECURITY.md#residual-risk-by-design) में है।
-- **Play a sound when a request is queued for Claude** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध
-  Claude को सौंपता है, हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ))।
+- **Play sounds for requests and answers** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध Claude को सौंपता है, हर एक के
+  लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ)), और जब कोई बोल नहीं रहा हो तब खुली या खुलती line पर
+  पहुँचने वाले Claude के हर जवाब के लिए भी एक। प्रतीक्षा कर रहे नतीजे की ध्वनि हर हाल में बजती है।
 - **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
   chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
   hear it"), नतीजा खुद कभी नहीं। उस पर click करने से menu bar menu खुलता है।

@@ -122,6 +122,7 @@ actor FakeAudio: AudioSide {
   func flushPreroll() { calls.append("flushPreroll") }
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
+  func confirmAnswer() { calls.append("confirmAnswer") }
   func confirmHandoff() { calls.append("confirmHandoff") }
   func muteMicrophone() { calls.append("muteMicrophone") }
   func unmuteMicrophone() { calls.append("unmuteMicrophone") }
@@ -151,7 +152,7 @@ struct BridgeTests {
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
     time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
+    confirmsWithSound: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
     appVersion: AppVersion? = nil
   ) throws {
     self.time = time
@@ -164,7 +165,7 @@ struct BridgeTests {
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
-      notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs,
+      notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
       pausesSync: { pause.withLock { $0 } }, appVersion: appVersion)
   }
 
@@ -783,13 +784,30 @@ struct BridgeTests {
   /// Settings' handoff sound is read at each handoff; off, the request still goes.
   @Test func handoffSoundCanBeTurnedOff() async throws {
     let settings = SettingsStore(file: nil)
-    let test = try BridgeTests(confirmsHandoffs: { settings.current.confirmHandoffs })
+    let test = try BridgeTests(confirmsWithSound: { settings.current.confirmHandoffs })
     settings.update { $0.confirmHandoffs = false }
     try await test.join(a, "Alpha")
     await test.live()
     test.voice.emit(.handoff(request(1)))
     #expect(try await eventually { try await test.registry.poll(a) == .request(request(1)) })
     #expect(await !test.audio.calls.contains("confirmHandoff"))
+  }
+
+  /// The same setting holds the sound for an answer that does not wait; on, it posts no notice.
+  @Test func answerSoundFollowsTheSoundSetting() async throws {
+    let settings = SettingsStore(file: nil)
+    let test = try BridgeTests(confirmsWithSound: { settings.current.confirmHandoffs })
+    try await test.join(a, "Alpha")
+    await test.live()
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await test.bridge.audioEvent(.speechEnded)
+    try await test.answer(request(1), from: a)
+    #expect(await test.audio.calls.contains("confirmAnswer"))
+    #expect(await test.notifier.posted.isEmpty)
+    settings.update { $0.confirmHandoffs = false }
+    try await test.answer(request(2), from: a)
+    #expect(await test.voice.added.count == 2)
+    #expect(await test.audio.calls.filter { $0 == "confirmAnswer" }.count == 1)
   }
 
   /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.
