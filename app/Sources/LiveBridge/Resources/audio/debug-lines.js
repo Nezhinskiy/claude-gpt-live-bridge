@@ -61,7 +61,7 @@ export function createFakeLines({ count, play, quietMs = 600, cuts = [] }) {
       if (loud) quietSince = tMs;
       if (loud && !playing && replyFrom === null) replyFrom = tMs;
       const cut = cuts[current + 1];
-      if (!stopped && !playing && cut != null && replyFrom !== null && tMs - replyFrom >= cut) {
+      if (!stopped && !playing && !acknowledging && cut != null && replyFrom !== null && tMs - replyFrom >= cut) {
         current++;
         replyFrom = null;
         cutOff = true;

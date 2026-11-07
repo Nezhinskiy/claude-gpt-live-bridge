@@ -166,3 +166,16 @@ test('after a handoff the next line waits for the answer, not the acknowledgemen
   lines.voice(false, 26000);
   assert.deepEqual(played, [0, 1]);
 });
+
+test('a cut line waits out an acknowledgement and cuts into the answer', () => {
+  const { lines, played } = cutRig();
+  lines.handoff();
+  lines.voice(true, 1000);
+  lines.voice(true, 6000);
+  assert.deepEqual(played, [0]);
+  lines.voiceFinished(6500);
+  lines.voice(false, 7000);
+  lines.voice(true, 20000);
+  lines.voice(true, 24000);
+  assert.deepEqual(played, [0, 1]);
+});
