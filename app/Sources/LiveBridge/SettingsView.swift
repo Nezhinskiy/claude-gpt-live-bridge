@@ -37,10 +37,10 @@ struct SettingsView: View {
         .font(.caption).foregroundStyle(.secondary)
       }
       Section("Notifications") {
-        Toggle("Play a sound when a request is queued for Claude", isOn: setting(\.confirmHandoffs))
+        Toggle("Play sounds for requests and answers", isOn: setting(\.confirmHandoffs))
         Text(
-          "The voice sometimes says it is looking without sending the request; with no sound, "
-            + "nothing was queued, so say it again."
+          "The voice sometimes says it is looking without sending the request. An answer has "
+            + "its own sound; with no request sound, nothing was queued, so say it again."
         )
         .font(.caption).foregroundStyle(.secondary)
         Toggle(

@@ -110,6 +110,8 @@ final class AudioHost: NSObject, AudioSide {
 
   func confirmHandoff() async { handoffSound?.play() }
 
+  func confirmAnswer() async { chimeSound?.play() }
+
   // MARK: The page
 
   /// A page call the call cannot go on without: its failure ends the call, saying which

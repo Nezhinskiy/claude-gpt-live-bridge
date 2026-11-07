@@ -320,8 +320,10 @@ parlez.
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](SECURITY.md#residual-risk-by-design).
-- **Play a sound when a request is queued for Claude** (activé par défaut) : un son bref pour
-  chaque demande que la voix transmet à Claude ([pourquoi](#limitations-connues)).
+- **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
+  voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
+  question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
+  parle. Le signal d'un résultat en attente retentit dans tous les cas.
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
   attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
   new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
@@ -519,8 +521,8 @@ session.
   ([BR-001](docs/bugs/BR-001.md)). Elle peut aussi prétendre à un travail qu'elle n'a pas fait,
   comme « I'll take a look. », y compris à partir de lignes qu'elle n'a que comme contexte ([ADR
   0001 (n), (o)](docs/adr/0001-platform-findings.md)). L'application joue un son bref quand elle met
-  une demande en file pour Claude ; si la voix dit qu'elle regarde et qu'aucun son ne suit, répétez
-  la demande. L'application ne peut pas distinguer une telle promesse d'une réponse par ses mots,
+  une demande en file pour Claude, différent de celui d'une réponse ; si la voix dit qu'elle regarde
+  et que ce son ne suit pas, répétez la demande. L'application ne peut pas distinguer une telle promesse d'une réponse par ses mots,
   car la voix parle votre langue.
 - Une question de Claude, ou une demande de permission qu'il attend, est seulement donnée à la voix,
   et la voix peut ne pas la dire ; rien ne l'y oblige. Ne comptez donc pas sur la voix pour annoncer

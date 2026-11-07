@@ -122,6 +122,22 @@ actor FakeAudio: AudioSide {
   func flushPreroll() { calls.append("flushPreroll") }
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
+  /// While set, the next answer's sound waits for `releaseSound()`, as a hop to the main actor
+  /// lets others in.
+  var holdsSound = false
+  private var heldSounds: [CheckedContinuation<Void, Never>] = []
+  var soundWaiting: Int { heldSounds.count }
+  func holdSound() { holdsSound = true }
+  func releaseSound() {
+    for wait in heldSounds { wait.resume() }
+    heldSounds = []
+  }
+  func confirmAnswer() async {
+    calls.append("confirmAnswer")
+    guard holdsSound else { return }
+    holdsSound = false
+    await withCheckedContinuation { heldSounds.append($0) }
+  }
   func confirmHandoff() { calls.append("confirmHandoff") }
   func muteMicrophone() { calls.append("muteMicrophone") }
   func unmuteMicrophone() { calls.append("unmuteMicrophone") }
@@ -151,7 +167,7 @@ struct BridgeTests {
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
     time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
+    confirmsWithSound: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
     appVersion: AppVersion? = nil
   ) throws {
     self.time = time
@@ -164,7 +180,7 @@ struct BridgeTests {
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
-      notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs,
+      notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
       pausesSync: { pause.withLock { $0 } }, appVersion: appVersion)
   }
 
@@ -783,13 +799,54 @@ struct BridgeTests {
   /// Settings' handoff sound is read at each handoff; off, the request still goes.
   @Test func handoffSoundCanBeTurnedOff() async throws {
     let settings = SettingsStore(file: nil)
-    let test = try BridgeTests(confirmsHandoffs: { settings.current.confirmHandoffs })
+    let test = try BridgeTests(confirmsWithSound: { settings.current.confirmHandoffs })
     settings.update { $0.confirmHandoffs = false }
     try await test.join(a, "Alpha")
     await test.live()
     test.voice.emit(.handoff(request(1)))
     #expect(try await eventually { try await test.registry.poll(a) == .request(request(1)) })
     #expect(await !test.audio.calls.contains("confirmHandoff"))
+  }
+
+  /// The same setting holds the sound for an answer that does not wait; on, it posts no notice.
+  @Test func answerSoundFollowsTheSoundSetting() async throws {
+    let settings = SettingsStore(file: nil)
+    let test = try BridgeTests(confirmsWithSound: { settings.current.confirmHandoffs })
+    try await test.join(a, "Alpha")
+    await test.live()
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await test.bridge.audioEvent(.speechEnded)
+    try await test.answer(request(1), from: a)
+    #expect(await test.audio.calls.contains("confirmAnswer"))
+    #expect(await test.notifier.posted.isEmpty)
+    settings.update { $0.confirmHandoffs = false }
+    try await test.answer(request(2), from: a)
+    #expect(await test.voice.added.count == 2)
+    #expect(await test.audio.calls.filter { $0 == "confirmAnswer" }.count == 1)
+  }
+
+  /// The waiting chime is the only sign of that result, so the sound setting leaves it on.
+  @Test func theChimeDoesNotFollowTheSoundSetting() async throws {
+    let test = try BridgeTests(confirmsWithSound: { false })
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.answer(request(1), from: a)
+    #expect(await test.audio.calls.contains("chime"))
+  }
+
+  /// The attempt exists before the answer's sound, so a Stop while it plays ends it.
+  @Test func noLineOpensAfterAStopWhileAnOpeningAnswerSounds() async throws {
+    try await closedAfterARequest()
+    await audio.holdSound()
+    let answering = Task { try await answerFirstRequest() }
+    #expect(await eventually { await audio.soundWaiting == 1 })
+    await bridge.perform(.stop)
+    let opens = await voice.opens.count
+    await audio.releaseSound()
+    try await answering.value
+    #expect(await bridge.status.call == .off)
+    try await Task.sleep(for: .milliseconds(100))  // a line opened late would be there by now
+    #expect(await voice.opens.count == opens)
   }
 
   /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.
