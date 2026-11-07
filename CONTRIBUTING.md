@@ -81,7 +81,7 @@ answer also needs changes to the audio page.
   Glass needs Xcode 26 or later; with an older Xcode the menu's buttons fall back to bordered
   capsules and the app shows only its classic icon.
 - Node 26, for the mod's checks and the audio page's tests. `scripts/check.sh` installs the
-  mod's development dependencies, TypeScript and `@types/node`, with `npm ci`.
+  mod's development dependencies, TypeScript, `@types/node` and fast-check, with `npm ci`.
 - Claude Code, for the mod's engine-facing half (below).
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the workflows' pinned actions
