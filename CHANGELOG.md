@@ -6,6 +6,16 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Conversation** no longer runs a step behind the call. Your words and the voice's now show as
+  codex transcribes them, where a line used to appear only when it was final: a long reply showed
+  once the voice had finished it, and your line once the voice had started answering. What is kept,
+  and what the voice is seeded with, is still only the final text, which replaces the words shown.
+
+Note: this comes from recorded events and tests, and has not been seen in the real menu during a
+call.
+
 ## [0.4.1]
 
 ### Changed

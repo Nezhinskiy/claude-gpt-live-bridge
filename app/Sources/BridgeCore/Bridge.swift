@@ -30,6 +30,8 @@ public actor Bridge: Router {
   private var timers: [CallTimer: Task<Void, Never>] = [:]
   /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
+  /// The open line's lines not yet final, which belong to `lineSession`.
+  private var growing = GrowingLines()
   /// The session whose conversation the line last opened with; its transcripts are kept there.
   private var lineSession: SessionID?
   /// Whether `lineSession` is set for the line opening now; until then a target change cannot
@@ -117,7 +119,8 @@ public actor Bridge: Router {
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes,
-        conversation: shown.shownLines, labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
+        conversation: shown.shownLines + growing.lines,
+        labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
         claudeLimits: claudeLimits)
     }
   }
@@ -290,6 +293,7 @@ public actor Bridge: Router {
   private func send(_ event: CallEvent) async {
     let before = machine.phase
     let effects = machine.handle(event)
+    if !isLineOpen { growing = GrowingLines() }
     let now = time.now  // read before any await, so an interleaved event cannot shift it
     if before != .live, machine.phase == .live { await meter.opened(at: now) }
     if before == .live, machine.phase != .live { await meter.closed(at: now) }
@@ -489,14 +493,18 @@ public actor Bridge: Router {
             AnswerShaper.line(
               .failed, label: "LiveBridge", body: "no Claude Code session is joined.")))
       }
+    case .userSpeaking(let words): grow(.owner, words)
     case .userUtterance(let text):
+      growing.finish(.owner)
       record(.owner, text, in: lineSession)
       await send(.userTranscribed)
+    case .assistantSpeaking(let words):
+      grow(.voice, words)
+      await send(.assistantSpeaking)
     case .assistantUtterance(let text):
+      growing.finish(.voice)
       record(.voice, text, in: lineSession)
       await send(.assistantFinishedSpeaking(text))
-    case .userSpeaking: break
-    case .assistantSpeaking: await send(.assistantSpeaking)
     case .closed(let reason):
       connecting?.cancel()
       connecting = nil
@@ -504,6 +512,13 @@ public actor Bridge: Router {
       await send(.remoteClosed(reason))
     }
     await changed()
+  }
+
+  /// Words of a line not yet final, for the menu only. One that arrives after the line closed
+  /// would never get its final text.
+  private func grow(_ speaker: Conversation.Line.Speaker, _ words: String) {
+    guard isLineOpen, lineSession != nil else { return }
+    growing.add(words, from: speaker)
   }
 
   private func record(_ speaker: Conversation.Line.Speaker, _ text: String, in id: SessionID?) {
@@ -795,8 +810,8 @@ public struct BridgeUpdate: Sendable, Equatable {
   /// The status's problem, with its kind.
   public let problem: Problem?
   public let minutesThisCall: Double
-  /// The target's whole conversation, oldest first: every line the app keeps, and a summary no
-  /// kept line holds.
+  /// The target's whole conversation, oldest first: every line the app keeps, a summary no kept
+  /// line holds, and the lines the open line is still saying.
   public let conversation: [Conversation.Line]
   /// The joined sessions whose mod is older than the app, or names no version, by label.
   public let labelsOnAnOlderMod: [String]

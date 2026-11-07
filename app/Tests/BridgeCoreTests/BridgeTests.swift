@@ -2082,6 +2082,124 @@ struct BridgeTests {
     #expect(await eventually { await lines().count == 2 })
   }
 
+  // MARK: Lines as they are spoken
+
+  /// codex's words arrive while they are said, so the menu has them long before the final text.
+  @Test func theOwnersWordsShowAsTheyArrive() async throws {
+    await live()
+    voice.emit(.userSpeaking(" Thanks"))
+    voice.emit(.userSpeaking(". By the"))
+    #expect(await eventually { await lines() == ["You: Thanks. By the"] })
+  }
+
+  @Test func theVoicesWordsShowAsTheyArrive() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(" Thanks for"))
+    voice.emit(.assistantSpeaking(" asking"))
+    #expect(await eventually { await lines() == ["Voice: Thanks for asking"] })
+  }
+
+  /// The final text is what is kept, whatever the words on the way said.
+  @Test func theFinalTextReplacesTheGrowingLine() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(" Again"))
+    #expect(await eventually { await lines() == ["Voice: Again"] })
+    voice.emit(.assistantUtterance("Once more."))
+    #expect(await eventually { await lines() == ["Voice: Once more."] })
+  }
+
+  /// The order of a recorded call: the voice starts before the owner's final text arrives, and
+  /// the owner's line stays above it.
+  @Test func theOwnersFinalTextStaysAboveTheVoicesGrowingLine() async throws {
+    await live()
+    voice.emit(.userSpeaking(" Thanks."))
+    voice.emit(.assistantSpeaking(" Thanks for"))
+    voice.emit(.userUtterance("Thanks."))
+    #expect(await eventually { await lines() == ["You: Thanks.", "Voice: Thanks for"] })
+  }
+
+  /// codex says an empty delta can follow a final text; it must not open a line.
+  @Test func anEmptyDeltaShowsNoLine() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(""))
+    voice.emit(.assistantSpeaking(" "))
+    voice.emit(.userUtterance("Hello."))
+    #expect(await eventually { await lines() == ["You: Hello."] })
+  }
+
+  @Test func aGrowingLineIsNotStored() async throws {
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    let restarted = try restart()
+    try await restarted.join(a, "Alpha")
+    #expect(await restarted.lines().isEmpty)
+  }
+
+  /// A line that closes before its final text leaves nothing: not in the menu, not in the seed.
+  @Test func aGrowingLineDoesNotSeedTheNextLine() async throws {
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    await bridge.perform(.stop)
+    #expect(await lines().isEmpty)
+    await live()
+    #expect(await voice.opens.last == [])
+    #expect(await lines().isEmpty)
+  }
+
+  @Test func theLineClosingByItselfEndsAGrowingLine() async throws {
+    await live()
+    voice.emit(.assistantSpeaking("Option A"))
+    #expect(await eventually { await lines() == ["Voice: Option A"] })
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await lines().isEmpty })
+  }
+
+  /// A new line starts from nothing, even when the last one's words never got a final text.
+  @Test func wordsOfAClosedLineDoNotJoinTheNextOnes() async throws {
+    await live()
+    voice.emit(.assistantSpeaking("Option A"))
+    #expect(await eventually { await lines() == ["Voice: Option A"] })
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await bridge.audioEvent(.speechStarted)
+    voice.emit(.assistantSpeaking("Option B"))
+    #expect(await eventually { await lines() == ["Voice: Option B"] })
+  }
+
+  /// The menu shows the target's conversation: a growing line of another session is not in it.
+  @Test func aGrowingLineShowsOnlyForItsSession() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    await bridge.setTarget(b)
+    #expect(await lines().isEmpty)
+  }
+
+  /// `/clear` gives the session a new id during the line; its words go with it.
+  @Test func aGrowingLineFollowsTheSessionsNewID() async throws {
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
+    #expect(await lines() == ["You: Remember"])
+  }
+
+  /// A word still on its way when the line closes would never get its final text.
+  @Test func wordsAfterTheLineClosedShowNoLine() async throws {
+    await live()
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    voice.emit(.userSpeaking("Late"))
+    voice.end()  // the events end after that word, so it has been taken once codex is shut down
+    #expect(await eventually { await voice.shutdowns == 1 })
+    #expect(await lines().isEmpty)
+  }
+
   /// A conversation file that does not decode starts empty instead of failing the bridge.
   @Test func anUnreadableConversationFileStartsEmpty() async throws {
     try Data("not json".utf8).write(to: dir.appending(path: "continuity.json"))

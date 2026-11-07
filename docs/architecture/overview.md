@@ -81,6 +81,14 @@ microphone or Claude:
   approval notices stay out with it (`Bridge.activity`). The open line about the
   session is given an admitted line at once with `addContext`, a connecting one when it is
   connected.
+- `GrowingLines`: the lines the open line is still saying, for the menu only, in the order they
+  started. `Bridge` adds each `transcript/delta` here, shows the result after the target's
+  conversation, and moves a line to `Continuity` when its `transcript/done` brings the final text,
+  which replaces the words shown. A growing line is never saved and never seeds the voice; a line
+  that closes before the final text loses it. So the menu is as late as codex's deltas, not its
+  final text ([ADR 0001 (r)](../adr/0001-platform-findings.md)). codex's deltas name only a role, so
+  a reply that starts before the last one's final text loses its first words on screen until its
+  own final text.
 - `RealtimeSession`: one ephemeral, read-only codex thread per realtime session; it refuses to go
   on unless codex reports every MCP server disabled, interrupts every codex turn and declines
   every request codex sends.
