@@ -8,6 +8,7 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
+- The translated READMEs moved to `docs/i18n/`.
 - An answer, failure or question from Claude that reaches an open or opening line now plays the
   same sound, unless someone is speaking. There is no notification with it, and an update has no sound. The setting is
   now **Play sounds for requests and answers** and covers it; the sound for a result that waits
