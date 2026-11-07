@@ -1,22 +1,14 @@
-# CodeQL for the three languages this repository has: the workflows, the mod and audio page
-# (JavaScript/TypeScript) and the app (Swift). The Swift analysis builds the app and takes about
-# a quarter of an hour, so a change that touches only prose or images skips it; the weekly run
-# still scans main whatever changed. Comment-only edits inside code files are not told apart and
-# run it. (This replaces GitHub's default CodeQL setup, which cannot filter paths.)
+# CodeQL for the workflows and the mod and audio page (JavaScript/TypeScript), on every push to
+# main, every pull request and weekly. These two take about a minute, so they run on changes to
+# prose too, and every merged change carries a code-scanning result. The app's Swift analysis builds
+# the app and takes about a quarter of an hour, so it lives in codeql-swift.yml, which skips such
+# changes. (This replaces GitHub's default CodeQL setup, which cannot filter paths.)
 name: CodeQL
 
 on:
   push:
     branches: [main]
-    paths-ignore: &prose
-      - "**/*.md"
-      - "docs/**"
-      - "site/assets/**"
-      - "LICENSE"
-      - ".github/ISSUE_TEMPLATE/**"
-      - ".github/pull_request_template.md"
   pull_request:
-    paths-ignore: *prose
   schedule:
     - cron: "17 4 * * 1"
 
@@ -30,24 +22,15 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - language: actions
-            runner: ubuntu-latest
-            build-mode: none
-          - language: javascript-typescript
-            runner: ubuntu-latest
-            build-mode: none
-          - language: swift
-            runner: xcode-27  # the image ci.yml builds the app on
-            build-mode: manual
+        language: [actions, javascript-typescript]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,10 +38,7 @@ jobs:
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-      # SwiftPM's manifest sandbox (sandbox-exec) cannot start under CodeQL's tracer.
-      - if: matrix.build-mode == 'manual'
-        run: swift build --package-path app --disable-sandbox
+          build-mode: none
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: /language:${{ matrix.language }}
