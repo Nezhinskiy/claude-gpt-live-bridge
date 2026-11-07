@@ -607,6 +607,7 @@ issues, the [known limitations](#known-limitations) and the directions
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): the layout, the toolchain, the checks (`scripts/check.sh`)
   and the conventions.
+- [Issue forms](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): report a bug or ask for a feature.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): how we treat each other here.
 - [SECURITY.md](SECURITY.md): report a vulnerability privately, not in a public issue.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each release.

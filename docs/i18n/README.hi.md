@@ -585,6 +585,7 @@ label लगा होता है; [CONTRIBUTING.md](../../CONTRIBUTING.md#whe
 issues, [ज्ञात सीमाएँ](#ज्ञात-सीमाएँ) और [ऊपर](#रोडमैप-और-सहयोग-चाहिए) बताई गई दिशाएँ।
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): layout, toolchain, checks (`scripts/check.sh`) और conventions।
+- [Issue forms](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): bug की रिपोर्ट करें या कोई feature माँगें।
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): यहाँ हम एक-दूसरे के साथ कैसे पेश आते हैं।
 - [SECURITY.md](../../SECURITY.md): vulnerability की रिपोर्ट निजी तौर पर करें, public issue में नहीं।
 - [CHANGELOG.md](../../CHANGELOG.md): हर release में क्या बदला।

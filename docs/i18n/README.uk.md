@@ -602,6 +602,7 @@ GitHub, а `gh` ще й до Sigstore по корінь довіри, під в�
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): структура репозиторію, інструментарій, перевірки
   (`scripts/check.sh`) та конвенції.
+- [Форми задач](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): повідомте про помилку або запропонуйте функцію.
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): як ми поводимося одне з одним тут.
 - [SECURITY.md](../../SECURITY.md): про вразливість повідомляйте приватно, а не у публічній задачі.
 - [CHANGELOG.md](../../CHANGELOG.md): що змінилося в кожному випуску.

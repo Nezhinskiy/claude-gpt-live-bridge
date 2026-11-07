@@ -649,6 +649,7 @@ les [limitations connues](#limitations-connues) et les directions
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) : l'organisation du dépôt, la chaîne d'outils, les
   vérifications (`scripts/check.sh`) et les conventions.
+- [Formulaires de tickets](https://github.com/getLiveBridge/LiveBridge/issues/new/choose) : signalez un bug ou demandez une fonctionnalité.
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md) : comment nous nous traitons ici.
 - [SECURITY.md](../../SECURITY.md) : signalez une vulnérabilité en privé, pas dans un ticket public.
 - [CHANGELOG.md](../../CHANGELOG.md) : ce qui a changé dans chaque version.
