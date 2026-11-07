@@ -23,10 +23,8 @@ final class AudioHost: NSObject, AudioSide {
   private var navigation: WKNavigation?
   private var loaded = false
   private var waiting: [CheckedContinuation<Void, Never>] = []
-  /// The bundled `audio/handoff.wav`, which `scripts/render-sound.mjs` renders.
-  private let handoffSound = Bundle.module.url(
-    forResource: "handoff", withExtension: "wav", subdirectory: "audio"
-  ).flatMap { NSSound(contentsOf: $0, byReference: true) }
+  private let chimeSound = bundledSound("chime")
+  private let handoffSound = bundledSound("handoff")
 
   /// `fakeMic` (debug builds only) replaces the microphone with a WAV file.
   init(fakeMic: URL?) {
@@ -50,6 +48,12 @@ final class AudioHost: NSObject, AudioSide {
   }
 
   private func load() { navigation = webView.load(URLRequest(url: AudioPage.url)) }
+
+  /// A bundled `audio/<name>.wav`, which `scripts/render-sound.mjs` renders.
+  private static func bundledSound(_ name: String) -> NSSound? {
+    Bundle.module.url(forResource: name, withExtension: "wav", subdirectory: "audio")
+      .flatMap { NSSound(contentsOf: $0, byReference: true) }
+  }
 
   // MARK: AudioSide
 
@@ -102,7 +106,7 @@ final class AudioHost: NSObject, AudioSide {
 
   func closePeer() async { _ = try? await call("LB.closePeer()") }
 
-  func chime() async { NSSound(named: "Glass")?.play() }
+  func chime() async { chimeSound?.play() }
 
   func confirmHandoff() async { handoffSound?.play() }
 

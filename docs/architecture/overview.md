@@ -211,7 +211,8 @@ again, as it does after a `404` (the app restarted).
 
 The owner speaks; the line opens with the pre-roll and the voice hands the request off. Once the
 request is queued for a session, in any phase of the line, the app plays a short sound
-([BR-001](../bugs/BR-001.md)). The line stays open for its result up to
+([BR-001](../bugs/BR-001.md); [render-sound.mjs](../../scripts/render-sound.mjs) says what each part
+of the app's two sounds means). The line stays open for its result up to
 `CallMachine.resultWindowSeconds` (120 s) after the latest handoff, however silent it is (sound
 without words still closes it after 90 s). A result from a session handed a request in that window
 is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the

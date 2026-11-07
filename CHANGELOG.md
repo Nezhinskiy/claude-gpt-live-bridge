@@ -6,6 +6,12 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The sound for a waiting result is now LiveBridge's own instead of macOS's Glass, made to pair
+  with the sound for a queued request. It is shorter, 0.82 s instead of 1.65 s, and louder at its
+  peak.
+
 ### Fixed
 
 - During a call, **Conversation** now shows your words and the voice's as codex transcribes them,
@@ -14,8 +20,8 @@ All notable changes to this project are listed here. The format follows
   moment after you say them, and the voice's a moment before you hear them. What is kept, and what
   the voice is seeded with, is still only the final text, which replaces the words shown.
 
-Note: this comes from recorded events and tests, and has not been seen in the real menu during a
-call.
+Note: the **Conversation** fix comes from recorded events and tests, and has not been seen in the
+real menu during a call.
 
 ## [0.4.1]
 

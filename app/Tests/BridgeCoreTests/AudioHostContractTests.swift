@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -36,5 +37,13 @@ struct AudioHostContractTests {
     #expect(AudioPage.resourceName(for: URL(string: "livebridge-audio://app/../x.js")!) == nil)
     #expect(AudioPage.resourceName(for: URL(string: "livebridge-audio://evil/vad.js")!) == nil)
     #expect(AudioPage.resourceName(for: URL(string: "livebridge-audio://app/a/b.js")!) == nil)
+  }
+
+  /// `AudioHost` plays these with `?.play()`, so one that does not load is only silence.
+  @Test(arguments: ["chime", "handoff"]) func soundLoads(_ name: String) throws {
+    let file = URL(filePath: #filePath).deletingLastPathComponent()
+      .appending(path: "../../Sources/LiveBridge/Resources/audio/\(name).wav")
+    let sound = try #require(NSSound(contentsOf: file, byReference: true))
+    #expect(sound.duration > 0)
   }
 }
