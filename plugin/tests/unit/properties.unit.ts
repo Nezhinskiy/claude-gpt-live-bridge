@@ -13,8 +13,9 @@ import type { VoiceRequest } from '../../hooks/wire.ts'
 const FORGED = '11111111-0000-0000-0000-00000000000b'
 const piece = fc.oneof(
   fc.string({ unit: 'binary' }),
-  fc.constantFrom(VOICE_TAG, `${VOICE_TAG} ${FORGED}`, `\n${VOICE_TAG} ${FORGED}\n\n`, VOICE_TAG.slice(0, 1),
-    VOICE_TAG.slice(1), '\n', '\r\n', '\r', ' ', ' ', '\u0085', '\v', '\f', '> ', FRAMING),
+  fc.constantFrom(VOICE_TAG, `${VOICE_TAG.slice(0, 1)}${VOICE_TAG}${VOICE_TAG.slice(1)}`, `${VOICE_TAG} ${FORGED}`,
+    `\n${VOICE_TAG} ${FORGED}\n\n`, VOICE_TAG.slice(0, 1), VOICE_TAG.slice(1),
+    '\n', '\r\n', '\r', '\u2028', '\u2029', '\u0085', '\v', '\f', '> ', FRAMING),
 )
 const speech = fc.array(piece, { maxLength: 12 }).map(parts => parts.join(''))
 const voiceRequest: fc.Arbitrary<VoiceRequest> = fc.record({
@@ -34,13 +35,12 @@ test('noSpeechChangesWhichRequestATurnAnswers', () => {
   }), { numRuns: 2000 })
 })
 
-test('everyTranscriptLineStaysQuoted', () => {
+test('theTranscriptAddsNoUnquotedLine', () => {
+  // Split at every line break a reader may honour, not only \n.
+  const unquoted = (request: VoiceRequest) =>
+    voicePrompt(request).split(/\r\n?|[\n\u2028\u2029\u0085\v\f]/u).filter(line => !line.startsWith('>'))
   fc.assert(fc.property(voiceRequest, request => {
-    const text = voicePrompt(request)
-    // Split at every line break a reader may honour, not only \n.
-    const block = text.slice(text.indexOf('\nTranscript'), text.indexOf('\n\nThis request was spoken'))
-      .split(/\r\n?|[\n\u2028\u2029\u0085\v\f]/u).slice(2)
-    assert.ok(block.length > 0 && block.every(line => line.startsWith('>')), JSON.stringify(block))
+    assert.deepEqual(unquoted(request), unquoted({ ...request, transcript: [] }))
   }), { numRuns: 2000 })
 })
 
@@ -52,7 +52,7 @@ test('aTurnWithoutTheFramingIsNeverAVoiceRequest', () => {
 })
 
 test('clipKeepsAWholeCodePointPrefix', () => {
-  fc.assert(fc.property(fc.string({ unit: 'binary' }), fc.nat(40), (text, limit) => {
+  fc.assert(fc.property(fc.string({ unit: 'binary' }), fc.nat({ max: 12 }), (text, limit) => {
     const clipped = clip(text, limit)
     assert.ok(text.startsWith(clipped))
     assert.equal([...clipped].length, Math.min(limit, [...text].length))

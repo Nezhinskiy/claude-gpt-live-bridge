@@ -2,7 +2,7 @@
 # main, every pull request and weekly. These two take about a minute, so they run on changes to
 # prose too, and every merged change carries a code-scanning result. The app's Swift analysis builds
 # the app and takes about a quarter of an hour, so it lives in codeql-swift.yml, which skips such
-# changes. (This replaces GitHub's default CodeQL setup, which cannot filter paths.)
+# changes. (The two workflows replace GitHub's default CodeQL setup, which cannot filter paths.)
 name: CodeQL
 
 on:
