@@ -32,7 +32,7 @@ do not have to hold the line open while Claude works: its answer opens the close
 goes to the voice to say. The voice also follows what you type in the session and what Claude
 answers, so you can switch between speaking and typing.
 
-<p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
+<p align="center"><img src="docs/assets/readme-demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
 between your own codex and your own Claude Code. The app and the mod talk over a Unix socket

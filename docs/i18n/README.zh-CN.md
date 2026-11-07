@@ -31,7 +31,7 @@ Claude 工作时你不必让线路一直打开：它的答复会重新打开已�
 
 *英文原文为准（[README.md](../../README.md)）；本译文可能滞后。*
 
-<p align="center"><img src="../../site/assets/demo.gif" alt="通过 LiveBridge 与 Claude Code 会话对话" width="100%"></p>
+<p align="center"><img src="../assets/readme-demo.gif" alt="通过 LiveBridge 与 Claude Code 会话对话" width="100%"></p>
 
 **设计上完全本地。** 没有遥测，也没有自己的服务器：LiveBridge 只是你 Mac 上的一座桥，连接你自己的 codex 与你自己的
 Claude Code。应用与模组之间通过只有你的用户才能打开的 Unix 套接字通信，应用不监听任何网络端口。除了这两个工具本来就会发送的内容
