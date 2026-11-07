@@ -1,0 +1,8 @@
+{
+  "name": "livebridge-claude-code-floor",
+  "private": true,
+  "description": "The lowest Claude Code the README promises, which scripts/check-floor.sh installs with npm ci from this lockfile; README.md's Requirements line is the version's home.",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.301"
+  }
+}

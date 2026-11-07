@@ -1,5 +1,7 @@
-# Weekly update PRs for the two things this repository pulls in: the SHA-pinned actions of its
-# workflows and the mod's development dependencies. The app has no Swift package dependencies.
+# Weekly update PRs for the SHA-pinned actions of the workflows and the mod's development
+# dependencies. The app has no Swift package dependencies. The two Claude Code lockfiles under
+# .github/ are left out on purpose: CI's version is picked by hand and the floor must not move, so
+# a security PR against the floor is expected to fail its check, and its alert is dismissed.
 # A new version waits a week before it is proposed, so a release that is pulled soon after
 # publication never reaches a PR.
 version: 2

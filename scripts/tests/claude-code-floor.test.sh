@@ -28,19 +28,31 @@ for file in README*.md site/index.html; do
   [ -z "$other" ] || problem "$file says $other but README.md's Requirements say $floor"
 done
 
+# The floor's package.json asks for the floor, and its lockfile installs it.
+asked=$(node -p "require('./.github/claude-code-floor/package.json').dependencies['@anthropic-ai/claude-code']")
+[ "$asked" = "$floor" ] ||
+  problem ".github/claude-code-floor/package.json asks for Claude Code $asked, not $floor"
+locked=$(node -p "require('./.github/claude-code-floor/package-lock.json')
+  .packages['node_modules/@anthropic-ai/claude-code']?.version")
+[ "$locked" = "$floor" ] ||
+  problem ".github/claude-code-floor/package-lock.json installs Claude Code $locked, not $floor"
+
 grep -Eq '^ +run: scripts/check-floor\.sh$' .github/workflows/ci.yml ||
   problem "ci.yml does not run scripts/check-floor.sh"
 grep -q '^sh scripts/check-mod\.sh$' scripts/check.sh ||
   problem "check.sh does not run scripts/check-mod.sh"
 
-# The scratch copy: the two scripts and the README. Each run finds types left by a higher version.
+# The scratch copy: the two scripts, the README and the floor's lockfile folder. Each run finds
+# types left by a higher version.
 repo="$tmp/repo"
 types=plugin/.claude-plugin/types/claude-code/index.d.ts
-mkdir -p "$repo/scripts" "$repo/$(dirname "$types")" "$tmp/bin"
+mkdir -p "$repo/scripts" "$repo/$(dirname "$types")" "$repo/.github" "$tmp/bin"
 cp scripts/check-floor.sh scripts/check-mod.sh "$repo/scripts/"
 cp README.md "$repo/"
+cp -R .github/claude-code-floor "$repo/.github/"
 
-# What `npm install` lays: a claude that reports $FAKE_CLAUDE_VERSION, or the version asked for.
+# What `npm ci` lays: a claude that reports $FAKE_CLAUDE_VERSION, or the version its package.json
+# asks for.
 cat >"$tmp/claude" <<'STUB'
 #!/bin/sh
 case "$1 ${2:-} ${3:-}" in
@@ -59,11 +71,11 @@ esac
 STUB
 cat >"$tmp/bin/npm" <<'STUB'
 #!/bin/sh
-if [ "$1" = install ]; then
+if [ "$1" = ci ]; then
   prefix=$3
-  for last; do :; done
+  requested=$(sed -n 's/.*"@anthropic-ai\/claude-code": "\(.*\)".*/\1/p' "$prefix/package.json")
   mkdir -p "$prefix/node_modules/.bin"
-  { echo '#!/bin/sh'; echo "FAKE_REQUESTED=${last##*@}"; cat "$FAKE_STUBS/claude"; } \
+  { echo '#!/bin/sh'; echo "FAKE_REQUESTED=$requested"; cat "$FAKE_STUBS/claude"; } \
     >"$prefix/node_modules/.bin/claude"
   chmod +x "$prefix/node_modules/.bin/claude"
 else
