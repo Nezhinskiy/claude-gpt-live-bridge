@@ -1,7 +1,8 @@
 // Debug builds only. The fake microphone's scripted lines: the first plays when the microphone is
 // taken, each next one once the voice has finished its reply and has been quiet for `quietMs`
-// (its transcript ends before its audio does). A line with a cut plays over the voice instead,
-// that long into its reply. Pure: the page passes in what plays a line.
+// (its transcript ends before its audio does). What the voice finishes during a line is a word
+// dropped into it ("Mm-hmm"), not a reply. A line with a cut plays over the voice instead, that
+// long into its reply. Pure: the page passes in what plays a line.
 
 /** `play(index)` plays line `index`; `ended` reports it played out. */
 export function createFakeLines({ count, play, quietMs = 600, cuts = [] }) {
@@ -38,6 +39,7 @@ export function createFakeLines({ count, play, quietMs = 600, cuts = [] }) {
         cutOff = false; // what finished is the reply cut off, which owes nothing
         return;
       }
+      if (playing) return; // a word dropped into a line, not a reply to it
       cutOff = false;
       replyFrom = null;
       due = !stopped && current + 1 < count;

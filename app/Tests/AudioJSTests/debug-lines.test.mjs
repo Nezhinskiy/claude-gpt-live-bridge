@@ -42,16 +42,6 @@ test('audio still playing after the transcript holds the next line back', () => 
   assert.deepEqual(played, [0, 1]);
 });
 
-test('a line still playing holds the next one back', () => {
-  const { lines, played } = rig(2);
-  lines.voiceFinished(1000);
-  lines.voice(false, 3000);
-  assert.deepEqual(played, [0]);
-  lines.ended();
-  lines.voice(false, 3100);
-  assert.deepEqual(played, [0, 1]);
-});
-
 test('one finished reply plays one line', () => {
   const { lines, played } = rig(3);
   lines.ended();
@@ -147,4 +137,19 @@ test('the reply to a cut line owes the next line', () => {
   lines.voiceFinished(8000);
   lines.voice(false, 9000);
   assert.deepEqual(played, [0, 1, 2]);
+});
+
+test('a word the voice drops into a playing line owes no line', () => {
+  const played = [];
+  const lines = createFakeLines({ count: 3, play: (index) => played.push(index) });
+  lines.start();
+  lines.voice(true, 3000);
+  lines.voiceFinished(3500);
+  lines.ended();
+  lines.voice(false, 9000);
+  assert.deepEqual(played, [0]);
+  lines.voice(true, 10000);
+  lines.voiceFinished(12000);
+  lines.voice(false, 13000);
+  assert.deepEqual(played, [0, 1]);
 });
