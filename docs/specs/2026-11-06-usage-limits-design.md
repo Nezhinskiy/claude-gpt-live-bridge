@@ -152,9 +152,9 @@ no slot from a live one. That matters for Claude, whose readings arrive only wit
 
 **The menu.** `MenuContent` gets a limit item carrying the row's parts, tooltip and which windows are
 near the limit; `outline` prints it for the tests. All rules are pure and tested there. The
-threshold is one constant, 90. A row is an enabled native `NSMenuItem` with `toolTip`: on a disabled
-hosted row SwiftUI's `.help` did not show in the real menu. So a row highlights under the pointer,
-and a click only closes the menu, which the owner accepted.
+threshold is one constant, 90. A row is an enabled hosted row: it highlights under the pointer, a
+click does nothing, and its reset times show in a panel of their own while the pointer is on it
+([ADR 0001](../adr/0001-platform-findings.md)).
 
 ## Docs
 

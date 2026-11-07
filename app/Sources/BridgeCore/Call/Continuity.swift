@@ -205,8 +205,8 @@ public struct Continuity: Codable, Sendable, Equatable {
   }
 
   /// A summary from `id` arrived. False: it was asked for before the latest gap or forget, so it
-  /// covers less than the conversation lacks and must not be taken. One nobody asked for (`/live
-  /// context`) cannot be dated, and is taken.
+  /// covers less than the conversation lacks and must not be taken. One nobody asked for (an older
+  /// mod's `/live context`) cannot be dated, and is taken.
   public mutating func takeSummaryAsk(of id: SessionID, at now: Date) -> Bool {
     use(id) { $0.takeSummaryAsk(at: now) }
   }

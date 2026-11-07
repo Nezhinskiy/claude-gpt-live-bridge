@@ -122,6 +122,22 @@ actor FakeAudio: AudioSide {
   func flushPreroll() { calls.append("flushPreroll") }
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
+  /// While set, the next answer's sound waits for `releaseSound()`, as a hop to the main actor
+  /// lets others in.
+  var holdsSound = false
+  private var heldSounds: [CheckedContinuation<Void, Never>] = []
+  var soundWaiting: Int { heldSounds.count }
+  func holdSound() { holdsSound = true }
+  func releaseSound() {
+    for wait in heldSounds { wait.resume() }
+    heldSounds = []
+  }
+  func confirmAnswer() async {
+    calls.append("confirmAnswer")
+    guard holdsSound else { return }
+    holdsSound = false
+    await withCheckedContinuation { heldSounds.append($0) }
+  }
   func confirmHandoff() { calls.append("confirmHandoff") }
   func muteMicrophone() { calls.append("muteMicrophone") }
   func unmuteMicrophone() { calls.append("unmuteMicrophone") }
@@ -151,7 +167,7 @@ struct BridgeTests {
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
     time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
+    confirmsWithSound: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
     appVersion: AppVersion? = nil
   ) throws {
     self.time = time
@@ -164,7 +180,7 @@ struct BridgeTests {
       registry: registry, realtime: realtime ?? { [voice] in voice }, audio: audio,
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
-      notifier: notifier, notifies: notifies, confirmsHandoffs: confirmsHandoffs,
+      notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
       pausesSync: { pause.withLock { $0 } }, appVersion: appVersion)
   }
 
@@ -687,7 +703,7 @@ struct BridgeTests {
     #expect(try await eventually { try await test.registry.poll(a) == .request(request(2)) })
     await voices.made.last?.emit(.assistantUtterance("On it."))  // the handoff's acknowledgement
     try await test.answer(request(3), from: b, .question, "Which file?")
-    await voices.made.last?.emit(.assistantSpeaking)
+    await voices.made.last?.emit(.assistantSpeaking("Hello"))
     await voices.made.last?.emit(.assistantUtterance("Beta asks which file."))
     #expect(await eventually { await test.bridge.status.unheard == 0 })
     await test.bridge.setTarget(a)
@@ -739,9 +755,9 @@ struct BridgeTests {
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.added == ["[RESULT] Alpha: Done."])
     #expect(await bridge.status.unheard == 1)  // until the voice has said it
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("I"))  // cut off by the owner
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("Alpha is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
   }
@@ -783,13 +799,54 @@ struct BridgeTests {
   /// Settings' handoff sound is read at each handoff; off, the request still goes.
   @Test func handoffSoundCanBeTurnedOff() async throws {
     let settings = SettingsStore(file: nil)
-    let test = try BridgeTests(confirmsHandoffs: { settings.current.confirmHandoffs })
+    let test = try BridgeTests(confirmsWithSound: { settings.current.confirmHandoffs })
     settings.update { $0.confirmHandoffs = false }
     try await test.join(a, "Alpha")
     await test.live()
     test.voice.emit(.handoff(request(1)))
     #expect(try await eventually { try await test.registry.poll(a) == .request(request(1)) })
     #expect(await !test.audio.calls.contains("confirmHandoff"))
+  }
+
+  /// The same setting holds the sound for an answer that does not wait; on, it posts no notice.
+  @Test func answerSoundFollowsTheSoundSetting() async throws {
+    let settings = SettingsStore(file: nil)
+    let test = try BridgeTests(confirmsWithSound: { settings.current.confirmHandoffs })
+    try await test.join(a, "Alpha")
+    await test.live()
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await test.bridge.audioEvent(.speechEnded)
+    try await test.answer(request(1), from: a)
+    #expect(await test.audio.calls.contains("confirmAnswer"))
+    #expect(await test.notifier.posted.isEmpty)
+    settings.update { $0.confirmHandoffs = false }
+    try await test.answer(request(2), from: a)
+    #expect(await test.voice.added.count == 2)
+    #expect(await test.audio.calls.filter { $0 == "confirmAnswer" }.count == 1)
+  }
+
+  /// The waiting chime is the only sign of that result, so the sound setting leaves it on.
+  @Test func theChimeDoesNotFollowTheSoundSetting() async throws {
+    let test = try BridgeTests(confirmsWithSound: { false })
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.answer(request(1), from: a)
+    #expect(await test.audio.calls.contains("chime"))
+  }
+
+  /// The attempt exists before the answer's sound, so a Stop while it plays ends it.
+  @Test func noLineOpensAfterAStopWhileAnOpeningAnswerSounds() async throws {
+    try await closedAfterARequest()
+    await audio.holdSound()
+    let answering = Task { try await answerFirstRequest() }
+    #expect(await eventually { await audio.soundWaiting == 1 })
+    await bridge.perform(.stop)
+    let opens = await voice.opens.count
+    await audio.releaseSound()
+    try await answering.value
+    #expect(await bridge.status.call == .off)
+    try await Task.sleep(for: .milliseconds(100))  // a line opened late would be there by now
+    #expect(await voice.opens.count == opens)
   }
 
   /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.
@@ -1124,7 +1181,7 @@ struct BridgeTests {
     try await post(
       "/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Deploy which branch?")
     )
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("Beta asks: deploy which branch?"))
     #expect(await eventually { await bridge.status.unheard == 0 })
     voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
@@ -1395,7 +1452,7 @@ struct BridgeTests {
     try await test.sync(test.a, "Private thing.")
     await test.bridge.remove(test.a)
     test.setPause(false)
-    try await test.join(test.a, "Alpha", owner: true)  // /live on
+    try await test.join(test.a, "Alpha", owner: true)  // /live
     await test.live()
     #expect(try await test.registry.poll(test.a) == nil)
   }
@@ -1603,7 +1660,7 @@ struct BridgeTests {
     await live()
     try await answer(request(1), from: b)
     #expect(await voice.added == ["[RESULT] Beta: Done."])
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("Beta is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
     #expect(await lines() == ["Voice: Beta is done."])
@@ -2080,6 +2137,210 @@ struct BridgeTests {
     #expect(await lines() == ["You: Remember the colour teal."])
     voice.emit(.userUtterance("And blue."))
     #expect(await eventually { await lines().count == 2 })
+  }
+
+  // MARK: Lines as they are spoken
+
+  /// codex's words arrive while they are said, so the menu has them long before the final text.
+  @Test func theOwnersWordsShowAsTheyArrive() async throws {
+    await live()
+    voice.emit(.userSpeaking(" Thanks"))
+    voice.emit(.userSpeaking(". By the"))
+    #expect(await eventually { await lines() == ["You: Thanks. By the"] })
+  }
+
+  @Test func theVoicesWordsShowAsTheyArrive() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(" Thanks for"))
+    voice.emit(.assistantSpeaking(" asking"))
+    #expect(await eventually { await lines() == ["Voice: Thanks for asking"] })
+  }
+
+  /// The final text is what is kept, whatever the words on the way said.
+  @Test func theFinalTextReplacesTheGrowingLine() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(" Again and again"))
+    #expect(await eventually { await lines() == ["Voice: Again and again"] })
+    voice.emit(.assistantUtterance("Once more."))
+    #expect(await eventually { await lines() == ["Voice: Once more."] })
+  }
+
+  /// The owner's next sentence starts before the last one's final text, which comes seconds
+  /// after they stop: its words stay, and the rest of it joins them.
+  @Test func wordsPastTheFinalTextStay() async throws {
+    await live()
+    voice.emit(.userSpeaking(" First."))
+    voice.emit(.userSpeaking(" Second one"))
+    voice.emit(.userUtterance("First."))
+    #expect(await eventually { await lines() == ["You: First.", "You: Second one"] })
+    voice.emit(.userSpeaking(" goes on"))
+    #expect(await eventually { await lines() == ["You: First.", "You: Second one goes on"] })
+  }
+
+  /// The same for the voice's next reply.
+  @Test func aRepliesWordsPastTheFinalTextStay() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(" Done."))
+    voice.emit(.assistantSpeaking(" Next"))
+    voice.emit(.assistantUtterance("Done."))
+    #expect(await eventually { await lines() == ["Voice: Done.", "Voice: Next"] })
+  }
+
+  /// A final text that says everything shown leaves no line behind.
+  @Test func aFinalTextThatCoversTheWordsEndsTheLine() async throws {
+    await live()
+    voice.emit(.userSpeaking(" First. "))
+    voice.emit(.userUtterance("First."))
+    #expect(await eventually { await lines() == ["You: First."] })
+  }
+
+  /// The order of a recorded call: the voice starts before the owner's final text arrives, and
+  /// the owner's line stays above it.
+  @Test func theOwnersFinalTextStaysAboveTheVoicesGrowingLine() async throws {
+    await live()
+    voice.emit(.userSpeaking(" Thanks."))
+    voice.emit(.assistantSpeaking(" Thanks for"))
+    voice.emit(.userUtterance("Thanks."))
+    #expect(await eventually { await lines() == ["You: Thanks.", "Voice: Thanks for"] })
+  }
+
+  /// codex says an empty delta can follow a final text; it must not open a line.
+  @Test func anEmptyDeltaShowsNoLine() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(""))
+    voice.emit(.assistantSpeaking(" "))
+    voice.emit(.userUtterance("Hello."))
+    #expect(await eventually { await lines() == ["You: Hello."] })
+  }
+
+  /// A blank delta says nothing, so it cannot put the voice's answer above the owner's question.
+  @Test func aBlankDeltaTakesNoPlaceInTheOrder() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(""))
+    voice.emit(.userSpeaking(" Hi"))
+    voice.emit(.assistantSpeaking(" Hello"))
+    #expect(await eventually { await lines() == ["You: Hi", "Voice: Hello"] })
+  }
+
+  @Test func aGrowingLineIsNotStored() async throws {
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    let restarted = try restart()
+    try await restarted.join(a, "Alpha")
+    #expect(await restarted.lines().isEmpty)
+  }
+
+  /// A line that closes before its final text leaves nothing: not in the menu, not in the seed.
+  @Test func aGrowingLineDoesNotSeedTheNextLine() async throws {
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    await bridge.perform(.stop)
+    #expect(await lines().isEmpty)
+    await live()
+    #expect(await voice.opens.last == [])
+    #expect(await lines().isEmpty)
+  }
+
+  @Test func theLineClosingByItselfEndsAGrowingLine() async throws {
+    await live()
+    voice.emit(.assistantSpeaking("Option A"))
+    #expect(await eventually { await lines() == ["Voice: Option A"] })
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await lines().isEmpty })
+  }
+
+  /// A new line starts from nothing, even when the last one's words never got a final text.
+  @Test func wordsOfAClosedLineDoNotJoinTheNextOnes() async throws {
+    await live()
+    voice.emit(.assistantSpeaking("Option A"))
+    #expect(await eventually { await lines() == ["Voice: Option A"] })
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await bridge.audioEvent(.speechStarted)
+    voice.emit(.assistantSpeaking("Option B"))
+    #expect(await eventually { await lines() == ["Voice: Option B"] })
+  }
+
+  /// The owner's words trail their voice, so they say nothing about whether the owner still
+  /// speaks: the line hangs up when it would have without them.
+  @Test func theOwnersWordsDoNotMoveTheSilenceHangUp() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    #expect(await eventually { time.sleepers >= 3 })  // sweep, 2 silence timers
+    for _ in 1..<CallMachine.silenceSeconds {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)  // the session stays joined
+    }
+    voice.emit(.userSpeaking(" Trailing"))
+    #expect(await eventually { await lines() == ["You: Trailing"] })
+    time.advance(by: .seconds(1))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
+  /// Nor do they make a result wait, as the owner speaking or the voice speaking does.
+  @Test func aResultIsSaidAmongTheOwnersWords() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    voice.emit(.userSpeaking(" Trailing"))
+    #expect(await eventually { await lines().last == "You: Trailing" })
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Done."] })
+  }
+
+  /// A line opened for a question closes without any call event when the question is settled.
+  @Test func aLineClosedByAWithdrawnQuestionEndsAGrowingLine() async throws {
+    await live()
+    voice.emit(.userUtterance("Hi"))
+    #expect(await eventually { await lines() == ["You: Hi"] })
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await voice.holdOpen()
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which?", turn: TurnRef(id: "turn-2")))
+    #expect(await eventually { await voice.openWaiting == 1 })
+    voice.emit(.assistantSpeaking(" Late"))
+    #expect(await eventually { await lines().last == "Voice: Late" })
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .working, turn: TurnRef(id: "turn-2")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    #expect(await !lines().contains("Voice: Late"))
+  }
+
+  /// The menu shows the target's conversation: a growing line of another session is not in it.
+  @Test func aGrowingLineShowsOnlyForItsSession() async throws {
+    try await join(a, "Alpha")
+    try await join(b, "Beta")
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    await bridge.setTarget(b)
+    #expect(await lines().isEmpty)
+  }
+
+  /// `/clear` gives the session a new id during the line; its words go with it.
+  @Test func aGrowingLineFollowsTheSessionsNewID() async throws {
+    await live()
+    voice.emit(.userSpeaking("Remember"))
+    #expect(await eventually { await lines() == ["You: Remember"] })
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
+    #expect(await lines() == ["You: Remember"])
+  }
+
+  /// A word still on its way when the line closes would never get its final text.
+  @Test func wordsAfterTheLineClosedShowNoLine() async throws {
+    await live()
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    voice.emit(.userSpeaking("Late"))
+    voice.end()  // the events end after that word, so it has been taken once codex is shut down
+    #expect(await eventually { await voice.shutdowns == 1 })
+    #expect(await lines().isEmpty)
   }
 
   /// A conversation file that does not decode starts empty instead of failing the bridge.
@@ -2733,8 +2994,8 @@ struct BridgeTests {
     #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
   }
 
-  /// `/live target`, and the band's Talk here: a question the voice has said routes nothing once
-  /// the owner chose another session.
+  /// The band's Talk here: a question the voice has said routes nothing once the owner chose
+  /// another session.
   @Test func aPostedTargetEndsTheRouteOfAQuestionAlreadySaid() async throws {
     let voices = FakeVoices()
     let test = try BridgeTests { await voices.make() }
@@ -2742,7 +3003,7 @@ struct BridgeTests {
     try await test.join(b, "Beta")
     await test.live()
     try await test.answer(request(1), from: a, .question, "Deploy which branch?")
-    await voices.made.last?.emit(.assistantSpeaking)
+    await voices.made.last?.emit(.assistantSpeaking("Hello"))
     await voices.made.last?.emit(.assistantUtterance("Alpha asks: deploy which branch?"))
     #expect(await eventually { await test.bridge.status.unheard == 0 })
     try await test.post("/v1/target", TargetBody(sessionId: b))

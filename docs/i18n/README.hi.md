@@ -1,6 +1,6 @@
-<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <b>हिन्दी</b> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
+<p align="center"><a href="../../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <b>हिन्दी</b> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
 
-<p align="center"><img src="site/assets/icon.png" alt="LiveBridge ऐप आइकन" width="144"></p>
+<p align="center"><img src="../../site/assets/icon.png" alt="LiveBridge ऐप आइकन" width="144"></p>
 
 <h1 align="center">LiveBridge</h1>
 
@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="लाइसेंस: MIT"></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="लाइसेंस: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="प्लेटफ़ॉर्म: Apple Silicon पर macOS 14+">
 </p>
 
@@ -33,9 +33,9 @@ voice line तैयार रखता है (API key की ज़रूर�
 session में क्या टाइप करते हैं और Claude क्या जवाब देता है, इसलिए आप बोलने और टाइप करने के बीच आ-जा
 सकते हैं।
 
-*मूल पाठ अंग्रेज़ी में है ([README.md](README.md)); यह अनुवाद पीछे रह सकता है।*
+*मूल पाठ अंग्रेज़ी में है ([README.md](../../README.md)); यह अनुवाद पीछे रह सकता है।*
 
-<p align="center"><img src="site/assets/demo.gif" alt="LiveBridge के ज़रिए Claude Code session से बात करना" width="100%"></p>
+<p align="center"><img src="../../site/assets/demo.gif" alt="LiveBridge के ज़रिए Claude Code session से बात करना" width="100%"></p>
 
 **डिज़ाइन से ही लोकल।** कोई telemetry नहीं और अपना कोई server नहीं: LiveBridge आपके Mac पर आपके अपने
 codex और आपके अपने Claude Code के बीच एक bridge है। App और mod सिर्फ़ एक Unix socket पर बात करते
@@ -47,7 +47,7 @@ codex और आपके अपने Claude Code के बीच एक bridg
 सकते हैं; **Check for update** दबाने पर वही जाँच; नए release की सूचना देने पर `gh auth status`; और
 **Install** click करने पर download, उसकी जाँच और mod का update। [गोपनीयता](#गोपनीयता) में ठीक-ठीक
 लिखा है कि OpenAI तक क्या पहुँचता है, और GitHub को भेजे जाने वाले app के requests के नाम भी वहीं
-हैं; [SECURITY.md](SECURITY.md) बताता है कि यह किस चीज़ से बचाता है और किस चीज़ से नहीं।
+हैं; [SECURITY.md](../../SECURITY.md) बताता है कि यह किस चीज़ से बचाता है और किस चीज़ से नहीं।
 
 > **अनौपचारिक।** इसका Anthropic या OpenAI से कोई संबंध नहीं है, और न ही उनका समर्थन या सपोर्ट
 > इसे हासिल है। यह codex के experimental realtime API पर निर्भर है, जो codex के किसी भी release
@@ -70,7 +70,7 @@ cd livebridge
 scripts/build-app.sh --release
 ```
 
-3. जिस Claude Code session से बात करनी है, उसमें `/live on` टाइप करें।
+3. जिस Claude Code session से बात करनी है, उसमें `/live` टाइप करें।
 4. prompt के ऊपर वाले band में **Start** दबाएँ, microphone की अनुमति दें, और बोलें।
 
 खुद build नहीं करना चाहते? हर [release](https://github.com/getLiveBridge/LiveBridge/releases/latest)
@@ -94,7 +94,7 @@ Update, अनुमतियाँ, नए build के बाद भी microp
   नहीं पाता, उसे वह अस्वीकार कर देता है, इसलिए कोई दूसरा संस्करण तब तक शुरू नहीं हो सकता जब तक
   LiveBridge अपडेट न हो।
 - App build करने के लिए: Swift 6.0 या उसके बाद के toolchain वाला Xcode। टेस्ट किए गए संस्करण
-  [CONTRIBUTING.md](CONTRIBUTING.md#toolchain) में हैं। Build किया हुआ app macOS 14 या उसके बाद के संस्करण पर चलता है।
+  [CONTRIBUTING.md](../../CONTRIBUTING.md#toolchain) में हैं। Build किया हुआ app macOS 14 या उसके बाद के संस्करण पर चलता है।
 
 ## इंस्टॉल करना
 
@@ -117,7 +117,7 @@ ad hoc signed होता है और notarized नहीं होता।
    ```
 
    जहाँ `vX.Y.Z` release का tag है, जैसा उसके page पर लिखा है। यह जाँच सिर्फ़ ऐसी image के लिए पास
-   होती है जिसे इस repository के [release workflow](.github/workflows/release.yml) ने उसी tag से,
+   होती है जिसे इस repository के [release workflow](../../.github/workflows/release.yml) ने उसी tag से,
    GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। image के स्रोत का
    यही एकमात्र प्रमाण है: ad hoc signature किसी का नाम नहीं बताता। यह इस बात का प्रमाण नहीं है कि
    किसी ने code की समीक्षा की है।
@@ -167,7 +167,7 @@ LiveBridge app और अपने mod को तभी update करता ह�
 - update का download कोई quarantine attribute नहीं लगाता, इसलिए macOS को updated app का पहला launch
   वैसे block नहीं करना चाहिए जैसे पहले download को किया था; यह code से निकलता है और अभी असल में देखा
   नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं
-  ([SECURITY.md](SECURITY.md#what-an-update-installs))। हाँ, update के बाद पहले **Start** पर macOS
+  ([SECURITY.md](../../SECURITY.md#what-an-update-installs))। हाँ, update के बाद पहले **Start** पर macOS
   microphone के लिए दोबारा पूछता है, क्योंकि हर release ad hoc signed होता है।
 
 हाथ से update करने के लिए, हर session में `/live off` चलाएँ (app जवाब देना बंद करते ही mod
@@ -218,11 +218,8 @@ claude plugin uninstall livebridge@livebridge
 
 | Command | क्या करता है |
 |---|---|
-| `/live on` | session के title के नाम से LiveBridge से जुड़ता है, और app चल नहीं रहा हो तो उसे खोलता है। |
+| `/live` | session के title के नाम से LiveBridge से जुड़ता है, और app चल नहीं रहा हो तो उसे खोलता है। जुड़े हुए session में band वापस लाता है और एक पंक्ति में जवाब देता है: call, target, न सुने गए नतीजे, आज के मिनट। |
 | `/live off` | LiveBridge से अलग हो जाता है। |
-| `/live target` | इस session को वह session बनाता है जिसे voice काम सौंपता है। |
-| `/live status` (या सिर्फ़ `/live`) | एक पंक्ति: call, target, न सुने गए नतीजे, आज के मिनट। |
-| `/live context` | voice को इस session का नया सारांश भेजता है, जिसे session का model लिखता है। |
 
 Command `/live` है, `/voice` नहीं, क्योंकि `/voice` Claude Code का अपना voice mode है। call रुकी होने पर session में टाइप किया
 हुआ voice से बाहर रखा जाए या नहीं, यह कोई command नहीं है: यह सभी sessions के लिए एक
@@ -235,13 +232,16 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है उसे
   session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
   हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद कभी नहीं
-  ([विवरण](docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही हो,
-  तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live on` उसे वापस ले
+  ([विवरण](../../docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही हो,
+  तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live` उसे वापस ले
   आता है।
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है, voice के Claude को सौंपे
   हर अनुरोध के लिए एक **Task** पंक्ति और जहाँ सारांश load हुआ वहाँ एक **Loaded context** पंक्ति के साथ), उपयोग की सीमाएँ, मिनट,
-  **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
+  **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं। call के दौरान **Conversation** आपके और voice के शब्द
+  वैसे-वैसे दिखाता है जैसे-जैसे codex उन्हें transcribe करता है, इसलिए आपके शब्द बोलने के थोड़ी देर बाद, और
+  voice के शब्द सुनाई देने से थोड़ा पहले दिख सकते हैं। हर बात पूरी होने पर उसका अंतिम पाठ इन शब्दों की जगह
+  ले लेता है। सिर्फ़ अंतिम पाठ रखा जाता है: line बंद होने तक जिन शब्दों को अंतिम पाठ नहीं मिला, वे चले जाते हैं।
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
   चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice को
   बोलने के लिए दिया जाता है। band phase वैसी ही रखता है और `· muted` जोड़ता है; जब कोई line खुली न
@@ -251,23 +251,22 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   बचते। **Unmute** microphone फिर लेता है, और न ले पाए (मना किया गया, busy, मौजूद नहीं) तो call कारण
   के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू
   होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
-  ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge))।
+  ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge))।
 - **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: **Pause sync** चालू रहते सारांश नहीं है,
   कोई turn नहीं पहुँचा, कोई सवाल या permission notice app तक नहीं पहुँचा, mod बंद रहते turns चले,
   सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे बढ़
   जाती है), session paused रहा है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
   date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर सारांश अभी नहीं है और कुछ खोया नहीं है, तो यह
   **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। सारांश पर कोई तारीख
-  नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है, और `/live context` विफल हो सकता है,
-  भूली हुई बात वापस ला सकता है या paused का निशान हटा सकता है ([BR-002](docs/bugs/BR-002.md))।
+  नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है ([BR-002](../../docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
   line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े
   जाते हैं; उन्हें सिर्फ़ **Stop** मिटाता है। Claude के इंतज़ार कर रहे सवालों के नियम अलग हैं
-  ([विवरण](SECURITY.md#residual-risk-by-design))। **Pause sync** बंद हो और session paused न हो, तो
+  ([विवरण](../../SECURITY.md#residual-risk-by-design))। **Pause sync** बंद हो और session paused न हो, तो
   अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें वह भी है जो session ने
   पढ़ा; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
-  session में `/live on` उसे फिर से जोड़ देता है।
+  session में `/live` उसे फिर से जोड़ देता है।
 
 ### सेटिंग्स
 
@@ -284,13 +283,15 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   तक Mac से कुछ बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू
   करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
   session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
-  के बाद भी नहीं: यह सिर्फ़ **Load context** या `/live context` करता है, और वह सारांश पूरे
+  के बाद भी नहीं: यह सिर्फ़ **Load context** करता है, और वह सारांश पूरे
   transcript से लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था। जिस turn में voice
   अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
-  हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](SECURITY.md#residual-risk-by-design) में है।
-- **Play a sound when a request is queued for Claude** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध
-  Claude को सौंपता है, हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ))।
+  हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](../../SECURITY.md#residual-risk-by-design) में है।
+- **Play sounds for requests and answers** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध Claude को सौंपता है,
+  हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ)), और जब कोई बोल नहीं रहा हो तब खुली या खुलती
+  line पर पहुँचने वाले Claude के हर जवाब, विफलता या सवाल के लिए भी एक। प्रतीक्षा कर रहे नतीजे की
+  ध्वनि हर हाल में बजती है।
 - **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
   chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
   hear it"), नतीजा खुद कभी नहीं। उस पर click करने से menu bar menu खुलता है।
@@ -304,7 +305,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   उसे आगे सौंप देता है: tasks, code के बारे में सवाल, फ़ैसले, सुधार और रोकना।
 - कुछ भी विनाशकारी या बाहर की ओर जाने वाला (delete, push, publish, send, deploy, pay) सौंपने से पहले
   वह अनुरोध दोहराता है और पूछता है "yes?"। यह voice को सिखाई गई एक आदत है, कोई सुरक्षा उपाय नहीं;
-  [SECURITY.md](SECURITY.md) बताता है कि सुरक्षा उपाय क्या है।
+  [SECURITY.md](../../SECURITY.md) बताता है कि सुरक्षा उपाय क्या है।
 - वह नतीजे session के नाम के साथ एक-दो वाक्यों में पढ़कर सुनाता है। Code blocks और tables session में
   ही रहते हैं, और जो credentials वह पहचान लेता है उन्हें छिपा (redact) दिया जाता है।
 - Claude का काम पूरा होने पर वह लौट आता है। line खुली रखने की ज़रूरत नहीं: बातचीत शांत होने पर line
@@ -337,7 +338,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   अनुरोध नहीं था, उसका सिर्फ़ दर्ज होता है। जिस turn को pause बाहर रखता है, उसमें इनमें से कुछ नहीं
   होता। जब कोई सवाल या prompt voice के बिना निपट जाता है, या कोई turn बिना जवाब के ख़त्म होता है, तो
   voice को यह बताने वाली पंक्ति दी जाती है ([कौन-सी
-  पंक्तियाँ](SECURITY.md#what-session-text-can-do))।
+  पंक्तियाँ](../../SECURITY.md#what-session-text-can-do))।
 
 ## बिलिंग का ध्यान रखने वाला डिज़ाइन
 
@@ -362,7 +363,7 @@ Realtime voice session खुली रहने तक खर्च होत�
   रहते आने वाली बाकी हर चीज़ (उस session से आई कोई भी चीज़ जिससे आप हट गए, बाद का update) chime
   बजाती है और इंतज़ार करती है: band और menu उसे न सुना हुआ दिखाते हैं, और जब आप अगली बार बोलते हैं
   तो वह voice को जाती है ([कब माना जाता है कि सुन लिया
-  गया](docs/architecture/overview.md#a-result-while-the-line-is-closed))।
+  गया](../../docs/architecture/overview.md#a-result-while-the-line-is-closed))।
 - हर Claude Code session की voice के साथ अपनी अलग conversation होती है। वह अगले realtime session में
   आगे ले जाई जाती है, और Stop और Start के पार भी, ताकि voice को याद रहे कि आपने एक मिनट पहले क्या
   कहा था। नया target conversation बदल देता है: खुली line बंद हो जाती है, और आपके अगले शब्द उसे नए target
@@ -370,8 +371,8 @@ Realtime voice session खुली रहने तक खर्च होत�
 - Menu वे मिनट दिखाता है जितनी देर line खुली रही, जिन्हें app voice के connect होने से गिनता है,
   इसलिए आपका plan थोड़ा ज़्यादा गिन सकता है। OpenAI desktop voice की कीमत आपके Codex usage budget के
   प्रति मिनट के हिसाब से तय करता है, और उसके API पर मॉडल का वही परिवार मौन का भी बिल बनाता है
-  ([विवरण](docs/research/2026-11-04-gpt-live-billing.md),
-  [सीमाएँ](docs/research/2026-11-05-gpt-live-limits.md)); आपके plan का अपना usage page ही प्रामाणिक
+  ([विवरण](../../docs/research/2026-11-04-gpt-live-billing.md),
+  [सीमाएँ](../../docs/research/2026-11-05-gpt-live-limits.md)); आपके plan का अपना usage page ही प्रामाणिक
   है।
 - Menu दिखाता है कि आपके Codex और Claude usage का कितना हिस्सा इस्तेमाल हो चुका है: हर एक की एक
   पंक्ति, plan जितनी windows बताता है उनमें से हर एक का इस्तेमाल हुआ प्रतिशत (हर पंक्ति में अधिकतम
@@ -383,7 +384,7 @@ Realtime voice session खुली रहने तक खर्च होत�
   रहते आँकड़े बदल सकते हैं; launch के ठीक बाद पंक्ति पहली reading आने पर दिखती है, और पढ़ना विफल होने पर
   reading 15 मिनट बाद हट जाती है।
   कौन-सी limit voice को
-  सबसे पहले रोकती है, यह प्रकाशित नहीं है ([विवरण](docs/research/2026-11-05-gpt-live-limits.md))।
+  सबसे पहले रोकती है, यह प्रकाशित नहीं है ([विवरण](../../docs/research/2026-11-05-gpt-live-limits.md))।
 
 ## गोपनीयता
 
@@ -445,30 +446,31 @@ Settings का **Check for update** दबाने पर वही request �
 release मिलने पर app `gh auth status` चलाता है, यह बताने के लिए कि image जाँची जा सकती है या नहीं।
 सिर्फ़ जब आप **Install** click करते हैं, तभी वह image download करता है और `gh attestation verify` व
 `claude plugin` चलाता है, जो आपके अपने logins से GitHub तक, और `gh` के trust root के लिए Sigstore
-तक, पहुँचते हैं। [SECURITY.md](SECURITY.md#what-leaves-the-mac) में हर request की सूची है।
+तक, पहुँचते हैं। [SECURITY.md](../../SECURITY.md#what-leaves-the-mac) में हर request की सूची है।
 
 आपके Mac पर app अपनी settings, usage meter, update की पिछली जाँच का समय और जिन versions की सूचना दी
 गई, पिछले update ने क्या किया, और, सबसे हाल में इस्तेमाल हुए 20 sessions में से हर एक की, उसकी हाल
 की conversation (64 पंक्तियों तक, जिसमें आपका उसमें टाइप किया हुआ भी है; call के बिना दर्ज होती है,
 जब तक आप **Pause sync** चालू न करें) और उससे आख़िरी बार load की गई context पंक्ति `~/Library/Application Support/LiveBridge` में रखता है, ऐसे folder में जिसे केवल आपका user खोल सकता है
-([यह कैसे रखी जाती है](SECURITY.md#residual-risk-by-design))। किसी session की पंक्तियाँ तब जाती हैं जब आप
+([यह कैसे रखी जाती है](../../SECURITY.md#residual-risk-by-design))। किसी session की पंक्तियाँ तब जाती हैं जब आप
 उसे target रखकर **New conversation** दबाते हैं या उसे × से हटाते हैं। जो session चला गया है, उसकी
 पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए 20 sessions उन्हें बाहर न धकेल दें; उन्हें
-जल्दी मिटाने के लिए, उसी session में फिर से `/live on` चलाएँ और **New conversation** दबाएँ।
-Uninstall करने से वे सब हट जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](SECURITY.md#residual-risk-by-design))।
+जल्दी मिटाने के लिए, उसी session में फिर से `/live` चलाएँ और **New conversation** दबाएँ।
+Uninstall करने से वे सब हट जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](../../SECURITY.md#residual-risk-by-design))।
 
-[SECURITY.md](SECURITY.md) में threat model है: संक्षेप में, जो कुछ भी आपका microphone सुन सकता है
+[SECURITY.md](../../SECURITY.md) में threat model है: संक्षेप में, जो कुछ भी आपका microphone सुन सकता है
 वह एक ऐसा अनुरोध बन सकता है जिसे Claude session के अपने permission mode के तहत चलाता है।
 
 ## ज्ञात सीमाएँ
 
 - voice कभी-कभी कहता है कि वह देख रहा है ("On it", "Looking now"), पर अनुरोध Claude को नहीं सौंपता,
   इसलिए Claude तक कुछ नहीं पहुँचता: पहले लिखे गए नियम के साथ लगभग पाँच में से एक अनुरोध, और अब के
-  नियम के साथ 20 में से 0, जो किस्मत से अलग बताने के लिए बहुत कम है ([BR-001](docs/bugs/BR-001.md))।
+  नियम के साथ 20 में से 0, जो किस्मत से अलग बताने के लिए बहुत कम है ([BR-001](../../docs/bugs/BR-001.md))।
   वह ऐसे काम का दावा भी कर सकता है जो उसने नहीं किया, जैसे "I'll take a look.", उन पंक्तियों पर भी
   जो उसके पास सिर्फ़ context के रूप में हैं ([ADR 0001 (n),
-  (o)](docs/adr/0001-platform-findings.md))। जब app किसी अनुरोध को Claude की queue में डालता है, तो
-  एक छोटी आवाज़ बजती है; अगर voice कहे कि वह देख रहा है और कोई आवाज़ न बजे, तो अनुरोध दोबारा कहें।
+  (o)](../../docs/adr/0001-platform-findings.md))। जब app किसी अनुरोध को Claude की queue में डालता है, तो
+  एक छोटी आवाज़ बजती है, जो जवाब की आवाज़ से अलग है; अगर voice कहे कि वह देख रहा है और यह आवाज़ न
+  बजे, तो अनुरोध दोबारा कहें।
   app शब्दों से ऐसे वादे और जवाब में फ़र्क नहीं कर सकता, क्योंकि voice आपकी भाषा में बोलता है।
 - Claude का सवाल, या वह permission prompt जिसका वह इंतज़ार कर रहा है, सिर्फ़ voice को दिया जाता है,
   और voice उसे शायद न बोले; उसे कोई मजबूर नहीं करता। इसलिए Mac से दूर होने पर voice के prompt बताने
@@ -476,20 +478,20 @@ Uninstall करने से वे सब हट जाती हैं। mod
   इंतज़ार करता है, और वही एकमात्र नियंत्रण है; voice नियंत्रण नहीं है, और LiveBridge prompt का जवाब
   कभी नहीं देता। जाँचों में, खुली line पर टाइप किए गए turn का permission notice keyboard के जवाब से
   पहले 3 में से 0 runs में बोला गया, यह गिनती है, दर नहीं ([ADR 0001
-  (n)](docs/adr/0001-platform-findings.md))। बंद line इनके लिए तभी खुलती है जब target की
+  (n)](../../docs/adr/0001-platform-findings.md))। बंद line इनके लिए तभी खुलती है जब target की
   conversation में आपका कोई turn हो; नहीं तो app chime बजाता है, और call बंद हो तो ये सिर्फ़ दर्ज
   होते हैं।
 - Claude desktop app टाइप किए गए prompt का origin क्या बताता है, यह देखा नहीं गया ([ADR 0001
-  (m)](docs/adr/0001-platform-findings.md))। mod किसी prompt को आपका तभी दर्ज करता है जब उसका origin
+  (m)](../../docs/adr/0001-platform-findings.md))। mod किसी prompt को आपका तभी दर्ज करता है जब उसका origin
   `composer` हो। अगर वहाँ टाइप किया prompt किसी और रूप में आए, तो वहाँ टाइप किया कुछ भी दर्ज नहीं
   होता, कोई gap चिह्नित नहीं होता, menu **Context up to date** कहता है, और pause कम पहुँचता है
-  ([विवरण](SECURITY.md#what-session-text-can-do))।
+  ([विवरण](../../SECURITY.md#what-session-text-can-do))।
 - जो नतीजा तब आता है जब line उसका इंतज़ार कर रही हो, वह voice को बोलने के लिए text के रूप में जाता
   है; codex में ऐसा कोई call नहीं है जो voice को तुरंत बुलवाए, इसलिए कब बोलना है यह model तय करता
   है। टेस्टिंग में वह कुछ सेकंड के भीतर बोल गया। अगर नहीं बोलता, तो नतीजा न सुना हुआ रहता है: वह
   आपके अगले शब्दों के साथ फिर voice को जाता है, या line बंद होने पर chime बजती है।
 - जब Claude का जवाब line को फिर से खोलता है, तो voice चुप रह सकता है: मापे गए 14 में से 4 runs में
-  ऐसा हुआ, जो छोटा नमूना है ([ADR 0001 (n)](docs/adr/0001-platform-findings.md))। तब line connect
+  ऐसा हुआ, जो छोटा नमूना है ([ADR 0001 (n)](../../docs/adr/0001-platform-findings.md))। तब line connect
   होने के 5 सेकंड बाद बंद हो जाती है और जवाब chime बजाकर इंतज़ार करता है, जैसा नीचे बताया गया है।
   जहाँ voice बोला, वहाँ उसने connect के लगभग 2 सेकंड के भीतर बोलना शुरू किया; जो voice उन 5 सेकंड के
   बाद शुरू होता, वह कट जाता है।
@@ -501,17 +503,17 @@ Uninstall करने से वे सब हट जाती हैं। mod
   है, ताकि बोलने से विफल होने वाली lines न खुलें। Claude Code काम करता रहता है, जवाब इंतज़ार करते
   रहते हैं, और Start एक बार फिर कोशिश करता है। app किसी limit को सिर्फ़ codex के शब्दों या service
   के error code से पहचानता है, क्योंकि और कुछ यह नहीं बताता
-  ([विवरण](docs/research/2026-11-05-gpt-live-limits.md))। जिस इनकार को वह नहीं पहचानता, जैसे बिना
+  ([विवरण](../../docs/research/2026-11-05-gpt-live-limits.md))। जिस इनकार को वह नहीं पहचानता, जैसे बिना
   कारण बताए गिरी हुई line ("The voice session closed (transport_closed)."), उसमें call चालू रहती है,
   इसलिए आपके अगले शब्द फिर कोशिश करते हैं; limit reset होने तक **Stop** दबाएँ।
 - जो prompt composer में टाइप नहीं किया गया (host का संदेश, schedule, दूसरा agent और शायद Remote
   Control), वह voice की conversation में आपके शब्दों के रूप में दर्ज नहीं होता, हालाँकि उस पर Claude
   का जवाब दर्ज होता है, और pause में वह चल रहे turn को अस्वीकार नहीं करता
-  ([SECURITY.md](SECURITY.md#what-session-text-can-do) बताता है कि कौन-से prompt आपके माने जाते
+  ([SECURITY.md](../../SECURITY.md#what-session-text-can-do) बताता है कि कौन-से prompt आपके माने जाते
   हैं)।
 - जो session अब भी इस release से पहले के mod पर है, वह restart होने तक sync नहीं होता: वह turns छूटे
   session की तरह सारांश load करता है, और कोई pause उसकी पंक्तियों को अस्वीकार नहीं करता ([और क्या
-  अलग है](CHANGELOG.md))।
+  अलग है](../../CHANGELOG.md))।
 - जो Claude Code session mod के load होने से पहले ही खुला था, उसमें `/live` चलने से पहले उसे दोबारा
   खोलना पड़ सकता है।
 - Claude desktop app में, ऐसे session में टाइप किया गया `/live` जिसका Claude Code process अभी शुरू
@@ -523,7 +525,7 @@ Uninstall करने से वे सब हट जाती हैं। mod
   mod चलाने के बजाय model को भेज देती।
 - किसी जवाब ने इंतज़ार कर रहे नतीजे को बताया या नहीं, इसका फ़ैसला उसके शब्दों से होता है, सिर्फ़
   अंग्रेज़ी और रूसी के आम शब्दों की सूची के साथ
-  ([नियम](docs/architecture/overview.md#a-result-while-the-line-is-closed))। किसी दूसरी भाषा में, अगर
+  ([नियम](../../docs/architecture/overview.md#a-result-while-the-line-is-closed))। किसी दूसरी भाषा में, अगर
   voice ने नतीजे का सिर्फ़ ज़िक्र किया हो, तब भी वह सुना हुआ गिना जा सकता है।
 - जहाँ कोई organization Claude Code को manage करता है, वहाँ LiveBridge में कुछ भी आपको नहीं बताता
   कि कोई permission prompt इंतज़ार कर रहा है। Claude Code का built-in guard managed settings वाली
@@ -532,7 +534,7 @@ Uninstall करने से वे सब हट जाती हैं। mod
   लेकिन voice उसके बारे में कुछ नहीं कहता और menu bar दिखाता है कि Claude काम कर रहा है, इसलिए अगर
   जवाब में देर लगे तो Claude Code देखें। `/plugin` उन hooks के नाम बताता है, और Claude Code के हाल
   के versions एक line भी दिखाते हैं कि hook छोड़ दिया गया। Claude के सवाल फिर भी voice तक पहुँचते
-  हैं। Hooks को एक Linux container में [मापा गया](docs/adr/0001-platform-findings.md); voice और
+  हैं। Hooks को एक Linux container में [मापा गया](../../docs/adr/0001-platform-findings.md); voice और
   menu bar क्या करते हैं, यह code से निकलता है, और कोई असली line नहीं चलाई गई। Team और Enterprise
   का मामला Claude Code के documentation से लिया गया है।
 - Managed settings में `allowManagedHooksOnly`, `allowManagedModsOnly` या `disableAllHooks` होने
@@ -540,13 +542,13 @@ Uninstall करने से वे सब हट जाती हैं। mod
   के रूप में install कर सकता
   है](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods), हर
   machine के एक folder से: तब permission hooks चलते हैं, पहली दो settings के साथ भी ([मापा
-  गया](docs/adr/0001-platform-findings.md))। Claude Code के documentation के अनुसार, managed
+  गया](../../docs/adr/0001-platform-findings.md))। Claude Code के documentation के अनुसार, managed
   settings में marketplace की copy चालू करना काफ़ी नहीं है।
 
 ## यह कैसे काम करता है
 
-[docs/architecture/overview.md](docs/architecture/overview.md) components, mod और app के बीच की wire,
-और message flows का वर्णन करता है; [ADR 0001](docs/adr/0001-platform-findings.md) उन platform तथ्यों को
+[docs/architecture/overview.md](../../docs/architecture/overview.md) components, mod और app के बीच की wire,
+और message flows का वर्णन करता है; [ADR 0001](../../docs/adr/0001-platform-findings.md) उन platform तथ्यों को
 दर्ज करता है जिन पर design टिका है।
 
 ## रोडमैप और सहयोग चाहिए
@@ -554,7 +556,7 @@ Uninstall करने से वे सब हट जाती हैं। mod
 LiveBridge आज एक Mac app, एक worker (Claude Code) और एक voice provider (ChatGPT login पर codex) है।
 ये तीनों संकरे जोड़ों (seams) पर मिलते हैं, और नीचे की हर दिशा contributors के लिए खुली है। उनके issues पर
 [help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
-label लगा होता है; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) बताता है कि पहले कौन-सी फ़ाइलें पढ़ें।
+label लगा होता है; [CONTRIBUTING.md](../../CONTRIBUTING.md#where-to-start) बताता है कि पहले कौन-सी फ़ाइलें पढ़ें।
 
 - **Windows और Linux।** Menu bar app, उसका audio page और socket server macOS से बँधे हैं; mod और app के
   बीच की wire, और खुद mod, portable हैं। पोर्ट की शुरुआत नए platform के ऐसे app से होती है जो वही wire बोलता हो।
@@ -570,10 +572,10 @@ label लगा होता है; [CONTRIBUTING.md](CONTRIBUTING.md#where-to-
 [help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
 issues, [ज्ञात सीमाएँ](#ज्ञात-सीमाएँ) और [ऊपर](#रोडमैप-और-सहयोग-चाहिए) बताई गई दिशाएँ।
 
-- [CONTRIBUTING.md](CONTRIBUTING.md): layout, toolchain, checks (`scripts/check.sh`) और conventions।
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): यहाँ हम एक-दूसरे के साथ कैसे पेश आते हैं।
-- [SECURITY.md](SECURITY.md): vulnerability की रिपोर्ट निजी तौर पर करें, public issue में नहीं।
-- [CHANGELOG.md](CHANGELOG.md): हर release में क्या बदला।
+- [CONTRIBUTING.md](../../CONTRIBUTING.md): layout, toolchain, checks (`scripts/check.sh`) और conventions।
+- [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): यहाँ हम एक-दूसरे के साथ कैसे पेश आते हैं।
+- [SECURITY.md](../../SECURITY.md): vulnerability की रिपोर्ट निजी तौर पर करें, public issue में नहीं।
+- [CHANGELOG.md](../../CHANGELOG.md): हर release में क्या बदला।
 
 ## श्रेय
 
@@ -583,4 +585,4 @@ mod और app के बीच के wire protocol की प्रेरण�
 
 ## लाइसेंस
 
-[MIT](LICENSE)।
+[MIT](../../LICENSE)।

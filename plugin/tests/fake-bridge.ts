@@ -100,7 +100,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     /** How long the session's model takes over a summary, on the mocked clock. */
     forkMs: 0,
     joined: new Set<string>(),
-    /** Sessions the owner removed in the menu; only the owner's join (`/live on`) clears the mark. */
+    /** Sessions the owner removed in the menu; only the owner's join (`/live`) clears the mark. */
     removed: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, unheard: 0, isMuted: false } as StatusReply,
     work: [] as Work[],
@@ -295,8 +295,8 @@ export async function step($: Engine, world: ReturnType<typeof fakeWorld>, turnI
   return stream.result
 }
 
-/** The session starts and `/live on` joins it. */
+/** The session starts and `/live` joins it. */
 export async function liveOn($: Engine) {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: '' })
 }

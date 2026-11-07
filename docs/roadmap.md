@@ -6,7 +6,8 @@ prose above the trail marker.
 
 ## Now
 
-0.4.1 is out, on 0.4.0's conversation sync and usage limits in the menu. A short demo recording
+0.4.2 is out, with LiveBridge's own sounds, a Conversation that keeps up with the talk, and one
+`/live` command. A short demo recording
 follows it.
 
 ## Next

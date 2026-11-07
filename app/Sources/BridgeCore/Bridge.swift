@@ -14,8 +14,8 @@ public actor Bridge: Router {
   private let notifier: (any ResultNotifying)?
   /// Settings' "Notify when a result is waiting", read at each chime.
   private let notifies: @Sendable () -> Bool
-  /// Settings' "Play a sound when a request is queued for Claude", read at each handoff.
-  private let confirmsHandoffs: @Sendable () -> Bool
+  /// Settings' "Play sounds for requests and answers", read at each sound.
+  private let confirmsWithSound: @Sendable () -> Bool
   /// Settings' "Pause sync while the call is stopped", read at each synced line, join and line
   /// that opens.
   private let pausesSync: @Sendable () -> Bool
@@ -30,6 +30,8 @@ public actor Bridge: Router {
   private var timers: [CallTimer: Task<Void, Never>] = [:]
   /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
+  /// What the open line is still saying, which belongs to `lineSession`.
+  private var growing = GrowingLines()
   /// The session whose conversation the line last opened with; its transcripts are kept there.
   private var lineSession: SessionID?
   /// Whether `lineSession` is set for the line opening now; until then a target change cannot
@@ -67,13 +69,13 @@ public actor Bridge: Router {
     realtime: @escaping @Sendable () async throws -> any RealtimeControlling, audio: any AudioSide,
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
-    confirmsHandoffs: @escaping @Sendable () -> Bool = { true },
+    confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
-    self.confirmsHandoffs = confirmsHandoffs
+    self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
     self.registry = registry
     makeRealtime = realtime
@@ -117,7 +119,8 @@ public actor Bridge: Router {
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes,
-        conversation: shown.shownLines, labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
+        conversation: shown.shownLines + growing.lines,
+        labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
         claudeLimits: claudeLimits)
     }
   }
@@ -187,7 +190,7 @@ public actor Bridge: Router {
     await changed()
   }
 
-  /// The owner's choice of target, from the menu, the band or `/live target`. A change takes every
+  /// The owner's choice of target, from the menu or the band. A change takes every
   /// other session's question off the line's queue, so it is not said on the new target's line and
   /// the reply does not reach the wrong session; it stays recorded, so it is in its own session's
   /// seed. A route ends with its question.
@@ -325,7 +328,8 @@ public actor Bridge: Router {
     case .chime:
       await audio.chime()
       await notifyWaiting()
-    case .confirmHandoff: if confirmsHandoffs() { await audio.confirmHandoff() }
+    case .confirmHandoff: if confirmsWithSound() { await audio.confirmHandoff() }
+    case .confirmAnswer: if confirmsWithSound() { await audio.confirmAnswer() }
     case .problem(let shown): problem = shown
     }
   }
@@ -489,13 +493,18 @@ public actor Bridge: Router {
             AnswerShaper.line(
               .failed, label: "LiveBridge", body: "no Claude Code session is joined.")))
       }
+    case .userSpeaking(let words): growing.add(words, from: .owner)
     case .userUtterance(let text):
+      growing.finish(.owner, with: text)
       record(.owner, text, in: lineSession)
       await send(.userTranscribed)
+    case .assistantSpeaking(let words):
+      growing.add(words, from: .voice)
+      await send(.assistantSpeaking)
     case .assistantUtterance(let text):
+      growing.finish(.voice, with: text)
       record(.voice, text, in: lineSession)
       await send(.assistantFinishedSpeaking(text))
-    case .assistantSpeaking: await send(.assistantSpeaking)
     case .closed(let reason):
       connecting?.cancel()
       connecting = nil
@@ -760,6 +769,7 @@ public actor Bridge: Router {
   @discardableResult private func changed() async -> StatusReply {
     await withdrawQuestionsOfDroppedSessions()
     await followTarget()
+    if !isLineOpen { growing = GrowingLines() }  // no final text comes for what a closed line said
     changes += 1
     let mine = changes
     let update = await current
@@ -794,8 +804,8 @@ public struct BridgeUpdate: Sendable, Equatable {
   /// The status's problem, with its kind.
   public let problem: Problem?
   public let minutesThisCall: Double
-  /// The target's whole conversation, oldest first: every line the app keeps, and a summary no
-  /// kept line holds.
+  /// The target's whole conversation, oldest first: every line the app keeps, a summary no kept
+  /// line holds, and the lines the open line is still saying.
   public let conversation: [Conversation.Line]
   /// The joined sessions whose mod is older than the app, or names no version, by label.
   public let labelsOnAnOlderMod: [String]
