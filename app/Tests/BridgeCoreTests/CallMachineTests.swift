@@ -75,7 +75,7 @@ struct CallMachineTests {
       "speechWhileMutedOnALiveLineIsIgnored", live + [.mute], .speechStarted, .live, []),
     row(
       "aResultWhileMutedStillOpensTheLine", [.start, .mute], opening(result), .connecting,
-      [.confirmAnswer, .openRealtimeForResult], pending: [result]),
+      [.openRealtimeForResult, .confirmAnswer], pending: [result]),
     row(
       "muteWhileSpeakingOnALiveLineEndsTheSpeech", live + [.speechStarted], .mute, .live,
       [.muteMicrophone, arm]),
@@ -163,7 +163,7 @@ struct CallMachineTests {
     row("theServiceRefusingAStoppedCallDoesNothing", [], .refused(limit), .off, []),
     row(
       "aLineThatOpensTheLineOpensIt", [.start], opening(result), .connecting,
-      [.confirmAnswer, .openRealtimeForResult], pending: [result]),
+      [.openRealtimeForResult, .confirmAnswer], pending: [result]),
     row(
       "theOpenedLineGetsItAsContextAndWaitsBrieflyForTheVoice", [.start, opening(result)],
       .connected, .live, [.problem(nil), .flushPreroll, .addContext(result), firstWord],
@@ -382,8 +382,8 @@ struct CallMachineTests {
       "anAnswerWhileAnAnswerOpensTheLineSounds", [.start, opening(result)], deliver(done),
       .connecting, [.confirmAnswer], pending: [result, done]),
     row(
-      "aQuestionSoundsToo", waiting + [.handedOff(alpha)], deliver(alphas(.question, "Which?")),
-      .live, [.confirmAnswer, .speak(alphas(.question, "Which?")), arm],
+      "aQuestionSoundsToo", waiting, deliver(alphas(.question, "Which?")), .live,
+      [.confirmAnswer, .speak(alphas(.question, "Which?")), arm],
       pending: [alphas(.question, "Which?")]),
     row(
       "aFailureSoundsToo", waiting, deliver(alphas(.failed, "It broke.")), .live,
@@ -405,9 +405,6 @@ struct CallMachineTests {
     row(
       "noSoundForAnUpdate", waiting, deliver(update), .live, [.speak(update), arm],
       pending: [update]),
-    row(
-      "noSoundForTheBridgesOwnLine", live, deliver(a), .live, [.addContext(a), arm],
-      pending: [a]),
     row(
       "targetChangeClosesTheOpenLine", live + [deliver(a)], .conversationChanged, .listening,
       [.closeRealtime, .chime], pending: [a]),

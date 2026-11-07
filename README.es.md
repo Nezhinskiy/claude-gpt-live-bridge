@@ -300,9 +300,10 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
   de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
   [SECURITY.md](SECURITY.md#residual-risk-by-design).
-- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que la voz pasa
-  a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta de Claude que llega a una línea
-  abierta o abriéndose mientras nadie habla. El aviso de un resultado en espera suena de todos modos.
+- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
+  la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
+  de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
+  resultado en espera suena de todos modos.
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
@@ -491,8 +492,8 @@ sesión.
   ([BR-001](docs/bugs/BR-001.md)). También puede afirmar un trabajo que no ha hecho, como en "I'll
   take a look.", incluso a partir de líneas que solo tiene como contexto ([ADR 0001 (n),
   (o)](docs/adr/0001-platform-findings.md)). La aplicación emite un sonido breve cuando pone una
-  petición en la cola de Claude; si la voz dice que está mirando y no suena nada, repite la
-  petición. La aplicación no puede distinguir esa promesa de una respuesta por sus palabras, porque
+  petición en la cola de Claude, distinto del de una respuesta; si la voz dice que está mirando y
+  ese sonido no llega, repite la petición. La aplicación no puede distinguir esa promesa de una respuesta por sus palabras, porque
   la voz habla tu idioma.
 - Una pregunta de Claude, o una solicitud de permiso que espera, solo se da a la voz, y la voz puede
   no decirla; nada la obliga. Por eso no confíes en que la voz anuncie una solicitud cuando estés

@@ -284,9 +284,10 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
   it does and does not do.
-- **Play sounds for requests and answers** (on by default): a short sound for each request the voice hands off
-  ([why](#known-limitations)), and one for each answer from Claude that reaches an open or opening
-  line while nobody is speaking. The chime for a result that waits plays either way.
+- **Play sounds for requests and answers** (on by default): a short sound for each request the voice
+  hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
+  that reaches an open or opening line while nobody is speaking. The chime for a result that waits
+  plays either way.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
@@ -461,7 +462,8 @@ can become a request that Claude runs under the session's own permission mode.
   with the rule now, too few to tell from luck ([BR-001](docs/bugs/BR-001.md)). It can also claim
   work it has not done, as in "I'll take a look.", also from lines it only has as context ([ADR 0001
   (n), (o)](docs/adr/0001-platform-findings.md)). The app plays a short sound when it queues a
-  request for Claude; if the voice says it is looking and no sound follows, say the request again.
+  request for Claude, not the one an answer has; if the voice says it is looking and that sound
+  does not follow, say the request again.
   The app cannot tell such a promise from an answer by its words, since the voice speaks your
   language.
 - A question Claude asks, or a permission prompt it waits on, is only given to the voice, and the

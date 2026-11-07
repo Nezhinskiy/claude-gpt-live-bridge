@@ -287,9 +287,11 @@ arrives; then the line closes, and the line chimes and waits as below. A voice t
 cut off. The mod's request that brought the line does not wait for the connect, and a question or
 approval the owner settles at the keyboard while its line still connects closes that line.
 
-An answer from a session that reaches an open or opening line while nobody is speaking has the
-chime's sound, with no notification, under the same setting as the handoff's sound. An update, an
-approval and the bridge's own lines have none.
+An answer from a session (a result, a failure, including one the bridge writes for it such as a
+timeout, or a question it ends its turn on) that reaches an open or opening line while nobody is
+speaking has the chime's sound, with no notification, under the same setting as the handoff's
+sound. It sounds once, as it arrives. An update, an approval, a question Claude waits on, a typed
+turn's synced answer and the bridge's own lines have none.
 
 Any other line that arrives while the line is closed (one from a session that is not the target, a
 later update) does not open it. It chimes, the notification names the session, and the line waits;

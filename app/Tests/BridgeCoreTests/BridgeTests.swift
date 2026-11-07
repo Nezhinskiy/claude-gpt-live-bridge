@@ -122,7 +122,22 @@ actor FakeAudio: AudioSide {
   func flushPreroll() { calls.append("flushPreroll") }
   func closePeer() { calls.append("closePeer") }
   func chime() { calls.append("chime") }
-  func confirmAnswer() { calls.append("confirmAnswer") }
+  /// While set, the next answer's sound waits for `releaseSound()`, as a hop to the main actor
+  /// lets others in.
+  var holdsSound = false
+  private var heldSounds: [CheckedContinuation<Void, Never>] = []
+  var soundWaiting: Int { heldSounds.count }
+  func holdSound() { holdsSound = true }
+  func releaseSound() {
+    for wait in heldSounds { wait.resume() }
+    heldSounds = []
+  }
+  func confirmAnswer() async {
+    calls.append("confirmAnswer")
+    guard holdsSound else { return }
+    holdsSound = false
+    await withCheckedContinuation { heldSounds.append($0) }
+  }
   func confirmHandoff() { calls.append("confirmHandoff") }
   func muteMicrophone() { calls.append("muteMicrophone") }
   func unmuteMicrophone() { calls.append("unmuteMicrophone") }
@@ -808,6 +823,30 @@ struct BridgeTests {
     try await test.answer(request(2), from: a)
     #expect(await test.voice.added.count == 2)
     #expect(await test.audio.calls.filter { $0 == "confirmAnswer" }.count == 1)
+  }
+
+  /// The waiting chime is the only sign of that result, so the sound setting leaves it on.
+  @Test func theChimeDoesNotFollowTheSoundSetting() async throws {
+    let test = try BridgeTests(confirmsWithSound: { false })
+    try await test.join(a, "Alpha")
+    await test.bridge.perform(.start)
+    try await test.answer(request(1), from: a)
+    #expect(await test.audio.calls.contains("chime"))
+  }
+
+  /// The attempt exists before the answer's sound, so a Stop while it plays ends it.
+  @Test func noLineOpensAfterAStopWhileAnOpeningAnswerSounds() async throws {
+    try await closedAfterARequest()
+    await audio.holdSound()
+    let answering = Task { try await answerFirstRequest() }
+    #expect(await eventually { await audio.soundWaiting == 1 })
+    await bridge.perform(.stop)
+    let opens = await voice.opens.count
+    await audio.releaseSound()
+    try await answering.value
+    #expect(await bridge.status.call == .off)
+    try await Task.sleep(for: .milliseconds(100))  // a line opened late would be there by now
+    #expect(await voice.opens.count == opens)
   }
 
   /// Hands `request(1)` to Alpha on the open line and lets Alpha take it.

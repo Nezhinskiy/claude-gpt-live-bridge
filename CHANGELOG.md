@@ -8,8 +8,8 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
-- An answer from Claude that reaches an open or opening line now plays the same sound, unless
-  someone is speaking. There is no notification with it, and an update has no sound. The setting is
+- An answer, failure or question from Claude that reaches an open or opening line now plays the
+  same sound, unless someone is speaking. There is no notification with it, and an update has no sound. The setting is
   now **Play sounds for requests and answers** and covers it; the sound for a result that waits
   plays either way. Whether the sound reaches the microphone from speakers was not tested.
 - The sound for a waiting result is now LiveBridge's own instead of macOS's Glass, made to pair

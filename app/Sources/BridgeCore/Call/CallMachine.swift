@@ -174,7 +174,7 @@ public struct CallMachine: Sendable {
 
   /// The grace before a held result is said, once neither the owner nor the voice is speaking.
   private var graceIfQuiet: [CallEffect] {
-    !unheard.contains(where: \.isHeld) || isSoundOn || isVoiceSpeaking
+    !unheard.contains(where: \.isHeld) || isSomeoneSpeaking
       ? [] : [.armGrace(milliseconds: Self.graceMilliseconds)]
   }
 
@@ -223,7 +223,8 @@ public struct CallMachine: Sendable {
       guard opensLine else { return [.chime] }
       phase = .connecting
       isAwaitingFirstWord = true
-      return arrival(of: result) + [.openRealtimeForResult]
+      // the open first: the sound lets others in, and the attempt must exist by then
+      return [.openRealtimeForResult] + arrival(of: result)
     case (.connecting, .deliver(let result, _, _)):
       unheard.append(Unheard(line: result))
       return arrival(of: result)
@@ -253,7 +254,7 @@ public struct CallMachine: Sendable {
         return sound + [.addContext(result), armSilence()]
       }
       if result.kind.answers, let session = result.session { awaited.remove(session) }
-      let isHeld = isSoundOn || isVoiceSpeaking
+      let isHeld = isSomeoneSpeaking
       unheard.append(Unheard(line: result, isHeld: isHeld))
       return sound + (isHeld ? [armSilence()] : [.speak(result), armSilence()])
     case (.connecting, .speechStarted):
@@ -377,9 +378,10 @@ public struct CallMachine: Sendable {
   /// The sound for a line that reached a line opening or open: a session's answer, unless someone
   /// is speaking over it.
   private func arrival(of line: VoiceLine) -> [CallEffect] {
-    line.session != nil && line.kind.answers && !isSoundOn && !isVoiceSpeaking
-      ? [.confirmAnswer] : []
+    line.session != nil && line.kind.answers && !isSomeoneSpeaking ? [.confirmAnswer] : []
   }
+
+  private var isSomeoneSpeaking: Bool { isSoundOn || isVoiceSpeaking }
 
   /// A new line would fail the same way, so the call ends, as Stop does, and keeps what waits to
   /// be said. Start tries once more.
