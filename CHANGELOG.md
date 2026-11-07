@@ -6,13 +6,15 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.2]
+
 ### Changed
 
 - The translated READMEs moved to `docs/i18n/`.
 - An answer, failure or question from Claude that reaches an open or opening line now plays the
-  same sound, unless someone is speaking. There is no notification with it, and an update has no sound. The setting is
-  now **Play sounds for requests and answers** and covers it; the sound for a result that waits
-  plays either way. Whether the sound reaches the microphone from speakers was not tested.
+  same sound, unless someone is speaking. There is no notification with it, and an update has no
+  sound. The setting is now **Play sounds for requests and answers** and covers it; the sound for a
+  result that waits plays either way.
 - The sound for a waiting result is now LiveBridge's own instead of macOS's Glass, made to pair
   with the sound for a queued request. It is shorter, 0.82 s instead of 1.65 s, and louder at its
   peak.
@@ -38,8 +40,9 @@ All notable changes to this project are listed here. The format follows
   nothing. Its reset times now go as soon as the pointer leaves the row, and clicks pass through
   them.
 
-Note: the **Conversation** fix comes from recorded events and tests, and has not been seen in the
-real menu during a call.
+Note: the owner tried this version by hand on a debug build before the release. How often the new
+sound reaches the microphone on speakers was not measured, and the update from the app has not run
+on this version.
 
 ## [0.4.1]
 

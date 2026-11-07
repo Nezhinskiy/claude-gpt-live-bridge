@@ -47,7 +47,7 @@ the status section at most 50 lines); detail lives in the documents it links to.
 
 ## Current status
 
-- 0.4.1 is the latest release. Its open items are the README's
+- 0.4.2 is the latest release. Its open items are the README's
   [known limitations](README.md#known-limitations).
 <!-- stayfixed:harness:begin -->
 ## stayfixed
