@@ -238,7 +238,10 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **Menu bar menu** में call, जुड़े हुए sessions (किसी पर click करके उसे target बनाएँ),
   **Load context**, target की **Conversation** (जैसी LiveBridge उसे रखता है, voice के Claude को सौंपे
   हर अनुरोध के लिए एक **Task** पंक्ति और जहाँ सारांश load हुआ वहाँ एक **Loaded context** पंक्ति के साथ), उपयोग की सीमाएँ, मिनट,
-  **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं।
+  **Star LiveBridge on GitHub** (repository का page खोलता है), **Settings…** और **Quit LiveBridge** होते हैं। call के दौरान **Conversation** आपके और voice के शब्द
+  वैसे-वैसे दिखाता है जैसे-जैसे codex उन्हें transcribe करता है, इसलिए आपके शब्द बोलने के थोड़ी देर बाद, और
+  voice के शब्द सुनाई देने से थोड़ा पहले दिख सकते हैं। हर बात पूरी होने पर उसका अंतिम पाठ इन शब्दों की जगह
+  ले लेता है। सिर्फ़ अंतिम पाठ रखा जाता है: line बंद होने तक जिन शब्दों को अंतिम पाठ नहीं मिला, वे चले जाते हैं।
 - **Mute** (**Stop** के बगल में, band में और menu के call card में; muted होने पर **Unmute**) call
   चलते रहने के दौरान आपका microphone छोड़ देता है: Claude का जवाब फिर भी line खोलता है और voice को
   बोलने के लिए दिया जाता है। band phase वैसी ही रखता है और `· muted` जोड़ता है; जब कोई line खुली न
