@@ -152,7 +152,12 @@ final class AudioHost: NSObject, AudioSide {
     #endif
   }
 
-  func confirmAnswer() async { chimeSound?.play() }
+  func confirmAnswer() async {
+    #if DEBUG
+      tape?.mark("answer")
+    #endif
+    chimeSound?.play()
+  }
 
   // MARK: The page
 
