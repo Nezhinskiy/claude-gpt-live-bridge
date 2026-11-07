@@ -2195,6 +2195,27 @@ struct BridgeTests {
     #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Done."] })
   }
 
+  /// A line opened for a question closes without any call event when the question is settled.
+  @Test func aLineClosedByAWithdrawnQuestionEndsAGrowingLine() async throws {
+    await live()
+    voice.emit(.userUtterance("Hi"))
+    #expect(await eventually { await lines() == ["You: Hi"] })
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await voice.holdOpen()
+    try await post(
+      "/v1/activity",
+      ActivityBody(
+        sessionId: a, state: .approval, question: "Which?", turn: TurnRef(id: "turn-2")))
+    #expect(await eventually { await voice.openWaiting == 1 })
+    voice.emit(.assistantSpeaking(" Late"))
+    #expect(await eventually { await lines().last == "Voice: Late" })
+    try await post(
+      "/v1/activity", ActivityBody(sessionId: a, state: .working, turn: TurnRef(id: "turn-2")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    #expect(await !lines().contains("Voice: Late"))
+  }
+
   /// The menu shows the target's conversation: a growing line of another session is not in it.
   @Test func aGrowingLineShowsOnlyForItsSession() async throws {
     try await join(a, "Alpha")

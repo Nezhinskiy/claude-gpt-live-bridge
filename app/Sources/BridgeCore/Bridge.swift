@@ -30,7 +30,7 @@ public actor Bridge: Router {
   private var timers: [CallTimer: Task<Void, Never>] = [:]
   /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
-  /// The open line's lines not yet final, which belong to `lineSession`.
+  /// What the open line is still saying, which belongs to `lineSession`.
   private var growing = GrowingLines()
   /// The session whose conversation the line last opened with; its transcripts are kept there.
   private var lineSession: SessionID?
@@ -293,7 +293,6 @@ public actor Bridge: Router {
   private func send(_ event: CallEvent) async {
     let before = machine.phase
     let effects = machine.handle(event)
-    if !isLineOpen { growing = GrowingLines() }
     let now = time.now  // read before any await, so an interleaved event cannot shift it
     if before != .live, machine.phase == .live { await meter.opened(at: now) }
     if before == .live, machine.phase != .live { await meter.closed(at: now) }
@@ -493,13 +492,13 @@ public actor Bridge: Router {
             AnswerShaper.line(
               .failed, label: "LiveBridge", body: "no Claude Code session is joined.")))
       }
-    case .userSpeaking(let words): grow(.owner, words)
+    case .userSpeaking(let words): growing.add(words, from: .owner)
     case .userUtterance(let text):
       growing.finish(.owner)
       record(.owner, text, in: lineSession)
       await send(.userTranscribed)
     case .assistantSpeaking(let words):
-      grow(.voice, words)
+      growing.add(words, from: .voice)
       await send(.assistantSpeaking)
     case .assistantUtterance(let text):
       growing.finish(.voice)
@@ -512,13 +511,6 @@ public actor Bridge: Router {
       await send(.remoteClosed(reason))
     }
     await changed()
-  }
-
-  /// Words of a line not yet final, for the menu only. One that arrives after the line closed
-  /// would never get its final text.
-  private func grow(_ speaker: Conversation.Line.Speaker, _ words: String) {
-    guard isLineOpen, lineSession != nil else { return }
-    growing.add(words, from: speaker)
   }
 
   private func record(_ speaker: Conversation.Line.Speaker, _ text: String, in id: SessionID?) {
@@ -776,6 +768,7 @@ public actor Bridge: Router {
   @discardableResult private func changed() async -> StatusReply {
     await withdrawQuestionsOfDroppedSessions()
     await followTarget()
+    if !isLineOpen { growing = GrowingLines() }  // no final text comes for what a closed line said
     changes += 1
     let mine = changes
     let update = await current
