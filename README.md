@@ -238,9 +238,10 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   for each request the voice handed to Claude and a **Loaded context** line where a summary was
   loaded), the usage limits, the minutes, **Star LiveBridge on GitHub**
   (opens the repository's page), **Settings…** and **Quit LiveBridge**. During a call
-  **Conversation** shows your words and the voice's as codex transcribes them, so the voice's can
-  run a moment ahead of its sound; the final text replaces them when the line ends. Only final text
-  is kept: words of a line that closes before its final text are gone.
+  **Conversation** shows your words and the voice's as codex transcribes them, so yours can appear a
+  moment after you say them and the voice's a moment before you hear them. When each is finished,
+  its final text replaces them. Only final text is kept: words still waiting for it when the line
+  closes are gone.
 - **Mute** (beside **Stop**, in the band and in the menu's call card; **Unmute** while muted)
   releases your microphone while the call goes on: an answer from Claude still opens the line and
   goes to the voice to say. The band keeps the phase and adds `· muted`; the menu says "Muted — line

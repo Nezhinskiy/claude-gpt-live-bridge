@@ -418,13 +418,16 @@ arrives as `transcript/done` (`turn.done`) later.
 
 - A delta names its role and carries no turn or item id; the two roles interleave. The voice's first
   words came before the owner's `done`. The `done` holds the final text, and codex's own tests have
-  it differ from the deltas (`realtime_websocket/transcript_tests.rs`).
+  it differ from the deltas, and an empty delta follow it (`realtime_websocket/transcript_tests.rs`).
+  In the log the deltas add up to the `done`, and none of the 173 is blank.
 - The owner's 8 deltas took 1.72 s for 1.8 s of speech (their `end_ms`), so they keep pace with it.
   How far the first one trails the owner's voice was not measured.
 - In the filmed take the owner's `done` reached the menu 1.7 to 3.5 s after the owner stopped
-  speaking (3 lines), and the voice's `done` 0.6 to 0.96 s after its audio ended (4 replies) and
-  2.06 s after its last delta (1 reply). A 20 s reply was therefore on screen 20.8 s after it began,
-  about when the owner took the next step.
+  speaking (3 lines), and the voice's `done` 0.6 to 0.96 s after its audio ended (4 replies). A 20 s
+  reply was therefore on screen 20.8 s after it began, about when the owner took the next step.
+- The voice's `done` came 1.73 to 2.06 s after its last delta in the 5 replies of the log that have
+  one. The frames of 2 more stop within 1.8 s of the last delta, with no `done`: their sessions seem
+  to have ended first.
 - The voice's last delta came about 1 s before the end of its audio (1 reply): its text runs ahead of
   its sound.
 
@@ -608,8 +611,8 @@ band in the terminal.
   (the silence rule waits for that acknowledgement), and `initialItems` for continuity.
 - Every `turn/started` on the voice thread is interrupted at once; it costs nothing audible.
 - `transcript/delta` is what the menu shows while a line is spoken, `transcript/done` what the app
-  keeps (item (r)): a delta can differ from the final text and cannot be tied to a turn, so it is
-  never stored and never seeds the voice.
+  keeps: a delta can differ from the final text and names no turn (item (r);
+  [`GrowingLines`](../architecture/overview.md#components) has the rule).
 - Results go to the voice with `appendText` (`role: "user"`, tagged lines). A result that arrives
   while the session is closed cannot make a fresh session speak by itself, so it waits for the
   owner to speak (see "Decision: results while the voice is closed" below). A result for a

@@ -8,10 +8,11 @@ All notable changes to this project are listed here. The format follows
 
 ### Fixed
 
-- **Conversation** no longer runs a step behind the call. Your words and the voice's now show as
-  codex transcribes them, where a line used to appear only when it was final: a long reply showed
-  once the voice had finished it, and your line once the voice had started answering. What is kept,
-  and what the voice is seeded with, is still only the final text, which replaces the words shown.
+- During a call, **Conversation** now shows your words and the voice's as codex transcribes them,
+  where a line used to appear only when it was final: a long reply showed once the voice had
+  finished it, and your line once the voice had started answering. Your words can still appear a
+  moment after you say them, and the voice's a moment before you hear them. What is kept, and what
+  the voice is seeded with, is still only the final text, which replaces the words shown.
 
 Note: this comes from recorded events and tests, and has not been seen in the real menu during a
 call.
