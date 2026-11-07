@@ -35,7 +35,9 @@ session में क्या टाइप करते हैं और Claude
 
 *मूल पाठ अंग्रेज़ी में है ([README.md](../../README.md)); यह अनुवाद पीछे रह सकता है।*
 
-<p align="center"><img src="../../site/assets/demo.gif" alt="LiveBridge के ज़रिए Claude Code session से बात करना" width="100%"></p>
+**बातचीत, डिक्टेशन नहीं।** GPT-Live बोलते समय भी सुनता रहता है: बीच में टोकें तो वह रुककर आपकी बात सुनता है; ज़ोर से सोचें तो वह छोटा-सा "हम्म" बोल सकता है। **ख़ामोशी के पैसे देना बंद:** OpenAI आवाज़ का शुल्क मिनट के हिसाब से लेता है, इसलिए 20 सेकंड की चुप्पी के बाद लाइन बंद हो जाती है और आपके बोलते ही फिर खुल जाती है, और बातचीत वहीं से आगे बढ़ती है जहाँ आपने छोड़ी थी ([बिलिंग](#बिलिंग-का-ध्यान-रखने-वाला-डिज़ाइन))।
+
+<p align="center"><img src="../assets/readme-demo.gif" alt="LiveBridge के ज़रिए Claude Code session से बात करना" width="100%"></p>
 
 **डिज़ाइन से ही लोकल।** कोई telemetry नहीं और अपना कोई server नहीं: LiveBridge आपके Mac पर आपके अपने
 codex और आपके अपने Claude Code के बीच एक bridge है। App और mod सिर्फ़ एक Unix socket पर बात करते
@@ -124,6 +126,16 @@ ad hoc signed होता है और notarized नहीं होता।
 3. उसे खोलें और LiveBridge को Applications में drag करें।
 4. पहली बार launch करने पर macOS app को तब तक block रखता है जब तक आप उसे System Settings > Privacy &
    Security > **Open Anyway** में अनुमति न दें।
+
+### Homebrew से
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+यह वही डिस्क इमेज [LiveBridge के अपने tap](https://github.com/getLiveBridge/homebrew-tap) से इंस्टॉल करता है, जो Homebrew का आधिकारिक cask नहीं
+है। Homebrew पहले इस tap पर भरोसा करने को कह सकता है, और macOS पहली बार खोलने को ऊपर बताए अनुसार रोकता
+है। इसके बाद app खुद अपडेट होता है।
 
 ### सोर्स से
 

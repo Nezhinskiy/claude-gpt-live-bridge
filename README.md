@@ -32,7 +32,12 @@ do not have to hold the line open while Claude works: its answer opens the close
 goes to the voice to say. The voice also follows what you type in the session and what Claude
 answers, so you can switch between speaking and typing.
 
-<p align="center"><img src="site/assets/demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
+**A conversation, not dictation.** GPT-Live listens while it talks: cut in and it stops and hears you
+out, think out loud and it can drop in a quick "mm-hmm". **You stop paying for silence:** OpenAI
+prices voice by the minute, so after 20 seconds of quiet the line closes, and it opens again when you
+speak, with the conversation where you left it ([Billing](#billing-aware-by-design)).
+
+<p align="center"><img src="docs/assets/readme-demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
 between your own codex and your own Claude Code. The app and the mod talk over a Unix socket
@@ -121,6 +126,16 @@ ad hoc and not notarized.
 3. Open it and drag LiveBridge to Applications.
 4. On first launch macOS blocks the app until you allow it under System Settings > Privacy &
    Security > **Open Anyway**.
+
+### With Homebrew
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+This installs the same disk image from [LiveBridge's own tap](https://github.com/getLiveBridge/homebrew-tap), which is not one of Homebrew's
+casks. Homebrew may ask you to trust the tap first, and macOS blocks the first launch as above. The
+app then updates itself, as below.
 
 ### From source
 

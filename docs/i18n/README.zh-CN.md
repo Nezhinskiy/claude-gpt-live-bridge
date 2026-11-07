@@ -31,7 +31,9 @@ Claude 工作时你不必让线路一直打开：它的答复会重新打开已�
 
 *英文原文为准（[README.md](../../README.md)）；本译文可能滞后。*
 
-<p align="center"><img src="../../site/assets/demo.gif" alt="通过 LiveBridge 与 Claude Code 会话对话" width="100%"></p>
+**是对话，不是听写。** GPT-Live 一边说一边听：你随时打断，它就停下来听你说；你边想边说时，它还可能插一句“嗯”。**不再为沉默付费：** OpenAI 按分钟计算语音费用，所以静默 20 秒后线路会关闭，你一开口就重新打开，对话从上次停下的地方继续（[计费](#按需计费的设计)）。
+
+<p align="center"><img src="../assets/readme-demo.gif" alt="通过 LiveBridge 与 Claude Code 会话对话" width="100%"></p>
 
 **设计上完全本地。** 没有遥测，也没有自己的服务器：LiveBridge 只是你 Mac 上的一座桥，连接你自己的 codex 与你自己的
 Claude Code。应用与模组之间通过只有你的用户才能打开的 Unix 套接字通信，应用不监听任何网络端口。除了这两个工具本来就会发送的内容
@@ -102,6 +104,14 @@ scripts/build-app.sh --release
    这是映像唯一的来源证明：ad hoc 签名不指向任何人。它并不能证明有人审查过代码。
 3. 打开映像，把 LiveBridge 拖到“应用程序”。
 4. 首次启动时，macOS 会拦截该应用，直到你在“系统设置”>“隐私与安全性”中点击 **Open Anyway** 予以允许。
+
+### 通过 Homebrew 安装
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+这条命令从 [LiveBridge 自己的 tap](https://github.com/getLiveBridge/homebrew-tap) 安装同一个磁盘映像，它不是 Homebrew 的官方 cask。Homebrew 可能会先要求你信任这个 tap，macOS 也会像上面所说的那样阻止首次启动。之后应用会自行更新。
 
 ### 从源码构建
 
