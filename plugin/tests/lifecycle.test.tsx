@@ -308,6 +308,60 @@ test('theCommandInAJoinedSessionAnswersTheStatus', async ($, on) => {
   expect(world.take('join')).toEqual([])
 })
 
+/** The engine gives up on a command after 10 s, and an app that is stuck holds a poll for longer. */
+test('theCommandInAJoinedSessionDoesNotWaitForAPoll', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  await world.clock.advance(1000)
+  world.invalidated.length = 0
+  let release = () => {}
+  world.holdNext = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onNextHeld = resolve })
+  const poll = world.clock.advance(1000)
+  await held
+  const waited = new Promise<string>(resolve => { setTimeout(() => resolve('it waited'), 1000) })
+  const answer = await Promise.race([$.command.run({ ...LIVE, args: '' }).then(reply => reply.text), waited])
+  const drawn = [...world.invalidated]
+  release()
+  await poll
+  expect(answer).toBe(STATUS_LINE)
+  expect(drawn).toEqual(['ui.render'])
+})
+
+/** The join is on its way, so the band is not there yet: nothing says voice is off. */
+test('theCommandDuringTheJoinSaysItIsJoining', async ($, on) => {
+  const world = fakeWorld(on)
+  await $.session.start(START)
+  let release = () => {}
+  world.holdStore = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onStoreHeld = resolve })
+  const first = $.command.run({ ...LIVE, args: '' })
+  await held
+  const waited = new Promise<string>(resolve => { setTimeout(() => resolve('it waited'), 1000) })
+  const answer = await Promise.race([$.command.run({ ...LIVE, args: '' }).then(reply => reply.text), waited])
+  release()
+  await first
+  expect(answer).toBe('LiveBridge: joining…')
+})
+
+/** Both pass the look before the queue while a leave runs, so the one that waits looks again. */
+test('twoCommandsBehindALeaveJoinOnce', async ($, on) => {
+  const world = fakeWorld(on)
+  await liveOn($)
+  world.take('join')
+  let release = () => {}
+  world.holdStore = new Promise(resolve => { release = resolve })
+  const held = new Promise<void>(resolve => { world.onStoreHeld = resolve })
+  const off = $.command.run({ ...LIVE, args: 'off' })
+  await held
+  const answers = [$.command.run({ ...LIVE, args: '' }), $.command.run({ ...LIVE, args: '' })]
+  await aMoment()
+  release()
+  await off
+  expect((await Promise.all(answers)).map(reply => reply.text)).toEqual(['Joined LiveBridge.', 'LiveBridge: joining…'])
+  expect(world.take('join')).toHaveLength(1)
+})
+
 test('aRepeatedCommandNeverLeaves', async ($, on) => {
   const world = fakeWorld(on)
   await liveOn($)

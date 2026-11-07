@@ -427,12 +427,18 @@ async function contextAsked($: EngineInterface): Promise<void> {
 
 async function statusText($: EngineInterface): Promise<string> {
   const state = await read($, band)
-  if (state === null) return 'Voice is off for this session. /live joins LiveBridge.'
+  // A join on its way has no band yet.
+  if (state === null || (!state.isOffline && state.status === undefined)) return JOINING
   const status = state.status
-  if (!state.isOffline && status === undefined) return JOINING
   if (state.isOffline || status === undefined) return `LiveBridge is not reachable. ${state.problem ?? ''}`.trim()
   return `LiveBridge: ${status.call}; target: ${status.target}; ${status.unheard} unheard; ` +
     `${Math.round(status.minutesToday)} min today.${status.problem ? ` ${status.problem}` : ''}`
+}
+
+/** `/live` in a joined session: the owner's way back to a band the surface lost, and the status. */
+function joinedAnswer($: EngineInterface): Promise<string> {
+  redrawBand($)
+  return statusText($)
 }
 
 /**
@@ -447,11 +453,10 @@ async function live($: EngineInterface, args: string): Promise<string> {
     return 'Left LiveBridge.'
   }
   if (verb !== '' && verb !== 'on') return USAGE
+  // Not through the queue: a held poll would outlast the engine's patience with a command.
+  if (link?.session) return joinedAnswer($)
   return serial(async () => {
-    if (link?.session) {
-      redrawBand($)  // the owner's way back to a band the surface lost
-      return statusText($)
-    }
+    if (link?.session) return joinedAnswer($)
     // No title here: a new session's is still the one Claude Code derives from its folder, and
     // the app shows the name the session is given next, once the poll follows it.
     return (await turnOn($, true))
