@@ -4,11 +4,13 @@ import Foundation
 public enum RealtimeEvent: Sendable, Equatable {
   /// The voice handed a request off (a codex `handoff_request` item), once per handoff id.
   case handoff(VoiceRequest)
+  /// The owner's next words (a transcript delta), which only add to what the line shows.
+  case userSpeaking(String)
   case userUtterance(String)
   /// The voice finished a reply.
   case assistantUtterance(String)
-  /// The voice is saying something (a transcript delta).
-  case assistantSpeaking
+  /// The voice is saying something (a transcript delta): its next words.
+  case assistantSpeaking(String)
   /// codex closed the session, for this reason.
   case closed(Problem)
 }
@@ -310,7 +312,9 @@ public actor RealtimeSession: RealtimeControlling {
       if params["role"] == "user" { emit.yield(.userUtterance(text)) }
       if params["role"] == "assistant" { emit.yield(.assistantUtterance(text)) }
     case "thread/realtime/transcript/delta":
-      if params["role"] == "assistant" { emit.yield(.assistantSpeaking) }
+      let words = params["delta"]?.string ?? ""
+      if params["role"] == "user" { emit.yield(.userSpeaking(words)) }
+      if params["role"] == "assistant" { emit.yield(.assistantSpeaking(words)) }
     case "turn/started":
       guard let turn = params["turn"]?["id"] else { return }
       Task {

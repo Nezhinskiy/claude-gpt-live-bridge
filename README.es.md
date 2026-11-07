@@ -249,7 +249,11 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
   conserva LiveBridge (con una línea **Task** por cada petición que la voz pasó a Claude y una línea **Loaded context** donde se cargó un resumen), los
   límites de uso, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
-  **Settings…** y **Quit LiveBridge**.
+  **Settings…** y **Quit LiveBridge**. Durante una llamada, **Conversation** muestra tus palabras y
+  las de la voz a medida que codex las transcribe, así que las tuyas pueden aparecer un momento después
+  de decirlas y las de la voz un momento antes de oírlas. Cuando cada frase termina, su texto final
+  las sustituye. Solo se conserva el texto final: las palabras que aún lo esperan cuando se cierra la
+  línea se pierden.
 - **Mute** (junto a **Stop**, en la banda y en la tarjeta de llamada del menú; **Unmute** mientras
   está silenciado) libera tu micrófono mientras la llamada continúa: una respuesta de Claude sigue
   abriendo la línea y pasa a la voz para que la diga. La banda mantiene la fase y añade `· muted`;
