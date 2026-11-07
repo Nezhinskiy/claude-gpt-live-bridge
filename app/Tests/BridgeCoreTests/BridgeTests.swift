@@ -2168,6 +2168,33 @@ struct BridgeTests {
     #expect(await eventually { await lines() == ["Voice: Option B"] })
   }
 
+  /// The owner's words trail their voice, so they say nothing about whether the owner still
+  /// speaks: the line hangs up when it would have without them.
+  @Test func theOwnersWordsDoNotMoveTheSilenceHangUp() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    #expect(await eventually { time.sleepers >= 3 })  // sweep, 2 silence timers
+    for _ in 1..<CallMachine.silenceSeconds {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)  // the session stays joined
+    }
+    voice.emit(.userSpeaking(" Trailing"))
+    #expect(await eventually { await lines() == ["You: Trailing"] })
+    time.advance(by: .seconds(1))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
+  /// Nor do they make a result wait, as the owner speaking or the voice speaking does.
+  @Test func aResultIsSaidAmongTheOwnersWords() async throws {
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    try await handOff()
+    voice.emit(.userSpeaking(" Trailing"))
+    #expect(await eventually { await lines().last == "You: Trailing" })
+    try await answerFirstRequest()
+    #expect(await eventually { await voice.spoken == ["[RESULT] Alpha: Done."] })
+  }
+
   /// The menu shows the target's conversation: a growing line of another session is not in it.
   @Test func aGrowingLineShowsOnlyForItsSession() async throws {
     try await join(a, "Alpha")
