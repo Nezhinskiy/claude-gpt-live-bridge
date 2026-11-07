@@ -159,7 +159,7 @@ confirms a request.
 - Failures the bridge writes itself, "timed out" and the session-left reason, carry a session
   (`SessionRegistry.swift:278`, `:342`), so they sound. CHANGELOG says "An answer from Claude", and
   the sound means Claude has thought and sent. Accept it and word it so, or exclude them.
-- `.asking` has no sound, which fits "final answer", but `overview.md:289-291` and the PR's table
+- `.asking` has no sound, which fits "final answer", but `overview.md:290-292` and the PR's table
   list what has none without it. A reader of the paragraph above takes it for "a question".
 - For the owner to confirm: the final answer of a typed turn arrives as a synced line, so it has no
   sound on an open line, and neither does a superseded answer (`Bridge.swift:734`). The code matches
