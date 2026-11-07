@@ -381,15 +381,6 @@ async function hasTurns($: EngineInterface): Promise<boolean> {
   return ((await turnCount($)) ?? 1) > 0  // not known: the model says when there is nothing
 }
 
-/**
- * Sends the session's summary to the app; says what happened and never rejects. While one is on
- * its way a second ask joins it.
- */
-function sendContext($: EngineInterface): Promise<ContextOutcome> {
-  sending ??= deliverContext($).finally(() => { sending = null })
-  return sending
-}
-
 async function deliverContext($: EngineInterface): Promise<ContextOutcome> {
   if (!(await hasTurns($))) return 'empty'
   const send = ++sendCount
@@ -419,10 +410,14 @@ async function writeAndPost($: EngineInterface, send: number): Promise<ContextOu
   }
 }
 
-/** The summary asked for by the app, which has no reply line of its own. */
+/**
+ * Sends the summary the app asked for, which has no reply line of its own, and never rejects. While
+ * one is on its way a second ask joins it.
+ */
 async function contextAsked($: EngineInterface): Promise<void> {
+  sending ??= deliverContext($).finally(() => { sending = null })
   // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
-  if ((await sendContext($)) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
+  if ((await sending) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
 }
 
 async function statusText($: EngineInterface): Promise<string> {
@@ -446,13 +441,13 @@ function joinedAnswer($: EngineInterface): Promise<string> {
  * repeated `/live` never leaves. `on` is `/live` under its old name.
  */
 async function live($: EngineInterface, args: string): Promise<string> {
-  const verb = args.trim()
-  if (verb === 'off') {
+  const form = args.trim()
+  if (form === 'off') {
     if (!link?.session) return 'This session has not joined LiveBridge.'
     await serial(() => turnOff($))
     return 'Left LiveBridge.'
   }
-  if (verb !== '' && verb !== 'on') return USAGE
+  if (form !== '' && form !== 'on') return USAGE
   // Not through the queue: a held poll would outlast the engine's patience with a command.
   if (link?.session) return joinedAnswer($)
   return serial(async () => {
