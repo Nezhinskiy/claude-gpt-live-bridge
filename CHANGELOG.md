@@ -11,6 +11,16 @@ All notable changes to this project are listed here. The format follows
 - The sound for a waiting result is now LiveBridge's own instead of macOS's Glass, made to pair
   with the sound for a queued request. It is shorter, 0.82 s instead of 1.65 s, and louder at its
   peak.
+- **`/live` is the one command that joins.** In a session that has not joined it joins, and opens
+  the app if it is not running; in a joined session it brings back the band and answers with the
+  status line. It is not a toggle: repeating it never leaves, and `/live off` still does. `/live on`
+  still works, the same as `/live`.
+
+### Removed
+
+- `/live target`, `/live status` and `/live context`. Each now answers
+  `Usage: /live | /live off`. **Talk here** in the band and a click on a session in the menu set the
+  target, `/live` gives the status, and **Load context** in the menu loads a summary.
 
 ## [0.4.1]
 

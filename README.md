@@ -68,7 +68,7 @@ cd livebridge
 scripts/build-app.sh --release
 ```
 
-3. In the Claude Code session you want to talk to, type `/live on`.
+3. In the Claude Code session you want to talk to, type `/live`.
 4. Press **Start** in the band above the prompt, allow the microphone, and talk.
 
 Rather not build it? Each [release](https://github.com/getLiveBridge/LiveBridge/releases/latest)
@@ -213,11 +213,8 @@ In the Claude Code session you want to talk to:
 
 | Command | What it does |
 |---|---|
-| `/live on` | Joins LiveBridge under the session's title, and opens the app if it is not running. |
+| `/live` | Joins LiveBridge under the session's title, and opens the app if it is not running. In a joined session it brings back the band and answers in one line: the call, the target, unheard results, minutes today. |
 | `/live off` | Leaves LiveBridge. |
-| `/live target` | Makes this session the one the voice hands work to. |
-| `/live status` (or just `/live`) | One line: the call, the target, unheard results, minutes today. |
-| `/live context` | Sends the voice a new summary of this session, written by the session's model. |
 
 The command is `/live`, not `/voice`, because `/voice` is Claude Code's own voice mode. Whether a
 session's typing is kept out of the voice while the call is stopped is not a command: it is one
@@ -231,7 +228,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   with the session's conversation, and loads a summary of the session as well when the voice would
   lack part of it (see **Load context** below), but never while **Pause sync** is on or after a
   pause ([details](docs/architecture/overview.md#components)). While the call talks to another
-  session, the band shows **Talk here**. If the band is not there in a joined session, `/live on`
+  session, the band shows **Talk here**. If the band is not there in a joined session, `/live`
   brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
@@ -254,15 +251,15 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   conversation outgrows that), the session was paused, or its mod does not sync. Otherwise the item
   reads **Context up to date** and is disabled, because the voice already has the conversation. With
   no summary yet and nothing lost it reads **Context loads with the line** and is disabled, because
-  the next line asks for one by itself. A summary carries no date, so one can be ignored while the item stays enabled, and `/live context`
-  can fail, bring back what was forgotten or clear the paused mark ([BR-002](docs/bugs/BR-002.md)).
+  the next line asks for one by itself. A summary carries no date, so one can be ignored while the item stays enabled
+  ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×
   removes it and erases its own; both ask first. The voice starts afresh from the next time the line
   opens. Results it has not said yet stay and are added again; only **Stop** clears them. Claude's
   waiting questions follow other rules ([details](SECURITY.md#residual-risk-by-design)). With
   **Pause sync** off and the session not paused, the next line loads a summary of the same session's
   transcript by itself, which holds the text the session read; `/clear` the session first to avoid
-  that, then press **New conversation**. `/live on` in a removed session joins it again.
+  that, then press **New conversation**. `/live` in a removed session joins it again.
 
 ### Settings
 
@@ -279,7 +276,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, press Stop,
   then type: nothing you type while the call is stopped is recorded, and the session is marked as
   paused. While it is on, no line loads a summary by itself, and neither does one after a pause:
-  only **Load context** or `/live context` does, and that summary is written from the whole
+  only **Load context** does, and that summary is written from the whole
   transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
@@ -447,7 +444,7 @@ call running unless you turned on **Pause sync**) and the context line last load
 `~/Library/Application Support/LiveBridge`, a folder only your user can open
 ([how it is kept](SECURITY.md#residual-risk-by-design)). A session's lines go when you press **New
 conversation** with it as the target or remove it with ×. A session that has left keeps them
-until 20 sessions used since push them out; to erase them sooner, run `/live on` in it again and
+until 20 sessions used since push them out; to erase them sooner, run `/live` in it again and
 press **New conversation**. Uninstalling removes them all. The mod keeps a snapshot of its own in Claude Code's plugin store ([what it holds](SECURITY.md#residual-risk-by-design)).
 
 [SECURITY.md](SECURITY.md) has the threat model: in short, anything your microphone can hear

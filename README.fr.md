@@ -75,7 +75,7 @@ cd livebridge
 scripts/build-app.sh --release
 ```
 
-3. Dans la session Claude Code à laquelle vous voulez parler, tapez `/live on`.
+3. Dans la session Claude Code à laquelle vous voulez parler, tapez `/live`.
 4. Appuyez sur **Start** dans la bande au-dessus du prompt, autorisez le microphone, et parlez.
 
 Vous préférez ne pas compiler ? Chaque [version](https://github.com/getLiveBridge/LiveBridge/releases/latest)
@@ -236,11 +236,8 @@ Dans la session Claude Code à laquelle vous voulez parler :
 
 | Commande | Ce qu'elle fait |
 |---|---|
-| `/live on` | Rejoint LiveBridge sous le titre de la session, et ouvre l'application si elle n'est pas lancée. |
+| `/live` | Rejoint LiveBridge sous le titre de la session, et ouvre l'application si elle n'est pas lancée. Dans une session déjà rejointe, fait revenir la bande et répond en une ligne : l'appel, la cible, les résultats non entendus, les minutes du jour. |
 | `/live off` | Quitte LiveBridge. |
-| `/live target` | Fait de cette session celle à qui la voix confie le travail. |
-| `/live status` (ou simplement `/live`) | Une ligne : l'appel, la cible, les résultats non entendus, les minutes du jour. |
-| `/live context` | Envoie à la voix un nouveau résumé de cette session, rédigé par le modèle de la session. |
 
 La commande est `/live`, et non `/voice`, car `/voice` est le mode vocal propre à Claude Code.
 Garder ou non hors de la voix ce que vous tapez dans une session tant que l'appel est arrêté n'est
@@ -257,7 +254,7 @@ parlez.
   une partie d'elle (voir **Load context** ci-dessous), mais jamais avec **Pause sync** activé ni
   après une pause ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à
   une autre session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session
-  rejointe, `/live on` la fait revenir.
+  rejointe, `/live` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
   la conserve (avec une ligne **Task** pour chaque demande que la voix a transmise à Claude et une ligne **Loaded context** là où un résumé a été chargé), les
@@ -282,8 +279,7 @@ parlez.
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
   déjà la conversation. Sans résumé encore et sans rien de perdu, il affiche **Context loads with the
   line** et est désactivé, car la prochaine ligne le demande d'elle-même. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
-  reste activé, et `/live context` peut échouer, ramener ce qui a été oublié ou lever la marque de
-  pause ([BR-002](docs/bugs/BR-002.md)).
+  reste activé ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne. Les résultats qu'elle n'a pas encore dits
@@ -291,7 +287,7 @@ parlez.
   suivent d'autres règles ([détails](SECURITY.md#residual-risk-by-design)). Avec **Pause sync**
   désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
   transcription de la session, qui contient ce que la session a lu ; pour l'éviter, faites d'abord
-  `/clear` dans la session, puis appuyez sur **New conversation**. `/live on` dans une session
+  `/clear` dans la session, puis appuyez sur **New conversation**. `/live` dans une session
   retirée la rejoint de nouveau.
 
 ### Réglages
@@ -310,8 +306,8 @@ parlez.
   s'ouvre. Rien ne quitte le Mac avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
   voir arriver chez OpenAI, activez le réglage, appuyez sur Stop, puis tapez : rien de ce que vous
   tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
-  aucune ligne ne charge de résumé d'elle-même, ni après une pause : seuls **Load context** ou
-  `/live context` le font, et ce résumé est écrit à partir de toute la transcription, donc il porte
+  aucune ligne ne charge de résumé d'elle-même, ni après une pause : seul **Load context** le
+  fait, et ce résumé est écrit à partir de toute la transcription, donc il porte
   ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
@@ -500,7 +496,7 @@ mise à jour et, pour chacune des 20 dernières sessions utilisées, sa conversa
 ([comment il est conservé](SECURITY.md#residual-risk-by-design)). Les lignes d'une session disparaissent quand vous
 appuyez sur **New conversation** avec elle comme cible ou que vous la retirez avec ×. Une session
 qui est partie les conserve jusqu'à ce que 20 sessions utilisées ensuite les évincent ; pour les
-effacer plus tôt, exécutez de nouveau `/live on` dans cette session et appuyez sur **New
+effacer plus tôt, exécutez de nouveau `/live` dans cette session et appuyez sur **New
 conversation**. La désinstallation les supprime toutes. Le mod garde un instantané à lui dans le magasin de plugins de Claude Code ([ce qu'il contient](SECURITY.md#residual-risk-by-design)).
 
 [SECURITY.md](SECURITY.md) contient le modèle de menace : en bref, tout ce que votre microphone

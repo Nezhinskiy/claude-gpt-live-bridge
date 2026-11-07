@@ -60,7 +60,7 @@ cd livebridge
 scripts/build-app.sh --release
 ```
 
-3. 在你想与之对话的 Claude Code 会话中，输入 `/live on`。
+3. 在你想与之对话的 Claude Code 会话中，输入 `/live`。
 4. 点击提示输入框上方状态条中的 **Start**，允许使用麦克风，然后开始说话。
 
 不想自己构建？每个[发布版本](https://github.com/getLiveBridge/LiveBridge/releases/latest)都附有磁盘映像形式的应用，
@@ -174,11 +174,8 @@ claude plugin uninstall livebridge@livebridge
 
 | 命令 | 作用 |
 |---|---|
-| `/live on` | 以会话标题加入 LiveBridge；如果应用未运行，则将其打开。 |
+| `/live` | 以会话标题加入 LiveBridge；如果应用未运行，则将其打开。在已加入的会话中，它会让状态条重新出现，并用一行作答：通话、目标、未听取的结果、今日分钟数。 |
 | `/live off` | 离开 LiveBridge。 |
-| `/live target` | 让当前会话成为语音交办工作的目标会话。 |
-| `/live status`（或直接 `/live`） | 一行信息：通话、目标、未听取的结果、今日分钟数。 |
-| `/live context` | 向语音发送由该会话的模型撰写的、关于此会话的新摘要。 |
 
 命令是 `/live` 而不是 `/voice`，因为 `/voice` 是 Claude Code 自带的语音模式。通话停止期间，你在会话中输入的内容是否不进入语音，并不是一个命令：
 它是对所有会话生效的一项设置，位于 LiveBridge 的[设置](#设置)窗口中。
@@ -188,13 +185,13 @@ claude plugin uninstall livebridge@livebridge
 在提示输入框上方的状态条或菜单栏菜单中点击 **Start**，然后开始说话。
 
 - **状态条上的 Start** 会让它所属的会话成为目标并开始通话；它打开的线路会带上该会话的对话，并且在语音会缺少该会话的一部分时（见下文 **Load context**）另外加载摘要，但在 **Pause sync** 开启期间或暂停之后绝不加载（[详情](docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
-  状态条，`/live on` 会让它重新出现。
+  状态条，`/live` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
   **Load context**、LiveBridge 保存的目标会话 **Conversation**（语音交给 Claude 的每个请求都有一行 **Task**，载入摘要的位置有一行 **Loaded context**）、用量限额、分钟数、
   **Star LiveBridge on GitHub**（打开仓库页面）、**Settings…** 和 **Quit LiveBridge**。
 - **Mute**（在 **Stop** 旁边，位于状态条和菜单的通话卡片中；Mute 后显示 **Unmute**）会在通话继续时释放你的麦克风：Claude 的答复仍会打开线路，并交给语音去说。状态条保留阶段并加上 `· muted`；没有线路打开时，菜单显示 “Muted — line closed”。Mute 不会关闭线路：已打开的线路会在通常的无声时长后关闭：若你当时在说话，则从 Mute 起算；若线路本来就安静，Mute 不会改变它何时关闭，计费与任何无声时段相同，因此 Mute 不会节省实时分钟数。**Unmute** 会重新使用麦克风，若无法使用（被拒绝、被占用、缺失），通话会带着原因结束。**Stop** 会结束通话和 Mute；下一次 **Start** 从未 Mute 开始。Mute 不是锁：任何以你的用户身份运行的进程都可以解除它（[SECURITY.md](SECURITY.md#who-can-drive-the-bridge)）。
-- **Load context** 只在语音缺少目标的一部分时可用：**Pause sync** 开启时没有摘要、某一轮没有送达、某个问题或权限通知没有送到应用、模组关闭期间有轮次运行、摘要之后的行数已超出语音所能承载（较长的对话会超出）、该会话曾被暂停，或其模组不同步。否则该项显示为 **Context up to date** 且不可用，因为语音已经有了这段对话。如果还没有摘要且没有丢失任何内容，该项显示为 **Context loads with the line** 且不可用，因为下一条线路会自行请求摘要。摘要不带日期，因此它可能被忽略而该项仍保持可用，`/live context` 也可能失败、带回已被忘记的内容或清除暂停标记（[BR-002](docs/bugs/BR-002.md)）。
-- **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。语音从线路下次打开时重新开始。它还没说出的结果会保留并再次加入，只有 **Stop** 会清除它们。Claude 等待中的问题遵循其他规则（[详情](SECURITY.md#residual-risk-by-design)）。**Pause sync** 关闭且该会话未被暂停时，下一条线路会自行加载同一会话记录的摘要，其中包括该会话读过的内容；要避免这一点，请先在该会话中执行 `/clear`，再点击 **New conversation**。在被移除的会话中执行 `/live on` 可让它重新加入。
+- **Load context** 只在语音缺少目标的一部分时可用：**Pause sync** 开启时没有摘要、某一轮没有送达、某个问题或权限通知没有送到应用、模组关闭期间有轮次运行、摘要之后的行数已超出语音所能承载（较长的对话会超出）、该会话曾被暂停，或其模组不同步。否则该项显示为 **Context up to date** 且不可用，因为语音已经有了这段对话。如果还没有摘要且没有丢失任何内容，该项显示为 **Context loads with the line** 且不可用，因为下一条线路会自行请求摘要。摘要不带日期，因此它可能被忽略而该项仍保持可用（[BR-002](docs/bugs/BR-002.md)）。
+- **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。语音从线路下次打开时重新开始。它还没说出的结果会保留并再次加入，只有 **Stop** 会清除它们。Claude 等待中的问题遵循其他规则（[详情](SECURITY.md#residual-risk-by-design)）。**Pause sync** 关闭且该会话未被暂停时，下一条线路会自行加载同一会话记录的摘要，其中包括该会话读过的内容；要避免这一点，请先在该会话中执行 `/clear`，再点击 **New conversation**。在被移除的会话中执行 `/live` 可让它重新加入。
 
 ### 设置
 
@@ -203,7 +200,7 @@ claude plugin uninstall livebridge@livebridge
 - **Voice**：你的 codex 提供的实时语音之一（窗口打开时由 codex 列出），或 **Codex default**。从线路下次打开起生效。
 - **Prompt**（默认为空）：你给语音的自定义指令，例如“用西班牙语和我说话”，最多 2,000 个字符。它们会追加在 LiveBridge
   为语音设定的规则之后；两者冲突时以 LiveBridge 的规则为准。从线路下次打开起生效。
-- **Pause sync while the call is stopped**（默认关闭）：默认情况下，你在已加入的会话中输入的内容以及 Claude 对此的最终答复，即使通话已停止，也会保存到该会话与语音的对话中，下一条线路打开时语音就拥有它们。在线路打开之前，没有任何内容离开这台 Mac。若不想让某些文字到达 OpenAI，请开启此项，按下 Stop，然后再输入：通话停止期间你输入的内容都不会被记录，该会话会被标记为已暂停。开启期间，没有任何线路会自行加载摘要，暂停之后也是如此：只有 **Load context** 或 `/live context` 才会加载，而该摘要由整份会话记录写成，因此会带上你暂停的内容。向正在运行语音请求的那一轮输入，会使它的答复失败，其中的任何内容都不会被记录或说出。此项不会删除已记录的任何内容，Claude 之后的答复也可能重复被暂停的文字；它做什么、不做什么，见 [SECURITY.md](SECURITY.md#residual-risk-by-design)。
+- **Pause sync while the call is stopped**（默认关闭）：默认情况下，你在已加入的会话中输入的内容以及 Claude 对此的最终答复，即使通话已停止，也会保存到该会话与语音的对话中，下一条线路打开时语音就拥有它们。在线路打开之前，没有任何内容离开这台 Mac。若不想让某些文字到达 OpenAI，请开启此项，按下 Stop，然后再输入：通话停止期间你输入的内容都不会被记录，该会话会被标记为已暂停。开启期间，没有任何线路会自行加载摘要，暂停之后也是如此：只有 **Load context** 才会加载，而该摘要由整份会话记录写成，因此会带上你暂停的内容。向正在运行语音请求的那一轮输入，会使它的答复失败，其中的任何内容都不会被记录或说出。此项不会删除已记录的任何内容，Claude 之后的答复也可能重复被暂停的文字；它做什么、不做什么，见 [SECURITY.md](SECURITY.md#residual-risk-by-design)。
 - **Play a sound when a request is queued for Claude**（默认开启）：语音每转交一个请求给 Claude，就播放一声短音（[原因](#已知限制)）。
 - **Notify when a result is waiting**（默认开启）：当线路关闭期间有结果在等待时，除提示音外，还会弹出一条 macOS 通知，其中写明会话名称
   （“Alpha has a new result — speak to hear it”），但绝不包含结果本身。点击通知会打开菜单栏菜单。
@@ -272,7 +269,7 @@ LiveBridge 没有遥测，也不监听任何网络端口；模组通过一个只
 在你的 Mac 上，应用把设置、用量计量、上次检查更新的时间和已通知过的版本、上一次更新做了什么，以及最近使用的 20 个会话各自的近期对话（最多 64 行，包括你在其中输入的内容；除非你开启 **Pause sync**，否则无需通话也会记录）和上次从中加载的上下文行，保存在
 `~/Library/Application Support/LiveBridge`，该文件夹只有你的用户才能打开（[保存方式](SECURITY.md#residual-risk-by-design)）。当你以某个会话为目标按下 **New
 conversation**，或用 × 移除它时，该会话的这些行就会被删除。已离开的会话会保留这些内容，
-直到之后使用的 20 个会话将其挤出；若想更早地清除，请在其中再次运行 `/live on` 并点击 **New conversation**。卸载会将它们全部移除。模组在 Claude Code 的插件存储中保留自己的快照（[其中有什么](SECURITY.md#residual-risk-by-design)）。
+直到之后使用的 20 个会话将其挤出；若想更早地清除，请在其中再次运行 `/live` 并点击 **New conversation**。卸载会将它们全部移除。模组在 Claude Code 的插件存储中保留自己的快照（[其中有什么](SECURITY.md#residual-risk-by-design)）。
 
 [SECURITY.md](SECURITY.md) 给出了威胁模型：简而言之，凡是你的麦克风能听到的内容，都可能变成一条请求，由 Claude 在该会话自己的权限模式下执行。
 

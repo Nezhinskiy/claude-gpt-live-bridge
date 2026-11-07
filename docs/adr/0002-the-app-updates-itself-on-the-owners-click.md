@@ -4,7 +4,7 @@
 
 Until 0.1.2 each release was installed by hand: download `LiveBridge.dmg`, check it with
 `gh attestation verify`, drag the app over the old one, then run two `claude plugin` commands
-for the mod. Done by hand, it races the mod. While a session has `/live on`, the mod opens
+for the mod. Done by hand, it races the mod. While a session has joined, the mod opens
 `/Applications/LiveBridge.app` again whenever the app stops answering, so quitting the app before
 replacing it can bring the old binary back; this happened while installing 0.1.2. The owner
 asked for the Settings window to show the version, to update the app and the mod from there,

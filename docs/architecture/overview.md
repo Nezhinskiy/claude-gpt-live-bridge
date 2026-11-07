@@ -152,7 +152,7 @@ draws a band above the prompt with the call's phase, the target, the unheard cou
 buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries `isMuted`, with a
 `· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own.
 A surface that has drawn no band for 3 s while the session is joined is asked for it again, and
-`/live on` in a joined session asks every surface for it. Start makes the session the target and
+`/live` in a joined session asks every surface for it. Start makes the session the target and
 starts the call; the line the app opens then asks the target for its summary when the voice would
 lack part of the session (it has none, a turn did not arrive, the lines since the summary no
 longer all fit the seed, or the mod does not sync), unless the pause setting is on or the session
@@ -180,7 +180,7 @@ that both test suites parse.
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `turn` the main-loop turn it belongs to: `{ id, request? }`, `request` being the voice request the turn's answer belongs to; absent between turns and from a released mod |
 | `POST /v1/sync` | `sessionId`, `turn`, `kind` and `text`: a line of a main-loop turn. A voice turn posts its `start`, what is typed into it and the mod's lines; its answer goes by `/v1/answer`. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
 | `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
-| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. One the app asked for before the latest gap or forget is ignored; one nobody asked for (`/live context`) cannot be dated and is taken, so it can clear a *paused* mark across a refused turn |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. One the app asked for before the latest gap or forget is ignored; one nobody asked for cannot be dated and is taken, so it can clear a *paused* mark across a refused turn. The mod sends none from 0.4.2; only an older mod's `/live context` still does |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
 Every reply carries the status: the phase, `isMuted`, the sessions with their labels (`Title · ab12` when
@@ -189,9 +189,9 @@ and the count of unheard results. What only the app's menu shows (the minutes th
 target's context line and its conversation) is not on the wire.
 
 A session the owner removed with the menu's × is gone as if it had left, and until the owner
-joins it again (`/live on`, the only join that sends `"owner": true`) every call from it,
+joins it again (`/live`, the only join that sends `"owner": true`) every call from it,
 its own automatic joins included, answers `410` with `"code": "removed"`. The mod then turns itself off
-for that session and logs "Removed from LiveBridge. /live on joins again." instead of joining
+for that session and logs "Removed from LiveBridge. /live joins again." instead of joining
 again, as it does after a `404` (the app restarted).
 
 ## Flows
@@ -503,7 +503,7 @@ only if it is still the one it bound.
 ## Failure behaviour
 
 - **No session joined:** Start is disabled in the menu. From the band or the socket, Start
-  does nothing but report "No Claude Code session has joined: run /live on in a session, then
+  does nothing but report "No Claude Code session has joined: run /live in a session, then
   start."; the sentence goes when a session joins. The last session leaving (`/live off`, the
   session closing, the menu's ×, or no poll for 5 s) stops a call that is on, a Start still
   launching codex included, as Stop does, and reports the same sentence. Any session that leaves
