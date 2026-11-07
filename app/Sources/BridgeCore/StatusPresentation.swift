@@ -43,7 +43,7 @@ public struct StatusPresentation: Sendable, Equatable {
   private let problem: String?
   public let unheard: Int
   /// What joins a Claude Code session.
-  public static let joinCommand = "/live on"
+  public static let joinCommand = "/live"
 
   /// A problem outranks everything; then a session waiting for approval, results the owner has
   /// not heard, and a session at work.

@@ -93,7 +93,7 @@ struct SessionRegistryTests {
       try await registry.join(JoinBody(sessionId: a, title: "Renamed"))
     }
     #expect(await registry.rows().map(\.sessionId) == [b, c])
-    try await registry.join(JoinBody(sessionId: a, title: "Alpha", owner: true))  // `/live on`
+    try await registry.join(JoinBody(sessionId: a, title: "Alpha", owner: true))  // `/live`
     #expect(try await registry.poll(a) == nil)
   }
 

@@ -187,7 +187,7 @@ public actor Bridge: Router {
     await changed()
   }
 
-  /// The owner's choice of target, from the menu, the band or `/live target`. A change takes every
+  /// The owner's choice of target, from the menu or the band. A change takes every
   /// other session's question off the line's queue, so it is not said on the new target's line and
   /// the reply does not reach the wrong session; it stays recorded, so it is in its own session's
   /// seed. A route ends with its question.
