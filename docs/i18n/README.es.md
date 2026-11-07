@@ -621,7 +621,7 @@ las [limitaciones conocidas](#limitaciones-conocidas) y las direcciones de la
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): la estructura, la toolchain, las comprobaciones
   (`scripts/check.sh`) y las convenciones.
-- [Informa de un error o pide una función](https://github.com/getLiveBridge/LiveBridge/issues/new/choose) con los formularios de incidencias.
+- [Formularios de incidencias](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): informa de un error o pide una función.
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): cómo nos tratamos aquí.
 - [SECURITY.md](../../SECURITY.md): informa de una vulnerabilidad en privado, no en una incidencia
   pública.

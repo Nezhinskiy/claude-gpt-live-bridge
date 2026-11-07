@@ -338,7 +338,7 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
 议题、[已知限制](#已知限制)以及[上文](#路线图与欢迎协助)的各个方向。
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md)：目录布局、工具链、检查（`scripts/check.sh`）和约定。
-- [报告缺陷或提出功能需求](https://github.com/getLiveBridge/LiveBridge/issues/new/choose)：使用议题表单。
+- [议题表单](https://github.com/getLiveBridge/LiveBridge/issues/new/choose)：报告缺陷或提出功能请求。
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md)：我们在这里如何相互对待。
 - [SECURITY.md](../../SECURITY.md)：请私下报告漏洞，不要发在公开议题中。
 - [CHANGELOG.md](../../CHANGELOG.md)：每个发布版本的变更。

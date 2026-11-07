@@ -602,7 +602,7 @@ Sigstore за корнем доверия, под вашими собствен�
 
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): структура репозитория, инструменты, проверки
   (`scripts/check.sh`) и соглашения.
-- [Сообщите об ошибке или попросите функцию](https://github.com/getLiveBridge/LiveBridge/issues/new/choose) через формы задач.
+- [Формы задач](https://github.com/getLiveBridge/LiveBridge/issues/new/choose): сообщите об ошибке или предложите функцию.
 - [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md): как мы здесь общаемся.
 - [SECURITY.md](../../SECURITY.md): об уязвимости сообщайте приватно, не в открытой задаче.
 - [CHANGELOG.md](../../CHANGELOG.md): что изменилось в каждом выпуске.
