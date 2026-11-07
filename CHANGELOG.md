@@ -10,7 +10,8 @@ All notable changes to this project are listed here. The format follows
 
 - The app installs with Homebrew from LiveBridge's own tap:
   `brew install --cask getlivebridge/tap/livebridge`.
-- Each release carries its disk image's build attestation as `LiveBridge.dmg.sigstore.json`.
+- Each release from v0.2.0 on carries its disk image's build attestation as
+  `LiveBridge.dmg.sigstore.json`.
   Adding `--bundle LiveBridge.dmg.sigstore.json` to the README's whole `gh attestation verify`
   command checks the image against that file instead of the copy GitHub stores.
 
