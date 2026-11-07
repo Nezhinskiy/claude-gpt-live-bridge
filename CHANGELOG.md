@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The app installs with Homebrew from LiveBridge's own tap:
+  `brew install --cask getlivebridge/tap/livebridge`.
+
 ## [0.4.2]
 
 ### Changed

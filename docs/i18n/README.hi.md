@@ -125,6 +125,16 @@ ad hoc signed होता है और notarized नहीं होता।
 4. पहली बार launch करने पर macOS app को तब तक block रखता है जब तक आप उसे System Settings > Privacy &
    Security > **Open Anyway** में अनुमति न दें।
 
+### Homebrew से
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+यह वही डिस्क इमेज [LiveBridge के अपने tap](https://github.com/getLiveBridge/homebrew-tap) से इंस्टॉल करता है, जो Homebrew का आधिकारिक cask नहीं
+है। Homebrew पहले इस tap पर भरोसा करने को कह सकता है, और macOS पहली बार खोलने को ऊपर बताए अनुसार रोकता
+है। इसके बाद app खुद अपडेट होता है।
+
 ### सोर्स से
 
 `scripts/build-app.sh --release` app को build करता है, उसे `/Applications` में install करता है (आपके

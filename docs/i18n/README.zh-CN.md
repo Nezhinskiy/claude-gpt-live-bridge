@@ -103,6 +103,14 @@ scripts/build-app.sh --release
 3. 打开映像，把 LiveBridge 拖到“应用程序”。
 4. 首次启动时，macOS 会拦截该应用，直到你在“系统设置”>“隐私与安全性”中点击 **Open Anyway** 予以允许。
 
+### 通过 Homebrew 安装
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+这条命令从 [LiveBridge 自己的 tap](https://github.com/getLiveBridge/homebrew-tap) 安装同一个磁盘映像，它不是 Homebrew 的官方 cask。Homebrew 可能会先要求你信任这个 tap，macOS 也会像上面所说的那样阻止首次启动。之后应用会自行更新。
+
 ### 从源码构建
 
 `scripts/build-app.sh --release` 会构建应用，把它安装到 `/Applications`（你的账户必须有写入权限，管理员账户即可）并打开它。
