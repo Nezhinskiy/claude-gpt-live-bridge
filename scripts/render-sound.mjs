@@ -6,7 +6,7 @@
 // - handoff.wav, played when the app queues a request the voice handed off (BR-001): codex sends
 //   (a soft lift), then Claude starts to think (three dots, fading).
 // - chime.wav, played when a result waits with the line closed: Claude has thought (the same three
-//   dots, growing), then Claude sends (a held note). Claude's send is a different sound from
+//   dots, growing), then Claude sends (a ringing note). Claude's send is a different sound from
 //   codex's.
 //
 //   node scripts/render-sound.mjs
