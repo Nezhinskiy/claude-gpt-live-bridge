@@ -35,7 +35,7 @@ LiveBridge — це застосунок у рядку меню macOS, який 
 
 *Основний текст — англійський ([README.md](../../README.md)); переклад може відставати.*
 
-<p align="center"><img src="../../site/assets/demo.gif" alt="Розмова з сесією Claude Code через LiveBridge" width="100%"></p>
+<p align="center"><img src="../assets/readme-demo.gif" alt="Розмова з сесією Claude Code через LiveBridge" width="100%"></p>
 
 **Локально за задумом.** Жодної телеметрії та жодного власного сервера: LiveBridge — це міст на
 вашому Mac між вашим власним codex і вашим власним Claude Code. Застосунок і мод спілкуються

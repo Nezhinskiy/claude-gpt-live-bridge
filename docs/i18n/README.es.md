@@ -35,7 +35,7 @@ responde Claude, así que puedes alternar entre hablar y escribir.
 
 *El texto en inglés es el canónico ([README.md](../../README.md)); esta traducción puede ir por detrás.*
 
-<p align="center"><img src="../../site/assets/demo.gif" alt="Hablando con una sesión de Claude Code a través de LiveBridge" width="100%"></p>
+<p align="center"><img src="../assets/readme-demo.gif" alt="Hablando con una sesión de Claude Code a través de LiveBridge" width="100%"></p>
 
 **Local por diseño.** Sin telemetría y sin servidor propio: LiveBridge es un puente en tu Mac
 entre tu propio codex y tu propio Claude Code. La aplicación y el mod se comunican por un socket
