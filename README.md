@@ -32,6 +32,11 @@ do not have to hold the line open while Claude works: its answer opens the close
 goes to the voice to say. The voice also follows what you type in the session and what Claude
 answers, so you can switch between speaking and typing.
 
+**A conversation, not dictation.** GPT-Live listens while it talks: cut in and it stops and hears you
+out, think out loud and it can drop in a quick "mm-hmm". **You stop paying for silence:** OpenAI
+prices voice by the minute, so after 20 seconds of quiet the line closes, and it opens again when you
+speak, with the conversation where you left it ([Billing](#billing-aware-by-design)).
+
 <p align="center"><img src="docs/assets/readme-demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac

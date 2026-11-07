@@ -35,8 +35,8 @@
   <div class="hero-inner">
     <img class="hero-icon" src="assets/icon.png" width="112" height="112" alt="LiveBridge app icon: white bars standing on a bridge deck, on a teal tile">
     <h1>LiveBridge</h1>
-    <p class="tagline">Talk to an open Claude Code session by voice.</p>
-    <p class="lede">A macOS menu bar app that keeps a GPT-Live voice line ready through codex on your ChatGPT login, with no API key. The voice chats, asks what you mean, and hands real work to your Claude Code session. Claude does the work with its own model, tools and permission mode, and the voice tells you the result. You do not have to hold the line open while Claude works: its answer opens the closed line again and goes to the voice to say.</p>
+    <p class="tagline">Talk to Claude Code out loud. A conversation, not dictation.</p>
+    <p class="lede">LiveBridge puts a GPT-Live voice on the line with your open Claude Code session, on your ChatGPT login, with no API key. Think out loud with it, cut in whenever you like, and when you have decided it hands Claude one clear task. Claude works with its own model, tools and permission mode, and the voice tells you the result. You do not have to hold the line open while Claude works: its answer opens the line again. And you stop paying for silence: when the talk goes quiet, the line closes.</p>
     <div class="actions">
       <a class="button primary" href="https://github.com/getLiveBridge/LiveBridge/releases/latest/download/LiveBridge.dmg">
         <svg class="button-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -105,8 +105,11 @@
 <main id="main">
 
   <section class="demo" aria-labelledby="demo-title">
-    <h2 id="demo-title" class="card-title">One request, start to finish</h2>
-    <img class="demo-gif" src="assets/demo.gif" width="1280" height="608" alt="Talking to a Claude Code session through LiveBridge">
+    <h2 id="demo-title" class="card-title">A real call, start to finish</h2>
+    <video class="demo-video" controls playsinline preload="none" width="1920" height="1080" poster="assets/livebridge-demo-poster.jpg" aria-label="A real call through LiveBridge: the voice reacts while the speaker talks, the speaker cuts in, Claude Code does the work, and the voice says the result">
+      <source src="assets/livebridge-demo.mp4" type="video/mp4">
+      <a href="assets/livebridge-demo.mp4">Watch the demo</a>
+    </video>
   </section>
 
   <section id="how-it-works" aria-labelledby="how-title">
@@ -116,7 +119,7 @@
       <article class="role">
         <h3>The voice</h3>
         <p class="role-sub">GPT-Live, through <code>codex app-server</code> on your ChatGPT login</p>
-        <p>The front desk. It chats, answers explanations itself and hands off tasks, questions about the code, decisions and corrections. Its codex thread is ephemeral and read-only, with every MCP server off: it is there only to talk. It sometimes says it is looking without handing the request off, so a short sound tells you when a request was queued; if none follows, say it again. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">known limitations</a> have this and the rest.</p>
+        <p>The front desk, and a colleague who listens while it talks. It thinks with you, answers explanations itself and hands off tasks, questions about the code, decisions and corrections. Its codex thread is ephemeral and read-only, with every MCP server off: it is there only to talk.</p>
       </article>
       <article class="role role-app">
         <h3>LiveBridge</h3>
@@ -178,30 +181,34 @@ claude plugin install livebridge@livebridge</code></pre>
   </section>
 
   <section id="highlights" aria-labelledby="highlights-title">
-    <h2 id="highlights-title">Built to stay out of the way</h2>
+    <h2 id="highlights-title">What sets it apart</h2>
     <dl class="highlights">
       <div>
-        <dt>Local by design</dt>
-        <dd>No telemetry and no server of its own. The app listens on no network port. Besides what codex and Claude Code already send (the voice line to OpenAI while it is open, with what you type in a joined session, and Claude’s work to Anthropic), the app’s only traffic of its own is a short-lived codex that, when you open the menu, asks OpenAI for your Codex usage figures, also while the call is off, and the traffic for updates: an automatic check with GitHub for a new release (daily, and at launch while one it announced is not installed), which you can turn off; the same check when you press Check for update; <code>gh auth status</code> when a new release is announced; and the download, its verification and the mod’s update when you click Install. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists exactly what reaches OpenAI and names the requests the app makes to GitHub.</dd>
+        <dt>A conversation, not dictation</dt>
+        <dd>GPT-Live listens while it talks. Cut in at any moment and it stops and hears you out; think out loud and it can drop in a quick “mm-hmm”. Voice typing can’t do that.</dd>
       </div>
       <div>
-        <dt>Billing-aware</dt>
-        <dd>While nobody is talking, the microphone feeds only a voice detector on your Mac and nothing is sent. The line opens when you speak, when Claude answers you or asks you, or when it waits for your approval, closes once the talk goes quiet, and after a handoff stays open a little longer for Claude’s answer. If the voice stays silent on a reopened line, the answer chimes and waits. Mute releases your microphone while the call goes on, and Claude’s answer still opens the line; it closes no line, so it saves no minutes. The menu shows the minutes and how much of your Codex and Claude usage is used. At your plan’s usage limit the app says so and ends the call, and Claude Code keeps working. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#billing-aware-by-design">Billing</a> section has the timings, and its <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">known limitations</a> what can still go wrong.</dd>
+        <dt>You stop paying for silence</dt>
+        <dd>OpenAI prices voice by the minute, and on its API silence counts too. So LiveBridge closes the line after 20 seconds of quiet and opens it again when you speak, with the conversation where you left it. While nobody is talking, voice detection runs on your Mac and nothing is sent. After a handoff the line waits up to 2 minutes for Claude’s answer, and the menu shows your minutes and your Codex and Claude usage. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#billing-aware-by-design">Billing</a> section has the timings.</dd>
       </div>
       <div>
-        <dt>Memory per session</dt>
-        <dd>Each Claude Code session has its own conversation with the voice, carried across Stop and Start, so the voice remembers what you said a minute ago. What you type in a joined session and Claude’s final answers go into it too, also while the call is stopped, and go to OpenAI once a line opens, so you can switch between speaking and typing. Nothing leaves your Mac until then. What the Claude desktop app reports for a typed prompt was not observed, so the <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">known limitations</a> say what that could cost. A setting pauses this while the call is stopped.</dd>
+        <dt>No telemetry, no server</dt>
+        <dd>The app has no telemetry and no server of its own, and listens on no network port. Your voice, and what you type in a joined session, go to OpenAI through your own codex while a line is open; Claude’s work goes to Anthropic through your own Claude Code. The app’s only traffic of its own is a usage read through your codex when you open the menu, and updates from GitHub, whose automatic check you can turn off. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#privacy">Privacy</a> section lists every request.</dd>
+      </div>
+      <div>
+        <dt>Speak or type, it keeps up</dt>
+        <dd>Each Claude Code session has its own conversation with the voice, carried across Stop and Start. What you type in a joined session and Claude’s final answers go into it too, so you can switch between speaking and typing. Nothing leaves your Mac until a line opens, and a setting pauses this while the call is stopped.</dd>
       </div>
       <div>
         <dt>Your Claude keeps its permissions</dt>
-        <dd>Requests run under the session’s own permission mode. When Claude waits for a permission prompt, the voice is given a notice and may tell you, except <a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">where an organization manages Claude Code</a>, so do not rely on that when away from your Mac. You answer the prompt in Claude Code; LiveBridge never answers it for you. Anything the microphone hears can become a request, so read <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/SECURITY.md">SECURITY.md</a> before using voice with a mode that acts without asking.</dd>
+        <dd>Requests run under the session’s own permission mode. LiveBridge never answers a permission prompt: you do, in Claude Code. Anything the microphone hears can become a request, so read <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/SECURITY.md">SECURITY.md</a> before using voice with a mode that acts without asking.</dd>
       </div>
     </dl>
   </section>
 
   <section id="open-source" aria-labelledby="oss-title">
     <h2 id="oss-title">Open source</h2>
-    <p>LiveBridge is MIT-licensed and open to contributors. For anything larger than a fix, open an issue first so the shape can be agreed before the work starts. <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> has the layout, the toolchain and the checks.</p>
+    <p>LiveBridge is free and open source under the MIT license, and open to contributors. For anything larger than a fix, open an issue first so the shape can be agreed before the work starts. <a href="https://github.com/getLiveBridge/LiveBridge/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> has the layout, the toolchain and the checks.</p>
     <p>Today it is one Mac app, one worker and one voice provider. They meet at narrow seams, and each of these directions needs help:</p>
     <ul class="directions">
       <li>
@@ -229,6 +236,7 @@ claude plugin install livebridge@livebridge</code></pre>
       <li><a href="https://github.com/getLiveBridge/LiveBridge/blob/main/LICENSE">License</a></li>
       <li><a href="https://github.com/getLiveBridge/LiveBridge/blob/main/SECURITY.md">Security</a></li>
       <li><a href="https://github.com/getLiveBridge/LiveBridge#readme">README</a></li>
+      <li><a href="https://github.com/getLiveBridge/LiveBridge#known-limitations">Known limitations</a></li>
     </ul>
   </nav>
   <p>LiveBridge is an unofficial project, not affiliated with, endorsed by or supported by Anthropic or OpenAI.</p>

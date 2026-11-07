@@ -35,6 +35,8 @@ dans la session et ce que Claude répond, vous pouvez donc passer de la parole a
 
 *Le texte anglais fait foi ([README.md](../../README.md)) ; cette traduction peut avoir du retard.*
 
+**Une conversation, pas une dictée.** GPT-Live écoute pendant qu'il parle : coupez-le et il s'arrête pour vous écouter ; pensez à voix haute et il peut glisser un petit « mm-hmm ». **Vous cessez de payer le silence :** OpenAI facture la voix à la minute, donc après 20 secondes de silence la ligne se ferme et se rouvre dès que vous parlez, la conversation reprenant là où vous l'aviez laissée ([Facturation](#facturation-maîtrisée-par-conception)).
+
 <p align="center"><img src="../assets/readme-demo.gif" alt="Conversation avec une session Claude Code via LiveBridge" width="100%"></p>
 
 **Local par conception.** Pas de télémétrie et pas de serveur propre : LiveBridge est un pont sur
