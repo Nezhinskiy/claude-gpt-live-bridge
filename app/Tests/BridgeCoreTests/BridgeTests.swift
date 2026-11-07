@@ -2108,6 +2108,35 @@ struct BridgeTests {
     #expect(await eventually { await lines() == ["Voice: Once more."] })
   }
 
+  /// The owner's next sentence starts before the last one's final text, which comes seconds
+  /// after they stop: its words stay, and the rest of it joins them.
+  @Test func wordsPastTheFinalTextStay() async throws {
+    await live()
+    voice.emit(.userSpeaking(" First."))
+    voice.emit(.userSpeaking(" Second one"))
+    voice.emit(.userUtterance("First."))
+    #expect(await eventually { await lines() == ["You: First.", "You: Second one"] })
+    voice.emit(.userSpeaking(" goes on"))
+    #expect(await eventually { await lines() == ["You: First.", "You: Second one goes on"] })
+  }
+
+  /// The same for the voice's next reply.
+  @Test func aRepliesWordsPastTheFinalTextStay() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(" Done."))
+    voice.emit(.assistantSpeaking(" Next"))
+    voice.emit(.assistantUtterance("Done."))
+    #expect(await eventually { await lines() == ["Voice: Done.", "Voice: Next"] })
+  }
+
+  /// A final text that says everything shown leaves no line behind.
+  @Test func aFinalTextThatCoversTheWordsEndsTheLine() async throws {
+    await live()
+    voice.emit(.userSpeaking(" First. "))
+    voice.emit(.userUtterance("First."))
+    #expect(await eventually { await lines() == ["You: First."] })
+  }
+
   /// The order of a recorded call: the voice starts before the owner's final text arrives, and
   /// the owner's line stays above it.
   @Test func theOwnersFinalTextStaysAboveTheVoicesGrowingLine() async throws {

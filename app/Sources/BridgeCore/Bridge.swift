@@ -494,14 +494,14 @@ public actor Bridge: Router {
       }
     case .userSpeaking(let words): growing.add(words, from: .owner)
     case .userUtterance(let text):
-      growing.finish(.owner)
+      growing.finish(.owner, with: text)
       record(.owner, text, in: lineSession)
       await send(.userTranscribed)
     case .assistantSpeaking(let words):
       growing.add(words, from: .voice)
       await send(.assistantSpeaking)
     case .assistantUtterance(let text):
-      growing.finish(.voice)
+      growing.finish(.voice, with: text)
       record(.voice, text, in: lineSession)
       await send(.assistantFinishedSpeaking(text))
     case .closed(let reason):

@@ -16,8 +16,16 @@ struct GrowingLines: Sendable {
     }
   }
 
-  /// `speaker`'s line got its final text.
-  mutating func finish(_ speaker: Conversation.Line.Speaker) {
-    lines.removeAll { $0.speaker == speaker }
+  /// `speaker`'s line got its final text, `final`. Words past it are the start of the next line.
+  /// A delta names no turn, so words that do not match the final text cannot be told apart, and go.
+  mutating func finish(_ speaker: Conversation.Line.Speaker, with final: String) {
+    guard let index = lines.firstIndex(where: { $0.speaker == speaker }) else { return }
+    let said = lines[index].text
+    let next = said.hasPrefix(final) ? said.dropFirst(final.count).drop(while: \.isWhitespace) : ""
+    if next.isEmpty {
+      lines.remove(at: index)
+    } else {
+      lines[index].text = String(next)
+    }
   }
 }
