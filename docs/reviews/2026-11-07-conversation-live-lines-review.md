@@ -89,7 +89,7 @@ line a result opened. The effect is display only. It ranks here because the PR b
 `app/Sources/BridgeCore/Call/GrowingLines.swift:29`, `docs/architecture/overview.md:89-91`
 
 `finish` drops everything that speaker has growing. The PR body and `overview.md` give this as a
-limit for replies only. It is as true of the owner, and more likely there: the voice rarely starts a
+limit for replies only. It is as true of the owner, and more likely there: the voice is unlikely to start a
 new reply inside the 2 s before its last `done`, but the owner's `done` reached the menu 1.7 to 3.5 s
 after they stopped (ADR 0001 (r)), so a short pause between two sentences is enough.
 
@@ -281,9 +281,10 @@ comes from SwiftUI's documented overloads, not from a compile test. No third-par
   - `item.submenu = nil` (`StatusMenu.swift:144`) on an open submenu, when the first line of a new
     conversation closes before its final text, which empties it.
 - Keeping to the end while a line grows was checked by reading only (`ScrollingItem.show` and `fit`).
-- Why two of the seven replies in the log have no `done`. Their frames just stop, about 1.5 s after
-  the last delta at most, so the session ended first. If that is common, the words that vanish at a
-  close are a larger part of what the owner sees. Which close it was is not known.
+- Why two of the seven replies in the log have no `done`. Their frames stop within 1.8 s of the last
+  delta, before the roughly 2 s a `done` takes, so the session seems to have ended first. If that is
+  common, the words that vanish at a close are a larger part of what the owner sees. Which close it
+  was is not known.
 
 ## Declined to judge
 
