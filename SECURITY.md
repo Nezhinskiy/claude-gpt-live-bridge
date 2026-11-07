@@ -230,7 +230,8 @@ those shapes goes to OpenAI as typed, personal text included.
   While
   the setting is on, no line loads a summary by itself (`Bridge.openLine`), and none does for a
   session marked paused after the setting is off again: only **Load context**
-  does, because a summary is written from the whole transcript and carries the paused text.
+  does, because a summary is written from the whole transcript and carries the paused text. An
+  older mod's `/live context` does too; the last point below says what that can do.
   What the pause does not do:
   - It removes nothing already recorded, in the data folder or in a line that is open.
   - It cannot stop Claude's later answers from repeating paused text: a Claude line of a turn
@@ -273,6 +274,8 @@ those shapes goes to OpenAI as typed, personal text included.
     typing during that command to clear the *paused* mark, and the paused text may be in that
     summary; one written across **New conversation** brings back what was forgotten
     ([BR-002](docs/bugs/BR-002.md)). This is accepted, as a 60 second window on an explicit command.
+    The current mod can land there too, for about a second: the reply to a second ask that came
+    after a poll took the first and before that summary landed finds no ask open.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
   conversation** with the session as the target, or remove it with ×, or when 20 sessions used since
   push them out (which also loses a paused mark); a load of a new summary replaces the old one for
