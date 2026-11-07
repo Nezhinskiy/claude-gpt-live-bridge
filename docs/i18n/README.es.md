@@ -129,6 +129,16 @@ notarizada.
 4. En el primer arranque, macOS bloquea la aplicación hasta que la permitas en Ajustes del Sistema >
    Privacidad y seguridad > **Open Anyway**.
 
+### Con Homebrew
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+Instala la misma imagen de disco desde el [tap propio de LiveBridge](https://github.com/getLiveBridge/homebrew-tap), que no es un cask oficial
+de Homebrew. Homebrew puede pedirte primero que confíes en el tap, y macOS bloquea el primer inicio
+como se indica arriba. Después la aplicación se actualiza sola.
+
 ### Desde el código fuente
 
 `scripts/build-app.sh --release` compila la aplicación, la instala en `/Applications` (tu cuenta

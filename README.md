@@ -122,6 +122,16 @@ ad hoc and not notarized.
 4. On first launch macOS blocks the app until you allow it under System Settings > Privacy &
    Security > **Open Anyway**.
 
+### With Homebrew
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+This installs the same disk image from [LiveBridge's own tap](https://github.com/getLiveBridge/homebrew-tap), which is not one of Homebrew's
+casks. Homebrew may ask you to trust the tap first, and macOS blocks the first launch as above. The
+app then updates itself, as below.
+
 ### From source
 
 `scripts/build-app.sh --release` builds the app, installs it in `/Applications` (your account

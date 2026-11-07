@@ -130,6 +130,16 @@ scripts/build-app.sh --release
 4. Під час першого запуску macOS блокує застосунок, доки ви не дозволите його в System
    Settings > Privacy & Security > **Open Anyway**.
 
+### Через Homebrew
+
+```sh
+brew install --cask getlivebridge/tap/livebridge
+```
+
+Команда ставить той самий образ диска з [власного tap LiveBridge](https://github.com/getLiveBridge/homebrew-tap): це не офіційний cask
+Homebrew. Homebrew може спершу попросити довіряти цьому tap, а macOS заблокує перший запуск, як описано
+вище. Далі застосунок оновлюється сам.
+
 ### З вихідного коду
 
 `scripts/build-app.sh --release` збирає застосунок, встановлює його в `/Applications` (ваш
