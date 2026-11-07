@@ -153,3 +153,16 @@ test('a word the voice drops into a playing line owes no line', () => {
   lines.voice(false, 13000);
   assert.deepEqual(played, [0, 1]);
 });
+
+test('after a handoff the next line waits for the answer, not the acknowledgement', () => {
+  const { lines, played } = rig(2);
+  lines.ended();
+  lines.handoff();
+  lines.voiceFinished(1000);
+  lines.voice(false, 9000);
+  assert.deepEqual(played, [0]);
+  lines.voice(true, 20000);
+  lines.voiceFinished(25000);
+  lines.voice(false, 26000);
+  assert.deepEqual(played, [0, 1]);
+});

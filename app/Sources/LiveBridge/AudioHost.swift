@@ -141,6 +141,7 @@ final class AudioHost: NSObject, AudioSide {
   func confirmHandoff() async {
     #if DEBUG
       tape?.mark("handoff")
+      _ = try? await call("LB.tools?.handoff()")
     #endif
     handoffSound?.play()
   }

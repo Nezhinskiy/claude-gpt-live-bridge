@@ -76,5 +76,6 @@ export async function createCallTools({ context, lines, cuts, record }) {
       voice?.connect(merger, 0, 1);
     },
     voiceFinished: () => sequence.voiceFinished(context.currentTime * 1000),
+    handoff: () => sequence.handoff(),
   };
 }
