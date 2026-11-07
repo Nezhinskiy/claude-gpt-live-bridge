@@ -397,6 +397,41 @@ such lines and adds two more right after `.connected`, on a line opened by speec
   `Conversation.estimatedTokens` counted characters, Cyrillic at about half, until it took the
   same estimate.
 
+**(r) When a spoken line's text arrives.** Observed, 2026-11-07, `codex-cli 0.166.0`, from what real
+calls left behind; no voice was spent for this. `~/.codex/logs_2.sqlite` keeps about the last 240
+frames of each realtime session (target `codex_api::realtime_websocket::wire`) with timestamps, so
+this is the tail of each call: one call holds a whole exchange, and the filmed take holds its last
+reply. The filmed take's menu recording, its speech spans and the app's mark at each assistant
+`transcript/done` give the times on screen. Each side's words arrive as they are said, as
+`transcript/delta` (`input_transcript.added`, `output_transcript.added` on the wire); the whole line
+arrives as `transcript/done` (`turn.done`) later.
+
+| Seconds | Notification | Text |
+|---|---|---|
+| 56.18 | `delta`, user | " Thanks" |
+| 56.25 to 57.34 | `delta`, user, 6 of them | ". By the", " way", ", how", " is", " your", " day" |
+| 57.90 | `delta`, user | " going" |
+| 57.90 | `delta`, assistant | " Thanks for" |
+| 58.13 to 58.67 | `delta`, assistant, 3 of them | " asking", ".", " I'm" |
+| 58.67 | `done`, user | the owner's whole line, 0.77 s after its last delta |
+| 59.18 to 61.48 | `delta`, assistant, every 0.1 to 0.5 s | up to "?" |
+| 63.31 | `done`, assistant | the whole reply, 1.83 s after its last delta |
+
+- A delta names its role and carries no turn or item id; the two roles interleave. The voice's first
+  words came before the owner's `done`. The `done` holds the final text, and codex's own tests have
+  it differ from the deltas, and an empty delta follow it (`realtime_websocket/transcript_tests.rs`).
+  In the log the deltas add up to the `done`, and none of the 173 is blank.
+- The owner's 8 deltas took 1.72 s for 1.8 s of speech (their `end_ms`), so they keep pace with it.
+  How far the first one trails the owner's voice was not measured.
+- In the filmed take the owner's `done` reached the menu 1.7 to 3.5 s after the owner stopped
+  speaking (3 lines), and the voice's `done` 0.6 to 0.96 s after its audio ended (4 replies). A 20 s
+  reply was therefore on screen 20.8 s after it began, about when the owner took the next step.
+- The voice's `done` came 1.73 to 2.06 s after its last delta in the 5 replies of the log that have
+  one. The frames of 2 more stop within 1.8 s of the last delta, with no `done`: their sessions seem
+  to have ended first.
+- The voice's last delta came about 1 s before the end of its audio (1 reply): its text runs ahead of
+  its sound.
+
 ### Claude Code mod API
 
 **(e) Session title.** Observed against the desktop app's own session list: for each of 5
@@ -576,6 +611,9 @@ band in the terminal.
   `includeStartupContext: false`, `clientManagedHandoffs: true`, `delegationAckFiller: true`
   (the silence rule waits for that acknowledgement), and `initialItems` for continuity.
 - Every `turn/started` on the voice thread is interrupted at once; it costs nothing audible.
+- `transcript/delta` is what the menu shows while a line is spoken, `transcript/done` what the app
+  keeps: a delta can differ from the final text and names no turn (item (r);
+  [`GrowingLines`](../architecture/overview.md#components) has the rule).
 - Results go to the voice with `appendText` (`role: "user"`, tagged lines). A result that arrives
   while the session is closed cannot make a fresh session speak by itself, so it waits for the
   owner to speak (see "Decision: results while the voice is closed" below). A result for a
