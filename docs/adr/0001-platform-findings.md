@@ -121,10 +121,11 @@ second session then completed a full handoff.
 
 ### Menu bar
 
-**A row with a tooltip is an enabled native item.** Observed in a real menu, on Xcode 27 and
-macOS 27. SwiftUI's `.help` did not show on a hosted row that is disabled; `NSMenuItem.toolTip` on
-an enabled native `NSMenuItem` did. Such an item highlights under the pointer, and a click closes
-the menu. The usage rows are built this way
+**A hint on a menu row is a window of its own.** Observed in a real menu, on Xcode 27 and macOS 27.
+SwiftUI's `.help` did not show on a hosted row that is disabled. `NSMenuItem.toolTip` on an enabled
+native `NSMenuItem` did, but a click on that item closes the menu, and the owner saw the tooltip stay
+after the pointer left and take clicks. So the usage rows are hosted, and `LimitHint` shows their
+reset times in a panel that ignores the mouse
 ([spec](../specs/2026-11-06-usage-limits-design.md)).
 
 ### Codex

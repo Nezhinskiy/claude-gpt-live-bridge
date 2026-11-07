@@ -19,6 +19,9 @@ All notable changes to this project are listed here. The format follows
   finished it, and your line once the voice had started answering. Your words can still appear a
   moment after you say them, and the voice's a moment before you hear them. What is kept, and what
   the voice is seeded with, is still only the final text, which replaces the words shown.
+- A click on a usage row no longer closes the menu: the row lights up under the pointer and does
+  nothing. Its reset times now go as soon as the pointer leaves the row, and clicks pass through
+  them.
 
 Note: the **Conversation** fix comes from recorded events and tests, and has not been seen in the
 real menu during a call.
