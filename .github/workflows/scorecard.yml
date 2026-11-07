@@ -1,15 +1,14 @@
 # OpenSSF Scorecard: an automated check of how this repository is run (pinned actions, token
 # permissions, branch rules, static analysis, signed releases and more), scored 0 to 10 and shown
 # as the README's badge. It rates practices, not the code itself, so it is not a security audit.
-# Publishing the result is what feeds the badge, and Scorecard's API then accepts only a workflow
-# shaped like this one: no top-level env or defaults, no workflow-level write permission, an
-# Ubuntu runner and only its listed actions in the job. It runs on main only, where it publishes.
+# Publishing the result is what feeds the badge, and Scorecard's API accepts it only from a workflow
+# that meets https://github.com/ossf/scorecard-action#workflow-restrictions, so add no env,
+# defaults, run steps or other actions here. It publishes from main only, so it runs on main.
 name: Scorecard
 
 on:
   push:
     branches: [main]
-  branch_protection_rule:
   schedule:
     - cron: "41 5 * * 1"
 
