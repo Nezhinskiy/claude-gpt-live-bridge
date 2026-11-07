@@ -2127,6 +2127,15 @@ struct BridgeTests {
     #expect(await eventually { await lines() == ["You: Hello."] })
   }
 
+  /// A blank delta says nothing, so it cannot put the voice's answer above the owner's question.
+  @Test func aBlankDeltaTakesNoPlaceInTheOrder() async throws {
+    await live()
+    voice.emit(.assistantSpeaking(""))
+    voice.emit(.userSpeaking(" Hi"))
+    voice.emit(.assistantSpeaking(" Hello"))
+    #expect(await eventually { await lines() == ["You: Hi", "Voice: Hello"] })
+  }
+
   @Test func aGrowingLineIsNotStored() async throws {
     await live()
     voice.emit(.userSpeaking("Remember"))
