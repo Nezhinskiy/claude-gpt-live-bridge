@@ -2102,8 +2102,8 @@ struct BridgeTests {
   /// The final text is what is kept, whatever the words on the way said.
   @Test func theFinalTextReplacesTheGrowingLine() async throws {
     await live()
-    voice.emit(.assistantSpeaking(" Again"))
-    #expect(await eventually { await lines() == ["Voice: Again"] })
+    voice.emit(.assistantSpeaking(" Again and again"))
+    #expect(await eventually { await lines() == ["Voice: Again and again"] })
     voice.emit(.assistantUtterance("Once more."))
     #expect(await eventually { await lines() == ["Voice: Once more."] })
   }
