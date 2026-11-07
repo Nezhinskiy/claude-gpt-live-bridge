@@ -8,12 +8,12 @@ import SwiftUI
 @MainActor
 final class LimitHint {
   /// As long as the pointer rests on a row before its hint shows.
-  private static let delay = Duration.milliseconds(400)
+  private static let delay: TimeInterval = 0.4
 
   private let panel = NSPanel(
     contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
     defer: true)
-  private var showing: Task<Void, Never>?
+  private var showing: Timer?
 
   init() {
     panel.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
@@ -23,21 +23,24 @@ final class LimitHint {
     panel.ignoresMouseEvents = true
     panel.isReleasedWhenClosed = false
     panel.hidesOnDeactivate = false
-    panel.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
+    panel.collectionBehavior = [
+      .canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle,
+    ]
   }
 
-  /// Shows `text` after the delay, beside the menu in `frame`, unless `hide` comes first.
+  /// Shows `text` after the delay, beside the menu in `frame`, unless `hide` comes first. A timer
+  /// in the common modes, not a task: a menu opened from the main actor holds it until it closes.
   func show(_ text: String, beside frame: NSRect) {
-    showing?.cancel()
-    showing = Task { [weak self] in
-      try? await Task.sleep(for: Self.delay)
-      guard !Task.isCancelled else { return }
-      self?.present(text, beside: frame)
+    showing?.invalidate()
+    let timer = Timer(timeInterval: Self.delay, repeats: false) { [weak self] _ in
+      MainActor.assumeIsolated { self?.present(text, beside: frame) }
     }
+    RunLoop.main.add(timer, forMode: .common)
+    showing = timer
   }
 
   func hide() {
-    showing?.cancel()
+    showing?.invalidate()
     showing = nil
     panel.orderOut(nil)
   }

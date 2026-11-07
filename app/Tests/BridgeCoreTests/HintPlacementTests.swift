@@ -26,6 +26,14 @@ struct HintPlacementTests {
     #expect(Self.origin(menu: menu, pointerY: 400).y == 370)
   }
 
+  /// A display left of the main one has negative x.
+  @Test func staysOnAScreenLeftOfTheOrigin() {
+    let left = CGRect(x: -1000, y: 0, width: 1000, height: 800)
+    let menu = CGRect(x: -990, y: 0, width: 985, height: 800)
+    let origin = HintPlacement.origin(size: Self.size, beside: menu, pointerY: 400, on: left)
+    #expect(origin.x == -1000)
+  }
+
   @Test func staysOnTheScreen() {
     let menu = CGRect(x: 0, y: 0, width: 990, height: 800)
     let top = Self.origin(menu: menu, pointerY: 795)

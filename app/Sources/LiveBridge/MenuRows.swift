@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The menu's custom rows, hosted in its items by `StatusMenu`. They use the menu's own type
 /// sizes (13 pt titles, 11 pt subtitles) and insets, so they line up with the native items, and
-/// a row that acts on a click draws the menu's selection highlight under the pointer.
+/// a session or usage row draws the menu's selection highlight under the pointer.
 enum MenuStyle {
   /// From the menu's edge to a row's text, as a native item's title sits.
   static let inset: CGFloat = 14
@@ -205,14 +205,15 @@ struct LimitRowView: View {
   @State private var hovering = false
 
   var body: some View {
-    Text(title(isLit: hovering || menu.highlight.contains(key)))
+    let lit = hovering || menu.highlight.contains(key)
+    Text(title(isLit: lit))
       .font(MenuStyle.subtitle)
-      .lineLimit(1)
+      .fixedSize(horizontal: false, vertical: true)  // a long row wraps: its end may be `blocked`
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, MenuStyle.inset - MenuStyle.highlightInset)
-      .padding(.vertical, 4)
+      .padding(.vertical, 5)
       .background {
-        if hovering || menu.highlight.contains(key) {
+        if lit {
           RoundedRectangle(cornerRadius: MenuStyle.highlightRadius)
             .fill(Color(nsColor: .selectedContentBackgroundColor))
         }
@@ -223,8 +224,10 @@ struct LimitRowView: View {
         hovering = $0
         if $0 { menu.showHint(row.tooltip, for: key) } else { menu.hideHint() }
       }
+      .onChange(of: row.tooltip) { if hovering { menu.showHint(row.tooltip, for: key) } }
       .onDisappear { menu.hideHint() }
       .accessibilityElement()
+      .accessibilityAddTraits(.isStaticText)
       .accessibilityLabel("\(row.name) \(row.text)")
       .accessibilityHint(row.tooltip)
   }

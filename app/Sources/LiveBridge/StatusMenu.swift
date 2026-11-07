@@ -5,8 +5,8 @@ import SwiftUI
 
 /// The menu bar item and its menu: an `NSStatusItem` whose button shows the animated glyph, and
 /// a real `NSMenu`, so its corners, material and shadow are the system's own. `MenuContent`
-/// says what it holds; this renders it: the call card, the session rows and the conversation
-/// are hosted SwiftUI views (`MenuRows.swift`), the rest native items. The menu follows
+/// says what it holds; this renders it: the call card, the session and usage rows and the
+/// conversation are hosted SwiftUI views (`MenuRows.swift`), the rest native items. The menu follows
 /// the model while it is open: items are updated in place, and rebuilt only when the content's
 /// shape changes; hosted views keep their state across updates.
 @MainActor
@@ -289,9 +289,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   }
 
   func menuDidClose(_ menu: NSMenu) {
-    hint.hide()
     highlight.set(nil, in: menu)
     guard menu === self.menu else { return }
+    hint.hide()
     highlight.clear()
     let actions = afterClose
     afterClose = []
