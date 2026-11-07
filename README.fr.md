@@ -263,7 +263,11 @@ parlez.
   la conserve (avec une ligne **Task** pour chaque demande que la voix a transmise à Claude et une ligne **Loaded context** là où un résumé a été chargé), les
   limites d'utilisation, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt),
   **Settings…** et
-  **Quit LiveBridge**.
+  **Quit LiveBridge**. Pendant un appel, **Conversation** affiche vos mots et ceux de la voix à mesure
+  que codex les transcrit : les vôtres peuvent donc apparaître un instant après que vous les avez dits,
+  et ceux de la voix un instant avant que vous les entendiez. Quand chaque phrase est terminée, son
+  texte final les remplace. Seul le texte final est conservé : les mots qui l'attendent encore quand la
+  ligne se ferme sont perdus.
 - **Mute** (à côté de **Stop**, dans la bande et dans la carte d'appel du menu ; **Unmute** quand le
   micro est coupé) libère votre microphone pendant que l'appel continue : une réponse de Claude
   ouvre toujours la ligne et passe à la voix pour qu'elle la dise. La bande garde la phase et ajoute

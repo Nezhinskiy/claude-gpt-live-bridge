@@ -308,12 +308,18 @@ struct RealtimeSessionTests {
     #expect(await events.next() == .assistantUtterance("I'm pulling up the folder now."))
   }
 
-  @Test func assistantDeltaMeansTheVoiceIsSpeaking() async throws {
+  @Test func assistantDeltaCarriesTheVoicesWords() async throws {
     _ = try await session.open(offerSDP: "offer", items: [])
-    rpc.push(try adrJSON("realtime-transcript-delta-user"))  // the owner's words are not
     rpc.push(try adrJSON("realtime-transcript-delta-user", params: ["role": "assistant"]))
     var events = session.events.makeAsyncIterator()
-    #expect(await events.next() == .assistantSpeaking)
+    #expect(await events.next() == .assistantSpeaking("Please list"))
+  }
+
+  @Test func userDeltaCarriesTheOwnersWords() async throws {
+    _ = try await session.open(offerSDP: "offer", items: [])
+    rpc.push(try adrJSON("realtime-transcript-delta-user"))
+    var events = session.events.makeAsyncIterator()
+    #expect(await events.next() == .userSpeaking("Please list"))
   }
 
   @Test func resultsAreAddedAsUserText() async throws {
