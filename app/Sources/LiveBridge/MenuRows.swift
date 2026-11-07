@@ -195,6 +195,57 @@ struct SessionRowView: View {
   }
 }
 
+/// A usage row: lit under the pointer like any row, but a click does nothing and leaves the menu
+/// open. The reset times show in `LimitHint` while the pointer is on it.
+struct LimitRowView: View {
+  let row: LimitRow
+  /// Its item's key, for the menu's highlight and the hint's place.
+  let key: String
+  let menu: StatusMenu
+  @State private var hovering = false
+
+  var body: some View {
+    Text(title(isLit: hovering || menu.highlight.contains(key)))
+      .font(MenuStyle.subtitle)
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, MenuStyle.inset - MenuStyle.highlightInset)
+      .padding(.vertical, 4)
+      .background {
+        if hovering || menu.highlight.contains(key) {
+          RoundedRectangle(cornerRadius: MenuStyle.highlightRadius)
+            .fill(Color(nsColor: .selectedContentBackgroundColor))
+        }
+      }
+      .padding(.horizontal, MenuStyle.highlightInset)
+      .contentShape(.rect)
+      .onHover {
+        hovering = $0
+        if $0 { menu.showHint(row.tooltip, for: key) } else { menu.hideHint() }
+      }
+      .onDisappear { menu.hideHint() }
+      .accessibilityElement()
+      .accessibilityLabel("\(row.name) \(row.text)")
+      .accessibilityHint(row.tooltip)
+  }
+
+  /// The name and the row's runs, quiet, a run near its limit orange, and the whole title orange
+  /// when blocked. Lit, it all takes the selection's colour.
+  private func title(isLit: Bool) -> AttributedString {
+    let selected = Color(nsColor: .selectedMenuItemTextColor)
+    let orange = Color(nsColor: .systemOrange)
+    let quiet = isLit ? selected : row.isBlocked ? orange : Color.secondary
+    func part(_ text: String, _ color: Color) -> AttributedString {
+      var part = AttributedString(text)
+      part.foregroundColor = color
+      return part
+    }
+    return row.runs.reduce(into: part(row.name + "  ", quiet)) { title, run in
+      title += part(run.text, run.isNear && !isLit ? orange : quiet)
+    }
+  }
+}
+
 /// The target's whole conversation, oldest first; its item scrolls (`ScrollingItem`).
 struct TranscriptView: View {
   let lines: [Conversation.Line]

@@ -26,8 +26,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var submenus: [String: NSMenu] = [:]
   private var card: HostedItem<CallCardView>?
   private var rows: [SessionID: HostedItem<SessionRowView>] = [:]
+  private var limits: [String: HostedItem<LimitRowView>] = [:]
+  private let hint = LimitHint()
   private var transcript: ScrollingItem<TranscriptView>?
-  /// What a hosted session row's item is, for the menu's highlight.
+  /// What a hosted row's item is, for the menu's highlight.
   private var rowKeys: [ObjectIdentifier: String] = [:]
   /// Actions that wait until the menu has closed and its tracking has ended, as an alert does.
   private var afterClose: [() -> Void] = []
@@ -51,6 +53,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   func perform(_ action: CallAction) { model.perform(action) }
   func setTarget(_ id: SessionID) { model.setTarget(id) }
+
+  /// Shows `text` beside the menu holding the limit row `key`.
+  func showHint(_ text: String, for key: String) {
+    guard let frame = limits[key]?.host.window?.frame else { return }
+    hint.show(text, beside: frame)
+  }
+
+  func hideHint() { hint.hide() }
 
   /// Closes the menu, then does `action` once its tracking has ended: an alert, a window, or
   /// another app.
@@ -93,10 +103,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     natives = natives.filter { used.contains($0.key) }
     submenus = submenus.filter { used.contains($0.key) }
     rows = rows.filter { used.contains("row|\($0.key.rawValue)") }
+    limits = limits.filter { used.contains($0.key) }
     if !used.contains("transcript") { transcript = nil }
     rowKeys = Dictionary(
       uniqueKeysWithValues: rows.map { (ObjectIdentifier($0.value.item), "row|\($0.key.rawValue)") }
-    )
+        + limits.map { (ObjectIdentifier($0.value.item), $0.key) })
   }
 
   private func fill(
@@ -169,28 +180,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         return shown.item
 
       case .limit(let shown):
-        let item = native("limit|\(shown.name)", used: &used) { NSMenuItem() }
-        // The attributed title's string is what VoiceOver reads.
-        item.attributedTitle = Self.limitTitle(shown)
-        item.toolTip = shown.tooltip
-        item.isEnabled = true
-        return item
+        let key = "limit|\(shown.name)"
+        used.insert(key)
+        let view = LimitRowView(row: shown, key: key, menu: self)
+        let row = limits[key] ?? HostedItem(view)
+        row.show(view)
+        limits[key] = row
+        return row.item
       }
     }
     sync(menu, built)
-  }
-
-  /// A limit row's title: the name and the row's runs, small and quiet, a run near its limit
-  /// orange, and the whole title orange when blocked.
-  private static func limitTitle(_ row: LimitRow) -> NSAttributedString {
-    let font = NSFont.systemFont(ofSize: 11)
-    let quiet: NSColor = row.isBlocked ? .systemOrange : .secondaryLabelColor
-    func part(_ text: String, _ color: NSColor) -> NSAttributedString {
-      NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
-    }
-    let title = NSMutableAttributedString(attributedString: part(row.name + "  ", quiet))
-    for run in row.runs { title.append(part(run.text, run.isNear ? .systemOrange : quiet)) }
-    return title
   }
 
   /// Puts `items` in `menu`, in order, unless it holds exactly them already. An item stands in
@@ -290,6 +289,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   }
 
   func menuDidClose(_ menu: NSMenu) {
+    hint.hide()
     highlight.set(nil, in: menu)
     guard menu === self.menu else { return }
     highlight.clear()

@@ -6,6 +6,12 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A click on a usage row no longer closes the menu: the row lights up under the pointer and does
+  nothing. Its reset times now go as soon as the pointer leaves the row, and clicks pass through
+  them.
+
 ## [0.4.1]
 
 ### Changed
