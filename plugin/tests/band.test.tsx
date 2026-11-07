@@ -76,17 +76,17 @@ test('joiningAsksEverySurfaceToDrawTheBandAgain', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   expect(world.invalidated).toEqual([])
-  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: '' })
   expect(world.invalidated).toEqual(['ui.render'])
 })
 
-test('liveOnWhenJoinedAsksForTheBandAgain', async ($, on) => {
-  // The owner's way to bring back a band the surface lost: /live on draws it, joined or not.
+test('theCommandWhenJoinedAsksForTheBandAgain', async ($, on) => {
+  // The owner's way to bring back a band the surface lost: /live draws it, joined or not.
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: '' })
   world.invalidated.length = 0
-  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: '' })
   expect(world.invalidated).toEqual(['ui.render'])
 })
 

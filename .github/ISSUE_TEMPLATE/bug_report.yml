@@ -42,9 +42,9 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: What you did, from `/live on` or Start, one step per line.
+      description: What you did, from `/live` or Start, one step per line.
       placeholder: |
-        1. /live on in a session
+        1. /live in a session
         2. Start in the band
         3. Asked the voice to ...
     validations:

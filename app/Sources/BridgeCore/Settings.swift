@@ -7,11 +7,13 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The realtime voice; nil leaves the choice to codex.
   public var voice: String?
   /// Keep what the owner types while the call is stopped out of the voice's conversation, and
-  /// load no summary by itself: only Load context or `/live context` does.
+  /// load no summary by itself: only Load context does, or an older mod's `/live context`.
   public var pauseSyncWhileStopped: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
-  /// Play a short sound when a handoff is queued for a session (BR-001).
+  /// Play a short sound when a handoff is queued for a session (BR-001) and when a session's
+  /// answer reaches the call. The chime for a result that waits does not depend on it. The name
+  /// predates the answer's sound, and saved settings hold it.
   public var confirmHandoffs: Bool
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.

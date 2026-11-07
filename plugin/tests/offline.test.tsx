@@ -10,7 +10,7 @@ test('offlineAppIsLaunchedOrExplained', async ($, on) => {
   const world = fakeWorld(on)
   world.isAppUp = false
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  expect((await $.command.run({ ...LIVE, args: 'on' })).text).toContain('not running')
+  expect((await $.command.run({ ...LIVE, args: '' })).text).toContain('not running')
 
   await world.clock.advance(1000)
   // Where both install routes put it first; then whatever app Launch Services knows by the
@@ -98,7 +98,7 @@ test('aFailedJoinKeepsTheGapForTheNextOne', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   world.isAppUp = false
-  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: '' })
   world.isAppUp = true
   await world.clock.advance(1000)
   expect(world.take('join').map(body => body?.missed)).toEqual([true])
@@ -121,7 +121,7 @@ test('joiningAgainOpensTheAppAgain', async ($, on) => {
   await world.clock.advance(11_000)
   const opened = world.launches.length
   await $.command.run({ ...LIVE, args: 'off' })
-  await $.command.run({ ...LIVE, args: 'on' })
+  await $.command.run({ ...LIVE, args: '' })
   await world.clock.advance(1000)
   expect(world.launches.length).toBeGreaterThan(opened)
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })

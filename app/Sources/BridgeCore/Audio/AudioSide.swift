@@ -50,6 +50,8 @@ public protocol AudioSide: Sendable {
   func chime() async
   /// The short sound that confirms a handoff was queued for a session (BR-001).
   func confirmHandoff() async
+  /// The same sound as `chime`, for an answer that does not wait.
+  func confirmAnswer() async
   /// The voice finished a reply. Only a debug build does anything with it: the fake microphone
   /// plays its next line, and the call tape marks the moment.
   func voiceFinished() async

@@ -6,6 +6,44 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.2]
+
+### Changed
+
+- The translated READMEs moved to `docs/i18n/`.
+- An answer, failure or question from Claude that reaches an open or opening line now plays the
+  same sound, unless someone is speaking. There is no notification with it, and an update has no
+  sound. The setting is now **Play sounds for requests and answers** and covers it; the sound for a
+  result that waits plays either way.
+- The sound for a waiting result is now LiveBridge's own instead of macOS's Glass, made to pair
+  with the sound for a queued request. It is shorter, 0.82 s instead of 1.65 s, and louder at its
+  peak.
+- **`/live` is the one command that joins.** In a session that has not joined it joins, and opens
+  the app if it is not running; in a joined session it brings back the band and answers with the
+  status line. It is not a toggle: repeating it never leaves, and `/live off` still does. `/live on`
+  still works, the same as `/live`.
+
+### Removed
+
+- `/live target`, `/live status` and `/live context`. Each now answers
+  `Usage: /live | /live off`. **Talk here** in the band and a click on a session in the menu set the
+  target, `/live` gives the status, and **Load context** in the menu loads a summary.
+
+### Fixed
+
+- During a call, **Conversation** now shows your words and the voice's as codex transcribes them,
+  where a line used to appear only when it was final: a long reply showed once the voice had
+  finished it, and your line once the voice had started answering. Your words can still appear a
+  moment after you say them, and the voice's a moment before you hear them. What is kept, and what
+  the voice is seeded with, is still only the final text, which replaces the words shown.
+- A click on a usage row no longer closes the menu: the row lights up under the pointer and does
+  nothing. Its reset times now go as soon as the pointer leaves the row, and clicks pass through
+  them.
+
+Note: the owner tried this version by hand on a debug build before the release. How often the new
+sound reaches the microphone on speakers was not measured, and the update from the app has not run
+on this version.
+
 ## [0.4.1]
 
 ### Changed

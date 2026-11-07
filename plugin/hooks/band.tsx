@@ -10,7 +10,7 @@ import type { CallPhase, SessionId, StatusReply } from './wire.ts'
 /** `start` makes this session the target first and loads its context; `target` is "Talk here". */
 export type BandActions = { start(): void; stop(): void; mute(): void; unmute(): void; target(): void }
 
-/** What the band and `/live status` say before the app's first reply. */
+/** What the band and `/live` say before the app's first reply. */
 export const JOINING = 'LiveBridge: joining…'
 
 const CONTEXT_NOTE = { loading: 'Loading context…', sent: 'Context sent' } as const

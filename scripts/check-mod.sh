@@ -15,9 +15,10 @@ if ! laid; then
   # A headless session lays the types while it watches the mod's folder. The mod's own command
   # answers without the model, so this needs no login, and no settings or other plugins load. If
   # the mod does not load, the command is only text to the model, and a logged-in session spends a
-  # turn on it.
+  # turn on it. `/live off`, because in a session that has not joined it changes nothing: a bare
+  # `/live` joins, and can open the real app.
   CLAUDE_CODE_PLUGIN_DIR_WATCH=1 claude -p --setting-sources "" --no-session-persistence \
-    --plugin-dir plugin "/live status" >&2
+    --plugin-dir plugin "/live off" >&2
   laid || { echo "check-mod.sh: Claude Code laid no API types of its own version in plugin/.claude-plugin/types" >&2; exit 1; }
 fi
 npm --prefix plugin run typecheck

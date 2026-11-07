@@ -81,7 +81,7 @@ public struct JoinBody: Codable, Sendable, Equatable {
   public var title: String
   /// The id the session had before `/clear`: its place, target and requests move to the new id.
   public var replaces: SessionID?
-  /// `true`: the owner asked for it (`/live on`). Only such a join brings back a session the
+  /// `true`: the owner asked for it (`/live`). Only such a join brings back a session the
   /// owner removed; any other is answered `410 removed`.
   public var owner: Bool?
   /// The mod's version, from its own plugin.json; absent from a mod from before this field, or
