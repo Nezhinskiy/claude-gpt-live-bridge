@@ -1,6 +1,6 @@
-<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.es.md">Español</a> · <b>Français</b> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
+<p align="center"><a href="../../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.es.md">Español</a> · <b>Français</b> · <a href="README.ru.md">Русский</a> · <a href="README.uk.md">Українська</a></p>
 
-<p align="center"><img src="site/assets/icon.png" alt="Icône de l'application LiveBridge" width="144"></p>
+<p align="center"><img src="../../site/assets/icon.png" alt="Icône de l'application LiveBridge" width="144"></p>
 
 <h1 align="center">LiveBridge</h1>
 
@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence : MIT"></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence : MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plateforme : macOS 14+ sur Apple Silicon">
 </p>
 
@@ -33,9 +33,9 @@ annonce le résultat. Inutile de garder la ligne ouverte pendant que Claude trav
 rouvre la ligne fermée et passe à la voix pour qu'elle la dise. La voix suit aussi ce que vous tapez
 dans la session et ce que Claude répond, vous pouvez donc passer de la parole au clavier.
 
-*Le texte anglais fait foi ([README.md](README.md)) ; cette traduction peut avoir du retard.*
+*Le texte anglais fait foi ([README.md](../../README.md)) ; cette traduction peut avoir du retard.*
 
-<p align="center"><img src="site/assets/demo.gif" alt="Conversation avec une session Claude Code via LiveBridge" width="100%"></p>
+<p align="center"><img src="../../site/assets/demo.gif" alt="Conversation avec une session Claude Code via LiveBridge" width="100%"></p>
 
 **Local par conception.** Pas de télémétrie et pas de serveur propre : LiveBridge est un pont sur
 votre Mac entre votre propre codex et votre propre Claude Code. L'application et le mod
@@ -50,7 +50,7 @@ n'est pas installée), que vous pouvez désactiver ; la même demande quand vous
 for update** ; `gh auth status` quand une nouvelle version est annoncée ; et, quand vous cliquez
 sur **Install**, le téléchargement, sa vérification et la mise à jour du mod.
 [Confidentialité](#confidentialité) liste précisément ce qui parvient à OpenAI et nomme les
-requêtes de l'application vers GitHub ; [SECURITY.md](SECURITY.md) explique ce que cela protège
+requêtes de l'application vers GitHub ; [SECURITY.md](../../SECURITY.md) explique ce que cela protège
 et ce que cela ne protège pas.
 
 > **Non officiel.** Sans lien avec Anthropic ou OpenAI, qui ne l'approuvent ni ne le prennent en
@@ -100,7 +100,7 @@ sous [Installation](#installation).
   lire le `codex features list`, donc une autre version peut ne pas démarrer tant que LiveBridge
   n'a pas été mis à jour.
 - Pour compiler l'application : Xcode avec une chaîne d'outils Swift 6.0 ou ultérieure. Les
-  versions testées sont indiquées dans [CONTRIBUTING.md](CONTRIBUTING.md#toolchain).
+  versions testées sont indiquées dans [CONTRIBUTING.md](../../CONTRIBUTING.md#toolchain).
   L'application compilée fonctionne sur macOS 14 ou ultérieur.
 
 ## Installation
@@ -126,7 +126,7 @@ ad hoc et non notarisée.
    ```
 
    où `vX.Y.Z` est le tag de la version, tel que sa page le nomme. La vérification ne réussit que
-   pour une image que le [workflow de publication](.github/workflows/release.yml) de ce dépôt a
+   pour une image que le [workflow de publication](../../.github/workflows/release.yml) de ce dépôt a
    compilée à partir de ce tag, sur un runner hébergé par GitHub, et qui n'a pas changé depuis.
    C'est l'unique preuve d'origine de l'image : la signature ad hoc ne désigne personne. Elle ne
    prouve pas que quiconque ait relu le code.
@@ -181,7 +181,7 @@ copie l'indique dans Settings.
 - Le téléchargement de la mise à jour ne pose pas d'attribut de quarantaine, donc macOS ne
   devrait pas bloquer le premier lancement de l'application mise à jour comme il a bloqué le
   premier téléchargement ; cela découle du code et n'a pas encore été observé. Les vérifications
-  ci-dessus en tiennent lieu ([SECURITY.md](SECURITY.md#what-an-update-installs)). macOS
+  ci-dessus en tiennent lieu ([SECURITY.md](../../SECURITY.md#what-an-update-installs)). macOS
   redemande en revanche l'accès au microphone au premier **Start** après une mise à jour, parce
   que chaque version est signée ad hoc.
 
@@ -252,7 +252,7 @@ parlez.
 - **Le Start de la bande** fait de sa session la cible et démarre l'appel ; la ligne qu'il ouvre
   reçoit la conversation de la session, et charge en plus un résumé quand il manquerait à la voix
   une partie d'elle (voir **Load context** ci-dessous), mais jamais avec **Pause sync** activé ni
-  après une pause ([détails](docs/architecture/overview.md#components)). Tant que l'appel parle à
+  après une pause ([détails](../../docs/architecture/overview.md#components)). Tant que l'appel parle à
   une autre session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session
   rejointe, `/live` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
@@ -275,7 +275,7 @@ parlez.
   **Unmute** reprend le microphone et, s'il n'y parvient pas (refusé, occupé, absent), l'appel se
   termine avec la raison. **Stop** termine l'appel et la coupure ; le **Start** suivant commence
   micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
-  lever ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
+  lever ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** n'est activé que lorsqu'il manque à la voix une partie de la cible : pas de
   résumé alors que **Pause sync** est activé, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
@@ -283,12 +283,12 @@ parlez.
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
   déjà la conversation. Sans résumé encore et sans rien de perdu, il affiche **Context loads with the
   line** et est désactivé, car la prochaine ligne le demande d'elle-même. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
-  reste activé ([BR-002](docs/bugs/BR-002.md)).
+  reste activé ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne. Les résultats qu'elle n'a pas encore dits
   restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude en attente
-  suivent d'autres règles ([détails](SECURITY.md#residual-risk-by-design)). Avec **Pause sync**
+  suivent d'autres règles ([détails](../../SECURITY.md#residual-risk-by-design)). Avec **Pause sync**
   désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
   transcription de la session, qui contient ce que la session a lu ; pour l'éviter, faites d'abord
   `/clear` dans la session, puis appuyez sur **New conversation**. `/live` dans une session
@@ -315,7 +315,7 @@ parlez.
   ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
-  fait et ne fait pas est dans [SECURITY.md](SECURITY.md#residual-risk-by-design).
+  fait et ne fait pas est dans [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
 - **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
   voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
   question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
@@ -335,7 +335,7 @@ parlez.
 - Avant de transmettre quoi que ce soit de destructeur ou tourné vers l'extérieur (supprimer,
   pousser, publier, envoyer, déployer, payer), elle répète la demande et demande « oui ? ». C'est
   une habitude que la voix a pour consigne de garder, pas une garantie de sécurité ;
-  [SECURITY.md](SECURITY.md) explique ce qui en est une.
+  [SECURITY.md](../../SECURITY.md) explique ce qui en est une.
 - Elle relit les résultats en une phrase ou deux, avec le nom de la session. Les blocs de code et
   les tableaux restent dans la session, et les identifiants qu'elle reconnaît sont masqués.
 - Elle revient quand Claude a fini. Inutile de garder la ligne ouverte : elle se ferme quand la
@@ -370,7 +370,7 @@ parlez.
   d'elle, sauf que celle d'un tour qui n'était pas une demande vocale n'est qu'enregistrée. Un tour
   que la pause tient dehors n'a rien de tout cela. Quand une question ou une demande est réglée sans
   la voix, ou qu'un tour se termine sans réponse, la voix reçoit une ligne qui le dit ([quelles
-  lignes](SECURITY.md#what-session-text-can-do)).
+  lignes](../../SECURITY.md#what-session-text-can-do)).
 
 ## Facturation maîtrisée par conception
 
@@ -397,7 +397,7 @@ attend votre autorisation :
   ligne ouverte. Tout le reste de ce qui arrive ligne fermée (tout ce qui vient d'une session que
   vous avez quittée, une mise à jour ultérieure) joue un carillon et attend : la bande et le menu
   l'affichent comme non entendu, et il passe à la voix la prochaine fois que vous parlez ([quand il
-  compte comme entendu](docs/architecture/overview.md#a-result-while-the-line-is-closed)).
+  compte comme entendu](../../docs/architecture/overview.md#a-result-while-the-line-is-closed)).
 - Chaque session Claude Code a sa propre conversation avec la voix. Elle est reportée sur la
   session temps réel suivante, et d'un Stop à un Start, de sorte que la voix se souvient de ce que
   vous avez dit il y a une minute. Une nouvelle cible change de conversation : une ligne ouverte
@@ -406,8 +406,8 @@ attend votre autorisation :
   à partir du moment où la voix se connecte, donc votre offre peut compter un peu plus. OpenAI
   facture la voix sur ordinateur à la minute de votre budget d'usage Codex, et sur son API la même
   famille de modèles facture aussi le silence
-  ([détails](docs/research/2026-11-04-gpt-live-billing.md),
-  [limites](docs/research/2026-11-05-gpt-live-limits.md)) ; la page d'usage de votre offre fait
+  ([détails](../../docs/research/2026-11-04-gpt-live-billing.md),
+  [limites](../../docs/research/2026-11-05-gpt-live-limits.md)) ; la page d'usage de votre offre fait
   autorité.
 - Le menu indique quelle part de votre usage de Codex et de Claude est consommée, une ligne chacun,
   en pourcentage utilisé de chaque fenêtre que l'offre signale (jusqu'à trois par ligne, par
@@ -420,7 +420,7 @@ attend votre autorisation :
   chiffres peuvent changer menu ouvert ; juste après le lancement, la ligne apparaît quand la
   première lecture arrive, et si les lectures échouent, une lecture disparaît au bout de 15 minutes. Quelle limite
   arrête la voix en premier n'est pas documenté
-  ([détails](docs/research/2026-11-05-gpt-live-limits.md)).
+  ([détails](../../docs/research/2026-11-05-gpt-live-limits.md)).
 
 ## Confidentialité
 
@@ -491,7 +491,7 @@ requête quand vous cliquez dessus. Quand la vérification automatique trouve un
 récente, l'application exécute `gh auth status` pour indiquer si l'image peut être vérifiée. Ce
 n'est que lorsque vous cliquez sur **Install** qu'elle télécharge l'image et exécute
 `gh attestation verify` et `claude plugin`, qui contactent GitHub, et Sigstore pour la racine de
-confiance de `gh`, sous vos propres connexions. [SECURITY.md](SECURITY.md#what-leaves-the-mac)
+confiance de `gh`, sous vos propres connexions. [SECURITY.md](../../SECURITY.md#what-leaves-the-mac)
 liste chaque requête.
 
 Sur votre Mac, l'application conserve ses réglages, le compteur d'utilisation, la date de sa
@@ -499,13 +499,13 @@ dernière recherche de mise à jour et les versions qu'elle a annoncées, ce qu'
 mise à jour et, pour chacune des 20 dernières sessions utilisées, sa conversation récente
 (jusqu'à 64 lignes, avec ce que vous y avez tapé ; enregistrée sans appel sauf si vous activez
 **Pause sync**) et la ligne de contexte chargée en dernier depuis elle, dans `~/Library/Application Support/LiveBridge`, un dossier que seul votre utilisateur peut ouvrir
-([comment il est conservé](SECURITY.md#residual-risk-by-design)). Les lignes d'une session disparaissent quand vous
+([comment il est conservé](../../SECURITY.md#residual-risk-by-design)). Les lignes d'une session disparaissent quand vous
 appuyez sur **New conversation** avec elle comme cible ou que vous la retirez avec ×. Une session
 qui est partie les conserve jusqu'à ce que 20 sessions utilisées ensuite les évincent ; pour les
 effacer plus tôt, exécutez de nouveau `/live` dans cette session et appuyez sur **New
-conversation**. La désinstallation les supprime toutes. Le mod garde un instantané à lui dans le magasin de plugins de Claude Code ([ce qu'il contient](SECURITY.md#residual-risk-by-design)).
+conversation**. La désinstallation les supprime toutes. Le mod garde un instantané à lui dans le magasin de plugins de Claude Code ([ce qu'il contient](../../SECURITY.md#residual-risk-by-design)).
 
-[SECURITY.md](SECURITY.md) contient le modèle de menace : en bref, tout ce que votre microphone
+[SECURITY.md](../../SECURITY.md) contient le modèle de menace : en bref, tout ce que votre microphone
 peut entendre peut devenir une demande que Claude exécute avec le mode de permissions propre à la
 session.
 
@@ -514,9 +514,9 @@ session.
 - La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande, si
   bien que rien n'arrive à Claude : environ une demande sur cinq avec la règle telle qu'écrite au
   départ, et 0 sur 20 avec la règle actuelle, trop peu pour distinguer cela du hasard
-  ([BR-001](docs/bugs/BR-001.md)). Elle peut aussi prétendre à un travail qu'elle n'a pas fait,
+  ([BR-001](../../docs/bugs/BR-001.md)). Elle peut aussi prétendre à un travail qu'elle n'a pas fait,
   comme « I'll take a look. », y compris à partir de lignes qu'elle n'a que comme contexte ([ADR
-  0001 (n), (o)](docs/adr/0001-platform-findings.md)). L'application joue un son bref quand elle met
+  0001 (n), (o)](../../docs/adr/0001-platform-findings.md)). L'application joue un son bref quand elle met
   une demande en file pour Claude, différent de celui d'une réponse ; si la voix dit qu'elle regarde
   et que ce son ne suit pas, répétez la demande. L'application ne peut pas distinguer une telle promesse d'une réponse par ses mots,
   car la voix parle votre langue.
@@ -526,21 +526,21 @@ session.
   l'annonce. Cette demande attend toujours dans Claude Code, et c'est le seul contrôle ; la voix
   n'est pas un contrôle, et LiveBridge ne répond jamais à la demande. Lors des vérifications, l'avis
   de permission d'un tour tapé, ligne ouverte, a été dit avant la réponse au clavier dans 0 essai
-  sur 3, un compte et non un taux ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). Une ligne
+  sur 3, un compte et non un taux ([ADR 0001 (n)](../../docs/adr/0001-platform-findings.md)). Une ligne
   fermée ne s'ouvre pour elles que si la conversation de la cible contient un tour de vous ; sinon
   l'application joue un carillon, et appel éteint elles ne sont qu'enregistrées.
 - Ce que l'application de bureau Claude indique comme origine d'un prompt tapé n'a pas été observé
-  ([ADR 0001 (m)](docs/adr/0001-platform-findings.md)). Le mod n'enregistre un prompt comme vôtre
+  ([ADR 0001 (m)](../../docs/adr/0001-platform-findings.md)). Le mod n'enregistre un prompt comme vôtre
   que si son origine est `composer`. Si un prompt tapé là-bas arrive autrement, rien de ce qui y est
   tapé n'est enregistré, aucun trou n'est noté, le menu affiche **Context up to date**, et la pause
-  va moins loin ([détails](SECURITY.md#what-session-text-can-do)).
+  va moins loin ([détails](../../SECURITY.md#what-session-text-can-do)).
 - Un résultat qui arrive pendant que la ligne l'attend est transmis à la voix sous forme de texte à
   dire ; codex n'a aucun appel qui fasse parler la voix immédiatement, c'est donc le modèle qui
   décide du moment. Lors des tests, elle a parlé en quelques secondes. Si ce n'est pas le cas, le
   résultat reste non entendu : il repasse à la voix avec vos prochains mots, ou un carillon retentit
   à la fermeture de la ligne.
 - Quand la réponse de Claude rouvre la ligne, la voix peut rester muette : c'est arrivé dans 4 des
-  14 essais mesurés, un petit échantillon ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). La
+  14 essais mesurés, un petit échantillon ([ADR 0001 (n)](../../docs/adr/0001-platform-findings.md)). La
   ligne se ferme alors 5 secondes après sa connexion, et la réponse joue un carillon et attend,
   comme ci-dessous. Quand la voix a parlé, elle a commencé dans les 2 secondes environ après la
   connexion ; une voix qui commencerait après ces 5 secondes est coupée.
@@ -554,18 +554,18 @@ session.
   lignes qui échouent. Claude Code continue de travailler, les réponses continuent d'attendre, et
   Start réessaie une fois. L'application ne reconnaît une limite qu'à la formulation de codex ou au
   code d'erreur du service, car rien d'autre ne la signale
-  ([détails](docs/research/2026-11-05-gpt-live-limits.md)). Un refus qu'elle ne reconnaît pas, comme
+  ([détails](../../docs/research/2026-11-05-gpt-live-limits.md)). Un refus qu'elle ne reconnaît pas, comme
   une ligne qui tombe sans raison donnée (« The voice session closed (transport_closed). »), laisse
   l'appel actif, et vos prochains mots réessaient ; appuyez sur **Stop** jusqu'à la réinitialisation
   de la limite.
 - Un prompt qui n'est pas tapé dans le compositeur (le message d'un hôte, une tâche planifiée, un
   autre agent et sans doute Remote Control) n'est pas enregistré dans la conversation de la voix
   comme vos mots, mais la réponse de Claude l'est, et il ne refuse pas un tour en cours sous la
-  pause ([SECURITY.md](SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les
+  pause ([SECURITY.md](../../SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les
   vôtres).
 - Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
   synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, et aucune
-  pause ne refuse ses lignes ([ce qui change d'autre](CHANGELOG.md)).
+  pause ne refuse ses lignes ([ce qui change d'autre](../../CHANGELOG.md)).
 - Une session Claude Code déjà ouverte avant le chargement du mod peut devoir être rouverte pour
   que `/live` y fonctionne.
 - Dans l'application de bureau Claude, `/live` saisi dans une session dont le processus Claude
@@ -579,7 +579,7 @@ session.
   lieu d'exécuter le mod.
 - Le fait qu'une réponse ait dit un résultat en attente est jugé d'après ses mots, avec une liste
   de mots courants en anglais et en russe seulement
-  ([la règle](docs/architecture/overview.md#a-result-while-the-line-is-closed)). Dans une autre
+  ([la règle](../../docs/architecture/overview.md#a-result-while-the-line-is-closed)). Dans une autre
   langue, un résultat peut compter comme entendu alors que la voix l'a seulement mentionné.
 - Là où une organisation administre Claude Code, rien dans LiveBridge ne vous signale qu'une
   demande de permission attend. Le garde intégré de Claude Code se charge sur une machine dotée de
@@ -589,7 +589,7 @@ session.
   regardez donc Claude Code si une réponse semble tarder. `/plugin` nomme les hooks, et les
   versions récentes de Claude Code affichent aussi une ligne indiquant qu'un hook a été ignoré.
   Les questions de Claude parviennent toujours à la voix. Les hooks ont été
-  [mesurés](docs/adr/0001-platform-findings.md) dans un conteneur Linux ; ce que font la voix et
+  [mesurés](../../docs/adr/0001-platform-findings.md) dans un conteneur Linux ; ce que font la voix et
   la barre de menus découle du code, et aucune vraie ligne n'a été testée. Le cas Team et
   Enterprise vient de la documentation de Claude Code.
 - Avec `allowManagedHooksOnly`, `allowManagedModsOnly` ou `disableAllHooks` dans les réglages
@@ -597,15 +597,15 @@ session.
   le mod comme celui de
   l'organisation](https://code.claude.com/docs/en/plugins/mods/admin#install-your-organizations-mods),
   depuis un dossier sur chaque machine : les hooks de permission s'exécutent alors, y compris avec
-  les deux premiers réglages ([mesuré](docs/adr/0001-platform-findings.md)). D'après la
+  les deux premiers réglages ([mesuré](../../docs/adr/0001-platform-findings.md)). D'après la
   documentation de Claude Code, activer la copie de la marketplace dans les réglages gérés ne
   suffit pas.
 
 ## Fonctionnement
 
-[docs/architecture/overview.md](docs/architecture/overview.md) décrit les composants, le protocole
+[docs/architecture/overview.md](../../docs/architecture/overview.md) décrit les composants, le protocole
 entre le mod et l'application, et les flux de messages ;
-l'[ADR 0001](docs/adr/0001-platform-findings.md) consigne les faits de plateforme sur lesquels
+l'[ADR 0001](../../docs/adr/0001-platform-findings.md) consigne les faits de plateforme sur lesquels
 repose la conception.
 
 ## Feuille de route et aide recherchée
@@ -615,7 +615,7 @@ voix (codex avec une connexion ChatGPT). Les trois se rencontrent à des jointur
 chacune des directions ci-dessous est ouverte aux contributeurs. Les tickets qui les concernent
 portent le label
 [help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) ;
-[CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) indique les fichiers à lire en premier.
+[CONTRIBUTING.md](../../CONTRIBUTING.md#where-to-start) indique les fichiers à lire en premier.
 
 - **Windows et Linux.** L'application de barre des menus, sa page audio et le serveur de socket
   sont liés à macOS ; le protocole entre le mod et l'application, ainsi que le mod lui-même, sont
@@ -635,11 +635,11 @@ tickets [help wanted](https://github.com/getLiveBridge/LiveBridge/issues?q=is%3A
 les [limitations connues](#limitations-connues) et les directions
 [ci-dessus](#feuille-de-route-et-aide-recherchée).
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) : l'organisation du dépôt, la chaîne d'outils, les
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) : l'organisation du dépôt, la chaîne d'outils, les
   vérifications (`scripts/check.sh`) et les conventions.
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) : comment nous nous traitons ici.
-- [SECURITY.md](SECURITY.md) : signalez une vulnérabilité en privé, pas dans un ticket public.
-- [CHANGELOG.md](CHANGELOG.md) : ce qui a changé dans chaque version.
+- [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md) : comment nous nous traitons ici.
+- [SECURITY.md](../../SECURITY.md) : signalez une vulnérabilité en privé, pas dans un ticket public.
+- [CHANGELOG.md](../../CHANGELOG.md) : ce qui a changé dans chaque version.
 
 ## Crédits
 
@@ -649,4 +649,4 @@ texte n'en a été copié.
 
 ## Licence
 
-[MIT](LICENSE).
+[MIT](../../LICENSE).

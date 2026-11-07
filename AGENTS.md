@@ -14,8 +14,8 @@ the status section at most 50 lines); detail lives in the documents it links to.
 - `plugin/`: the mod. `hooks/register.tsx` is the wiring; the other `hooks/*.ts` modules are pure.
 - `wire/fixtures/`: one JSON example of every message between the mod and the app.
 - `scripts/`: `check.sh`, `check-mod.sh`, `check-floor.sh`, `smoke.sh`, `build-app.sh`.
-- `docs/`: the [architecture](docs/architecture/overview.md), [ADRs](docs/adr/), and the
-  stayfixed scaffold ([CONTRIBUTING.md](CONTRIBUTING.md#stayfixed) says what each file is for).
+- `docs/`: the [architecture](docs/architecture/overview.md), [ADRs](docs/adr/), the README's
+  translations (`i18n/`), and the stayfixed scaffold ([CONTRIBUTING.md](CONTRIBUTING.md#stayfixed) says what each file is for).
 
 ## Build and test
 
