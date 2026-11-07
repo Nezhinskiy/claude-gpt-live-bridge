@@ -86,7 +86,7 @@ answer also needs changes to the audio page.
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the workflows' pinned actions
 and the mod's development dependencies, each version a week after its release; CI passes before
-one is merged.
+one is merged. It leaves the two Claude Code lockfiles under `.github/` alone, as its header says.
 
 ## Checks
 
@@ -98,7 +98,8 @@ It runs `swift format lint --strict`, the Swift build and tests, the shell and a
 tests, the type check and unit tests of the mod's pure modules, and, when `claude` is on your
 `PATH`, the type check of the mod's engine-facing files, `claude plugin validate` and `claude
 plugin test`. Without `claude` the script says that half was not checked and still passes; CI
-installs Claude Code (the version `.github/claude-code` pins, by hash) on the Xcode 27 macOS
+installs Claude Code (the version `.github/claude-code` pins, by hash; to move it, change that
+folder's `package.json` and run `npm install --package-lock-only` there) on the Xcode 27 macOS
 runner and runs the same script, which fails there if `claude` is missing.
 
 CI then runs the engine-facing half again on the lowest Claude Code the README promises, so the

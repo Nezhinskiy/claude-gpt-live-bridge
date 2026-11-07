@@ -3,8 +3,8 @@
 # check, validation and tests must pass on that version; a need none of them reach still passes.
 # A mod cannot declare a minimum (ADR 0001, item p), so this run is what holds the number to the
 # code. README.md's Requirements line is the number's home. The run installs it with npm ci from
-# .github/claude-code-floor, pinned by hash, so a new floor also needs that package.json's version
-# and `npm install --package-lock-only` there; the run refuses a lockfile that installs another.
+# .github/claude-code-floor, pinned by hash, and refuses a lockfile that installs another version;
+# CONTRIBUTING.md#checks says how to move the floor.
 # CI runs this after check.sh, which installs plugin/node_modules. It downloads that Claude Code,
 # so check.sh does not run it. --print prints the number and stops.
 set -eu

@@ -29,10 +29,11 @@ for file in README*.md site/index.html; do
 done
 
 # The floor's package.json asks for the floor, and its lockfile installs it.
-grep -q "\"@anthropic-ai/claude-code\": \"$floor\"" .github/claude-code-floor/package.json ||
-  problem ".github/claude-code-floor/package.json does not ask for Claude Code $floor"
-locked=$(sed -n '/"node_modules\/@anthropic-ai\/claude-code": {/,/}/s/.*"version": "\(.*\)".*/\1/p' \
-  .github/claude-code-floor/package-lock.json)
+asked=$(node -p "require('./.github/claude-code-floor/package.json').dependencies['@anthropic-ai/claude-code']")
+[ "$asked" = "$floor" ] ||
+  problem ".github/claude-code-floor/package.json asks for Claude Code $asked, not $floor"
+locked=$(node -p "require('./.github/claude-code-floor/package-lock.json')
+  .packages['node_modules/@anthropic-ai/claude-code']?.version")
 [ "$locked" = "$floor" ] ||
   problem ".github/claude-code-floor/package-lock.json installs Claude Code $locked, not $floor"
 
@@ -41,7 +42,8 @@ grep -Eq '^ +run: scripts/check-floor\.sh$' .github/workflows/ci.yml ||
 grep -q '^sh scripts/check-mod\.sh$' scripts/check.sh ||
   problem "check.sh does not run scripts/check-mod.sh"
 
-# The scratch copy: the two scripts and the README. Each run finds types left by a higher version.
+# The scratch copy: the two scripts, the README and the floor's lockfile folder. Each run finds
+# types left by a higher version.
 repo="$tmp/repo"
 types=plugin/.claude-plugin/types/claude-code/index.d.ts
 mkdir -p "$repo/scripts" "$repo/$(dirname "$types")" "$repo/.github" "$tmp/bin"
