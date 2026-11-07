@@ -72,7 +72,7 @@ cd livebridge
 scripts/build-app.sh --release
 ```
 
-3. En la sesión de Claude Code con la que quieras hablar, escribe `/live on`.
+3. En la sesión de Claude Code con la que quieras hablar, escribe `/live`.
 4. Pulsa **Start** en la banda situada sobre el prompt, permite el micrófono y habla.
 
 ¿Prefieres no compilarla? Cada [versión](https://github.com/getLiveBridge/LiveBridge/releases/latest)
@@ -225,11 +225,8 @@ En la sesión de Claude Code con la que quieras hablar:
 
 | Comando | Qué hace |
 |---|---|
-| `/live on` | Se une a LiveBridge con el título de la sesión y abre la aplicación si no se está ejecutando. |
+| `/live` | Se une a LiveBridge con el título de la sesión y abre la aplicación si no se está ejecutando. En una sesión ya unida devuelve la banda y responde en una línea: la llamada, el destino, los resultados sin escuchar, los minutos de hoy. |
 | `/live off` | Sale de LiveBridge. |
-| `/live target` | Convierte esta sesión en aquella a la que la voz pasa el trabajo. |
-| `/live status` (o solo `/live`) | Una línea: la llamada, el destino, los resultados sin escuchar, los minutos de hoy. |
-| `/live context` | Envía a la voz un nuevo resumen de esta sesión, escrito por el modelo de la sesión. |
 
 El comando es `/live` y no `/voice` porque `/voice` es el modo de voz propio de Claude Code. Que lo
 que escribes en una sesión quede fuera de la voz mientras la llamada está detenida no es un comando: es un
@@ -243,7 +240,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
   de ella (mira **Load context** abajo), pero nunca con **Pause sync** activado ni tras una pausa
   ([detalles](docs/architecture/overview.md#components)). Mientras la llamada habla con otra sesión,
-  la banda muestra **Talk here**. Si la banda no aparece en una sesión unida, `/live on` la
+  la banda muestra **Talk here**. Si la banda no aparece en una sesión unida, `/live` la
   recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
@@ -271,8 +268,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   conversación larga lo supera), la sesión estuvo en pausa o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
   Sin resumen aún y sin nada perdido dice **Context loads with the line** y está deshabilitado, porque
-  la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado, y `/live
-  context` puede fallar, devolver lo olvidado o quitar la marca de pausa
+  la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
@@ -281,7 +277,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   ([detalles](SECURITY.md#residual-risk-by-design)). Con **Pause sync** desactivado y la sesión sin
   pausa, la siguiente línea carga por sí sola un resumen de la misma transcripción de la sesión, que
   incluye lo que la sesión leyó; para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
-  conversation**. `/live on` en una sesión eliminada la une de nuevo.
+  conversation**. `/live` en una sesión eliminada la une de nuevo.
 
 ### Ajustes
 
@@ -298,8 +294,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   sale del Mac hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI, activa
   el ajuste, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
   registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
-  resumen por sí sola, ni tampoco después de una pausa: solo lo hacen **Load context** o `/live
-  context`, y ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
+  resumen por sí sola, ni tampoco después de una pausa: solo lo hace **Load context**,
+  y ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
   pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
   nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
   de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
@@ -482,7 +478,7 @@ salvo que actives **Pause sync**) y la última línea de contexto cargada desde 
 ([cómo se guarda](SECURITY.md#residual-risk-by-design)). Las líneas de una sesión desaparecen cuando
 pulsas **New conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido
 las conserva hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta
-`/live on` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](SECURITY.md#residual-risk-by-design)).
+`/live` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](SECURITY.md#residual-risk-by-design)).
 
 [SECURITY.md](SECURITY.md) contiene el modelo de amenazas: en resumen, todo lo que tu micrófono
 pueda oír puede convertirse en una petición que Claude ejecuta con el propio modo de permisos de la

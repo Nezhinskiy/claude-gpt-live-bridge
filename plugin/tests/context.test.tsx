@@ -5,13 +5,10 @@ import type { Engine, TestBody } from 'claude-code/testing'
 
 import { voicePrompt } from '../hooks/prompt.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
-import { BAND, fakeWorld, framed, ID, LIVE, liveOn } from './fake-bridge.ts'
+import { BAND, fakeWorld, framed, ID, liveOn } from './fake-bridge.ts'
 
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
 const SUMMARY = { sessionId: ID, summary: 'Goal: tidy the example project.' }
-declare const setTimeout: (fn: () => void, ms: number) => unknown
-/** Lets whatever is not held run as far as it can. */
-const aMoment = () => new Promise<void>(resolve => setTimeout(resolve, 20))
 
 /** Joined, the call off, this session the target. */
 async function joined(...[$, on]: Parameters<TestBody>) {
@@ -217,18 +214,17 @@ test('aTurnLostAtTheNextStartStalesTheSummary', async ($, on) => {
   expect(world.forks).toBe(2)
 })
 
-/** The app cannot date `/live context`: only the mod knows the gap came while the summary was written. */
+/** Only the mod knows the gap came while the summary was written. */
 test('aSummaryWrittenAcrossAGapIsNotPosted', async ($, on) => {
   const world = await joined($, on)
   world.forkMs = 5000
-  const asked = $.command.run({ ...LIVE, args: 'context' })
-  await aMoment()
+  await appAsks(world)
   expect(world.forks).toBe(1)
   world.syncStatus = 503
   await $.turn.start({ text: 'Count the files', turnId: 't1' })
   world.syncStatus = 200
   await world.clock.advance(5000)
-  expect((await asked).text).toContain('could not summarise')
+  expect(world.logs.some(line => line.includes('could not summarise'))).toBe(true)
   expect(world.take('context')).toEqual([])
 })
 
@@ -260,23 +256,11 @@ test('clearMakesTheContextSummariseAgain', async ($, on) => {
   expect(world.take('context')).toEqual([SUMMARY, { ...SUMMARY, sessionId: cleared }])
 })
 
-test('liveContextAsksTheModelEachTime', async ($, on) => {
-  // The manual path: the owner asked for a summary, so it is written again.
-  const world = await joined($, on)
-  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('Sent a summary')
-  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('Sent a summary')
-  expect(world.forks).toBe(2)
-  world.turns = 0
-  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toBe('Nothing to summarise yet.')
-  expect(world.forks).toBe(2)
-})
-
-test('onlyNothingToForkIsNothingToSummarise', async ($, on) => {
+test('nothingToForkIsNoFailure', async ($, on) => {
   // The engine answers an outage as a resolved api-error, which is a failure, not an empty session.
   const world = await joined($, on)
   world.forkFails = 'nothing-to-fork'
-  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toBe('Nothing to summarise yet.')
-  world.forkFails = 'api-error'
-  expect((await $.command.run({ ...LIVE, args: 'context' })).text).toContain('could not summarise')
+  await appAsks(world)
   expect(world.take('context')).toEqual([])
+  expect(world.logs.some(line => line.includes('could not summarise'))).toBe(false)
 })

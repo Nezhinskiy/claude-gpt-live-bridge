@@ -1452,7 +1452,7 @@ struct BridgeTests {
     try await test.sync(test.a, "Private thing.")
     await test.bridge.remove(test.a)
     test.setPause(false)
-    try await test.join(test.a, "Alpha", owner: true)  // /live on
+    try await test.join(test.a, "Alpha", owner: true)  // /live
     await test.live()
     #expect(try await test.registry.poll(test.a) == nil)
   }
@@ -2994,8 +2994,8 @@ struct BridgeTests {
     #expect(try await eventually { try await test.registry.poll(b) == .request(request(2)) })
   }
 
-  /// `/live target`, and the band's Talk here: a question the voice has said routes nothing once
-  /// the owner chose another session.
+  /// The band's Talk here: a question the voice has said routes nothing once the owner chose
+  /// another session.
   @Test func aPostedTargetEndsTheRouteOfAQuestionAlreadySaid() async throws {
     let voices = FakeVoices()
     let test = try BridgeTests { await voices.make() }
