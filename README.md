@@ -27,9 +27,8 @@
 LiveBridge is a macOS menu bar app that keeps a GPT-Live voice line ready through `codex app-server`
 on your ChatGPT login (no API key). The voice is the front desk: it chats, asks what you mean, and
 hands real work to your Claude Code session through a small Claude Code mod, `livebridge`. Claude
-does the work with its own model, tools and permission mode, and the voice tells you the result. You
-do not have to hold the line open while Claude works: its answer opens the closed line again and
-goes to the voice to say. The voice also follows what you type in the session and what Claude
+does the work with its own model, tools and permission mode, and the voice tells you the result.
+The voice also follows what you type in the session and what Claude
 answers, so you can switch between speaking and typing.
 
 **A conversation, not dictation.** GPT-Live listens while it talks: cut in and it stops and hears you
@@ -37,20 +36,39 @@ out, think out loud and it can drop in a quick "mm-hmm". **You stop paying for s
 prices voice by the minute, so after 20 seconds of quiet the line closes, and it opens again when you
 speak, with the conversation where you left it ([Billing](#billing-aware-by-design)).
 
+- **Claude's turns go to the work.** Ask "what did you mean?" or "what is the risk with B?" and
+  the voice answers from the conversation it shares with the session, so the question does not
+  become a turn in Claude's session or sit in its context. Claude gets one brief when you have
+  decided; a question that needs the code still goes to Claude. When the voice lacks part of the
+  session, the line first loads a short summary that the session's own model writes on the side.
+- **Walk away while Claude works.** Claude's answer to your request opens the closed line again
+  and the voice says it. If the voice stays silent, the answer chimes and waits, so it is not lost
+  ([what can go wrong](#known-limitations)).
+- **Claude's questions, talked through.** When Claude stops to ask you something with options, the
+  voice is given the question to put to you: it explains the options in its own words for as long
+  as you like, and your choice goes back as the answer. It may not bring the question up by itself
+  ([known limitations](#known-limitations)).
+- **One voice for all your sessions.** Join several sessions and pick the one to talk to from the
+  menu; another session's result chimes and waits until you next speak.
+- **Your language.** The voice answers in the language you speak.
+
+Claude Code's own `/voice` turns what you say into a prompt for Claude. LiveBridge is someone to
+talk it over with first, while Claude keeps working or waits.
+
 <p align="center"><img src="docs/assets/readme-demo.gif" alt="Talking to a Claude Code session through LiveBridge" width="100%"></p>
 
 **Local by design.** No telemetry and no server of its own: LiveBridge is a bridge on your Mac
-between your own codex and your own Claude Code. The app and the mod talk over a Unix socket
-only your user can open, and the app listens on no network port. Besides what those two tools
-already send (the voice line to OpenAI through your codex, only while it is open, with what you type in a joined session, and Claude's
-work to Anthropic through your Claude Code session), the app's only traffic of its own is a short-lived codex that, when you open the menu, asks OpenAI
-for your Codex usage figures, also while the call is off, and the traffic for
-[updates](#updating): an automatic check with GitHub for a new release (daily, and at launch
-while one it announced is not installed), which you can turn off; the same check when you press
-**Check for update**; `gh auth status` when a new release is announced; and the download, its
-verification and the mod's update when you click **Install**. [Privacy](#privacy) lists exactly
-what reaches OpenAI and names the requests the app makes to GitHub; [SECURITY.md](SECURITY.md)
-says what this does and does not protect against.
+between your own codex and your own Claude Code. The mod talks to the app over a Unix socket only
+your user can open, and the app listens on no network port. Your voice, and what you type in a joined
+session, go to OpenAI through your codex, only while a line is open; Claude's work goes to
+Anthropic through your Claude Code. The app's only traffic of its own is a usage read through
+your codex when you open the menu, and [updates](#updating) from GitHub, whose automatic check
+you can turn off. [Privacy](#privacy) lists exactly what reaches OpenAI and every request to
+GitHub; [SECURITY.md](SECURITY.md) says what this does and does not protect against.
+
+Free and open source under the [MIT license](LICENSE). The voice runs on the ChatGPT plan you
+already have, so there is no API key and no separate bill: its minutes come out of your plan's
+Codex usage ([Billing](#billing-aware-by-design)).
 
 > **Unofficial.** Not affiliated with, endorsed by or supported by Anthropic or OpenAI. It relies
 > on codex's experimental realtime API, which can change with any codex release.
@@ -63,23 +81,23 @@ includes voice; to build the app yourself, also Xcode with Swift 6.0+. The detai
 [Requirements](#requirements).
 
 ```sh
-# 1. The mod, from this repository's marketplace
+# 1. The app, from LiveBridge's own Homebrew tap
+brew install --cask getlivebridge/tap/livebridge
+
+# 2. The mod, from this repository's marketplace
 claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
-
-# 2. The app, built from source, installed in /Applications and opened
-git clone https://github.com/getLiveBridge/LiveBridge.git
-cd livebridge
-scripts/build-app.sh --release
 ```
 
-3. In the Claude Code session you want to talk to, type `/live`.
-4. Press **Start** in the band above the prompt, allow the microphone, and talk.
+3. Open LiveBridge. It is not notarized, so the first time macOS blocks it until you allow it
+   under System Settings > Privacy & Security > **Open Anyway**.
+4. In the Claude Code session you want to talk to, type `/live`.
+5. Press **Start** in the band above the prompt, allow the microphone, and talk.
 
-Rather not build it? Each [release](https://github.com/getLiveBridge/LiveBridge/releases/latest)
-has the app as a disk image, built and attested by GitHub Actions;
-[From the disk image](#from-the-disk-image) says how to check it and open it. The mod is
-installed the same way either way.
+No Homebrew? Each [release](https://github.com/getLiveBridge/LiveBridge/releases/latest) has
+the app as a disk image, built and attested by GitHub Actions
+([From the disk image](#from-the-disk-image)), or build it yourself
+([From source](#from-source)). The mod is installed the same way either way.
 
 If `/live` is not found in a session that was already open, reopen the session
 ([why](#known-limitations)). Updating, permissions, keeping the microphone permission across
@@ -103,7 +121,8 @@ rebuilds and uninstalling are under [Install](#install).
 
 The mod comes from this repository's marketplace (the [Quick start](#quick-start) commands),
 which names the latest release's tag, so the mod you install is that release's. The app goes in
-`/Applications` either way: from the disk image, or built from source. Either way it is signed
+`/Applications` whichever way you install it: with Homebrew, from the disk image, or built from
+source. Either way it is signed
 ad hoc and not notarized.
 
 ### From the disk image
