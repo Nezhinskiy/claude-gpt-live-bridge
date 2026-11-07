@@ -687,7 +687,7 @@ struct BridgeTests {
     #expect(try await eventually { try await test.registry.poll(a) == .request(request(2)) })
     await voices.made.last?.emit(.assistantUtterance("On it."))  // the handoff's acknowledgement
     try await test.answer(request(3), from: b, .question, "Which file?")
-    await voices.made.last?.emit(.assistantSpeaking)
+    await voices.made.last?.emit(.assistantSpeaking("Hello"))
     await voices.made.last?.emit(.assistantUtterance("Beta asks which file."))
     #expect(await eventually { await test.bridge.status.unheard == 0 })
     await test.bridge.setTarget(a)
@@ -739,9 +739,9 @@ struct BridgeTests {
     await bridge.audioEvent(.speechStarted)
     #expect(await voice.added == ["[RESULT] Alpha: Done."])
     #expect(await bridge.status.unheard == 1)  // until the voice has said it
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("I"))  // cut off by the owner
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("Alpha is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
   }
@@ -1124,7 +1124,7 @@ struct BridgeTests {
     try await post(
       "/v1/activity", ActivityBody(sessionId: b, state: .approval, question: "Deploy which branch?")
     )
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("Beta asks: deploy which branch?"))
     #expect(await eventually { await bridge.status.unheard == 0 })
     voice.emit(.closed(.codex(.realtimeError("You’ve hit your usage limit."))))
@@ -1603,7 +1603,7 @@ struct BridgeTests {
     await live()
     try await answer(request(1), from: b)
     #expect(await voice.added == ["[RESULT] Beta: Done."])
-    voice.emit(.assistantSpeaking)
+    voice.emit(.assistantSpeaking("Hello"))
     voice.emit(.assistantUtterance("Beta is done."))
     #expect(await eventually { await bridge.status.unheard == 0 })
     #expect(await lines() == ["Voice: Beta is done."])
@@ -2742,7 +2742,7 @@ struct BridgeTests {
     try await test.join(b, "Beta")
     await test.live()
     try await test.answer(request(1), from: a, .question, "Deploy which branch?")
-    await voices.made.last?.emit(.assistantSpeaking)
+    await voices.made.last?.emit(.assistantSpeaking("Hello"))
     await voices.made.last?.emit(.assistantUtterance("Alpha asks: deploy which branch?"))
     #expect(await eventually { await test.bridge.status.unheard == 0 })
     try await test.post("/v1/target", TargetBody(sessionId: b))
