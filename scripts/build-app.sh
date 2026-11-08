@@ -83,10 +83,9 @@ sign_package() {
   identity=${LIVEBRIDGE_SIGN_IDENTITY:-}
   if [ -z "$identity" ]; then
     codesign --force --sign - "$@"
-  elif [ -n "${LIVEBRIDGE_SIGN_KEYCHAIN:-}" ]; then
-    codesign --force --sign "$identity" --timestamp --keychain "$LIVEBRIDGE_SIGN_KEYCHAIN" "$@"
   else
-    codesign --force --sign "$identity" --timestamp "$@"
+    codesign --force --sign "$identity" --timestamp \
+      ${LIVEBRIDGE_SIGN_KEYCHAIN:+--keychain "$LIVEBRIDGE_SIGN_KEYCHAIN"} "$@"
   fi
 }
 
@@ -229,9 +228,12 @@ package_dmg() {
   rm -f "$out/LiveBridge.dmg"
   hdiutil create -quiet -volname "LiveBridge $version" -srcfolder "$stage" -ov \
     -format UDZO "$out/LiveBridge.dmg"
-  if [ -n "${LIVEBRIDGE_SIGN_IDENTITY:-}" ]; then
-    sign_package "$out/LiveBridge.dmg"
-    codesign --verify --strict "$out/LiveBridge.dmg"
+  if [ -n "${LIVEBRIDGE_SIGN_IDENTITY:-}" ] && ! {
+    sign_package "$out/LiveBridge.dmg" && codesign --verify --strict "$out/LiveBridge.dmg"
+  }; then
+    rm -f "$out/LiveBridge.dmg" # not left to pass for a signed image
+    echo "the image could not be signed; nothing packaged" >&2
+    return 1
   fi
   rm -rf "$stage"
   trap - EXIT

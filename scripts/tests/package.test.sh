@@ -2,8 +2,11 @@
 # `build-app.sh --package` with LIVEBRIDGE_SIGN_IDENTITY signs the app and the disk image with
 # that identity, the app with hardened runtime, a secure timestamp and the microphone
 # entitlement, as notarization needs. A throwaway self-signed identity in a scratch keychain
-# stands in for the Developer ID, so the login keychain and its search list are left alone. The
-# timestamp comes from Apple's server, so this needs the network.
+# stands in for the Developer ID, so the login keychain and its search list are left alone.
+#
+# The full run builds the release from scratch (about 45 s) and gets its timestamps from Apple's
+# server. Without that server it is skipped with a message, except in CI, where it fails. The
+# first check, an image whose signature fails, needs neither.
 set -eu
 cd "$(dirname "$0")/../.."
 
@@ -16,6 +19,30 @@ cleanup() {
   rm -rf "$tmp"
 }
 trap cleanup EXIT
+
+# An image the identity cannot sign is not left behind, where it could pass for a signed one.
+stub="$tmp/stub-dist"
+mkdir -p "$stub/LiveBridge.app/Contents"
+plutil -create xml1 "$stub/LiveBridge.app/Contents/Info.plist"
+plutil -insert CFBundleShortVersionString -string 0.0.0 "$stub/LiveBridge.app/Contents/Info.plist"
+if LIVEBRIDGE_SIGN_IDENTITY="LiveBridge No Such Identity" LIVEBRIDGE_DIST="$stub" \
+  scripts/build-app.sh --package-dmg >"$tmp/log" 2>&1; then
+  echo "package: --package-dmg passed with an identity that does not exist" >&2
+  exit 1
+fi
+if [ -e "$stub/LiveBridge.dmg" ]; then
+  echo "package: an image the identity could not sign was left in the output folder" >&2
+  exit 1
+fi
+
+if ! curl -s -m 10 -o /dev/null http://timestamp.apple.com/ts01; then
+  if [ -n "${CI:-}" ]; then
+    echo "package: Apple's timestamp server is unreachable" >&2
+    exit 1
+  fi
+  echo "package.test.sh: Apple's timestamp server is unreachable, so the signed package was NOT built or checked; run this again online" >&2
+  exit 0
+fi
 
 name="LiveBridge Package Test"
 cat >"$tmp/cert.cnf" <<EOF

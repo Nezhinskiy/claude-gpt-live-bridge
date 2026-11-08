@@ -10,6 +10,7 @@ sh scripts/tests/uninstall.test.sh
 # The marketplace pins the mod to the app's release tag; a release binary has no test-only switch.
 sh scripts/tests/release-guards.test.sh
 # --package with an identity signs the app and the image as notarization needs (a throwaway one).
+# A cold release build and Apple's timestamp server: about 45 s, skipped offline outside CI.
 sh scripts/tests/package.test.sh
 # notarize.sh staples only what Apple accepted, and contacts nothing without its credentials.
 sh scripts/tests/notarize.test.sh
