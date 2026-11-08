@@ -9,6 +9,8 @@ swift format lint --strict -r app
 sh scripts/tests/uninstall.test.sh
 # The marketplace pins the mod to the app's release tag; a release binary has no test-only switch.
 sh scripts/tests/release-guards.test.sh
+# --package with an identity signs the app and the image as notarization needs (a throwaway one).
+sh scripts/tests/package.test.sh
 # Every copy of the lowest Claude Code the README promises agrees with its Requirements line.
 sh scripts/tests/claude-code-floor.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
