@@ -148,7 +148,18 @@ built from it (`--package-dmg`), attests the stapled image, and creates the tag'
 in-app update verifies that attestation pinned to this workflow, the tag and GitHub-hosted
 runners ([SECURITY.md](SECURITY.md#what-an-update-installs)), so a release built any other way
 does not install. Without an Apple account, `scripts/build-app.sh --package` still builds the
-same image, signed ad hoc and not notarized.
+image from the same source, with the app signed ad hoc, the image unsigned and nothing
+notarized.
+
+Approve a release run only when its commit is the release merge on `main`: the approval screen
+does not show the workflow, and a `v*` tag on any other commit runs that commit's own
+`release.yml` with the Developer ID. A tag ruleset that lets only the owner create `v*` tags
+narrows who can start such a run.
+
+On release day, once the Release exists, move the tap's cask
+([getLiveBridge/homebrew-tap](https://github.com/getLiveBridge/homebrew-tap)) to the new
+version. For the first release after 0.4.2, also drop its caveat that the app is signed ad hoc,
+not notarized, and needs **Open Anyway**.
 
 ### The release environment (once, by the owner)
 

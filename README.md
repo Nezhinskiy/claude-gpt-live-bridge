@@ -94,8 +94,10 @@ claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 ```
 
-3. Open LiveBridge. The first time, macOS asks whether to open an app downloaded from the
-   internet; click **Open**.
+3. Open LiveBridge. Releases after 0.4.2 are notarized: the first time, macOS asks whether to
+   open an app downloaded from the internet; click **Open**. 0.4.2 and earlier are not, so
+   macOS blocks the first launch until you allow it under System Settings > Privacy & Security >
+   **Open Anyway**.
 4. In the Claude Code session you want to talk to, type `/live`.
 5. Press **Start** in the band above the prompt, allow the microphone, and talk.
 
@@ -127,8 +129,10 @@ rebuilds and uninstalling are under [Install](#install).
 The mod comes from this repository's marketplace (the [Quick start](#quick-start) commands),
 which names the latest release's tag, so the mod you install is that release's. The app goes in
 `/Applications` whichever way you install it: with Homebrew, from the disk image, or built from
-source. The disk image, which Homebrew installs too, is signed with LiveBridge's Developer ID
-and notarized by Apple; a build from source is neither.
+source. From the first release after 0.4.2, the disk image, which Homebrew installs too, is
+signed with LiveBridge's Developer ID and notarized by Apple; 0.4.2 and earlier were signed ad
+hoc and not notarized, and a build from source is neither signed with the Developer ID nor
+notarized.
 
 ### From the disk image
 
@@ -145,12 +149,14 @@ and notarized by Apple; a build from source is neither.
 
    with `vX.Y.Z` the release's tag, as its page names it. This passes only for an image that
    this repository's [release workflow](.github/workflows/release.yml) built from that tag, on a
-   GitHub-hosted runner, and that has not changed since. The Developer ID signature, which macOS
-   checks by itself, says who signed the image; this says what it was built from. It does not
-   prove that anyone reviewed the code.
+   GitHub-hosted runner, and that has not changed since. On a release after 0.4.2, the Developer
+   ID signature, which macOS checks by itself, says who signed the image, and this says what it
+   was built from; on 0.4.2 and earlier, whose ad hoc signature names no one, this is the image's
+   one proof of origin. It does not prove that anyone reviewed the code.
 3. Open it and drag LiveBridge to Applications.
-4. On first launch macOS asks whether to open an app downloaded from the internet; click
-   **Open**.
+4. On first launch, a release after 0.4.2 makes macOS ask whether to open an app downloaded
+   from the internet; click **Open**. 0.4.2 and earlier are blocked until you allow them under
+   System Settings > Privacy & Security > **Open Anyway**.
 
 ### With Homebrew
 
@@ -204,9 +210,10 @@ the copy at `/Applications/LiveBridge.app` updates; any other copy says so in Se
   app's first launch to ask, as it did after the first download; this follows from the code and
   has not yet been observed. The checks above are what stands in its place
   ([SECURITY.md](SECURITY.md#what-an-update-installs)). Releases after 0.4.2 are signed with
-  LiveBridge's Developer ID, so the microphone permission carries over from one to the next;
-  0.4.2 and earlier were signed ad hoc, so the first update from one of them asks for the
-  microphone once more, at the first **Start**.
+  LiveBridge's Developer ID, so the microphone permission should carry over from one to the
+  next; this follows from how macOS keys the permission and has not yet been observed. 0.4.2 and
+  earlier were signed ad hoc, so the first update from one of them asks for the microphone once
+  more, at the first **Start**.
 
 To update by hand instead, run `/live off` in every session (the mod reopens the app at
 `/Applications` whenever the app stops answering), quit LiveBridge, install the newer image as

@@ -107,9 +107,10 @@ del micrófono entre recompilaciones y la desinstalación están en [Instalació
 El mod viene del marketplace de este repositorio (los comandos de [Inicio
 rápido](#inicio-rápido)), que apunta a la etiqueta de la última versión, así que el mod que
 instalas es el de esa versión. La aplicación va en `/Applications` en ambos casos: desde la imagen
-de disco o compilada desde el código fuente. La imagen de disco está firmada con el
-Developer ID de LiveBridge y notarizada por Apple; una compilación desde el código fuente no es
-ninguna de las dos cosas.
+de disco o compilada desde el código fuente. Desde la primera versión posterior
+a 0.4.2, la imagen de disco está firmada con el Developer ID de LiveBridge y notarizada por Apple;
+la 0.4.2 y las anteriores se firmaron ad hoc y no están notarizadas, y una compilación desde el
+código fuente ni está firmada con el Developer ID ni notarizada.
 
 ### Desde la imagen de disco
 
@@ -127,12 +128,14 @@ ninguna de las dos cosas.
    donde `vX.Y.Z` es la etiqueta de la versión, tal como la nombra su página. Solo se supera con
    una imagen que el [flujo de trabajo de publicación](../../.github/workflows/release.yml) de este
    repositorio haya compilado a partir de esa etiqueta, en un runner alojado por GitHub, y que no
-   haya cambiado desde entonces. La firma Developer ID, que macOS comprueba por sí solo, dice quién
-   firmó la imagen; esta comprobación dice a partir de qué se compiló. No prueba que nadie haya
-   revisado el código.
+   haya cambiado desde entonces. En una versión posterior a 0.4.2, la firma Developer ID, que macOS
+   comprueba por sí solo, dice quién firmó la imagen, y esta comprobación dice a partir de qué se
+   compiló; en la 0.4.2 y las anteriores, cuya firma ad hoc no nombra a nadie, esta comprobación
+   es la única prueba de origen de la imagen. No prueba que nadie haya revisado el código.
 3. Ábrela y arrastra LiveBridge a Aplicaciones.
-4. En el primer arranque, macOS pregunta si abrir una aplicación descargada de internet; pulsa
-   **Open**.
+4. En el primer arranque, una versión posterior a 0.4.2 hace que macOS pregunte si abrir una
+   aplicación descargada de internet; pulsa **Open**. La 0.4.2 y las anteriores quedan bloqueadas
+   hasta que las permitas en Ajustes del Sistema > Privacidad y seguridad > **Open Anyway**.
 
 ### Con Homebrew
 
@@ -191,7 +194,8 @@ Settings.
   descarga; esto se deduce del código y aún no se ha observado. Las comprobaciones de arriba
   ocupan ese lugar ([SECURITY.md](../../SECURITY.md#what-an-update-installs)). Las versiones
   posteriores a 0.4.2 se firman con el Developer ID de LiveBridge, así que el permiso del
-  micrófono pasa de una a la siguiente; la 0.4.2 y las anteriores se firmaron ad hoc, así que la
+  micrófono debería pasar de una a la siguiente; esto se deduce de cómo macOS asocia el permiso y
+  aún no se ha observado. La 0.4.2 y las anteriores se firmaron ad hoc, así que la
   primera actualización desde una de ellas vuelve a pedir el micrófono una vez, en el primer
   **Start**.
 

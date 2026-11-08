@@ -378,7 +378,8 @@ testing; `scripts/check.sh` fails if a release binary contains that name.
 **The microphone prompt after an update.** Releases up to 0.4.2 were signed ad hoc, so macOS
 asks for the microphone again at the first **Start** after an update from one of them, or after
 an update that replaces a build from source. Later releases are signed with LiveBridge's
-Developer ID, which macOS's permission follows from one release to the next. Expect the prompt
+Developer ID, whose designated requirement names the team rather than one build, so the
+permission should follow from one release to the next; that has not yet been observed. Expect the prompt
 then, at the very first Start, and after a rebuild from source signed ad hoc. LiveBridge does
 not otherwise reset the permission, so a prompt at another time is worth a second look.
 

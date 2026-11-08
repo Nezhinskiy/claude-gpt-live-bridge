@@ -86,7 +86,7 @@ scripts/build-app.sh --release
 
 模组来自本仓库的 marketplace（即[快速开始](#快速开始)中的命令），它指向最新发布版本的标签，因此你安装的就是该版本的模组。
 应用无论采用哪种方式，都安装在 `/Applications`：
-通过磁盘映像，或从源码构建。磁盘映像使用 LiveBridge 的 Developer ID 签名，并经 Apple 公证；从源码构建的应用两者都不是。
+通过磁盘映像，或从源码构建。从 0.4.2 之后的第一个发布版本起，磁盘映像使用 LiveBridge 的 Developer ID 签名，并经 Apple 公证；0.4.2 及更早的版本使用 ad hoc 签名，未经公证；从源码构建的应用既未使用 Developer ID 签名，也未经公证。
 
 ### 通过磁盘映像安装
 
@@ -102,9 +102,9 @@ scripts/build-app.sh --release
 
    其中 `vX.Y.Z` 是该发布版本的标签，以其发布页面上的名称为准。只有由本仓库的[发布工作流](../../.github/workflows/release.yml)
    在 GitHub 托管的 runner 上根据该标签构建、且此后未被改动的映像才能通过验证。
-   Developer ID 签名由 macOS 自行检查，说明是谁签署了映像；这项验证说明映像是由什么构建的。它并不能证明有人审查过代码。
+   对于 0.4.2 之后的发布版本，Developer ID 签名由 macOS 自行检查，说明是谁签署了映像，而这项验证说明映像是由什么构建的；对于 0.4.2 及更早的版本，其 ad hoc 签名不指明任何人，这项验证是映像唯一的来源证明。它并不能证明有人审查过代码。
 3. 打开映像，把 LiveBridge 拖到“应用程序”。
-4. 首次启动时，macOS 会询问是否打开从互联网下载的应用；点击 **Open**。
+4. 首次启动时，0.4.2 之后的发布版本会让 macOS 询问是否打开从互联网下载的应用；点击 **Open**。0.4.2 及更早的版本会被拦截，直到你在“系统设置”>“隐私与安全性”> **Open Anyway** 中允许它们。
 
 ### 通过 Homebrew 安装
 
@@ -142,7 +142,7 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
 - 之后，Settings 会显示是从哪个版本更新而来。如果模组未能更新，那里会列出这两条命令，供你自己运行。
   已经打开的 Claude Code 会话在重启之前仍使用旧模组；Settings 会列出仍在使用旧模组的已加入会话。
 - 更新的下载不会设置隔离（quarantine）属性，因此 macOS 不应像首次下载之后那样，在更新后应用的首次启动时停下来询问；这是从代码推出的结论，尚未实际观察到。
-  由上述检查承担这一把关作用（[SECURITY.md](../../SECURITY.md#what-an-update-installs)）。0.4.2 之后的发布版本使用 LiveBridge 的 Developer ID 签名，因此麦克风权限会在版本之间保留；0.4.2 及更早的版本使用 ad hoc 签名，因此从其中任一版本进行的第一次更新，会在第一次点击 **Start** 时再次请求一次麦克风权限。
+  由上述检查承担这一把关作用（[SECURITY.md](../../SECURITY.md#what-an-update-installs)）。0.4.2 之后的发布版本使用 LiveBridge 的 Developer ID 签名，因此麦克风权限应当会在版本之间保留；这是根据 macOS 对该权限的关联方式推断的，尚未观察到。0.4.2 及更早的版本使用 ad hoc 签名，因此从其中任一版本进行的第一次更新，会在第一次点击 **Start** 时再次请求一次麦克风权限。
 
 若要手动更新，请先在每个会话中运行 `/live off`（应用一旦停止响应，模组就会重新打开 `/Applications` 中的应用），退出 LiveBridge，
 按上文安装较新的映像，然后运行这两条 `claude plugin` 命令。

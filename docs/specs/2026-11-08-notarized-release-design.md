@@ -63,9 +63,10 @@ Recorded as made, with whose call each was.
 - **No secrets, no release** (the owner's call): the job's first step after the tag checks fails
   when any of the five is empty.
 - **Identity by environment** (the orchestrator's call): `build-app.sh` signs with
-  `LIVEBRIDGE_SIGN_IDENTITY` when it is set, and ad hoc otherwise. The workflow sets it to the
-  prefix `Developer ID Application`, which `codesign` matches against the certificate's name,
-  so no personal name lands in the repository; a SHA-1 hash also works.
+  `LIVEBRIDGE_SIGN_IDENTITY` when it is set, and ad hoc otherwise. It takes a name prefix such
+  as `Developer ID Application` or a SHA-1 hash; the workflow passes the SHA-1 of the one valid
+  identity its keychain step found (after the review, A3), so no personal name lands in the
+  repository and the identity is looked up once.
   `LIVEBRIDGE_SIGN_KEYCHAIN`, when set, is the one keychain `codesign` searches (my call: the
   job then never changes the runner's keychain search list, and the packaging test signs with a
   throwaway identity without touching the login keychain).
@@ -79,7 +80,17 @@ Recorded as made, with whose call each was.
   fails, before anything is stapled.
 - **Gatekeeper's own check** (my call): after stapling, `notarize.sh` runs `spctl --assess` on
   the file (`--type execute` for the app, `--type open --context context:primary-signature` for
-  the image) and fails unless it passes.
+  the image) and fails unless it reports `source=Notarized Developer ID`; with assessments
+  switched off, `spctl` accepts anything with `override=security disabled` (review, S2).
+- **The staple is retried** (review, S3): Apple's ticket service can lag the verdict, so
+  `stapler staple` alone is tried three times, 20 s apart; the submission is not repeated.
+- **The chain is checked before notarization** (review, S1): `codesign --keychain` builds the
+  certificate chain from the search list only, not from the named keychain. The keychain step
+  fails unless the runner already has the Developer ID Certification Authority certificate, and
+  the packaging step fails unless the app's signature lists it and Apple Root CA as authorities.
+- **The signing material lives no longer than its use** (review, S4): the `.p8` is written just
+  before the first notarization and removed after the second; the keychain is deleted right after
+  the image is signed. The `always()` step stays as the backstop.
 - **The certificate's password reaches `security import -P`** (my call): `security import` reads
   a `.p12` password only from its command line. The value comes from the step's `env`, never
   from `${{ }}` in the script, so it is not in the workflow's text or its log (GitHub masks it);
@@ -89,21 +100,36 @@ Recorded as made, with whose call each was.
   goes by path.
 - **The microphone permission** (the orchestrator's call): a Developer ID signature gives the
   app a designated requirement that names the team, not one build's hash, so the permission
-  survives later updates. The first update from an ad hoc 0.4.x release asks once more.
+  should survive later updates; the docs say so with the hedge "not yet observed" until the
+  second Developer ID release shows it (review, S6). The first update from an ad hoc 0.4.x
+  release asks once more.
+- **Docs carry the version** (review, D1): `main` gets the docs when the release PR merges, before
+  the tag runs, so every claim of a notarized download says "releases after 0.4.2", and the Open
+  Anyway steps stay for 0.4.2 and earlier.
+- **No step checks that the tag is on `main`** (review, S5, not taken): the step would live in
+  the tag's own `release.yml`, which the run it should stop could simply leave out. The controls
+  are outside the file: the owner approves only a run whose commit is the release merge on
+  `main` (CONTRIBUTING), and a tag ruleset can limit who creates `v*` tags.
+- **The keychain logic stays in the workflow** (review, A1, not taken): a script would need a
+  switch that accepts the test's untrusted identity, which is the check it would exist to hold.
+  The step is short and was dry-run locally with a stand-in certificate.
 
 ## Design
 
 ### `scripts/build-app.sh`
 
-- `sign BUNDLE IDENTITY`: ad hoc (`-`) as today; any other identity adds `--timestamp`, which
-  notarization requires, and `--keychain "$LIVEBRIDGE_SIGN_KEYCHAIN"` when that is set.
+- `sign_package ARGS…`, beside the unchanged `sign`: ad hoc (`-`) without
+  `LIVEBRIDGE_SIGN_IDENTITY`; with it, `--timestamp`, which notarization requires, and
+  `--keychain "$LIVEBRIDGE_SIGN_KEYCHAIN"` when that is set. `sign`, which `--release` and the
+  debug build use, keeps no timestamp, so they still build offline.
 - `--package-app`: the first half of today's `--package` (the scratch copy of HEAD, the release
   build, `strip`, the signature, the check that the binary names no `$HOME`), ending with
   `codesign --verify --strict` and `ditto` of the app to `$DIST/LiveBridge.app`.
 - `--package-dmg`: copies `$DIST/LiveBridge.app` with `ditto` (signature and any stapled ticket
   kept) beside an `/Applications` link, builds `$DIST/LiveBridge.dmg` named after the app's own
   version, and signs the image with the same identity (with `--timestamp`; not ad hoc, which
-  has no meaning for an image, so an ad hoc package leaves the image unsigned as today).
+  has no meaning for an image, so an ad hoc package leaves the image unsigned as today). An
+  image that fails to sign is removed, so it cannot pass for a signed one.
 - `--package`: `--package-app` then `--package-dmg`.
 - `LIVEBRIDGE_DIST` names the output folder (default `dist`), so the test does not overwrite a
   contributor's `dist/`.
@@ -112,24 +138,27 @@ Recorded as made, with whose call each was.
 
 Reads `LIVEBRIDGE_NOTARY_KEY` (the `.p8`'s path), `LIVEBRIDGE_NOTARY_KEY_ID` and
 `LIVEBRIDGE_NOTARY_ISSUER`; refuses with exit 2 when one is missing or FILE is not an existing
-`.app` or `.dmg`. A `.app` is zipped with `ditto -c -k --keepParent` into a scratch folder and
-the zip submitted; a `.dmg` is submitted itself. Then the verdict, `stapler staple`,
-`stapler validate`, `spctl --assess`.
+`.app` or `.dmg`, or the key file is empty. A `.app` is zipped with `ditto -c -k --keepParent`
+into a scratch folder and the zip submitted; a `.dmg` is submitted itself. Then the verdict,
+`stapler staple` (three tries), `stapler validate`, `spctl --assess` and its source.
 
 ### `.github/workflows/release.yml`
 
 `environment: release`, `timeout-minutes: 60` (two notarizations, each given 20 minutes), the
-same three permissions. After the two tag checks:
+same three permissions, and Xcode 27.2 selected as `ci.yml` selects it (review, Q8). After the
+two tag checks:
 
 1. Fail unless the five secrets are set.
-2. Create the keychain in `$RUNNER_TEMP`, import the `.p12`, allow `codesign` to use the key
-   without a prompt (`set-key-partition-list`), require exactly one valid
-   `Developer ID Application` identity in it, and export `LIVEBRIDGE_SIGN_KEYCHAIN`.
-3. Decode the `.p8` into `$RUNNER_TEMP` (mode 600) and export `LIVEBRIDGE_NOTARY_KEY`.
-4. `build-app.sh --package-app`; `notarize.sh dist/LiveBridge.app`; `build-app.sh
-   --package-dmg`; `notarize.sh dist/LiveBridge.dmg`.
+2. Fail unless the runner has the Developer ID intermediate. Create the keychain in
+   `$RUNNER_TEMP`, import the `.p12`, allow `codesign` to use the key without a prompt
+   (`set-key-partition-list`), require exactly one valid `Developer ID Application` identity in
+   it, and export `LIVEBRIDGE_SIGN_KEYCHAIN` and its SHA-1 as `LIVEBRIDGE_SIGN_IDENTITY`.
+3. `build-app.sh --package-app`, then require the Developer ID and Apple root authorities.
+4. Decode the `.p8` into `$RUNNER_TEMP` (mode 600), export `LIVEBRIDGE_NOTARY_KEY`;
+   `notarize.sh dist/LiveBridge.app`; `build-app.sh --package-dmg`; delete the keychain;
+   `notarize.sh dist/LiveBridge.dmg`; delete the `.p8`.
 5. Attest, create the Release (unchanged).
-6. `if: always()`: delete the keychain, the `.p8` and the `.p12`.
+6. `if: always()`: delete the keychain, the `.p8` and the `.p12`, whatever is left.
 
 Secrets reach steps only through `env`. Actions stay pinned by SHA; no action is added;
 `scorecard.yml` is untouched.
@@ -146,14 +175,22 @@ the one proof of where the image came from. Nor does the `release` environment's
 the updater: a tag whose own `release.yml` drops the environment and the signing still gets an
 attestation from that path, which the updater accepts (SECURITY.md already says that anyone who
 can push a tag can make a release that passes). The reviewer guards the Developer ID, not the
-update. Pinning the team (`codesign --verify -R` with the
-team's requirement) is a follow-up once the first notarized release exists; an update from an ad
-hoc release cannot use it, because the running, older updater does the checking.
+update.
+
+Pinning the team (`codesign --verify -R` with the team's requirement) is not in this change,
+although shipping it in the first Developer ID release would protect one update sooner (review,
+A2). The reason: a requirement that turns out wrong (the team string, the anchor, how a stapled
+ticket or a later certificate renewal reads) would refuse every later update, and the only way
+out would be a manual reinstall by every user. Nothing can check the requirement against a real
+release until that release exists. So the first Developer ID release ships unpinned, its actual
+designated requirement is read from it, and the pin lands in the next release, written from what
+was read and tested against it. Until then, the attestation is the origin check, as before.
 
 ### What else says "ad hoc"
 
 The README and its translations, SECURITY.md, CONTRIBUTING.md (with the owner's one-time setup
-of the `release` environment), ADR 0002's consequences, the website's install step
+of the `release` environment and the release-day step for the Homebrew tap's caveat), a dated
+note at the end of ADR 0002 (its body stays a record of its time), the website's install step
 (`site/index.html`), CHANGELOG, and the app's own confirmation before **Install** replaces a
 build from source (`Confirmation.replaceSourceBuild`), which said the release image is signed ad
 hoc.
@@ -164,12 +201,16 @@ hoc.
   identity in a keychain under a scratch folder, runs `--package` with
   `LIVEBRIDGE_SIGN_IDENTITY` (its hash), `LIVEBRIDGE_SIGN_KEYCHAIN` and `LIVEBRIDGE_DIST`, and
   checks that the app is signed by that identity with hardened runtime, a timestamp and the
-  microphone entitlement, and that the image is signed by it and holds that app. It needs the
-  network for the timestamp, as CI has.
-- `scripts/tests/notarize.test.sh` (in `check.sh`): with stub `xcrun` and `spctl` first on
-  `PATH`, checks that missing credentials and a wrong file are refused before anything runs, that
-  an `Invalid` verdict fails without stapling and prints the log, and that an `Accepted` one
-  staples, validates and assesses.
+  microphone entitlement, and that the image is signed by it and holds that app. That run is a
+  cold release build and needs Apple's timestamp server; offline it is skipped with a message,
+  except in CI, where it fails (review, C1). Before it, with a stub bundle and no network, an
+  image whose signature fails must not be left behind.
+- `scripts/tests/notarize.test.sh` (in `check.sh`): with stub `xcrun`, `spctl` and `sleep` first
+  on `PATH`, checks that missing credentials, an empty key and a wrong file are refused before
+  anything runs; that an `Invalid`, `In Progress` or non-JSON reply fails without stapling (the
+  `Invalid` one printing the log); that Gatekeeper switched off fails; that a staple failing
+  twice is retried and one failing three times fails without a second submission; and that an
+  `Accepted` file is stapled, validated and assessed.
 - The workflow itself runs only on a tag.
 
 ## What only the first tag proves
@@ -177,9 +218,11 @@ hoc.
 Nothing below can run without the secrets, so the first `v*` tag after this change is its test:
 
 - The `release` environment, its tag rule and its reviewer gate the job as configured.
-- The `.p12` imports, the runner's image holds Apple's Developer ID intermediate certificate so
-  the identity is valid, and `codesign` finds it in the temporary keychain without a prompt (a
-  local dry run with a self-signed stand-in covered every step up to that validity check).
+- The runner's image holds Apple's Developer ID intermediate certificate on its search list
+  (otherwise the job now fails at once, saying so), the `.p12` imports, the identity is valid,
+  and `codesign` finds it in the temporary keychain without a prompt and chains it to Apple's
+  root (a local dry run with a self-signed stand-in covered every step up to that validity
+  check).
 - `notarytool submit --output-format json` answers with the `id` and `status` fields
   `notarize.sh` reads (its test uses a stub), and a Team key with the Developer role may
   notarize (Apple's forums say so; Apple's documentation names no role).
@@ -187,11 +230,14 @@ Nothing below can run without the secrets, so the first `v*` tag after this chan
   resource bundle), and `stapler` and `spctl` pass on the runner.
 - The attestation of the stapled image verifies, and the in-app update from 0.4.2 installs it
   (the updater's `codesign` and CDHash checks on a stapled, Developer ID app).
-- A download opens with macOS's "downloaded from the internet" question and no block, and the
-  microphone permission given to that release survives the next update.
+- A download opens with macOS's "downloaded from the internet" question and no block.
+- Across the update from ad hoc 0.4.2 to the first Developer ID release, what macOS keys to the
+  signature: the login item (`SMAppService`) and the Local Network permission, besides the
+  microphone, which is expected to ask once.
+- Only the second Developer ID release shows that the microphone permission given to the first
+  survives an update.
 
-If the first tag fails, no Release is created; the README already describes the next release,
-so the fix goes out before anyone reads it against the old one.
+If the first tag fails, no Release is created, and the docs, which name the version, stay true.
 
 ## Left to the builder
 

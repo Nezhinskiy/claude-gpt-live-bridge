@@ -103,8 +103,9 @@ Update, अनुमतियाँ, नए build के बाद भी microp
 
 mod इस repository के marketplace से आता है ([त्वरित शुरुआत](#त्वरित-शुरुआत) के commands), जो नवीनतम
 release के tag की ओर इशारा करता है, इसलिए आप जो mod install करते हैं वह उसी release का होता है। App
-दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके। डिस्क इमेज LiveBridge की
-Developer ID से signed और Apple द्वारा notarized है; source से बना build इनमें से कुछ भी नहीं होता।
+दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके। 0.4.2 के बाद के पहले release से, डिस्क इमेज
+LiveBridge की Developer ID से signed और Apple द्वारा notarized है; 0.4.2 और उससे पहले के releases ad hoc
+signed थे और notarized नहीं हैं, और source से बना build न तो Developer ID से signed होता है और न notarized।
 
 ### डिस्क इमेज से
 
@@ -121,12 +122,14 @@ Developer ID से signed और Apple द्वारा notarized है; sou
 
    जहाँ `vX.Y.Z` release का tag है, जैसा उसके page पर लिखा है। यह जाँच सिर्फ़ ऐसी image के लिए पास
    होती है जिसे इस repository के [release workflow](../../.github/workflows/release.yml) ने उसी tag से,
-   GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। Developer ID signature, जिसे
-   macOS खुद जाँचता है, बताता है कि image पर किसने sign किया; यह जाँच बताती है कि वह किससे build हुई
-   थी। यह इस बात का प्रमाण नहीं है कि किसी ने code की समीक्षा की है।
+   GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। 0.4.2 के बाद के release पर Developer ID
+   signature, जिसे macOS खुद जाँचता है, बताता है कि image पर किसने sign किया, और यह जाँच बताती है कि वह
+   किससे build हुई थी; 0.4.2 और उससे पहले के releases पर, जिनका ad hoc signature किसी का नाम नहीं बताता,
+   यह जाँच image के origin का इकलौता प्रमाण है। यह इस बात का प्रमाण नहीं है कि किसी ने code की समीक्षा की है।
 3. उसे खोलें और LiveBridge को Applications में drag करें।
-4. पहली बार launch करने पर macOS पूछता है कि internet से download किया गया app खोलना है या नहीं;
-   **Open** पर click करें।
+4. पहली बार launch करने पर, 0.4.2 के बाद के release पर macOS पूछता है कि internet से download किया गया
+   app खोलना है या नहीं; **Open** पर click करें। 0.4.2 और उससे पहले के releases तब तक blocked रहते हैं जब तक
+   आप उन्हें System Settings > Privacy & Security > **Open Anyway** में अनुमति नहीं देते।
 
 ### Homebrew से
 
@@ -182,7 +185,8 @@ LiveBridge app और अपने mod को तभी update करता ह�
   पूछने के लिए वैसे नहीं रोकना चाहिए जैसे पहले download के बाद रोका था; यह code से निकलता है और अभी असल
   में देखा नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं
   ([SECURITY.md](../../SECURITY.md#what-an-update-installs))। 0.4.2 के बाद के releases LiveBridge की
-  Developer ID से signed हैं, इसलिए microphone की अनुमति एक release से अगले में चली जाती है; 0.4.2 और उससे
+  Developer ID से signed हैं, इसलिए microphone की अनुमति एक release से अगले में जानी चाहिए; यह इस पर आधारित है कि macOS
+  अनुमति को कैसे जोड़ता है, और अभी तक देखा नहीं गया है। 0.4.2 और उससे
   पहले के releases ad hoc signed थे, इसलिए उनमें से किसी से पहला update पहले **Start** पर microphone के लिए
   एक बार फिर पूछता है।
 

@@ -10,9 +10,8 @@ replacing it can bring the old binary back; this happened while installing 0.1.2
 asked for the Settings window to show the version, to update the app and the mod from there,
 and for the app to look for updates by itself.
 
-An app that replaces itself is a new way for code to reach the Mac. LiveBridge was then signed ad
-hoc and not notarized, so macOS checked nothing about where a new version comes from (releases
-after 0.4.2 carry a Developer ID signature, which the updater does not require); the release's
+An app that replaces itself is a new way for code to reach the Mac. LiveBridge is signed ad hoc
+and not notarized, so macOS checks nothing about where a new version comes from; the release's
 one proof of origin is the build provenance attestation that `release.yml` makes on GitHub
 Actions. Before this, the app's only traffic was the voice line to OpenAI, through codex.
 
@@ -61,12 +60,11 @@ The design and its review are in
   updater's checks are the gate, and they rest on `gh` as found on the owner's `PATH`.
 - The attestation proves where and from what the image was built, not that anyone reviewed the
   code; the owner's click is the only stop for a release pushed by someone with push access.
-- macOS asks for the microphone again at the first Start after each update from a release signed
-  ad hoc (0.4.2 and earlier). Releases after it are signed with the Developer ID, which carries
-  the permission over ([the notarized release](../specs/2026-11-08-notarized-release-design.md)).
-- A build from source is replaced by the release image, which is not signed with the self-signed
-  identity from `build-app.sh --make-signing-identity`, so the permission does not carry over;
-  Install says so and asks first.
+- macOS asks for the microphone again at the first Start after each update, because each release
+  is signed ad hoc. Notarization or a Developer ID signature would stop that; neither is in place.
+- A build from source is replaced by the release image, which is signed ad hoc, so a self-signed
+  identity from `build-app.sh --make-signing-identity` no longer applies; Install says so and asks
+  first.
 - Sessions already open keep the old mod until they restart, so the `/v1` wire stays backward
   compatible across releases; a release that cannot keep this changes the route prefix.
 - The release commit must move the marketplace's `ref` to the new tag, and the tag must be pushed
@@ -84,3 +82,9 @@ Alternatives considered:
 ## Status
 
 Accepted, 2026-11-02.
+
+Later, 2026-11-08: releases after 0.4.2 are signed with a Developer ID and notarized
+([the notarized release](../specs/2026-11-08-notarized-release-design.md)). That changes the
+consequences above about the microphone prompt and about a build from source being replaced by
+an ad hoc image. The updater's checks, and this decision, are unchanged: its `codesign` check
+still names no signer, so the attestation stays the release's proof of origin.
