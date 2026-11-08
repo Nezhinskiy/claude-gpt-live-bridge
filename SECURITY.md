@@ -338,8 +338,10 @@ installs unless each passes:
 - **The app inside.** The image is attached read-only and must hold `LiveBridge.app` with the
   bundle identifier `com.getlivebridge.livebridge`, the release's version, when it names one an
   `LSMinimumSystemVersion` this Mac meets, and a signature that passes
-  `codesign --verify --deep --strict`. The app is signed ad hoc, so `codesign` proves only that
-  the bundle is whole as signed, not who signed it: it is not an origin check. Its CDHash is
+  `codesign --verify --deep --strict`. Releases after 0.4.2 are signed with LiveBridge's
+  Developer ID, but this check names no signer and would pass an ad hoc signature as readily,
+  so it proves only that the bundle is whole as signed, not who signed it: it is not an origin
+  check. Its CDHash is
   recorded, and the copy staged in `/Applications` must still have it, be a directory and not a
   symlink, and pass `codesign` again at the moment of the swap.
 - **The swap.** The staged copy is exchanged with the installed app in one
@@ -350,9 +352,10 @@ installs unless each passes:
 
 **An updated app skips Gatekeeper's first-launch block.** The download sets no quarantine
 attribute (the app does not set `LSFileQuarantineEnabled`), and one found on the staged copy is
-removed from that copy alone, after its CDHash matched. It follows that macOS does not block the
-new version's first launch, as it blocks a first install from the disk image until you allow it;
-this has not yet been observed on a real update. Either way, the checks above are the gate.
+removed from that copy alone, after its CDHash matched. It follows that macOS does not stop the
+new version's first launch to ask, as it does for a first install from the disk image; this has
+not yet been observed on a real update. Either way, the checks above are the gate, not
+Gatekeeper's notarization check.
 
 **The mod is fetched with git and is not attested.** `claude plugin marketplace update
 livebridge` and `claude plugin update livebridge@livebridge` fetch it over HTTPS from this
@@ -372,10 +375,12 @@ replaces the build with the release image. No build has a switch that skips the 
 debug build reads `LIVEBRIDGE_RELEASES_URL`, when set, in place of the GitHub API address, for
 testing; `scripts/check.sh` fails if a release binary contains that name.
 
-**The microphone prompt after an update.** Each release is signed ad hoc, so macOS asks for the
-microphone again at the first **Start** after an update. Expect that prompt then, at the very
-first Start, and after an install by hand or a rebuild from source. LiveBridge does not
-otherwise reset the permission, so a prompt at another time is worth a second look.
+**The microphone prompt after an update.** Releases up to 0.4.2 were signed ad hoc, so macOS
+asks for the microphone again at the first **Start** after an update from one of them, or after
+an update that replaces a build from source. Later releases are signed with LiveBridge's
+Developer ID, which macOS's permission follows from one release to the next. Expect the prompt
+then, at the very first Start, and after a rebuild from source signed ad hoc. LiveBridge does
+not otherwise reset the permission, so a prompt at another time is worth a second look.
 
 ### What leaves the Mac
 

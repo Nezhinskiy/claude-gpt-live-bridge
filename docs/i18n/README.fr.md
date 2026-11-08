@@ -111,8 +111,9 @@ sous [Installation](#installation).
 Le mod provient de la marketplace de ce dépôt (les commandes du [Démarrage
 rapide](#démarrage-rapide)), qui désigne le tag de la dernière version : le mod que vous
 installez est donc celui de cette version. L'application va dans `/Applications` dans les deux
-cas : depuis l'image disque, ou compilée depuis les sources. Dans les deux cas, elle est signée
-ad hoc et non notarisée.
+cas : depuis l'image disque, ou compilée depuis les sources. L'image disque est signée avec le
+Developer ID de LiveBridge et notarisée par Apple ; une compilation depuis les sources n'est ni
+l'un ni l'autre.
 
 ### Depuis l'image disque
 
@@ -131,11 +132,12 @@ ad hoc et non notarisée.
    où `vX.Y.Z` est le tag de la version, tel que sa page le nomme. La vérification ne réussit que
    pour une image que le [workflow de publication](../../.github/workflows/release.yml) de ce dépôt a
    compilée à partir de ce tag, sur un runner hébergé par GitHub, et qui n'a pas changé depuis.
-   C'est l'unique preuve d'origine de l'image : la signature ad hoc ne désigne personne. Elle ne
-   prouve pas que quiconque ait relu le code.
+   La signature Developer ID, que macOS vérifie de lui-même, dit qui a signé l'image ; cette
+   vérification dit à partir de quoi elle a été compilée. Elle ne prouve pas que quiconque ait
+   relu le code.
 3. Ouvrez-la et faites glisser LiveBridge dans Applications.
-4. Au premier lancement, macOS bloque l'application jusqu'à ce que vous l'autorisiez dans
-   Réglages Système > Confidentialité et sécurité > **Open Anyway**.
+4. Au premier lancement, macOS demande s'il faut ouvrir une application téléchargée sur
+   Internet ; cliquez sur **Open**.
 
 ### Avec Homebrew
 
@@ -145,7 +147,7 @@ brew install --cask getlivebridge/tap/livebridge
 
 Cette commande installe la même image disque depuis le [tap de LiveBridge](https://github.com/getLiveBridge/homebrew-tap), qui n'est pas un
 cask officiel de Homebrew. Homebrew peut d'abord vous demander de faire confiance à ce tap, et macOS
-bloque le premier lancement comme indiqué plus haut. L'application se met ensuite à jour seule.
+demande confirmation au premier lancement comme indiqué plus haut. L'application se met ensuite à jour seule.
 
 ### Depuis les sources
 
@@ -163,9 +165,9 @@ compilez le tag de la version (`git checkout vX.Y.Z`) ou chargez le mod de votre
 avec `claude --plugin-dir plugin`.
 
 Une compilation depuis les sources ne vérifie les mises à jour d'elle-même que si vous l'activez
-dans Settings. Installer une mise à jour la remplace par l'image de la version, signée ad hoc, si
-bien que le certificat auto-signé ne s'applique plus ; **Install** le signale et demande d'abord
-confirmation.
+dans Settings. Installer une mise à jour la remplace par l'image de la version, signée avec le
+Developer ID de LiveBridge et non avec votre certificat auto-signé, si bien que macOS redemande
+l'accès au microphone une fois ; **Install** le signale et demande d'abord confirmation.
 
 ### Mises à jour
 
@@ -192,11 +194,14 @@ copie l'indique dans Settings.
   Claude Code déjà ouvertes gardent l'ancien mod jusqu'à leur redémarrage ; Settings liste
   celles qui sont rejointes et l'utilisent encore.
 - Le téléchargement de la mise à jour ne pose pas d'attribut de quarantaine, donc macOS ne
-  devrait pas bloquer le premier lancement de l'application mise à jour comme il a bloqué le
-  premier téléchargement ; cela découle du code et n'a pas encore été observé. Les vérifications
-  ci-dessus en tiennent lieu ([SECURITY.md](../../SECURITY.md#what-an-update-installs)). macOS
-  redemande en revanche l'accès au microphone au premier **Start** après une mise à jour, parce
-  que chaque version est signée ad hoc.
+  devrait pas interrompre le premier lancement de l'application mise à jour pour demander, comme
+  il l'a fait après le premier téléchargement ; cela découle du code et n'a pas encore été
+  observé. Les vérifications ci-dessus en tiennent lieu
+  ([SECURITY.md](../../SECURITY.md#what-an-update-installs)). Les versions postérieures à 0.4.2
+  sont signées avec le Developer ID de LiveBridge, donc l'autorisation du microphone passe d'une
+  version à la suivante ; la 0.4.2 et les précédentes étaient signées ad hoc, si bien que la
+  première mise à jour depuis l'une d'elles redemande le microphone une fois, au premier
+  **Start**.
 
 Pour mettre à jour à la main, exécutez `/live off` dans chaque session (le mod rouvre
 l'application de `/Applications` dès qu'elle ne répond plus), quittez LiveBridge, installez
@@ -206,9 +211,9 @@ l'image plus récente comme ci-dessus et exécutez les deux commandes `claude pl
 
 Le premier Start demande à macOS l'accès au microphone. S'il a été refusé, l'appel s'arrête avec
 une phrase d'explication, et **Open Microphone Settings** dans le menu de la barre des menus
-ouvre Confidentialité et sécurité > Microphone, où vous autorisez LiveBridge. Avec la signature
-ad hoc, macOS redemande au premier Start après chaque mise à jour ou recompilation (voir
-ci-dessus). macOS peut aussi demander si LiveBridge peut trouver des appareils sur votre réseau
+ouvre Confidentialité et sécurité > Microphone, où vous autorisez LiveBridge. macOS redemande au
+premier Start après la première mise à jour depuis une version ad hoc, et après chaque
+recompilation depuis les sources signée ad hoc (voir ci-dessus). macOS peut aussi demander si LiveBridge peut trouver des appareils sur votre réseau
 local. La ligne vocale a besoin de cette seconde autorisation également ; sans elle, l'appel
 s'arrête avec une phrase qui indique où l'accorder.
 

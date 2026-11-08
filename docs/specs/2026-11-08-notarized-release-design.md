@@ -84,7 +84,9 @@ Recorded as made, with whose call each was.
   a `.p12` password only from its command line. The value comes from the step's `env`, never
   from `${{ }}` in the script, so it is not in the workflow's text or its log (GitHub masks it);
   it is visible only to processes on the ephemeral runner during that one command. The keychain's
-  own password is random per run and not a secret of the owner.
+  own password is random per run and not a secret of the owner. Likewise `notarytool` takes the
+  Key ID and Issuer ID as arguments; they name the key, and the `.p8` file, which is the secret,
+  goes by path.
 - **The microphone permission** (the orchestrator's call): a Developer ID signature gives the
   app a designated requirement that names the team, not one build's hash, so the permission
   survives later updates. The first update from an ad hoc 0.4.x release asks once more.
@@ -140,9 +142,21 @@ names a team or a requirement, so a Developer ID signature passes exactly as an 
 Stapling writes the ticket outside the code directory, so the CDHash `codesign -dvvv` reports is
 the one the signature gave, and `ditto` keeps both. The same fact cuts the other way: the check
 accepts an ad hoc app as readily, so it is still not an origin check, and the attestation stays
-the one proof of where the image came from. Pinning the team (`codesign --verify -R` with the
+the one proof of where the image came from. Nor does the `release` environment's reviewer gate
+the updater: a tag whose own `release.yml` drops the environment and the signing still gets an
+attestation from that path, which the updater accepts (SECURITY.md already says that anyone who
+can push a tag can make a release that passes). The reviewer guards the Developer ID, not the
+update. Pinning the team (`codesign --verify -R` with the
 team's requirement) is a follow-up once the first notarized release exists; an update from an ad
 hoc release cannot use it, because the running, older updater does the checking.
+
+### What else says "ad hoc"
+
+The README and its translations, SECURITY.md, CONTRIBUTING.md (with the owner's one-time setup
+of the `release` environment), ADR 0002's consequences, the website's install step
+(`site/index.html`), CHANGELOG, and the app's own confirmation before **Install** replaces a
+build from source (`Confirmation.replaceSourceBuild`), which said the release image is signed ad
+hoc.
 
 ## Tests
 
@@ -163,8 +177,12 @@ hoc release cannot use it, because the running, older updater does the checking.
 Nothing below can run without the secrets, so the first `v*` tag after this change is its test:
 
 - The `release` environment, its tag rule and its reviewer gate the job as configured.
-- The `.p12` imports, and `codesign` finds the Developer ID identity in the temporary keychain
-  without a prompt.
+- The `.p12` imports, the runner's image holds Apple's Developer ID intermediate certificate so
+  the identity is valid, and `codesign` finds it in the temporary keychain without a prompt (a
+  local dry run with a self-signed stand-in covered every step up to that validity check).
+- `notarytool submit --output-format json` answers with the `id` and `status` fields
+  `notarize.sh` reads (its test uses a stub), and a Team key with the Developer role may
+  notarize (Apple's forums say so; Apple's documentation names no role).
 - Apple accepts the app and the image (hardened runtime, timestamp, entitlements, the bundled
   resource bundle), and `stapler` and `spctl` pass on the runner.
 - The attestation of the stapled image verifies, and the in-app update from 0.4.2 installs it

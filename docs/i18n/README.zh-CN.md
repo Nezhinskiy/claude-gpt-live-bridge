@@ -86,7 +86,7 @@ scripts/build-app.sh --release
 
 模组来自本仓库的 marketplace（即[快速开始](#快速开始)中的命令），它指向最新发布版本的标签，因此你安装的就是该版本的模组。
 应用无论采用哪种方式，都安装在 `/Applications`：
-通过磁盘映像，或从源码构建。两种方式的应用都使用 ad hoc 签名，且未经公证。
+通过磁盘映像，或从源码构建。磁盘映像使用 LiveBridge 的 Developer ID 签名，并经 Apple 公证；从源码构建的应用两者都不是。
 
 ### 通过磁盘映像安装
 
@@ -102,9 +102,9 @@ scripts/build-app.sh --release
 
    其中 `vX.Y.Z` 是该发布版本的标签，以其发布页面上的名称为准。只有由本仓库的[发布工作流](../../.github/workflows/release.yml)
    在 GitHub 托管的 runner 上根据该标签构建、且此后未被改动的映像才能通过验证。
-   这是映像唯一的来源证明：ad hoc 签名不指向任何人。它并不能证明有人审查过代码。
+   Developer ID 签名由 macOS 自行检查，说明是谁签署了映像；这项验证说明映像是由什么构建的。它并不能证明有人审查过代码。
 3. 打开映像，把 LiveBridge 拖到“应用程序”。
-4. 首次启动时，macOS 会拦截该应用，直到你在“系统设置”>“隐私与安全性”中点击 **Open Anyway** 予以允许。
+4. 首次启动时，macOS 会询问是否打开从互联网下载的应用；点击 **Open**。
 
 ### 通过 Homebrew 安装
 
@@ -112,7 +112,7 @@ scripts/build-app.sh --release
 brew install --cask getlivebridge/tap/livebridge
 ```
 
-这条命令从 [LiveBridge 自己的 tap](https://github.com/getLiveBridge/homebrew-tap) 安装同一个磁盘映像，它不是 Homebrew 的官方 cask。Homebrew 可能会先要求你信任这个 tap，macOS 也会像上面所说的那样阻止首次启动。之后应用会自行更新。
+这条命令从 [LiveBridge 自己的 tap](https://github.com/getLiveBridge/homebrew-tap) 安装同一个磁盘映像，它不是 Homebrew 的官方 cask。Homebrew 可能会先要求你信任这个 tap，macOS 也会像上面所说的那样在首次启动时询问。之后应用会自行更新。
 
 ### 从源码构建
 
@@ -124,8 +124,8 @@ brew install --cask getlivebridge/tap/livebridge
 marketplace 把模组固定在上一个发布版本的标签上，因此从默认分支构建的应用会搭配该版本的模组运行。若要两者一致，请构建该发布版本的标签（`git checkout vX.Y.Z`），
 或用 `claude --plugin-dir plugin` 加载工作树中的模组。
 
-从源码构建的应用只有在你于 Settings 中开启后才会自行检查更新。安装更新会用发布版本的映像替换它，该映像使用 ad hoc 签名，
-因此自签名证书将不再适用；**Install** 会说明这一点并先征求确认。
+从源码构建的应用只有在你于 Settings 中开启后才会自行检查更新。安装更新会用发布版本的映像替换它，该映像使用 LiveBridge 的 Developer ID 签名，而不是你的自签名证书，
+因此 macOS 会再次请求一次麦克风权限；**Install** 会说明这一点并先征求确认。
 
 ### 更新应用
 
@@ -141,8 +141,8 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
   `claude plugin update livebridge@livebridge` 更新模组，停止通话，一步将新应用放到原位并打开它。
 - 之后，Settings 会显示是从哪个版本更新而来。如果模组未能更新，那里会列出这两条命令，供你自己运行。
   已经打开的 Claude Code 会话在重启之前仍使用旧模组；Settings 会列出仍在使用旧模组的已加入会话。
-- 更新的下载不会设置隔离（quarantine）属性，因此 macOS 不应像拦截首次下载那样拦截更新后应用的首次启动；这是从代码推出的结论，尚未实际观察到。
-  由上述检查承担这一把关作用（[SECURITY.md](../../SECURITY.md#what-an-update-installs)）。更新后第一次点击 **Start** 时，macOS 会再次请求麦克风权限，因为每个发布版本都使用 ad hoc 签名。
+- 更新的下载不会设置隔离（quarantine）属性，因此 macOS 不应像首次下载之后那样，在更新后应用的首次启动时停下来询问；这是从代码推出的结论，尚未实际观察到。
+  由上述检查承担这一把关作用（[SECURITY.md](../../SECURITY.md#what-an-update-installs)）。0.4.2 之后的发布版本使用 LiveBridge 的 Developer ID 签名，因此麦克风权限会在版本之间保留；0.4.2 及更早的版本使用 ad hoc 签名，因此从其中任一版本进行的第一次更新，会在第一次点击 **Start** 时再次请求一次麦克风权限。
 
 若要手动更新，请先在每个会话中运行 `/live off`（应用一旦停止响应，模组就会重新打开 `/Applications` 中的应用），退出 LiveBridge，
 按上文安装较新的映像，然后运行这两条 `claude plugin` 命令。
@@ -150,7 +150,7 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
 ### 权限
 
 首次点击 Start 时，macOS 会请求麦克风权限。如果被拒绝，通话会停止并给出一句提示，此时菜单栏菜单中的
-**Open Microphone Settings** 会打开“隐私与安全性”>“麦克风”，你可以在那里允许 LiveBridge。使用 ad hoc 签名时，每次更新或重新构建后
+**Open Microphone Settings** 会打开“隐私与安全性”>“麦克风”，你可以在那里允许 LiveBridge。从 ad hoc 签名的发布版本进行第一次更新后，以及每次使用 ad hoc 签名从源码重新构建后，
 第一次点击 Start，macOS 都会再次询问（见上文）。macOS 还可能询问是否允许 LiveBridge 查找本地网络上的设备。语音线路同样需要这第二项权限；
 没有它，通话会停止并给出一句提示，说明在哪里允许。
 
