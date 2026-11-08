@@ -1,0 +1,8 @@
+{
+  "name": "livebridge-claude-code",
+  "private": true,
+  "description": "The Claude Code CI checks the mod against (.github/workflows/ci.yml), installed with npm ci from this lockfile.",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.309"
+  }
+}

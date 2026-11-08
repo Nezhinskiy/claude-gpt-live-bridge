@@ -86,7 +86,7 @@ answer also needs changes to the audio page.
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the workflows' pinned actions
 and the mod's development dependencies, each version a week after its release; CI passes before
-one is merged.
+one is merged. It leaves the two Claude Code lockfiles under `.github/` alone, as its header says.
 
 ## Checks
 
@@ -98,8 +98,9 @@ It runs `swift format lint --strict`, the Swift build and tests, the shell and a
 tests, the type check and unit tests of the mod's pure modules, and, when `claude` is on your
 `PATH`, the type check of the mod's engine-facing files, `claude plugin validate` and `claude
 plugin test`. Without `claude` the script says that half was not checked and still passes; CI
-installs Claude Code (a pinned version) on the Xcode 27 macOS runner and runs the same script,
-which fails there if `claude` is missing.
+installs Claude Code (the version `.github/claude-code` pins, by hash; to move it, change that
+folder's `package.json` and run `npm install --package-lock-only` there) on the Xcode 27 macOS
+runner and runs the same script, which fails there if `claude` is missing.
 
 CI then runs the engine-facing half again on the lowest Claude Code the README promises, so the
 mod's type check, validation and tests must pass on that version; a need none of them reach still
@@ -110,8 +111,10 @@ scripts/check-floor.sh
 ```
 
 It reads the version from the `Claude Code` line under Requirements in `README.md`, the number's
-home, and downloads that version to a temporary folder. To change the floor, change that line;
-`check.sh` then fails until every other copy says the same.
+home, and installs it in `.github/claude-code-floor` with `npm ci` from that folder's lockfile,
+pinned by hash. To change the floor, change that line, set the same version in that folder's
+`package.json` and run `npm install --package-lock-only` there; `check.sh` fails until every copy
+says the same.
 
 The end-to-end smoke test drives the real codex and spends your ChatGPT plan's realtime voice;
 the header of `scripts/smoke.sh` says how much and what a pass is:
