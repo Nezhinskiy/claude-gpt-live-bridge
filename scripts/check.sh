@@ -11,6 +11,8 @@ sh scripts/tests/uninstall.test.sh
 sh scripts/tests/release-guards.test.sh
 # --package with an identity signs the app and the image as notarization needs (a throwaway one).
 sh scripts/tests/package.test.sh
+# notarize.sh staples only what Apple accepted, and contacts nothing without its credentials.
+sh scripts/tests/notarize.test.sh
 # Every copy of the lowest Claude Code the README promises agrees with its Requirements line.
 sh scripts/tests/claude-code-floor.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
