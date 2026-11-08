@@ -22,7 +22,7 @@ file=${1%/}
 for name in LIVEBRIDGE_NOTARY_KEY LIVEBRIDGE_NOTARY_KEY_ID LIVEBRIDGE_NOTARY_ISSUER; do
   [ -n "$(printenv "$name" || true)" ] || refuse "$name is not set"
 done
-[ -f "$LIVEBRIDGE_NOTARY_KEY" ] || refuse "LIVEBRIDGE_NOTARY_KEY names no file"
+[ -s "$LIVEBRIDGE_NOTARY_KEY" ] || refuse "LIVEBRIDGE_NOTARY_KEY names no file, or an empty one"
 case "$file" in
   *.app) [ -d "$file" ] || refuse "$file is not an app" ;;
   *.dmg) [ -f "$file" ] || refuse "$file is not a disk image" ;;
@@ -59,10 +59,29 @@ if [ "$status" != Accepted ]; then
 fi
 echo "notarized $file ($id)"
 
-xcrun stapler staple "$file"
+# Apple's ticket service can lag a moment behind the verdict, so the staple, and only the
+# staple, is tried three times.
+attempt=1
+until xcrun stapler staple "$file"; do
+  if [ $attempt = 3 ]; then
+    echo "notarize.sh: could not staple $file after $attempt attempts" >&2
+    exit 1
+  fi
+  attempt=$((attempt + 1))
+  sleep 20
+done
 xcrun stapler validate "$file"
+
+# Gatekeeper must accept the file as notarized: with assessments switched off, spctl accepts
+# anything and says "override=security disabled" instead.
 case "$file" in
-  *.app) spctl --assess --type execute --verbose=2 "$file" ;;
-  *.dmg) spctl --assess --type open --context context:primary-signature --verbose=2 "$file" ;;
+  *.app) set -- --type execute ;;
+  *.dmg) set -- --type open --context context:primary-signature ;;
 esac
-echo "stapled $file; Gatekeeper accepts it"
+spctl --assess "$@" --verbose=2 "$file" >"$tmp/spctl" 2>&1
+cat "$tmp/spctl"
+if ! grep -qx 'source=Notarized Developer ID' "$tmp/spctl"; then
+  echo "notarize.sh: Gatekeeper did not assess $file as notarized" >&2
+  exit 1
+fi
+echo "stapled $file; Gatekeeper accepts it as notarized"
