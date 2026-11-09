@@ -19,6 +19,8 @@ public actor Bridge: Router {
   /// Settings' "Pause sync while the call is stopped", read at each synced line, join and line
   /// that opens.
   private let pausesSync: @Sendable () -> Bool
+  /// A session's first summary is loaded under the pause too (`Settings.loadContextOnFirstCall`).
+  private let loadsContextOnFirstCall: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -70,13 +72,15 @@ public actor Bridge: Router {
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
-    pausesSync: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
+    pausesSync: @escaping @Sendable () -> Bool = { false },
+    loadsContextOnFirstCall: @escaping @Sendable () -> Bool = { true }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
     self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
+    self.loadsContextOnFirstCall = loadsContextOnFirstCall
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -400,6 +404,14 @@ public actor Bridge: Router {
     await attempt(waits: waits) { await self.openLine(preroll: preroll) }
   }
 
+  /// Whether the pause, the setting or a session's mark, stops the next line asking for a summary,
+  /// which is written from the whole transcript, paused text included. A session with no summary
+  /// has its first one asked for all the same, if the owner left `loadsContextOnFirstCall` on.
+  private func pauseHoldsBackSummary(of id: SessionID) -> Bool {
+    if loadsContextOnFirstCall(), continuity[id].context == nil { return false }
+    return pausesSync() || continuity[id].outOfSync == .paused
+  }
+
   /// Opens the line with the target's conversation, and asks the target for its context when it
   /// needs one and may have one; the line does not wait for it. Cancelled, it does nothing
   /// more: whoever cancelled it closes what it opened. A line the voice closed itself
@@ -410,9 +422,7 @@ public actor Bridge: Router {
     let session = await registry.target
     lineSession = session
     lineKnowsSession = true
-    if let session, !pausesSync(), continuity[session].outOfSync != .paused,
-      await needsContext(session)
-    {
+    if let session, !pauseHoldsBackSummary(of: session), await needsContext(session) {
       await askForContext(of: session)
     }
     do {
