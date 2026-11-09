@@ -11,8 +11,10 @@
 
     private init(log: CallStatsLog) { self.log = log }
 
-    /// Nil, having said why, when the folder cannot be made: the call goes on unrecorded.
+    /// Nil without `--call-stats`, or when the folder cannot be made (it prints why, which only a
+    /// terminal shows): the call goes on unrecorded.
     static func install(in config: WKWebViewConfiguration) -> CallStatsRecorder? {
+      guard CommandLine.arguments.contains("--call-stats") else { return nil }
       do {
         let directory = try CallStats.directory()
         let recorder = CallStatsRecorder(log: CallStatsLog(directory: directory))

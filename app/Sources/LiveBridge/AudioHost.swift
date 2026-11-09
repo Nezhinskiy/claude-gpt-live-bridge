@@ -40,7 +40,7 @@ final class AudioHost: NSObject, AudioSide {
     super.init()
     config.userContentController.add(self, name: "bridge")
     #if DEBUG
-      if AppModel.recordsCallStats { callStats = CallStatsRecorder.install(in: config) }
+      callStats = CallStatsRecorder.install(in: config)
     #endif
     webView.navigationDelegate = self
     webView.uiDelegate = self

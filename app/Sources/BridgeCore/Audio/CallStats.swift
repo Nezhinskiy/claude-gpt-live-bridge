@@ -89,9 +89,7 @@
     }
 
     static func directory(in base: URL) throws -> URL {
-      let debug = try Paths.ownerOnlyDirectory(
-        Paths.dataDir(in: base).appending(path: "debug"))
-      return try Paths.ownerOnlyDirectory(debug.appending(path: "call-stats"))
+      try Paths.ownerOnlyDirectory(Paths.dataDir(in: base).appending(path: "debug/call-stats"))
     }
   }
 

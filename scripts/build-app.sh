@@ -114,24 +114,16 @@ debug() {
   [ "${1:-}" = --run ] || return 0
   shift
   quit "$app"
-  # The app starts elsewhere, so the WAV's path is made absolute; what --call-stats prints reaches
-  # this terminal only through open's --stdout.
+  if [ "${1:-}" = --fake-mic ] && [ -n "${2:-}" ]; then
+    wav="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+    shift 2
+    set -- --fake-mic "$wav" "$@"
+  fi
+  # What --call-stats prints reaches this terminal only through open's --stdout.
   terminal=
-  n=$#
-  while [ "$n" -gt 0 ]; do
-    arg=$1
-    shift
-    n=$((n - 1))
-    set -- "$@" "$arg"
-    if [ "$arg" = --call-stats ]; then
-      terminal=$(tty 2>/dev/null) || terminal=
-    elif [ "$arg" = --fake-mic ] && [ "$n" -gt 0 ] && [ -n "$1" ]; then
-      wav="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
-      shift
-      n=$((n - 1))
-      set -- "$@" "$wav"
-    fi
-  done
+  case " $* " in
+    *" --call-stats "*) terminal=$(tty 2>/dev/null) || terminal= ;;
+  esac
   if [ -n "${CFFIXED_USER_HOME:-}" ]; then
     open -n --env "CFFIXED_USER_HOME=$CFFIXED_USER_HOME" ${terminal:+--stdout "$terminal"} \
       "$app" --args "$@"
