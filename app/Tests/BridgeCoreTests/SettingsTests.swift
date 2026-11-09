@@ -39,6 +39,51 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.pauseSyncWhileStopped)
   }
 
+  @Test func aFreshInstallLoadsContextOnTheFirstCall() {
+    #expect(Settings().loadContextOnFirstCall)
+  }
+
+  /// The settings a file gives, as an update reads it.
+  private func decoded(_ json: String) throws -> Settings {
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(json.utf8).write(to: file)
+    return SettingsStore(file: file).current
+  }
+
+  @Test func aFileWithoutThePauseLoadsContextOnTheFirstCall() throws {
+    #expect(try decoded(#"{"voice":"marin"}"#).loadContextOnFirstCall)
+  }
+
+  /// They chose that context loads only from the menu; an update must not widen that.
+  @Test func aFileWithThePauseOnDoesNotLoadContextOnTheFirstCall() throws {
+    #expect(try !decoded(#"{"pauseSyncWhileStopped":true}"#).loadContextOnFirstCall)
+  }
+
+  @Test func anOldOptOutDoesNotLoadContextOnTheFirstCall() throws {
+    #expect(try !decoded(#"{"autoContext":false}"#).loadContextOnFirstCall)
+  }
+
+  /// The migration follows the pause as read: an explicit pause off wins over the old opt-out.
+  @Test func anOldOptOutWithThePauseOffLoadsContextOnTheFirstCall() throws {
+    let settings = try decoded(#"{"autoContext":false,"pauseSyncWhileStopped":false}"#)
+    #expect(settings.loadContextOnFirstCall)
+  }
+
+  @Test func aSavedChoiceWinsOverThePauseMigration() throws {
+    let on = try decoded(#"{"pauseSyncWhileStopped":true,"loadContextOnFirstCall":true}"#)
+    #expect(on.loadContextOnFirstCall)
+    let off = try decoded(#"{"loadContextOnFirstCall":false}"#)
+    #expect(!off.loadContextOnFirstCall)
+  }
+
+  /// An owner with the pause on turns it on in Settings, and the migration does not undo that.
+  @Test func turningItOnUnderThePauseIsKept() throws {
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"pauseSyncWhileStopped":true}"#.utf8).write(to: file)
+    SettingsStore(file: file).update { $0.loadContextOnFirstCall = true }
+    #expect(SettingsStore(file: file).current.loadContextOnFirstCall)
+  }
+
   @Test func changesAreKeptAcrossRestarts() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     SettingsStore(file: file).update {

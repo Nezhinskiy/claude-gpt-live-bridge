@@ -251,7 +251,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 - **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है उसे
   session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
-  हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद कभी नहीं
+  हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद सिर्फ़ तब जब उसका सारांश अभी न हो
   ([विवरण](../../docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही हो,
   तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live` उसे वापस ले
   आता है।
@@ -272,18 +272,18 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू
   होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
   ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge))।
-- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: **Pause sync** चालू रहते सारांश नहीं है,
+- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है और **Pause sync** अगली line को उसे load करने से रोकता है,
   कोई turn नहीं पहुँचा, कोई सवाल या permission notice app तक नहीं पहुँचा, mod बंद रहते turns चले,
   सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे बढ़
-  जाती है), session paused रहा है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
-  date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर सारांश अभी नहीं है और कुछ खोया नहीं है, तो यह
+  जाती है), session paused रहा है और उसका सारांश है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
+  date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर कोई line खुली न हो, अगली line सारांश load करेगी और बाकी कुछ नहीं छूटा है, तो यह
   **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। सारांश पर कोई तारीख
   नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है ([BR-002](../../docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
   line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े
   जाते हैं; उन्हें सिर्फ़ **Stop** मिटाता है। Claude के इंतज़ार कर रहे सवालों के नियम अलग हैं
-  ([विवरण](../../SECURITY.md#residual-risk-by-design))। **Pause sync** बंद हो और session paused न हो, तो
+  ([विवरण](../../SECURITY.md#residual-risk-by-design))। **Load a session's context on its first call** चालू हो, या **Pause sync** बंद हो और session paused न हो, तो
   अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें वह भी है जो session ने
   पढ़ा; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
   session में `/live` उसे फिर से जोड़ देता है।
@@ -301,13 +301,20 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   में आप जो टाइप करते हैं और उस पर Claude का अंतिम जवाब, call रुकी होने पर भी voice के साथ उस
   session की conversation में रखे जाते हैं, और अगली line खुलने पर voice के पास होते हैं। line खुलने
   तक Mac से कुछ बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू
-  करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
+  करें, अगर session का सारांश शायद अभी न हो तो अगली setting बंद करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
   session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
-  के बाद भी नहीं: यह सिर्फ़ **Load context** करता है, और वह सारांश पूरे
+  के बाद भी नहीं, सिवाय ऐसे session के जिसका सारांश नहीं है (अगली setting); बाकी समय यह सिर्फ़ **Load context**
+  करता है। वह सारांश पूरे
   transcript से लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था। जिस turn में voice
   अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
   हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](../../SECURITY.md#residual-risk-by-design) में है।
+- **Load a session's context on its first call** (डिफ़ॉल्ट रूप से चालू; update के समय **Pause sync** चालू था तो बंद): जिस session का
+  सारांश voice के पास नहीं है, उसके लिए खुलने वाली line सारांश माँगती है, चाहे **Pause sync** चालू हो या
+  session paused हो, पुरानी chat और **New conversation** के बाद की chat समेत। वह सारांश पूरे transcript से
+  लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
+  बन जाने के बाद जो आगे होता है उस पर pause लागू होता है। यह बंद हो तो pause में सिर्फ़ **Load context** सारांश
+  load करता है।
 - **Play sounds for requests and answers** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध Claude को सौंपता है,
   हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ)), और जब कोई बोल नहीं रहा हो तब खुली या खुलती
   line पर पहुँचने वाले Claude के हर जवाब, विफलता या सवाल के लिए भी एक। प्रतीक्षा कर रहे नतीजे की

@@ -163,12 +163,13 @@ struct BridgeTests {
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
-  /// `dir` and `time` are given to restart the app on another test's data.
+  /// `dir` and `time` are given to restart the app on another test's data. The first-call
+  /// setting defaults off here, unlike in the app, so the suite pins the pause as it was.
   init(
     realtime: (@Sendable () async throws -> any RealtimeControlling)? = nil, dir: URL? = nil,
     time: TestTime = TestTime(), notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true }, pausesSync: Bool = false,
-    appVersion: AppVersion? = nil
+    loadsContextOnFirstCall: Bool = false, appVersion: AppVersion? = nil
   ) throws {
     self.time = time
     let pause = OSAllocatedUnfairLock(initialState: pausesSync)
@@ -181,7 +182,8 @@ struct BridgeTests {
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
-      pausesSync: { pause.withLock { $0 } }, appVersion: appVersion)
+      pausesSync: { pause.withLock { $0 } },
+      loadsContextOnFirstCall: { loadsContextOnFirstCall }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -1410,6 +1412,61 @@ struct BridgeTests {
   @Test func withThePauseSettingOnASessionWithNoSummaryNeedsAPress() async throws {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha")
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// The next line asks for it, so a press is not the only way.
+  @Test func withTheFirstCallSettingNoSummaryUnderThePauseLoadsWithTheLine() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    #expect(await test.bridge.current.contextNeed == .withTheLine)
+  }
+
+  @Test func withTheFirstCallSettingAPausedSessionWithNoSummaryLoadsWithTheLine() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    #expect(await test.bridge.current.contextNeed == .withTheLine)
+  }
+
+  @Test func withoutTheFirstCallSettingAPausedSessionWithNoSummaryNeedsAPress() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: false)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// Once there is a summary only a press loads another under the pause.
+  @Test func withTheFirstCallSettingAPausedSessionWithASummaryNeedsAPress() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/context", test.context())
+    try await test.sync(test.a, "Private thing.")
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// The line is already open and its ask brought nothing, so no line is about to load it.
+  @Test func aLiveLineWithNoSummaryOffersThePress() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    await test.live()
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// A call that is listening has no line yet: the next one still brings the summary.
+  @Test func aListeningCallWithNoSummaryLoadsWithTheLine() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    await test.bridge.perform(.start)
+    #expect(await test.bridge.status.call == .listening)
+    #expect(await test.bridge.current.contextNeed == .withTheLine)
+  }
+
+  /// A gap keeps the press, as it does with the pause off: it need not wait for a line.
+  @Test func withTheFirstCallSettingAGapWithNoSummaryNeedsAPress() async throws {
+    let test = try BridgeTests(loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha", missed: true)
+    #expect(try test.saved()[test.a].outOfSync == .missed)
     #expect(await test.bridge.current.contextNeed == .load)
   }
 
@@ -2644,6 +2701,145 @@ struct BridgeTests {
     let test = try BridgeTests(pausesSync: true)
     try await test.join(test.a, "Alpha", missed: true)
     #expect(try test.saved()[test.a].outOfSync == .paused)
+  }
+
+  // A session's first summary, under the pause
+
+  /// The case that started this: an old chat, the pause on, and a call that knew nothing.
+  @Test func theFirstLineUnderThePauseAsksForContext() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  @Test func aPausedSessionWithNoSummaryAsksForContext() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  /// A mark outlasts the pause setting: the first summary goes over the mark on its own.
+  @Test func aPausedMarkWithThePauseOffAndNoSummaryAsksForContext() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    test.setPause(false)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  @Test func withTheSettingOffTheFirstLineUnderThePauseAsksForNothing() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: false)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  @Test func withTheSettingOffAPausedSessionWithNoSummaryAsksForNothing() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: false)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// The setting covers the first summary only: this one has a summary and typed under the pause.
+  @Test func aPausedSessionWithASummaryAsksForNothing() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/context", test.context())
+    try await test.sync(test.a, "Private thing.")
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// A gap under the pause: there is a summary, so the first-call rule does not reach it.
+  @Test func aMissedSessionWithASummaryUnderThePauseAsksForNothing() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/context", test.context())
+    test.setPause(false)
+    try await test.join(test.a, "Alpha", missed: true)
+    test.setPause(true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+  }
+
+  /// After the first summary lands the pause governs what follows, as it did before.
+  @Test func afterTheFirstSummaryThePauseWorksAsBefore() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+    try await test.post("/v1/context", test.context())
+    #expect(try test.saved()[test.a].outOfSync == nil)
+    await test.bridge.perform(.stop)
+    try await test.sync(test.a, "Private thing.")
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+    #expect(await !test.voice.added.contains { $0.contains("Private thing") })
+  }
+
+  /// Typed under the pause after the ask went out: that summary may carry it past the refusal.
+  @Test func aFirstSummaryOvertakenByPausedTypingIsIgnored() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+    await test.bridge.perform(.stop)
+    try await test.sync(test.a, "Private thing.")
+    try await test.post("/v1/context", test.context())
+    #expect(try test.saved()[test.a].context == nil)
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+  }
+
+  /// New conversation forgets the summary and keeps the mark; the setting asks over the mark.
+  @Test func newConversationWithAPausedMarkAsksForContext() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/context", test.context())
+    try await test.sync(test.a, "Private thing.")
+    await test.bridge.newConversation()
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  @Test func aLineForANewTargetUnderThePauseAsksThatTarget() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/context", test.context())
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == nil)
+    try await test.join(test.b, "Beta")
+    await test.bridge.setTarget(test.b)
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(try await test.registry.poll(test.b) == .context)
+  }
+
+  /// A first ask that brought nothing is asked again by the next line.
+  @Test func aReopenedLineWithStillNoSummaryAsksAgain() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+    test.voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(try await test.registry.poll(test.a) == .context)
+  }
+
+  @Test func aReopenedLineAfterTheFirstSummaryAsksForNothing() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    await test.live()
+    #expect(try await test.registry.poll(test.a) == .context)
+    try await test.post("/v1/context", test.context())
+    test.voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await test.bridge.status.call == .listening })
+    await test.bridge.audioEvent(.speechStarted)
+    #expect(try await test.registry.poll(test.a) == nil)
   }
 
   @Test func aRemovedSessionsLineIsRefused() async throws {

@@ -166,8 +166,9 @@ A surface that has drawn no band for 3 s while the session is joined is asked fo
 `/live` in a joined session asks every surface for it. Start makes the session the target and
 starts the call; the line the app opens then asks the target for its summary when the voice would
 lack part of the session (it has none, a turn did not arrive, the lines since the summary no
-longer all fit the seed, or the mod does not sync), unless the pause setting is on or the session
-is *paused*. The mod writes it (none for a session with no prompt yet; the last one again, with
+longer all fit the seed, or the mod does not sync), unless the pause holds it back
+(`Bridge.pauseHoldsBackSummary`): the pause setting is on or the session is *paused*, and the session
+has a summary or **Load a session's context on its first call** is off. The mod writes it (none for a session with no prompt yet; the last one again, with
 no model call, until any main-loop turn completes, or `/clear`), with a
 short note in the band while it goes. Talk here shows only while the call talks to another session,
 and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
@@ -263,7 +264,7 @@ The realtime session is billed while open, so silence closes it. Voice detection
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
-its context when the voice would lack part of the session (see the mod's Start above) and neither the pause setting is on nor the session *paused*; the line does not wait for
+its context when the voice would lack part of the session (see the mod's Start above) and the pause does not hold it back (the same rule); the line does not wait for
 it, and a summary that comes while the line connects is added once it is connected, unless the
 line was seeded with the same one.
 

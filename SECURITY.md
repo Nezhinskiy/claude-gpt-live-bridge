@@ -87,8 +87,8 @@ voices.
     (`[CLAUDE]`). They are saved and seed later calls the same way, and go to the open line when
     that session is the target. The app takes the label on the process's word;
   - join a session as one that missed a turn, or that does not sync, which makes the next line
-    that session opens ask it for a fresh summary (never while the pause setting is on or the
-    session is marked paused, below), and so makes it write one;
+    that session opens ask it for a fresh summary (while the pause setting is on or the
+    session is marked paused, only one with no summary yet, below), and so makes it write one;
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation;
   - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as
@@ -228,9 +228,13 @@ those shapes goes to OpenAI as typed, personal text included.
   turn included, and the session is marked *paused* (`Continuity.admits`, `Bridge.sync`). Typing
   also refuses the rest of a turn that began synced: Claude's later lines of it stay out too.
   While
-  the setting is on, no line loads a summary by itself (`Bridge.openLine`), and none does for a
-  session marked paused after the setting is off again: only **Load context**
-  does, because a summary is written from the whole transcript and carries the paused text. An
+  the setting is on, no line loads a summary by itself (`Bridge.pauseHoldsBackSummary`), and none
+  does for a session marked paused after the setting is off again, with one exception. With **Load
+  a session's context on its first call** on, which is the default unless the pause was on when you
+  updated to it, a line that opens for a session with no summary asks for one, under the pause or
+  the mark. The pause does not hold that summary back: it is written from the whole transcript,
+  paused text included, goes to OpenAI, and clears the *paused* mark. Otherwise only **Load
+  context** loads one, and it carries the same text. An
   older mod's `/live context` does too; the last point below says what that can do.
   What the pause does not do:
   - It removes nothing already recorded, in the data folder or in a line that is open.
@@ -252,13 +256,15 @@ those shapes goes to OpenAI as typed, personal text included.
   - A prompt typed while Claude streams its final text starts a turn of its own, which keeps the
     decision of the turn it was typed into; a slash command queued behind a turn takes a
     decision of its own, so the pause reaches less far there.
-  - Eviction past the 20 sessions loses the paused mark. With the setting still on, no summary
-    loads; with it off, you have ended the pause.
+  - Eviction past the 20 sessions loses the paused mark and the summary. With the pause setting
+    still on, no summary loads unless **Load a session's context on its first call** is on; with
+    the pause setting off, you have ended the pause.
   - It does not hold if the app was not running or the mod could not post: a turn the app did not
     receive marks the session *missed*, or *paused* while the setting is on
     (`Continuity.markMissed`), and so do a question or permission notice the app did not take and
-    turns that ran while the mod was off. A missed session, unlike a paused one, loads a summary by
-    itself once the setting is off. A turn whose `start` never arrived has no decision: while the
+    turns that ran while the mod was off. A missed session loads a summary by itself once the pause setting is
+    off; a paused one does not, unless it has no summary and **Load a session's context on its first
+    call** is on. A turn whose `start` never arrived has no decision: while the
     session is *paused*, a line of Claude's opening it stays out (`Continuity.admits`).
   - The session title is not touched by the pause. The poll follows it whatever the setting says,
     and `AnswerShaper.line` puts it in every line, unredacted, so paused text the title was written
@@ -287,9 +293,10 @@ those shapes goes to OpenAI as typed, personal text included.
   Those lines stay recorded. `/clear` gives the session a new id and carries its lines and context
   to it, so `/clear` ends nothing until **New conversation** follows. Removing a session holds until
   you join it again, since the mod's own joins are refused (`410`). **New conversation** and × keep
-  the *paused* mark, so the next line asks for no summary of that transcript. A session with no
-  summary and no pause mark does get one from the next line, written from the whole transcript, the
-  text the session read included.
+  the *paused* mark, so with **Load a session's context on its first call** off the next line asks
+  for no summary of that transcript. With it on, or with the pause setting off and no pause mark, a session with no summary
+  does get one from the next line, written from the whole transcript, the text the session read
+  and any paused text included.
 - **A result from another session** is still spoken in whatever line is open, and the voice's
   reply to it stays in that line's conversation, so one session's text can still reach the
   conversation about another.
@@ -297,7 +304,8 @@ those shapes goes to OpenAI as typed, personal text included.
 Join only sessions whose input you trust. After a session has read text you do not trust,
 `/clear` it, press **Stop**, then press **New conversation** with it as the target, and do not
 press **Load context** for it until you want the transcript's summary. To keep what you type out of the
-voice, press Stop first and turn on **Pause sync while the call is stopped**; what you typed
+voice, press Stop first and turn on **Pause sync while the call is stopped**, and turn off **Load a
+session's context on its first call** if the session may have no summary yet; what you typed
 before that stays recorded. Keep voice off for a session whose permission mode acts without
 asking.
 
