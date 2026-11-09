@@ -526,4 +526,9 @@ final class AppModel {
     #endif
     return nil
   }
+
+  #if DEBUG
+    /// `--call-stats`: debug builds record the incoming voice's numbers, one local file per call.
+    static var recordsCallStats: Bool { CommandLine.arguments.contains("--call-stats") }
+  #endif
 }

@@ -194,6 +194,7 @@ The Apple Developer Program's account holder does this; nothing of it is in the 
 ```sh
 scripts/build-app.sh --run                      # debug build, then open it
 scripts/build-app.sh --run --fake-mic say.wav   # the WAV plays as the microphone
+scripts/build-app.sh --run --call-stats         # the voice's numbers, one CSV per call
 CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of your home
 /usr/bin/log stream --info --predicate 'subsystem == "com.getlivebridge.livebridge"'
 ```
@@ -201,6 +202,24 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 `claude --plugin-dir plugin` loads the mod from the working tree. The mod follows
 `CFFIXED_USER_HOME` to the socket as the app does, so `CFFIXED_USER_HOME=/tmp/lb claude
 --plugin-dir plugin` talks to the app started with the same variable.
+
+### Reading `--call-stats`
+
+For when the voice breaks up: was it the network? While a line is open, a debug build started
+with `--call-stats` adds a row once a second to a CSV in
+`~/Library/Application Support/LiveBridge/debug/call-stats/`, one file per call, and prints the
+file's path. It holds the time and numbers from WebKit's `getStats()` only: no audio, no
+transcript, no session names, and nothing leaves the Mac. A release build has none of this
+(`scripts/tests/release-guards.test.sh` checks).
+
+Note the time of the glitch and find its row. `line` changes when the line reopens, and the
+counters restart with it. All columns but `jitter` are running totals, so compare a row with the
+one before.
+
+- `packetsLost`, or `concealedSamples` minus `silentConcealedSamples`, jumping at that moment, or
+  `jitter` rising, points to the network.
+- Clean numbers mean the server or the local audio output (Bluetooth, echo cancellation). These
+  numbers alone cannot separate those two.
 
 ## Conventions
 
