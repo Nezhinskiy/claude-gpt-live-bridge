@@ -1,6 +1,7 @@
-// The `--call-stats` debug tool: numbers about the incoming voice, in a local file, to tell a
-// network glitch from any other. Debug builds only, and not by a setting: the README promises no
-// telemetry, so a release binary holds none of this (scripts/tests/release-guards.test.sh).
+// The `--call-stats` debug tool: numbers about the incoming voice, in a local file, to help tell
+// a network glitch from any other. Debug builds only, and not by a setting: the README promises
+// no telemetry, so `#if DEBUG` compiles it out of a release, and
+// scripts/tests/release-guards.test.sh looks there for its names.
 #if DEBUG
   import Foundation
 

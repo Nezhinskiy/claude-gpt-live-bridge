@@ -21,9 +21,8 @@
 # set, is the one keychain searched for it. LIVEBRIDGE_DIST names another folder than dist/.
 # --fake-mic (debug builds only) plays WAV as the microphone. --call-stats (debug builds only)
 # writes the incoming voice's numbers once a second to one CSV per call, under the app's data
-# folder in debug/call-stats, and prints its path. Numbers jumping at the moment of a glitch point
-# to the network; clean numbers mean the server or the local audio output, which they cannot
-# separate. CONTRIBUTING.md says how to read the columns. If CFFIXED_USER_HOME is set, the
+# folder in debug/call-stats, and prints its path when started from a terminal. CONTRIBUTING.md
+# says how to read the numbers, and what they cannot tell. If CFFIXED_USER_HOME is set, the
 # app keeps its files under that directory instead of your home folder. The disk image is
 # dragged to /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS
 # names another folder for it (the uninstall test's scratch one).

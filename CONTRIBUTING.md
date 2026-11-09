@@ -207,19 +207,21 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 
 For when the voice breaks up: was it the network? While a line is open, a debug build started
 with `--call-stats` adds a row once a second to a CSV in
-`~/Library/Application Support/LiveBridge/debug/call-stats/`, one file per call, and prints the
-file's path. It holds the time and numbers from WebKit's `getStats()` only: no audio, no
-transcript, no session names, and nothing leaves the Mac. A release build has none of this
-(`scripts/tests/release-guards.test.sh` checks).
+`~/Library/Application Support/LiveBridge/debug/call-stats/`, one file per call. Started from a
+terminal, it prints the file's path there. It holds the time and numbers from WebKit's
+`getStats()` only: no audio, no transcript, no session names, and nothing leaves the Mac. A release
+build compiles all of this out; `scripts/tests/release-guards.test.sh` looks for its names.
 
 Note the time of the glitch and find its row. `line` changes when the line reopens, and the
 counters restart with it. All columns but `jitter` are running totals, so compare a row with the
-one before.
+one before, and ignore a line's first row, where concealment is only start-up.
 
-- `packetsLost`, or `concealedSamples` minus `silentConcealedSamples`, jumping at that moment, or
-  `jitter` rising, points to the network.
-- Clean numbers mean the server or the local audio output (Bluetooth, echo cancellation). These
-  numbers alone cannot separate those two.
+- `packetsLost` jumping at that moment points to the network.
+- `packetsDiscarded`, `jitter`, or `concealedSamples` minus `silentConcealedSamples` rising without
+  loss means audio arrived late or not at all: the network or the server, which these numbers
+  cannot separate.
+- Clean numbers rule out delivery of the incoming audio. That leaves what the server generated and
+  the local audio output (Bluetooth, echo cancellation), which these numbers cannot separate either.
 
 ## Conventions
 
