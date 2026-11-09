@@ -61,11 +61,9 @@ struct SettingsView: View {
       Section("Sync") {
         Toggle("Pause sync while the call is stopped", isOn: setting(\.pauseSyncWhileStopped))
         Text(
-          model.settings.current.loadContextOnFirstCall
-            ? "What you type while the call is off stays out of the voice's conversation. After "
-              + "a session's first summary, context loads only from the menu."
-            : "What you type while the call is off stays out of the voice's conversation, and "
-              + "context loads only from the menu."
+          "What you type while the call is off stays out of the voice's conversation, and context "
+            + "loads only from the menu, unless the next setting loads a summary, which carries "
+            + "that text."
         )
         .font(.caption).foregroundStyle(.secondary)
         Toggle(
