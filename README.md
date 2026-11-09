@@ -94,8 +94,10 @@ claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 ```
 
-3. Open LiveBridge. It is not notarized, so the first time macOS blocks it until you allow it
-   under System Settings > Privacy & Security > **Open Anyway**.
+3. Open LiveBridge. Releases after 0.4.2 are notarized: the first time, macOS asks whether to
+   open an app downloaded from the internet; click **Open**. 0.4.2 and earlier are not, so
+   macOS blocks the first launch until you allow it under System Settings > Privacy & Security >
+   **Open Anyway**.
 4. In the Claude Code session you want to talk to, type `/live`.
 5. Press **Start** in the band above the prompt, allow the microphone, and talk.
 
@@ -127,7 +129,10 @@ rebuilds and uninstalling are under [Install](#install).
 The mod comes from this repository's marketplace (the [Quick start](#quick-start) commands),
 which names the latest release's tag, so the mod you install is that release's. The app goes in
 `/Applications` whichever way you install it: with Homebrew, from the disk image, or built from
-source. Whichever way, it is signed ad hoc and not notarized.
+source. From the first release after 0.4.2, the disk image, which Homebrew installs too, is
+signed with LiveBridge's Developer ID and notarized by Apple; 0.4.2 and earlier were signed ad
+hoc and not notarized, and a build from source is neither signed with the Developer ID nor
+notarized.
 
 ### From the disk image
 
@@ -144,11 +149,14 @@ source. Whichever way, it is signed ad hoc and not notarized.
 
    with `vX.Y.Z` the release's tag, as its page names it. This passes only for an image that
    this repository's [release workflow](.github/workflows/release.yml) built from that tag, on a
-   GitHub-hosted runner, and that has not changed since. It is the image's one proof of origin:
-   the ad hoc signature names no one. It does not prove that anyone reviewed the code.
+   GitHub-hosted runner, and that has not changed since. On a release after 0.4.2, the Developer
+   ID signature, which macOS checks by itself, says who signed the image, and this says what it
+   was built from; on 0.4.2 and earlier, whose ad hoc signature names no one, this is the image's
+   one proof of origin. It does not prove that anyone reviewed the code.
 3. Open it and drag LiveBridge to Applications.
-4. On first launch macOS blocks the app until you allow it under System Settings > Privacy &
-   Security > **Open Anyway**.
+4. On first launch, a release after 0.4.2 makes macOS ask whether to open an app downloaded
+   from the internet; click **Open**. 0.4.2 and earlier are blocked until you allow them under
+   System Settings > Privacy & Security > **Open Anyway**.
 
 ### With Homebrew
 
@@ -157,7 +165,7 @@ brew install --cask getlivebridge/tap/livebridge
 ```
 
 This installs the same disk image from [LiveBridge's own tap](https://github.com/getLiveBridge/homebrew-tap), which is not one of Homebrew's
-casks. Homebrew may ask you to trust the tap first, and macOS blocks the first launch as above. The
+casks. Homebrew may ask you to trust the tap first, and macOS asks at the first launch as above. The
 app then updates itself, as below.
 
 ### From source
@@ -174,8 +182,9 @@ runs with that release's mod. To match them, build the release's tag (`git check
 load the working tree's mod with `claude --plugin-dir plugin`.
 
 A build from source checks for updates by itself only if you turn that on in Settings.
-Installing an update replaces it with the release's image, which is signed ad hoc, so the
-self-signed certificate no longer applies; **Install** says so and asks first.
+Installing an update replaces it with the release's image, which is signed with LiveBridge's
+Developer ID, not your self-signed certificate, so macOS asks for the microphone once more;
+**Install** says so and asks first.
 
 ### Updating
 
@@ -197,11 +206,14 @@ the copy at `/Applications/LiveBridge.app` updates; any other copy says so in Se
 - Afterwards Settings says which version it updated from. If the mod could not be updated, it
   shows those two commands for you to run. Claude Code sessions already open keep the old mod
   until they restart; Settings lists the joined ones that still do.
-- The update's download sets no quarantine attribute, so macOS should not block the updated
-  app's first launch as it blocked the first download; this follows from the code and has not
-  yet been observed. The checks above are what stands in its place
-  ([SECURITY.md](SECURITY.md#what-an-update-installs)). macOS does ask for the microphone again
-  at the first **Start** after an update, because each release is signed ad hoc.
+- The update's download sets no quarantine attribute, so macOS should not stop the updated
+  app's first launch to ask, as it did after the first download; this follows from the code and
+  has not yet been observed. The checks above are what stands in its place
+  ([SECURITY.md](SECURITY.md#what-an-update-installs)). Releases after 0.4.2 are signed with
+  LiveBridge's Developer ID, so the microphone permission should carry over from one to the
+  next; this follows from how macOS keys the permission and has not yet been observed. 0.4.2 and
+  earlier were signed ad hoc, so the first update from one of them asks for the microphone once
+  more, at the first **Start**.
 
 To update by hand instead, run `/live off` in every session (the mod reopens the app at
 `/Applications` whenever the app stops answering), quit LiveBridge, install the newer image as
@@ -211,8 +223,9 @@ above and run the two `claude plugin` commands.
 
 The first Start asks macOS for the microphone. If it was refused, the call stops with a
 sentence and the menu bar menu's **Open Microphone Settings** opens Privacy & Security >
-Microphone, where you allow LiveBridge. With the ad hoc signature macOS asks again at the first
-Start after every update or rebuild (see above). macOS may also ask whether LiveBridge may find
+Microphone, where you allow LiveBridge. macOS asks again at the first Start after the first
+update from an ad hoc release, and after every rebuild from source signed ad hoc (see above).
+macOS may also ask whether LiveBridge may find
 devices on your local network. The voice line needs that second permission too; without it the
 call stops with a sentence that says where to allow it.
 

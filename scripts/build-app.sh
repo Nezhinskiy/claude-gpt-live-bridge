@@ -9,8 +9,15 @@
 #                                                 so the microphone permission survives upgrades
 #   scripts/build-app.sh --uninstall              remove the app and every file it keeps
 #   scripts/build-app.sh --package                the download: dist/LiveBridge.dmg, built from
-#                                                 the committed HEAD, signed ad hoc, not notarized
+#                                                 the committed HEAD, signed ad hoc unless
+#                                                 LIVEBRIDGE_SIGN_IDENTITY is set, not notarized
+#   scripts/build-app.sh --package-app            its first half: dist/LiveBridge.app
+#   scripts/build-app.sh --package-dmg            its second: the image, from dist/LiveBridge.app
 #
+# LIVEBRIDGE_SIGN_IDENTITY names the package's code-signing identity: a name prefix, such as
+# "Developer ID Application", or a SHA-1 hash. The app and the image are then signed with it and
+# a secure timestamp, as notarization (scripts/notarize.sh) needs; LIVEBRIDGE_SIGN_KEYCHAIN, when
+# set, is the one keychain searched for it. LIVEBRIDGE_DIST names another folder than dist/.
 # --fake-mic (debug builds only) plays WAV as the microphone. If CFFIXED_USER_HOME is set, the
 # app keeps its files under that directory instead of your home folder. The disk image is
 # dragged to /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS
@@ -24,7 +31,7 @@ IDENTITY="LiveBridge Local Signing"
 INSTALLED="${LIVEBRIDGE_APPLICATIONS:-/Applications}/LiveBridge.app"
 
 usage() {
-  sed -n '4,12s/^# \{0,1\}//p' "$0" >&2
+  sed -n '4,15s/^# \{0,1\}//p' "$0" >&2
   exit 2
 }
 
@@ -66,6 +73,20 @@ compile_icon() {
 sign() {
   codesign --force --sign "$2" --options runtime \
     --entitlements app/Support/LiveBridge.entitlements "$1"
+}
+
+# Signs as the package identity, LIVEBRIDGE_SIGN_IDENTITY, with the arguments given. Unset, the
+# signature is ad hoc (a local signing identity means nothing on another Mac); set, it carries a
+# secure timestamp, which notarization requires, and is looked up in LIVEBRIDGE_SIGN_KEYCHAIN
+# alone when that is set.
+sign_package() {
+  identity=${LIVEBRIDGE_SIGN_IDENTITY:-}
+  if [ -z "$identity" ]; then
+    codesign --force --sign - "$@"
+  else
+    codesign --force --sign "$identity" --timestamp \
+      ${LIVEBRIDGE_SIGN_KEYCHAIN:+--keychain "$LIVEBRIDGE_SIGN_KEYCHAIN"} "$@"
+  fi
 }
 
 has_identity() { security find-identity -p codesigning 2>/dev/null | grep -qF "\"$IDENTITY\""; }
@@ -157,33 +178,66 @@ EOF
   echo "created \"$IDENTITY\"; scripts/build-app.sh --release now signs with it"
 }
 
-# Builds the downloadable disk image from the committed HEAD in a scratch copy under /tmp, so no
-# path of this Mac ends up in the binary, strips the debug symbols, signs ad hoc (a local signing
-# identity means nothing on another Mac) and writes dist/LiveBridge.dmg. The version is read
-# from that copy, so the volume name matches the app inside it. The release workflow
-# (.github/workflows/release.yml) runs this on a tag and attests the image.
-package() {
-  out="$PWD/dist"
+# The package's output folder: LIVEBRIDGE_DIST, or dist/.
+dist() { printf '%s' "${LIVEBRIDGE_DIST:-$PWD/dist}"; }
+
+# Builds the downloadable app from the committed HEAD in a scratch copy under /tmp, so no path
+# of this Mac ends up in the binary, strips the debug symbols, signs it as the package identity
+# and writes dist/LiveBridge.app. The release workflow (.github/workflows/release.yml)
+# notarizes and staples it there before --package-dmg.
+package_app() {
+  out=$(dist)
   src=$(mktemp -d /tmp/livebridge-package.XXXXXX)
   trap 'rm -rf "$src"' EXIT
   git archive HEAD | tar -x -C "$src"
-  version=$(plutil -extract CFBundleShortVersionString raw "$src/app/Support/Info.plist")
   (
     cd "$src"
-    assemble release "$src/stage/LiveBridge.app"
-    strip -S -x "$src/stage/LiveBridge.app/Contents/MacOS/LiveBridge"
-    sign "$src/stage/LiveBridge.app" -
-    ln -s /Applications "$src/stage/Applications"
+    assemble release "$src/LiveBridge.app"
+    strip -S -x "$src/LiveBridge.app/Contents/MacOS/LiveBridge"
+    sign_package --options runtime --entitlements app/Support/LiveBridge.entitlements \
+      "$src/LiveBridge.app"
   )
-  if grep -a -q -e "$HOME" "$src/stage/LiveBridge.app/Contents/MacOS/LiveBridge"; then
+  if grep -a -q -e "$HOME" "$src/LiveBridge.app/Contents/MacOS/LiveBridge"; then
     echo "the binary still names $HOME; nothing packaged" >&2
     return 1
   fi
+  codesign --verify --deep --strict "$src/LiveBridge.app"
   mkdir -p "$out"
+  rm -rf "$out/LiveBridge.app"
+  ditto "$src/LiveBridge.app" "$out/LiveBridge.app"
+  rm -rf "$src"
+  trap - EXIT
+  echo "packaged $out/LiveBridge.app ($(git rev-parse --short HEAD))"
+}
+
+# Builds dist/LiveBridge.dmg from dist/LiveBridge.app, which ditto copies with its signature and
+# any stapled ticket, beside a link to /Applications. The volume is named after the app's own
+# version. The image is signed as the package identity; an ad hoc package leaves it unsigned, as
+# an ad hoc signature on an image proves nothing.
+package_dmg() {
+  out=$(dist)
+  if [ ! -d "$out/LiveBridge.app" ]; then
+    echo "$out/LiveBridge.app is missing; run --package-app first" >&2
+    return 1
+  fi
+  version=$(plutil -extract CFBundleShortVersionString raw "$out/LiveBridge.app/Contents/Info.plist")
+  stage=$(mktemp -d /tmp/livebridge-image.XXXXXX)
+  trap 'rm -rf "$stage"' EXIT
+  ditto "$out/LiveBridge.app" "$stage/LiveBridge.app"
+  ln -s /Applications "$stage/Applications"
   rm -f "$out/LiveBridge.dmg"
-  hdiutil create -quiet -volname "LiveBridge $version" -srcfolder "$src/stage" -ov \
+  hdiutil create -quiet -volname "LiveBridge $version" -srcfolder "$stage" -ov \
     -format UDZO "$out/LiveBridge.dmg"
-  echo "packaged $out/LiveBridge.dmg ($version, $(git rev-parse --short HEAD))"
+  if [ -n "${LIVEBRIDGE_SIGN_IDENTITY:-}" ] && ! {
+    sign_package "$out/LiveBridge.dmg" && codesign --verify --strict "$out/LiveBridge.dmg"
+  }; then
+    rm -f "$out/LiveBridge.dmg" # not left to pass for a signed image
+    echo "the image could not be signed; nothing packaged" >&2
+    return 1
+  fi
+  rm -rf "$stage"
+  trap - EXIT
+  echo "packaged $out/LiveBridge.dmg ($version)"
 }
 
 # Removes exactly these paths; the microphone permission is macOS's, so its reset is printed.
@@ -210,6 +264,11 @@ case "${1:-}" in
   --release) release ;;
   --make-signing-identity) make_identity ;;
   --uninstall) uninstall ;;
-  --package) package ;;
+  --package) # in sequence, not with &&, which would turn set -e off inside package_app
+    package_app
+    package_dmg
+    ;;
+  --package-app) package_app ;;
+  --package-dmg) package_dmg ;;
   *) usage ;;
 esac
