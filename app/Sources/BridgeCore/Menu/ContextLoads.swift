@@ -4,7 +4,7 @@ import Foundation
 public enum ContextNeed: Sendable, Equatable {
   /// The voice has the whole session.
   case none
-  /// It has no summary yet, nothing is lost, and the next line loads one by itself.
+  /// No line is open, and the next one loads the only thing missing, a summary, by itself.
   case withTheLine
   /// A press is worth offering: a gap, a mod that does not sync or too many lines, which the next
   /// line also asks for, or a pause that holds the next line back, so only a press loads.

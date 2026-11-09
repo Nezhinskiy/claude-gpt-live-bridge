@@ -1446,6 +1446,22 @@ struct BridgeTests {
     #expect(await test.bridge.current.contextNeed == .load)
   }
 
+  /// The line is already open and its ask brought nothing, so no line is about to load it.
+  @Test func aLiveLineWithNoSummaryOffersThePress() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    await test.live()
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// A call that is listening has no line yet: the next one still brings the summary.
+  @Test func aListeningCallWithNoSummaryLoadsWithTheLine() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    await test.bridge.perform(.start)
+    #expect(await test.bridge.status.call == .listening)
+    #expect(await test.bridge.current.contextNeed == .withTheLine)
+  }
+
   /// A gap keeps the press, as it does with the pause off: it need not wait for a line.
   @Test func withTheFirstCallSettingAGapWithNoSummaryNeedsAPress() async throws {
     let test = try BridgeTests(loadsContextOnFirstCall: true)

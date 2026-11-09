@@ -215,7 +215,7 @@ public actor Bridge: Router {
   /// Forgets the target's conversation; its next realtime session starts fresh.
   public func newConversation() async {
     guard let target = await registry.target else { return }
-    if isLineOpen, lineKnowsSession, lineSession == target { await send(.conversationChanged) }
+    if lineIsOpen(for: target) { await send(.conversationChanged) }
     await forgetConversation(of: target)
   }
 
@@ -387,15 +387,15 @@ public actor Bridge: Router {
     return await !registry.syncs(id)
   }
 
-  /// What the menu says of it: a session that has no summary and no gap has one asked for by its
-  /// next line, so it is offered no press, unless the pause stops that line. A paused mark is no
-  /// gap: all it costs the voice is the summary this line then brings.
+  /// What the menu says of it: a session whose next line asks for the one thing missing is
+  /// offered no press, unless a line is already open, whose ask may have brought nothing. A paused
+  /// mark is no gap: all it costs the voice is the summary that line then brings.
   private func contextNeed(_ id: SessionID) async -> ContextNeed {
     guard await needsContext(id) else { return .none }
     let conversation = continuity[id]
     let hasGap = conversation.outOfSync == .missed || conversation.isOverSeed
     let syncs = await registry.syncs(id)
-    return !hasGap && syncs && conversation.context == nil && !pauseHoldsBackSummary(of: id)
+    return !hasGap && syncs && !pauseHoldsBackSummary(of: id) && !lineIsOpen(for: id)
       ? .withTheLine : .load
   }
 
@@ -586,6 +586,10 @@ public actor Bridge: Router {
   private var pausing: Bool { pausesSync() && machine.phase == .off }
 
   private var isLineOpen: Bool { machine.phase == .connecting || machine.phase == .live }
+
+  private func lineIsOpen(for id: SessionID) -> Bool {
+    isLineOpen && lineKnowsSession && lineSession == id
+  }
 
   // MARK: Routing
 
