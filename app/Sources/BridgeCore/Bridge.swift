@@ -73,7 +73,7 @@ public actor Bridge: Router {
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false },
-    loadsContextOnFirstCall: @escaping @Sendable () -> Bool = { true }, appVersion: AppVersion?
+    loadsContextOnFirstCall: @escaping @Sendable () -> Bool, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
