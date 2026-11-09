@@ -11,8 +11,9 @@
     /// What is read from the incoming audio's `inbound-rtp` report, and written. All are running
     /// totals of the line, but `jitter`, which is the current value in seconds.
     static let fields = [
-      "packetsReceived", "packetsLost", "jitter", "concealedSamples", "silentConcealedSamples",
-      "concealmentEvents", "totalSamplesReceived", "insertedSamplesForDeceleration",
+      "packetsReceived", "packetsLost", "packetsDiscarded", "jitter", "concealedSamples",
+      "silentConcealedSamples", "concealmentEvents", "totalSamplesReceived",
+      "insertedSamplesForDeceleration",
       "removedSamplesForAcceleration", "jitterBufferDelay", "jitterBufferEmittedCount",
     ]
 

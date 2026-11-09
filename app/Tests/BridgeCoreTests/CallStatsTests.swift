@@ -60,7 +60,7 @@ struct CallStatsRowTests {
   /// The numbers the owner reads a glitch by.
   @Test(arguments: [
     "packetsLost", "packetsReceived", "jitter", "concealedSamples", "totalSamplesReceived",
-    "jitterBufferDelay",
+    "jitterBufferDelay", "packetsDiscarded",
   ])
   func theColumnIsWritten(_ name: String) throws {
     #expect(try cells(["line": 1, name: 7])[name] == "7")
