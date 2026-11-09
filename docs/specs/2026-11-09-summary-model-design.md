@@ -25,31 +25,62 @@ By voice, 2026-11-09, the last word replacing the earlier ones:
 - **A Settings field, "Summary model":** Haiku 5.5, Sonnet 5.5, Opus 5.5 and a custom text field,
   "на случай выхода новых моделей". Default Sonnet 5.5.
 - **Always low effort**, stated in Settings.
-- **No fallback** from one model to another.
+- **On an error, the default.** "Лучше просто в случае ошибки переключаться на дефолт." A summary
+  that fails on the chosen model is written by the default instead.
+- **A custom value is checked when it is saved.** "делать короткий запрос для проверки
+  работоспособности, либо оставаться, либо не принимать его."
 - **On Start the call loads the context first:** the owner presses Start, sees that it is loading,
   the microphone stays off and voice input is blocked until the summary is in, and then the voice
   chat begins. Polling for this goes every 0.2 s instead of every second.
 
-**Assumption to confirm.** The list holds pinned ids (`claude-haiku-5-5`, `claude-sonnet-5-5`,
-`claude-opus-5-5`), because the final wording names versions and gives new models as the reason
-for the custom field. An earlier wish was aliases that follow the latest version. If the owner
-prefers those, the list's three values become `haiku`, `sonnet` and `opus` and nothing else in this
-design moves.
+**Pinned versions, confirmed by the owner.** The list holds pinned ids (`claude-haiku-5-5`,
+`claude-sonnet-5-5`, `claude-opus-5-5`), not aliases that follow the latest version, which was an
+earlier wish. A new model is reached through the custom field until a release adds it to the list.
 
 ## What the owner sees
 
 ### Settings
 
 The Sync section gets a **Summary model** picker: Haiku 5.5, Sonnet 5.5, Opus 5.5, Custom…. Custom
-shows a text field. The caption says: "Writes the summary the voice gets as context, always at low
-effort, on your Claude usage. If Claude Code refuses this model, the call goes on without a new
-summary." Under it, once a summary has failed and until one succeeds, one line says why (a model
-Claude Code refuses or the API rejects, a time-out, no text).
+shows a text field and a **Check and save** button. The caption says: "Writes the summary the voice
+gets as context, always at low effort, on your Claude usage. If this model fails, Sonnet 5.5 writes
+it instead."
+
+Under it, one line appears after a summary that did not come from the chosen model, until one does:
+"The last summary used Sonnet 5.5: claude-example was refused." If the default failed too, the line
+says the voice got no new summary, and why.
 
 The value is stored as one string, `summaryModel`. A settings file without the key gets
 `claude-sonnet-5-5`. Text is trimmed; empty text, or text outside `[A-Za-z0-9._:/@\[\]-]{1,128}`,
-is not stored and the field says so. That check keeps nonsense out of the wire and the log. It is
-not a control: the engine resolves and allowlist-checks the value.
+is refused before any check. That keeps nonsense out of the wire and the log. It is not a control:
+the engine resolves and allowlist-checks the value.
+
+#### Checking a custom value
+
+The setting lives in the app, and `$.model.complete` lives in the mod: the app has no Claude client
+of its own. So a joined session's mod runs the check.
+
+1. **Check and save** is the only trigger. Picking a list entry checks nothing, nor does saving the
+   value already stored or a value from the list. Typing spends nothing.
+2. The app picks the target session if its mod says `writesSummaries`, otherwise the most recently
+   joined session whose mod does.
+3. The mod sends one request: `$.model.complete({ model, prompt: "Reply with OK.", effort: "low",
+   maxTokens: 256, timeoutMs: 15000 })`. The cap leaves room for low-effort thinking, which counts
+   against it. Any answered text counts as working. It costs a few tokens of the owner's usage.
+4. **It works:** the value is stored and takes effect on the next ask.
+5. **It does not:** the value is refused, Settings says why beside the field, the typed text stays
+   for correcting, and the previous choice stays in force.
+
+| While checking | Settings |
+|---|---|
+| In flight | the button says **Checking…** and is disabled |
+| No session is joined, or none has a mod that can check | refused at once, nothing is sent: "No session can check this model. Run `/live` in a session and save again." |
+| The session leaves, or no reply within 20 s | refused: "The check got no answer." |
+| A refused model, an API error, no text, a time-out | refused, with the reason |
+
+The check speaks for that session's Claude Code, which is the one a summary would run on if it were
+the target. Another session can differ (its own settings or provider), and a value can stop working
+later. The fallback below covers both, so a stored value is not checked again.
 
 ### Start
 
@@ -117,14 +148,18 @@ effort is not on the wire: `low` is a constant in the mod.
 | Wire change | Who sends it | Meaning |
 |---|---|---|
 | `Work.context.model?: string` | app | the model to write this summary with; absent from an older app |
-| `JoinBody.answersContext?: true` | mod | this mod answers every context ask with `POST /v1/context`, an empty summary when it has none |
-| `ContextBody.failure?: { reason, status? }` | mod | with `summary: ""`: why there is none |
+| `Work.context.fallbackModel?: string` | app | the default, to use if `model` fails; absent when `model` is the default |
+| `JoinBody.writesSummaries?: true` | mod | this mod writes with the model asked, answers every context ask with `POST /v1/context` (an empty summary when it has none), and runs model checks |
+| `ContextBody.failure?: { model, reason, status? }` | mod | why `model` wrote nothing. With a summary: the fallback wrote it. With `summary: ""`: there is none |
+| `Work.checkModel: { id, model }` | app | check this model; handed out like a context ask, only to a mod that said `writesSummaries` |
+| `POST /v1/model-check: { sessionId, id, ok, reason?, status? }` | mod | the result of that check; an unknown or stale `id` is ignored |
 | `ContextBody.stats?` | mod | the [timing log](#the-timing-log) |
 | `StatusReply.isLoadingContext?: true` | app | the call is loading its context; absent otherwise |
 
 `Wire.swift`, `plugin/hooks/wire.ts` and `wire/fixtures/` change together, with a fixture for an
-ask with a model, a join with `answersContext`, a summary with stats, a failed summary and a status
-that is loading.
+ask with a model and fallback, a join with `writesSummaries`, a summary with stats, a summary the
+fallback wrote, a failed summary, a status that is loading, a check to run and both results of one.
+The default lives in the app alone, which is why it travels on the ask.
 
 `CallPhase` gets no new value. An older band does `PHASE[status.call]`, so an unknown phase would
 throw when it draws. On the wire a loading call says `connecting`, which is what an older band
@@ -132,9 +167,10 @@ should show, and `isLoadingContext` tells a new band and the menu the rest.
 
 ### Versions
 
-- **A mod older than the app** ignores `model` and keeps writing with `$.model.fork`, and sends no
-  `answersContext`, so **no wait applies to it** and its Start is today's Start. The setting has no
-  effect on it; Settings already lists sessions on an older mod.
+- **A mod older than the app** ignores `model` and `fallbackModel` and keeps writing with
+  `$.model.fork`, and sends no `writesSummaries`, so **no wait applies to it**, its Start is today's
+  Start, and it is never sent a check. The setting has no effect on it; Settings already lists
+  sessions on an older mod.
 - **An app older than the mod** sends no `model`: the mod forks as it does today, and posts nothing
   when it has no summary. So an ask with no `model` keeps today's whole behaviour, and `fork` stays
   in the mod for that case alone. The app's decoder ignores the fields it does not know.
@@ -157,7 +193,7 @@ for this, and a character budget needs none: a token rarely covers less than a c
 120,000 characters stay under the smallest window in play (200,000 tokens for `haiku` on Bedrock,
 Vertex or Foundry, per the [research note](#evidence)). A session can outgrow any model's window
 and the budget does not move. A custom model with a smaller window, or an emoji-only transcript,
-ends in `api-error` and the failure path. The number is a first guess, to be checked by the
+ends in `api-error` and the fallback. The number is a first guess, to be checked by the
 comparison.
 
 **The cost of leaving the fork.** A fork reads the session's prompt cache; `complete` shares
@@ -171,23 +207,39 @@ reason `context.ts` gives: the app redacts first and caps after.
 
 ### When it fails
 
-| What happened | The mod | The app |
-|---|---|---|
-| No turn yet, or no text in the transcript | posts `summary: ""` | ends the wait at once; shows nothing |
-| Engine refuses the model (`complete` rejects) | posts `summary: ""`, `failure.reason: "model-refused"` | ends the wait; Settings says why |
-| `api-error` (bad id, window, overload) | posts `failure.reason: "api-error"`, `status` | same |
-| `empty-reply`, including a refusal with no text | posts `failure.reason: "empty-reply"` | same |
-| `aborted`, or `timeoutMs` (60 s) passed | posts `failure.reason: "timed-out"` | same |
-| The mod dies or its session closes | nothing | the limit, or the session's drop, ends the wait |
+The mod tries `model` once. On a failure it tries `fallbackModel` once, at once, with the same
+transcript, and only if the ask named one (so never when `model` is the default).
 
-In every row the voice still gets its line. There is one attempt and no fallback: another model is
-what the owner just chose against, and a retry spends limit on a request likely to fail the same
-way. The next line asks again, since `context` is still nil. The mod's `NO_SUMMARY` line stays.
+| What happened on `model` | Falls back? | Reported as |
+|---|---|---|
+| The engine refuses the model (`complete` rejects): blocked, unknown | yes | `failure.reason: "model-refused"` |
+| `api-error`: bad id, window too small, overload | yes | `"api-error"`, with `status` |
+| `empty-reply`, including a refusal with no text | yes | `"empty-reply"` |
+| `aborted`, or its time ran out | no | `"timed-out"`: the time is already spent |
+| No turn yet, or no text in the transcript | no model call | `summary: ""`, no `failure` |
+
+A refusal is expected to arrive as `empty-reply`; that is unverified, and a refusal that comes back
+as ordinary text would pass as a summary.
+
+**The fallback stays inside the wait.** The limits are not extended for it and the call does not
+wait twice. Refused models and bad ids fail in about a second, so the fallback normally fits. If the
+limit passes first, the call goes on and the summary, when it lands, is stored as any late one is.
+The mod's own 60 s (`timeoutMs` for each attempt being what is left of it) bounds both attempts.
+
+**What the mod posts.** A summary from the fallback carries `failure` naming the chosen model and
+why, so the owner can see it: the line under the Settings field and the timing log. `stats.model` is
+the model that wrote it. The chosen model stays selected and is tried first on the next ask.
+
+**If the default fails too**, or there is no fallback, the mod posts `summary: ""` with `failure`.
+The app ends the wait, and the voice still gets its line with no new summary. The next line asks
+again, since `context` is still nil. The mod's `NO_SUMMARY` line stays. If the mod dies or its
+session closes, the limit or the session's drop ends the wait.
+
 Empty and failed replies are posted only when the ask carried `model`, so an older app never sees
 one. The app's `context` route already tolerates an empty summary and closes the ask.
 
-The mod's cached summary (`summary` in `register.tsx`) is reused only for the same model, so a
-change of model writes a new one.
+The mod's cached summary (`summary` in `register.tsx`) is keyed by the model asked for, so a change
+of model writes a new one.
 
 ## Waiting
 
@@ -197,10 +249,10 @@ All of these, for the Start and for a line opened by speech alike:
 
 1. An ask was made for this Start or line: the pause does not hold it back and the voice lacks part
    of the session (`pauseHoldsBackSummary`, `needsContext`, unchanged).
-2. The session's mod said `answersContext`.
+2. The session's mod said `writesSummaries`.
 3. The mod takes the ask: if `GET /v1/next` has not handed it over within 3 s, the wait ends.
-4. The same session has not already failed or timed out in this call, so a bad custom model does
-   not delay every line.
+4. The same session has not already ended a wait with no summary in this call, so a persistent
+   failure does not delay every line.
 
 It ends at the first `POST /v1/context` from that session, whatever it carries, or on Stop, a target
 change, the session dropping, or the limit.
@@ -283,7 +335,8 @@ not re-checked) found no benchmark of summary quality for Haiku 5.5 or Sonnet 5.
 at 100k input of 15.5 s for Haiku and 3.0 s for Sonnet at low effort (Artificial Analysis), and
 that Haiku's safety classifiers can refuse with no server fallback. It recommends Sonnet with
 medium confidence, which is the owner's default. Pinned ids and aliases may also resolve differently
-on Bedrock, Vertex and Foundry, where a pinned first-party id can fail: that is the failure path.
+on Bedrock, Vertex and Foundry, where a pinned first-party id can fail. The default fails there too, and the voice goes without a
+new summary.
 
 ## Why not Codex
 
@@ -300,7 +353,12 @@ No permission prompt is touched, and the model has no tools. The transcript goes
 through the session's own client, as the session's own requests do; it now may go to a different
 model than the session's. The summary still passes the app's redactor and its 1,500-character cap
 before OpenAI sees it. The pause still does not keep paused text out of a summary: the transcript
-holds it.
+holds it. A check sends only "Reply with OK." and the model's name.
+
+`POST /v1/model-check` takes a local process's word, like the other routes SECURITY.md lists: one
+that guesses the check's `id` can make Settings accept a value that does not work. The fallback then
+writes the summary; no permission or data is reached. It is not a control, and SECURITY.md's list of
+what such a process can do gains this line.
 
 ## Documents that change with the code
 
@@ -314,11 +372,12 @@ holds it.
 ## Not in this change
 
 Other providers, a sound when the microphone opens (the owner may want one; the band and menu are
-the only signs), a model list fetched from the engine, a retry.
+the only signs), a model list fetched from the engine, a retry on the same model, re-checking a
+stored value.
 
 ## Implementation order
 
 Step one, which spends nothing: `summarize` reports duration and token use, `POST /v1/context`
 carries `stats`, and the app logs them, with nothing else changing. Then the comparison (when the
-owner agrees), the setting and transcript, the Start wait and the later line's wait with the limits
+owner agrees), the setting, transcript and fallback, the model check, the Start wait and the later line's wait with the limits
 filled in, and the 200 ms poll. The plan follows the spec's approval.
