@@ -110,6 +110,9 @@ passes. To run it yourself, after `check.sh` has installed the mod's dev depende
 scripts/check-floor.sh
 ```
 
+A pull request that changes only documents (`scripts/ci-documents-only.sh` lists them) skips both
+runs and counts as passed; a change to a comment in code does not. Every push to `main` runs them.
+
 It reads the version from the `Claude Code` line under Requirements in `README.md`, the number's
 home, and installs it in `.github/claude-code-floor` with `npm ci` from that folder's lockfile,
 pinned by hash. To change the floor, change that line, set the same version in that folder's

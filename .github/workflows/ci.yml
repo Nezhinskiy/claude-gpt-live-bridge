@@ -1,6 +1,9 @@
 # Runs scripts/check.sh on every push and pull request. Claude Code is installed first, so the
 # mod's engine-facing half is type-checked against its API types and run by `claude plugin test`.
 # Then scripts/check-floor.sh runs that half again on the lowest version the README promises.
+# A pull request that changes only documents skips that long job (scripts/ci-documents-only.sh).
+# The workflow still runs, because main requires the `check` status: GitHub counts a job its own
+# condition skipped as passed, but waits forever for a job in a workflow that never started.
 name: CI
 
 on:
@@ -16,7 +19,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Documents only?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      documents-only: ${{ steps.diff.outputs.documents-only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2  # a pull request's merge commit and the base it merges into
+          persist-credentials: false
+      - id: diff
+        if: github.event_name == 'pull_request'
+        run: |
+          if sh scripts/ci-documents-only.sh HEAD^1 HEAD; then
+            echo "documents-only=true" >>"$GITHUB_OUTPUT"
+          fi
+
   check:
+    needs: changes
+    # Runs unless the answer is yes, so a failed or missing answer runs it.
+    if: ${{ !cancelled() && needs.changes.outputs.documents-only != 'true' }}
     # The Xcode 27 image (macOS 27, arm64; a public preview in actions/runner-images).
     runs-on: xcode-27
     timeout-minutes: 30

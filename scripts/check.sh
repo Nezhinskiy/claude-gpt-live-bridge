@@ -16,6 +16,8 @@ sh scripts/tests/package.test.sh
 sh scripts/tests/notarize.test.sh
 # Every copy of the lowest Claude Code the README promises agrees with its Requirements line.
 sh scripts/tests/claude-code-floor.test.sh
+# CI skips its long check only for a change that is documents alone.
+sh scripts/tests/ci-documents-only.test.sh
 # The audio page's pure modules (voice detection, pre-roll and catch-up).
 node --test 'app/Tests/AudioJSTests/*.test.mjs'
 

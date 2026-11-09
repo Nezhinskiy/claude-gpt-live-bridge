@@ -10,7 +10,7 @@ on:
     paths-ignore: &prose
       - "**/*.md"
       - "docs/**"
-      - "site/assets/**"
+      - "site/**"
       - "LICENSE"
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/pull_request_template.md"
