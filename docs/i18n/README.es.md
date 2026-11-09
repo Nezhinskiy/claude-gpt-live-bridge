@@ -262,7 +262,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 
 - **El Start de la banda** convierte su sesión en el destino e inicia la llamada; la línea que abre
   recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
-  de ella (mira **Load context** abajo), pero nunca con **Pause sync** activado ni tras una pausa
+  de ella (mira **Load context** abajo), pero con **Pause sync** activado o tras una pausa solo si aún no tiene ninguno
   ([detalles](../../docs/architecture/overview.md#components)). Mientras la llamada habla con otra sesión,
   la banda muestra **Talk here**. Si la banda no aparece en una sesión unida, `/live` la
   recupera.
@@ -286,19 +286,19 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   llamada y **Mute**; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier
   proceso que se ejecute como tú puede quitarlo
   ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
-- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen con **Pause sync** activado,
+- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen y **Pause sync** impide que la siguiente línea lo cargue,
   un turno no llegó, una pregunta o un aviso de permiso no llegó a la aplicación, hubo turnos con el
   mod apagado, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
-  conversación larga lo supera), la sesión estuvo en pausa o su mod no sincroniza. En otro caso el
+  conversación larga lo supera), la sesión estuvo en pausa y tiene resumen, o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
-  Sin resumen aún y sin nada perdido dice **Context loads with the line** y está deshabilitado, porque
+  Sin línea abierta, cuando la siguiente línea va a cargar el resumen y no falta nada más, dice **Context loads with the line** y está deshabilitado, porque
   la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
   ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
   que se abre la línea. Los resultados que aún no ha dicho se quedan y se añaden de nuevo; solo
   **Stop** los borra. Las preguntas de Claude en espera siguen otras reglas
-  ([detalles](../../SECURITY.md#residual-risk-by-design)). Con **Pause sync** desactivado y la sesión sin
+  ([detalles](../../SECURITY.md#residual-risk-by-design)). Con **Load a session's context on its first call** activado, o con **Pause sync** desactivado y la sesión sin
   pausa, la siguiente línea carga por sí sola un resumen de la misma transcripción de la sesión, que
   incluye lo que la sesión leyó; para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
   conversation**. `/live` en una sesión eliminada la une de nuevo.
@@ -316,14 +316,20 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
   la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
   sale del Mac hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI, activa
-  el ajuste, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
+  el ajuste, desactiva el siguiente si la sesión puede no tener resumen aún, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
   registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
-  resumen por sí sola, ni tampoco después de una pausa: solo lo hace **Load context**,
-  y ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
+  resumen por sí sola, ni tampoco después de una pausa, salvo para una sesión sin resumen (el ajuste
+  siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
   pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
   nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
   de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
   [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
+- **Load a session's context on its first call** (activado por defecto; desactivado si **Pause sync** estaba activado al actualizar):
+  una línea que se abre para una sesión de la que la voz no tiene resumen lo pide aunque **Pause
+  sync** esté activado o la sesión esté en pausa, también en un chat antiguo o tras **New
+  conversation**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
+  pausaste, y va a OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
+  Desactivado, bajo la pausa solo **Load context** carga un resumen.
 - **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
   la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
   de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un

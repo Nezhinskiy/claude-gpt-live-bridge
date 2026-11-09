@@ -14,6 +14,15 @@ All notable changes to this project are listed here. The format follows
   `LiveBridge.dmg.sigstore.json`.
   Adding `--bundle LiveBridge.dmg.sigstore.json` to the README's whole `gh attestation verify`
   command checks the image against that file instead of the copy GitHub stores.
+- **Load a session's context on its first call**, in Settings under Sync, on by default: a line
+  that opens for a session the voice has no summary for asks for one even while **Pause sync
+  while the call is stopped** is on or the session is paused, so an old chat or a chat after **New
+  conversation** starts with its context. That summary is written from the whole transcript,
+  paused text included, and goes to OpenAI; after it, the pause works as before. If the pause was
+  on when you update (or you had turned off the automatic summary, which became the pause), this
+  stays off; you can turn it on in Settings. A session still marked paused from an earlier pause,
+  with the pause off when you update, is not covered: the setting is on, and that session's first
+  summary carries what you paused.
 
 ### Changed
 

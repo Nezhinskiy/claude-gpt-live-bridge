@@ -7,8 +7,13 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The realtime voice; nil leaves the choice to codex.
   public var voice: String?
   /// Keep what the owner types while the call is stopped out of the voice's conversation, and
-  /// load no summary by itself: only Load context does, or an older mod's `/live context`.
+  /// load no summary by itself: only Load context does, or an older mod's `/live context`, and a
+  /// session's first summary under `loadContextOnFirstCall`.
   public var pauseSyncWhileStopped: Bool
+  /// A line that opens for a session the voice has no summary for asks for one, even under the
+  /// pause or a paused mark. That summary is written from the whole transcript, paused text
+  /// included.
+  public var loadContextOnFirstCall: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
   /// Play a short sound when a handoff is queued for a session (BR-001) and when a session's
@@ -23,12 +28,13 @@ public struct Settings: Codable, Sendable, Equatable {
   public var checkUpdatesAutomatically: Bool?
 
   public init(
-    voice: String? = nil, pauseSyncWhileStopped: Bool = false,
+    voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
     notifyResults: Bool = true, confirmHandoffs: Bool = true, prompt: String = "",
     checkUpdatesAutomatically: Bool? = nil
   ) {
     self.voice = voice
     self.pauseSyncWhileStopped = pauseSyncWhileStopped
+    self.loadContextOnFirstCall = loadContextOnFirstCall
     self.notifyResults = notifyResults
     self.confirmHandoffs = confirmHandoffs
     self.prompt = prompt
@@ -40,7 +46,8 @@ public struct Settings: Codable, Sendable, Equatable {
 
   /// A field the file lacks keeps its default, and one it no longer has (`model`) is ignored.
   /// An old `autoContext: false`, the owner's choice to load summaries by hand, becomes the
-  /// pause when the file does not say.
+  /// pause when the file does not say. A file from before `loadContextOnFirstCall` leaves it off
+  /// under the pause: that owner chose context only from the menu, and an update must not widen it.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     voice = try container.decodeIfPresent(String.self, forKey: .voice)
@@ -49,6 +56,9 @@ public struct Settings: Codable, Sendable, Equatable {
       .decodeIfPresent(Bool.self, forKey: .autoContext) == false
     pauseSyncWhileStopped =
       try container.decodeIfPresent(Bool.self, forKey: .pauseSyncWhileStopped) ?? optedOut
+    loadContextOnFirstCall =
+      try container.decodeIfPresent(Bool.self, forKey: .loadContextOnFirstCall)
+      ?? !pauseSyncWhileStopped
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     confirmHandoffs = try container.decodeIfPresent(Bool.self, forKey: .confirmHandoffs) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
