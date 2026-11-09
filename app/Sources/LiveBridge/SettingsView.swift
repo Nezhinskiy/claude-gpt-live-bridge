@@ -61,8 +61,18 @@ struct SettingsView: View {
       Section("Sync") {
         Toggle("Pause sync while the call is stopped", isOn: setting(\.pauseSyncWhileStopped))
         Text(
-          "What you type while the call is off stays out of the voice's conversation, and "
-            + "context loads only from the menu."
+          model.settings.current.loadContextOnFirstCall
+            ? "What you type while the call is off stays out of the voice's conversation. After "
+              + "a session's first summary, context loads only from the menu."
+            : "What you type while the call is off stays out of the voice's conversation, and "
+              + "context loads only from the menu."
+        )
+        .font(.caption).foregroundStyle(.secondary)
+        Toggle(
+          "Load a session's context on its first call", isOn: setting(\.loadContextOnFirstCall))
+        Text(
+          "A line for a session with no summary yet asks for one, even while sync is paused. It "
+            + "is written from the whole transcript, paused text included, and goes to OpenAI."
         )
         .font(.caption).foregroundStyle(.secondary)
       }
