@@ -6,8 +6,8 @@ prose above the trail marker.
 
 ## Now
 
-0.4.2 is out, with LiveBridge's own sounds, a Conversation that keeps up with the talk, and one
-`/live` command. A short demo recording
+0.5.0 is out, signed with LiveBridge's Developer ID and notarized by Apple, and a session's
+context loads on its first call. A short demo recording
 follows it.
 
 ## Next
