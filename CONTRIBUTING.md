@@ -110,14 +110,14 @@ passes. To run it yourself, after `check.sh` has installed the mod's dev depende
 scripts/check-floor.sh
 ```
 
-A pull request that changes only documents (`scripts/ci-documents-only.sh` lists them) skips both
-runs and counts as passed; a change to a comment in code does not. Every push to `main` runs them.
-
 It reads the version from the `Claude Code` line under Requirements in `README.md`, the number's
 home, and installs it in `.github/claude-code-floor` with `npm ci` from that folder's lockfile,
 pinned by hash. To change the floor, change that line, set the same version in that folder's
 `package.json` and run `npm install --package-lock-only` there; `check.sh` fails until every copy
 says the same.
+
+A pull request that changes only documents (`scripts/ci-documents-only.sh` lists them) skips both
+runs and counts as passed; a change to a comment in code does not. Every push to `main` runs them.
 
 The end-to-end smoke test drives the real codex and spends your ChatGPT plan's realtime voice;
 the header of `scripts/smoke.sh` says how much and what a pass is:

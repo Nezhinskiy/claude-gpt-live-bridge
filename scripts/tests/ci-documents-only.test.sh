@@ -57,11 +57,25 @@ sed -i.bak 's/Prose/Better prose/' README.md && rm README.md.bak
 expect 'prose in the README' yes
 sed -i.bak 's/Prose/Better prose/' site/index.html && rm site/index.html.bak
 expect 'prose on the site' yes
+echo text >.github/pull_request_template.md
+expect 'the pull request template' yes
 
 sed -i.bak 's/2.1.301/2.1.302/' README.md && rm README.md.bak
 expect 'the Claude Code floor in the README' no
 sed -i.bak 's/2.1.301/2.1.302/' site/index.html && rm site/index.html.bak
 expect 'the Claude Code floor on the site' no
+sed -i.bak '/Claude Code/d' README.md && rm README.md.bak
+expect 'the floor line removed' no
+echo '- Claude Code 2.1.400 or later' >>README.md
+expect 'a floor line added' no
+echo note >README.fr.md
+expect 'another README at the root, which the check reads' no
+mkdir -p app/x && echo note >app/x/a.md
+expect 'Markdown under app' no
+mkdir -p wire/fixtures && echo note >wire/fixtures/a.md
+expect 'Markdown beside the wire fixtures' no
+echo note >scripts/a.md
+expect 'Markdown among the scripts' no
 echo 'let b = 2' >>app/a.swift
 expect 'code' no
 echo more >>docs/a.md
@@ -77,9 +91,14 @@ git mv app/a.swift docs/a.swift
 expect 'a file moved out of the code' no
 expect 'an empty change' no
 
-if ! sed -n '/^  check:/,/^    steps:/p' "$root/.github/workflows/ci.yml" |
-  grep -q "needs.changes.outputs.documents-only != 'true'"; then
-  problem "ci.yml must run the check unless the answer is that only documents changed"
-fi
+# The workflow asks this script and acts only on its yes: a failed or missing answer runs the check.
+workflow="$root/.github/workflows/ci.yml"
+job=$(sed -n '/^  check:/,/^    steps:/p' "$workflow")
+for line in "needs: changes" \
+  "if: \${{ !cancelled() && needs.changes.outputs.documents-only != 'true' }}"; do
+  printf '%s\n' "$job" | grep -qF "$line" || problem "ci.yml's check job must have: $line"
+done
+grep -qF 'if sh scripts/ci-documents-only.sh HEAD^1 HEAD; then' "$workflow" ||
+  problem "ci.yml must ask scripts/ci-documents-only.sh about the pull request's own change"
 
 exit "$fail"

@@ -1,5 +1,5 @@
 # CodeQL for the app (Swift). The analysis builds the app and takes about a quarter of an hour, so
-# a change that touches only prose or images skips it; the weekly run still scans main whatever
+# a change that touches only prose, images or the site skips it; the weekly run still scans main whatever
 # changed. Comment-only edits inside code files are not told apart and run it. The workflows and
 # the JavaScript/TypeScript are scanned on every change by codeql.yml.
 name: CodeQL (Swift)
@@ -7,7 +7,7 @@ name: CodeQL (Swift)
 on:
   push:
     branches: [main]
-    paths-ignore: &prose
+    paths-ignore: &no-swift
       - "**/*.md"
       - "docs/**"
       - "site/**"
@@ -15,7 +15,7 @@ on:
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/pull_request_template.md"
   pull_request:
-    paths-ignore: *prose
+    paths-ignore: *no-swift
   schedule:
     - cron: "17 4 * * 1"
 
