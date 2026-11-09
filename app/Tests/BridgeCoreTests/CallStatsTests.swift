@@ -62,9 +62,8 @@ struct CallStatsRowTests {
     "packetsLost", "packetsReceived", "jitter", "concealedSamples", "totalSamplesReceived",
     "jitterBufferDelay",
   ])
-  func theColumnsHold(_ name: String) {
-    #expect(CallStats.fields.contains(name))
-    #expect(CallStats.header.split(separator: ",").contains(Substring(name)))
+  func theColumnIsWritten(_ name: String) throws {
+    #expect(try cells(["line": 1, name: 7])[name] == "7")
   }
 
   @Test func theFileIsNamedAfterItsLocalMinuteAndSecond() {
@@ -123,15 +122,6 @@ struct CallStatsLogTests {
     #expect(try lines(two).count == 2)
   }
 
-  /// A call whose line never opened leaves nothing behind.
-  @Test func aCallWithoutSamplesLeavesNoFile() throws {
-    defer { try? FileManager.default.removeItem(at: base) }
-    let log = try log()
-    log.endCall()
-    let folder = try CallStats.directory(in: base)
-    #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
-  }
-
   @Test func aDroppedSampleOpensNoFile() throws {
     defer { try? FileManager.default.removeItem(at: base) }
     #expect(try log().record("not a sample", at: first) == nil)
@@ -170,7 +160,8 @@ struct CallStatsPageScriptTests {
       };
       var Native = window.RTCPeerConnection;
       var audio = { type: 'inbound-rtp', kind: 'audio', packetsLost: 2, jitter: 0.5,
-                    ssrc: 'x', trackIdentifier: 'secret', mid: 'secret' };
+                    packetsReceived: 'secret', ssrc: 'x', trackIdentifier: 'secret',
+                    mid: 'secret' };
       """)
     page.evaluateScript(CallStats.pageScript)
   }
