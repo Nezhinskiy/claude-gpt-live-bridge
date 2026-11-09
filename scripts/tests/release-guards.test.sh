@@ -29,13 +29,14 @@ if grep -a -q LIVEBRIDGE_RELEASES_URL "$binary"; then
   echo "the release binary contains LIVEBRIDGE_RELEASES_URL" >&2
   fail=1
 fi
+bundle="$(dirname "$binary")/LiveBridge_LiveBridge.bundle"
+if [ ! -d "$bundle" ]; then
+  echo "the release audio page $bundle is missing" >&2
+  exit 1
+fi
 for needle in getStats packetsLost callStats; do
-  if grep -a -q -e "$needle" "$binary"; then
-    echo "the release binary contains $needle" >&2
-    fail=1
-  fi
-  if grep -a -q -r -e "$needle" "$(dirname "$binary")/LiveBridge_LiveBridge.bundle"; then
-    echo "the release audio page contains $needle" >&2
+  if grep -a -q -r -e "$needle" "$binary" "$bundle"; then
+    echo "the release binary or its audio page contains $needle" >&2
     fail=1
   fi
 done
