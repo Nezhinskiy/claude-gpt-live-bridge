@@ -276,7 +276,7 @@ parlez.
 - **Le Start de la bande** fait de sa session la cible et démarre l'appel ; la ligne qu'il ouvre
   reçoit la conversation de la session, et charge en plus un résumé quand il manquerait à la voix
   une partie d'elle (voir **Load context** ci-dessous), mais avec **Pause sync** activé ou
-  après une pause seulement le premier résumé d'une session ([détails](../../docs/architecture/overview.md#components)). Tant que l'appel parle à
+  après une pause seulement si elle n'en a pas encore ([détails](../../docs/architecture/overview.md#components)). Tant que l'appel parle à
   une autre session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session
   rejointe, `/live` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
@@ -305,7 +305,7 @@ parlez.
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
   voix peut porter (une longue conversation le dépasse), la session a été mise en pause et a un résumé, ou son mod
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
-  déjà la conversation. Quand la ligne suivante va charger un premier résumé et que rien d'autre ne manque, il affiche **Context loads with the
+  déjà la conversation. Sans ligne ouverte, quand la ligne suivante va charger le résumé et que rien d'autre ne manque, il affiche **Context loads with the
   line** et est désactivé, car la prochaine ligne le demande d'elle-même. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
   reste activé ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
@@ -332,9 +332,9 @@ parlez.
   dans une session rejointe et la réponse finale de Claude sont gardés dans la conversation de cette
   session avec la voix même quand l'appel est arrêté, et la voix les a quand la ligne suivante
   s'ouvre. Rien ne quitte le Mac avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
-  voir arriver chez OpenAI, activez le réglage, appuyez sur Stop, puis tapez : rien de ce que vous
+  voir arriver chez OpenAI, activez le réglage, désactivez le suivant si la session n'a peut-être pas encore de résumé, appuyez sur Stop, puis tapez : rien de ce que vous
   tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
-  aucune ligne ne charge de résumé d'elle-même, ni après une pause, sauf le premier résumé d'une session (le réglage suivant) ; sinon seul
+  aucune ligne ne charge de résumé d'elle-même, ni après une pause, sauf pour une session sans résumé (le réglage suivant) ; sinon seul
   **Load context** le fait. Ce résumé est écrit à partir de toute la transcription, donc il porte
   ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà

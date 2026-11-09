@@ -42,7 +42,7 @@ speak, with the conversation where you left it ([Billing](#billing-aware-by-desi
   question does not start a turn of Claude's. Once you have decided, it hands Claude a brief, with
   what was said since the last request quoted after it; a question that needs the code still goes
   to Claude. When the voice lacks part of the session, the line asks the session's own model for a
-  short summary on the side (while **Pause sync** is on, at most a session's first).
+  short summary on the side (while **Pause sync** is on, only when it has no summary).
 - **Walk away while Claude works.** Claude's answer to your request opens the closed line again
   and the voice says it. If the voice stays silent, the answer chimes and waits, so it is not lost
   ([what can go wrong](#known-limitations)).
@@ -278,7 +278,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **The band's Start** makes its session the target and starts the call; the line it opens is seeded
   with the session's conversation, and loads a summary of the session as well when the voice would
   lack part of it (see **Load context** below), but while **Pause sync** is on or after a
-  pause only a session's first summary ([details](docs/architecture/overview.md#components)). While the call talks to another
+  pause only when it has none yet ([details](docs/architecture/overview.md#components)). While the call talks to another
   session, the band shows **Talk here**. If the band is not there in a joined session, `/live`
   brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
@@ -304,8 +304,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   and **Pause sync** stops the next line loading one, a turn did not arrive, a question or permission notice did not reach the app, turns ran while the
   mod was off, the lines since the summary no longer all fit what the voice can carry (a long
   conversation outgrows that), the session was paused and has a summary, or its mod does not sync. Otherwise the item
-  reads **Context up to date** and is disabled, because the voice already has the conversation. When
-  the next line will load a first summary and nothing else is missing, it reads **Context loads with the line** and is disabled, because
+  reads **Context up to date** and is disabled, because the voice already has the conversation. With
+  no line open, when the next line will load the summary and nothing else is missing, it reads **Context loads with the line** and is disabled, because
   the next line asks for one by itself. A summary carries no date, so one can be ignored while the item stays enabled
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×
@@ -328,10 +328,10 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **Pause sync while the call is stopped** (off by default): by default, what you type in a joined
   session and Claude's final answer to it are kept in that session's conversation with the voice
   even while the call is stopped, and the voice has them when the next line opens. Nothing leaves
-  the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, press Stop,
-  then type: nothing you type while the call is stopped is recorded, and the session is marked as
+  the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, turn off the next
+  setting if the session may have no summary yet, press Stop, then type: nothing you type while the call is stopped is recorded, and the session is marked as
   paused. While it is on, no line loads a summary by itself, and neither does one after a pause,
-  except a session's first summary (the next setting); otherwise only **Load context** does. That
+  except for a session with no summary (the next setting); otherwise only **Load context** does. That
   summary is written from the whole transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what

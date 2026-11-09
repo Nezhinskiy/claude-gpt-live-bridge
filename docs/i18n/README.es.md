@@ -262,7 +262,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 
 - **El Start de la banda** convierte su sesión en el destino e inicia la llamada; la línea que abre
   recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
-  de ella (mira **Load context** abajo), pero con **Pause sync** activado o tras una pausa solo el primer resumen de una sesión
+  de ella (mira **Load context** abajo), pero con **Pause sync** activado o tras una pausa solo si aún no tiene ninguno
   ([detalles](../../docs/architecture/overview.md#components)). Mientras la llamada habla con otra sesión,
   la banda muestra **Talk here**. Si la banda no aparece en una sesión unida, `/live` la
   recupera.
@@ -291,7 +291,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   mod apagado, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
   conversación larga lo supera), la sesión estuvo en pausa y tiene resumen, o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
-  Cuando la siguiente línea va a cargar un primer resumen y no falta nada más, dice **Context loads with the line** y está deshabilitado, porque
+  Sin línea abierta, cuando la siguiente línea va a cargar el resumen y no falta nada más, dice **Context loads with the line** y está deshabilitado, porque
   la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
   ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
@@ -316,9 +316,9 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
   la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
   sale del Mac hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI, activa
-  el ajuste, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
+  el ajuste, desactiva el siguiente si la sesión puede no tener resumen aún, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
   registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
-  resumen por sí sola, ni tampoco después de una pausa, salvo el primer resumen de una sesión (el ajuste
+  resumen por sí sola, ni tampoco después de una pausa, salvo para una sesión sin resumen (el ajuste
   siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
   pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
   nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores

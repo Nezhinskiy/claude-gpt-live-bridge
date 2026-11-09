@@ -20,7 +20,9 @@ All notable changes to this project are listed here. The format follows
   conversation** starts with its context. That summary is written from the whole transcript,
   paused text included, and goes to OpenAI; after it, the pause works as before. If the pause was
   on when you update (or you had turned off the automatic summary, which became the pause), this
-  stays off so nothing widens without you; you can turn it on in Settings.
+  stays off; you can turn it on in Settings. A session still marked paused from an earlier pause,
+  with the pause off when you update, is not covered: the setting is on, and that session's first
+  summary carries what you paused.
 
 ### Changed
 

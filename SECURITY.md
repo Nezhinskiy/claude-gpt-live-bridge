@@ -262,8 +262,9 @@ those shapes goes to OpenAI as typed, personal text included.
   - It does not hold if the app was not running or the mod could not post: a turn the app did not
     receive marks the session *missed*, or *paused* while the setting is on
     (`Continuity.markMissed`), and so do a question or permission notice the app did not take and
-    turns that ran while the mod was off. A missed session, unlike a paused one that has a
-    summary, loads a summary by itself once the setting is off. A turn whose `start` never arrived has no decision: while the
+    turns that ran while the mod was off. A missed session loads a summary by itself once the pause setting is
+    off; a paused one does not, unless it has no summary and **Load a session's context on its first
+    call** is on. A turn whose `start` never arrived has no decision: while the
     session is *paused*, a line of Claude's opening it stays out (`Continuity.admits`).
   - The session title is not touched by the pause. The poll follows it whatever the setting says,
     and `AnswerShaper.line` puts it in every line, unredacted, so paused text the title was written
@@ -293,7 +294,7 @@ those shapes goes to OpenAI as typed, personal text included.
   to it, so `/clear` ends nothing until **New conversation** follows. Removing a session holds until
   you join it again, since the mod's own joins are refused (`410`). **New conversation** and × keep
   the *paused* mark, so with **Load a session's context on its first call** off the next line asks
-  for no summary of that transcript. With it on, or with no pause mark, a session with no summary
+  for no summary of that transcript. With it on, or with the pause setting off and no pause mark, a session with no summary
   does get one from the next line, written from the whole transcript, the text the session read
   and any paused text included.
 - **A result from another session** is still spoken in whatever line is open, and the voice's

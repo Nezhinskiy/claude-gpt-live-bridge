@@ -25,9 +25,11 @@ Settings, in the Sync section, has **Load a session's context on its first call*
 - Every line goes by the same rule: Start, a line reopened by speech, one opened by an answer or an
   approval notice, one for a new target.
 - Once a summary exists, everything works as before: the pause governs what follows it.
-- With the setting off, behaviour is exactly as before.
-- The menu says **Context loads with the line** for a session the next line will ask, when the only
-  thing that used to stop that line was the pause. A session with a gap (`missed`), too many lines
+- With the setting off, behaviour is exactly as before, apart from the press on an open line below.
+- With no line open, the menu says **Context loads with the line** for a session the next line will
+  ask, when the only thing that used to stop that line was the pause. An open line whose ask brought
+  nothing offers **Load context**, whichever way the settings are, because no line is about to load
+  it. A session with a gap (`missed`), too many lines
   for the seed or a mod that does not sync keeps **Load context** enabled, as before: a press need
   not wait for a line.
 
@@ -52,8 +54,10 @@ does. The pause no longer holds that summary back while the setting is on. SECUR
 A settings file with no value for the new key gets `true`, unless the pause is on after the legacy
 mapping (`pauseSyncWhileStopped`, including an old `autoContext: false`); then it gets `false`.
 Those owners chose that context loads only from the menu, and an update must not widen that
-silently. Fresh installs and everyone without the pause get `true`. The changelog says that someone
-with the pause on can turn the new setting on in Settings.
+silently. A session still marked *paused* from an earlier pause, with the pause off at the update,
+is not covered: the setting is on, and its first summary goes over the mark. Fresh installs and
+everyone without the pause get `true`. The changelog says that someone with the pause on can turn
+the new setting on in Settings.
 
 ## What this does not change
 
