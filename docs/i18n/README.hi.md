@@ -103,8 +103,9 @@ Update, अनुमतियाँ, नए build के बाद भी microp
 
 mod इस repository के marketplace से आता है ([त्वरित शुरुआत](#त्वरित-शुरुआत) के commands), जो नवीनतम
 release के tag की ओर इशारा करता है, इसलिए आप जो mod install करते हैं वह उसी release का होता है। App
-दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके। दोनों में वह
-ad hoc signed होता है और notarized नहीं होता।
+दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके। 0.4.2 के बाद के पहले release से, डिस्क इमेज
+LiveBridge की Developer ID से signed और Apple द्वारा notarized है; 0.4.2 और उससे पहले के releases ad hoc
+signed थे और notarized नहीं हैं, और source से बना build न तो Developer ID से signed होता है और न notarized।
 
 ### डिस्क इमेज से
 
@@ -121,12 +122,14 @@ ad hoc signed होता है और notarized नहीं होता।
 
    जहाँ `vX.Y.Z` release का tag है, जैसा उसके page पर लिखा है। यह जाँच सिर्फ़ ऐसी image के लिए पास
    होती है जिसे इस repository के [release workflow](../../.github/workflows/release.yml) ने उसी tag से,
-   GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। image के स्रोत का
-   यही एकमात्र प्रमाण है: ad hoc signature किसी का नाम नहीं बताता। यह इस बात का प्रमाण नहीं है कि
-   किसी ने code की समीक्षा की है।
+   GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। 0.4.2 के बाद के release पर Developer ID
+   signature, जिसे macOS खुद जाँचता है, बताता है कि image पर किसने sign किया, और यह जाँच बताती है कि वह
+   किससे build हुई थी; 0.4.2 और उससे पहले के releases पर, जिनका ad hoc signature किसी का नाम नहीं बताता,
+   यह जाँच image के origin का इकलौता प्रमाण है। यह इस बात का प्रमाण नहीं है कि किसी ने code की समीक्षा की है।
 3. उसे खोलें और LiveBridge को Applications में drag करें।
-4. पहली बार launch करने पर macOS app को तब तक block रखता है जब तक आप उसे System Settings > Privacy &
-   Security > **Open Anyway** में अनुमति न दें।
+4. पहली बार launch करने पर, 0.4.2 के बाद के release पर macOS पूछता है कि internet से download किया गया
+   app खोलना है या नहीं; **Open** पर click करें। 0.4.2 और उससे पहले के releases तब तक blocked रहते हैं जब तक
+   आप उन्हें System Settings > Privacy & Security > **Open Anyway** में अनुमति नहीं देते।
 
 ### Homebrew से
 
@@ -135,7 +138,7 @@ brew install --cask getlivebridge/tap/livebridge
 ```
 
 यह वही डिस्क इमेज [LiveBridge के अपने tap](https://github.com/getLiveBridge/homebrew-tap) से इंस्टॉल करता है, जो Homebrew का आधिकारिक cask नहीं
-है। Homebrew पहले इस tap पर भरोसा करने को कह सकता है, और macOS पहली बार खोलने को ऊपर बताए अनुसार रोकता
+है। Homebrew पहले इस tap पर भरोसा करने को कह सकता है, और macOS पहली बार खोलने पर ऊपर बताए अनुसार पूछता
 है। इसके बाद app खुद अपडेट होता है।
 
 ### सोर्स से
@@ -153,8 +156,9 @@ marketplace mod को पिछले release के tag पर pin करत�
 `claude --plugin-dir plugin` से working tree का mod load करें।
 
 source से बना build updates की जाँच अपने-आप तभी करता है जब आप Settings में इसे चालू करें। Update
-install करने पर वह release की image से बदल जाता है, जो ad hoc signed है, इसलिए self-signed
-certificate फिर लागू नहीं रहता; **Install** यह बताता है और पहले पूछता है।
+install करने पर वह release की image से बदल जाता है, जो LiveBridge की Developer ID से signed है,
+आपके self-signed certificate से नहीं, इसलिए macOS microphone के लिए एक बार फिर पूछता है; **Install** यह
+बताता है और पहले पूछता है।
 
 ### अपडेट करना
 
@@ -178,10 +182,13 @@ LiveBridge app और अपने mod को तभी update करता ह�
   दोनों commands दिखते हैं ताकि आप इन्हें खुद चलाएँ। पहले से खुले Claude Code sessions restart होने
   तक पुराना mod ही रखते हैं; Settings उन जुड़े sessions को दिखाता है जो अब भी उसे चला रहे हैं।
 - update का download कोई quarantine attribute नहीं लगाता, इसलिए macOS को updated app का पहला launch
-  वैसे block नहीं करना चाहिए जैसे पहले download को किया था; यह code से निकलता है और अभी असल में देखा
-  नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं
-  ([SECURITY.md](../../SECURITY.md#what-an-update-installs))। हाँ, update के बाद पहले **Start** पर macOS
-  microphone के लिए दोबारा पूछता है, क्योंकि हर release ad hoc signed होता है।
+  पूछने के लिए वैसे नहीं रोकना चाहिए जैसे पहले download के बाद रोका था; यह code से निकलता है और अभी असल
+  में देखा नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं
+  ([SECURITY.md](../../SECURITY.md#what-an-update-installs))। 0.4.2 के बाद के releases LiveBridge की
+  Developer ID से signed हैं, इसलिए microphone की अनुमति एक release से अगले में जानी चाहिए; यह इस पर आधारित है कि macOS
+  अनुमति को कैसे जोड़ता है, और अभी तक देखा नहीं गया है। 0.4.2 और उससे
+  पहले के releases ad hoc signed थे, इसलिए उनमें से किसी से पहला update पहले **Start** पर microphone के लिए
+  एक बार फिर पूछता है।
 
 हाथ से update करने के लिए, हर session में `/live off` चलाएँ (app जवाब देना बंद करते ही mod
 `/Applications` वाला app फिर खोल देता है), LiveBridge बंद करें, नई image ऊपर बताए तरीके से install
@@ -191,8 +198,8 @@ LiveBridge app और अपने mod को तभी update करता ह�
 
 पहली बार Start करने पर macOS से microphone माँगा जाता है। अगर मना कर दिया गया, तो call एक वाक्य के
 साथ रुक जाती है और menu bar menu का **Open Microphone Settings** Privacy & Security > Microphone खोल
-देता है, जहाँ आप LiveBridge को अनुमति देते हैं। ad hoc signature के साथ macOS हर update या नए build
-के बाद पहले Start पर फिर पूछता है (ऊपर देखें)। macOS यह भी पूछ सकता है कि क्या LiveBridge आपके local
+देता है, जहाँ आप LiveBridge को अनुमति देते हैं। macOS किसी ad hoc release से पहले update के बाद, और source से बने हर ad hoc signed rebuild के बाद, पहले
+Start पर फिर पूछता है (ऊपर देखें)। macOS यह भी पूछ सकता है कि क्या LiveBridge आपके local
 network पर devices खोज सकता है। voice line को यह दूसरी अनुमति भी चाहिए; इसके बिना call एक वाक्य के
 साथ रुक जाती है, जो बताता है कि इसे कहाँ allow करना है।
 
@@ -244,7 +251,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 - **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है उसे
   session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
-  हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद कभी नहीं
+  हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद सिर्फ़ तब जब उसका सारांश अभी न हो
   ([विवरण](../../docs/architecture/overview.md#components))। जब call किसी दूसरे session से बात कर रही हो,
   तब band **Talk here** दिखाता है। अगर जुड़े हुए session में band न दिखे, तो `/live` उसे वापस ले
   आता है।
@@ -265,18 +272,18 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू
   होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
   ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge))।
-- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: **Pause sync** चालू रहते सारांश नहीं है,
+- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है और **Pause sync** अगली line को उसे load करने से रोकता है,
   कोई turn नहीं पहुँचा, कोई सवाल या permission notice app तक नहीं पहुँचा, mod बंद रहते turns चले,
   सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे बढ़
-  जाती है), session paused रहा है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
-  date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर सारांश अभी नहीं है और कुछ खोया नहीं है, तो यह
+  जाती है), session paused रहा है और उसका सारांश है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
+  date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर कोई line खुली न हो, अगली line सारांश load करेगी और बाकी कुछ नहीं छूटा है, तो यह
   **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। सारांश पर कोई तारीख
   नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है ([BR-002](../../docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
   का × उसे हटाता है और उसकी अपनी conversation मिटा देता है; दोनों पहले पूछते हैं। Voice अगली बार
   line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े
   जाते हैं; उन्हें सिर्फ़ **Stop** मिटाता है। Claude के इंतज़ार कर रहे सवालों के नियम अलग हैं
-  ([विवरण](../../SECURITY.md#residual-risk-by-design))। **Pause sync** बंद हो और session paused न हो, तो
+  ([विवरण](../../SECURITY.md#residual-risk-by-design))। **Load a session's context on its first call** चालू हो, या **Pause sync** बंद हो और session paused न हो, तो
   अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें वह भी है जो session ने
   पढ़ा; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
   session में `/live` उसे फिर से जोड़ देता है।
@@ -294,13 +301,20 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   में आप जो टाइप करते हैं और उस पर Claude का अंतिम जवाब, call रुकी होने पर भी voice के साथ उस
   session की conversation में रखे जाते हैं, और अगली line खुलने पर voice के पास होते हैं। line खुलने
   तक Mac से कुछ बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू
-  करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
+  करें, अगर session का सारांश शायद अभी न हो तो अगली setting बंद करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
   session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
-  के बाद भी नहीं: यह सिर्फ़ **Load context** करता है, और वह सारांश पूरे
+  के बाद भी नहीं, सिवाय ऐसे session के जिसका सारांश नहीं है (अगली setting); बाकी समय यह सिर्फ़ **Load context**
+  करता है। वह सारांश पूरे
   transcript से लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था। जिस turn में voice
   अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
   हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](../../SECURITY.md#residual-risk-by-design) में है।
+- **Load a session's context on its first call** (डिफ़ॉल्ट रूप से चालू; update के समय **Pause sync** चालू था तो बंद): जिस session का
+  सारांश voice के पास नहीं है, उसके लिए खुलने वाली line सारांश माँगती है, चाहे **Pause sync** चालू हो या
+  session paused हो, पुरानी chat और **New conversation** के बाद की chat समेत। वह सारांश पूरे transcript से
+  लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
+  बन जाने के बाद जो आगे होता है उस पर pause लागू होता है। यह बंद हो तो pause में सिर्फ़ **Load context** सारांश
+  load करता है।
 - **Play sounds for requests and answers** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध Claude को सौंपता है,
   हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ)), और जब कोई बोल नहीं रहा हो तब खुली या खुलती
   line पर पहुँचने वाले Claude के हर जवाब, विफलता या सवाल के लिए भी एक। प्रतीक्षा कर रहे नतीजे की

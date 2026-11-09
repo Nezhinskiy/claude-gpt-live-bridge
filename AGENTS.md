@@ -13,7 +13,8 @@ the status section at most 50 lines); detail lives in the documents it links to.
   microphone or Claude; `LiveBridge` is the menu bar app and its hidden audio page.
 - `plugin/`: the mod. `hooks/register.tsx` is the wiring; the other `hooks/*.ts` modules are pure.
 - `wire/fixtures/`: one JSON example of every message between the mod and the app.
-- `scripts/`: `check.sh`, `check-mod.sh`, `check-floor.sh`, `smoke.sh`, `build-app.sh`.
+- `scripts/`: `check.sh`, `check-mod.sh`, `check-floor.sh`, `smoke.sh`, `build-app.sh`,
+  `notarize.sh`.
 - `docs/`: the [architecture](docs/architecture/overview.md), [ADRs](docs/adr/), the README's
   translations (`i18n/`), and the stayfixed scaffold ([CONTRIBUTING.md](CONTRIBUTING.md#stayfixed) says what each file is for).
 
@@ -47,7 +48,7 @@ the status section at most 50 lines); detail lives in the documents it links to.
 
 ## Current status
 
-- 0.4.2 is the latest release. Its open items are the README's
+- 0.5.0 is the latest release. Its open items are the README's
   [known limitations](README.md#known-limitations).
 <!-- stayfixed:harness:begin -->
 ## stayfixed

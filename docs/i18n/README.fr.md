@@ -111,8 +111,10 @@ sous [Installation](#installation).
 Le mod provient de la marketplace de ce dépôt (les commandes du [Démarrage
 rapide](#démarrage-rapide)), qui désigne le tag de la dernière version : le mod que vous
 installez est donc celui de cette version. L'application va dans `/Applications` dans les deux
-cas : depuis l'image disque, ou compilée depuis les sources. Dans les deux cas, elle est signée
-ad hoc et non notarisée.
+cas : depuis l'image disque, ou compilée depuis les sources. À partir de la première version
+postérieure à 0.4.2, l'image disque est signée avec le Developer ID de LiveBridge et notarisée par
+Apple ; la 0.4.2 et les précédentes étaient signées ad hoc et non notarisées, et une compilation
+depuis les sources n'est ni signée avec le Developer ID ni notarisée.
 
 ### Depuis l'image disque
 
@@ -131,11 +133,16 @@ ad hoc et non notarisée.
    où `vX.Y.Z` est le tag de la version, tel que sa page le nomme. La vérification ne réussit que
    pour une image que le [workflow de publication](../../.github/workflows/release.yml) de ce dépôt a
    compilée à partir de ce tag, sur un runner hébergé par GitHub, et qui n'a pas changé depuis.
-   C'est l'unique preuve d'origine de l'image : la signature ad hoc ne désigne personne. Elle ne
-   prouve pas que quiconque ait relu le code.
+   Sur une version postérieure à 0.4.2, la signature Developer ID, que macOS vérifie de
+   lui-même, dit qui a signé l'image, et cette vérification dit à partir de quoi elle a été
+   compilée ; sur la 0.4.2 et les précédentes, dont la signature ad hoc ne nomme personne, cette
+   vérification est l'unique preuve d'origine de l'image. Elle ne prouve pas que quiconque ait
+   relu le code.
 3. Ouvrez-la et faites glisser LiveBridge dans Applications.
-4. Au premier lancement, macOS bloque l'application jusqu'à ce que vous l'autorisiez dans
-   Réglages Système > Confidentialité et sécurité > **Open Anyway**.
+4. Au premier lancement, une version postérieure à 0.4.2 fait demander à macOS s'il faut ouvrir
+   une application téléchargée sur Internet ; cliquez sur **Open**. La 0.4.2 et les précédentes
+   sont bloquées tant que vous ne les autorisez pas dans Réglages Système > Confidentialité et
+   sécurité > **Open Anyway**.
 
 ### Avec Homebrew
 
@@ -145,7 +152,7 @@ brew install --cask getlivebridge/tap/livebridge
 
 Cette commande installe la même image disque depuis le [tap de LiveBridge](https://github.com/getLiveBridge/homebrew-tap), qui n'est pas un
 cask officiel de Homebrew. Homebrew peut d'abord vous demander de faire confiance à ce tap, et macOS
-bloque le premier lancement comme indiqué plus haut. L'application se met ensuite à jour seule.
+demande confirmation au premier lancement comme indiqué plus haut. L'application se met ensuite à jour seule.
 
 ### Depuis les sources
 
@@ -163,9 +170,9 @@ compilez le tag de la version (`git checkout vX.Y.Z`) ou chargez le mod de votre
 avec `claude --plugin-dir plugin`.
 
 Une compilation depuis les sources ne vérifie les mises à jour d'elle-même que si vous l'activez
-dans Settings. Installer une mise à jour la remplace par l'image de la version, signée ad hoc, si
-bien que le certificat auto-signé ne s'applique plus ; **Install** le signale et demande d'abord
-confirmation.
+dans Settings. Installer une mise à jour la remplace par l'image de la version, signée avec le
+Developer ID de LiveBridge et non avec votre certificat auto-signé, si bien que macOS redemande
+l'accès au microphone une fois ; **Install** le signale et demande d'abord confirmation.
 
 ### Mises à jour
 
@@ -192,11 +199,15 @@ copie l'indique dans Settings.
   Claude Code déjà ouvertes gardent l'ancien mod jusqu'à leur redémarrage ; Settings liste
   celles qui sont rejointes et l'utilisent encore.
 - Le téléchargement de la mise à jour ne pose pas d'attribut de quarantaine, donc macOS ne
-  devrait pas bloquer le premier lancement de l'application mise à jour comme il a bloqué le
-  premier téléchargement ; cela découle du code et n'a pas encore été observé. Les vérifications
-  ci-dessus en tiennent lieu ([SECURITY.md](../../SECURITY.md#what-an-update-installs)). macOS
-  redemande en revanche l'accès au microphone au premier **Start** après une mise à jour, parce
-  que chaque version est signée ad hoc.
+  devrait pas interrompre le premier lancement de l'application mise à jour pour demander, comme
+  il l'a fait après le premier téléchargement ; cela découle du code et n'a pas encore été
+  observé. Les vérifications ci-dessus en tiennent lieu
+  ([SECURITY.md](../../SECURITY.md#what-an-update-installs)). Les versions postérieures à 0.4.2
+  sont signées avec le Developer ID de LiveBridge, donc l'autorisation du microphone devrait passer d'une
+  version à la suivante ; cela découle de la façon dont macOS rattache cette autorisation et n'a
+  pas encore été observé. La 0.4.2 et les précédentes étaient signées ad hoc, si bien que la
+  première mise à jour depuis l'une d'elles redemande le microphone une fois, au premier
+  **Start**.
 
 Pour mettre à jour à la main, exécutez `/live off` dans chaque session (le mod rouvre
 l'application de `/Applications` dès qu'elle ne répond plus), quittez LiveBridge, installez
@@ -206,9 +217,9 @@ l'image plus récente comme ci-dessus et exécutez les deux commandes `claude pl
 
 Le premier Start demande à macOS l'accès au microphone. S'il a été refusé, l'appel s'arrête avec
 une phrase d'explication, et **Open Microphone Settings** dans le menu de la barre des menus
-ouvre Confidentialité et sécurité > Microphone, où vous autorisez LiveBridge. Avec la signature
-ad hoc, macOS redemande au premier Start après chaque mise à jour ou recompilation (voir
-ci-dessus). macOS peut aussi demander si LiveBridge peut trouver des appareils sur votre réseau
+ouvre Confidentialité et sécurité > Microphone, où vous autorisez LiveBridge. macOS redemande au
+premier Start après la première mise à jour depuis une version ad hoc, et après chaque
+recompilation depuis les sources signée ad hoc (voir ci-dessus). macOS peut aussi demander si LiveBridge peut trouver des appareils sur votre réseau
 local. La ligne vocale a besoin de cette seconde autorisation également ; sans elle, l'appel
 s'arrête avec une phrase qui indique où l'accorder.
 
@@ -264,8 +275,8 @@ parlez.
 
 - **Le Start de la bande** fait de sa session la cible et démarre l'appel ; la ligne qu'il ouvre
   reçoit la conversation de la session, et charge en plus un résumé quand il manquerait à la voix
-  une partie d'elle (voir **Load context** ci-dessous), mais jamais avec **Pause sync** activé ni
-  après une pause ([détails](../../docs/architecture/overview.md#components)). Tant que l'appel parle à
+  une partie d'elle (voir **Load context** ci-dessous), mais avec **Pause sync** activé ou
+  après une pause seulement si elle n'en a pas encore ([détails](../../docs/architecture/overview.md#components)). Tant que l'appel parle à
   une autre session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session
   rejointe, `/live` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
@@ -290,18 +301,18 @@ parlez.
   micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
   lever ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** n'est activé que lorsqu'il manque à la voix une partie de la cible : pas de
-  résumé alors que **Pause sync** est activé, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
+  résumé et **Pause sync** empêche la ligne suivante d'en charger un, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
-  voix peut porter (une longue conversation le dépasse), la session a été mise en pause, ou son mod
+  voix peut porter (une longue conversation le dépasse), la session a été mise en pause et a un résumé, ou son mod
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
-  déjà la conversation. Sans résumé encore et sans rien de perdu, il affiche **Context loads with the
+  déjà la conversation. Sans ligne ouverte, quand la ligne suivante va charger le résumé et que rien d'autre ne manque, il affiche **Context loads with the
   line** et est désactivé, car la prochaine ligne le demande d'elle-même. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
   reste activé ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne. Les résultats qu'elle n'a pas encore dits
   restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude en attente
-  suivent d'autres règles ([détails](../../SECURITY.md#residual-risk-by-design)). Avec **Pause sync**
+  suivent d'autres règles ([détails](../../SECURITY.md#residual-risk-by-design)). Avec **Load a session's context on its first call** activé, ou avec **Pause sync**
   désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
   transcription de la session, qui contient ce que la session a lu ; pour l'éviter, faites d'abord
   `/clear` dans la session, puis appuyez sur **New conversation**. `/live` dans une session
@@ -321,14 +332,20 @@ parlez.
   dans une session rejointe et la réponse finale de Claude sont gardés dans la conversation de cette
   session avec la voix même quand l'appel est arrêté, et la voix les a quand la ligne suivante
   s'ouvre. Rien ne quitte le Mac avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
-  voir arriver chez OpenAI, activez le réglage, appuyez sur Stop, puis tapez : rien de ce que vous
+  voir arriver chez OpenAI, activez le réglage, désactivez le suivant si la session n'a peut-être pas encore de résumé, appuyez sur Stop, puis tapez : rien de ce que vous
   tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
-  aucune ligne ne charge de résumé d'elle-même, ni après une pause : seul **Load context** le
-  fait, et ce résumé est écrit à partir de toute la transcription, donc il porte
+  aucune ligne ne charge de résumé d'elle-même, ni après une pause, sauf pour une session sans résumé (le réglage suivant) ; sinon seul
+  **Load context** le fait. Ce résumé est écrit à partir de toute la transcription, donc il porte
   ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
+- **Load a session's context on its first call** (activé par défaut ; désactivé si **Pause sync** était activé lors de la mise à jour) :
+  une ligne qui s'ouvre pour une session dont la voix n'a pas de résumé en demande un même si
+  **Pause sync** est activé ou si la session est en pause, y compris pour une ancienne discussion
+  ou après **New conversation**. Ce résumé est écrit à partir de toute la transcription, donc il
+  porte ce que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
+  la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
 - **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
   voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
   question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne

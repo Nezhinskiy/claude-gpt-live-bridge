@@ -42,7 +42,7 @@ speak, with the conversation where you left it ([Billing](#billing-aware-by-desi
   question does not start a turn of Claude's. Once you have decided, it hands Claude a brief, with
   what was said since the last request quoted after it; a question that needs the code still goes
   to Claude. When the voice lacks part of the session, the line asks the session's own model for a
-  short summary on the side (not while **Pause sync** is on).
+  short summary on the side (while **Pause sync** is on, only when it has no summary).
 - **Walk away while Claude works.** Claude's answer to your request opens the closed line again
   and the voice says it. If the voice stays silent, the answer chimes and waits, so it is not lost
   ([what can go wrong](#known-limitations)).
@@ -94,8 +94,10 @@ claude plugin marketplace add getLiveBridge/LiveBridge
 claude plugin install livebridge@livebridge
 ```
 
-3. Open LiveBridge. It is not notarized, so the first time macOS blocks it until you allow it
-   under System Settings > Privacy & Security > **Open Anyway**.
+3. Open LiveBridge. Releases after 0.4.2 are notarized: the first time, macOS asks whether to
+   open an app downloaded from the internet; click **Open**. 0.4.2 and earlier are not, so
+   macOS blocks the first launch until you allow it under System Settings > Privacy & Security >
+   **Open Anyway**.
 4. In the Claude Code session you want to talk to, type `/live`.
 5. Press **Start** in the band above the prompt, allow the microphone, and talk.
 
@@ -127,7 +129,10 @@ rebuilds and uninstalling are under [Install](#install).
 The mod comes from this repository's marketplace (the [Quick start](#quick-start) commands),
 which names the latest release's tag, so the mod you install is that release's. The app goes in
 `/Applications` whichever way you install it: with Homebrew, from the disk image, or built from
-source. Whichever way, it is signed ad hoc and not notarized.
+source. From the first release after 0.4.2, the disk image, which Homebrew installs too, is
+signed with LiveBridge's Developer ID and notarized by Apple; 0.4.2 and earlier were signed ad
+hoc and not notarized, and a build from source is neither signed with the Developer ID nor
+notarized.
 
 ### From the disk image
 
@@ -144,11 +149,14 @@ source. Whichever way, it is signed ad hoc and not notarized.
 
    with `vX.Y.Z` the release's tag, as its page names it. This passes only for an image that
    this repository's [release workflow](.github/workflows/release.yml) built from that tag, on a
-   GitHub-hosted runner, and that has not changed since. It is the image's one proof of origin:
-   the ad hoc signature names no one. It does not prove that anyone reviewed the code.
+   GitHub-hosted runner, and that has not changed since. On a release after 0.4.2, the Developer
+   ID signature, which macOS checks by itself, says who signed the image, and this says what it
+   was built from; on 0.4.2 and earlier, whose ad hoc signature names no one, this is the image's
+   one proof of origin. It does not prove that anyone reviewed the code.
 3. Open it and drag LiveBridge to Applications.
-4. On first launch macOS blocks the app until you allow it under System Settings > Privacy &
-   Security > **Open Anyway**.
+4. On first launch, a release after 0.4.2 makes macOS ask whether to open an app downloaded
+   from the internet; click **Open**. 0.4.2 and earlier are blocked until you allow them under
+   System Settings > Privacy & Security > **Open Anyway**.
 
 ### With Homebrew
 
@@ -157,7 +165,7 @@ brew install --cask getlivebridge/tap/livebridge
 ```
 
 This installs the same disk image from [LiveBridge's own tap](https://github.com/getLiveBridge/homebrew-tap), which is not one of Homebrew's
-casks. Homebrew may ask you to trust the tap first, and macOS blocks the first launch as above. The
+casks. Homebrew may ask you to trust the tap first, and macOS asks at the first launch as above. The
 app then updates itself, as below.
 
 ### From source
@@ -174,8 +182,9 @@ runs with that release's mod. To match them, build the release's tag (`git check
 load the working tree's mod with `claude --plugin-dir plugin`.
 
 A build from source checks for updates by itself only if you turn that on in Settings.
-Installing an update replaces it with the release's image, which is signed ad hoc, so the
-self-signed certificate no longer applies; **Install** says so and asks first.
+Installing an update replaces it with the release's image, which is signed with LiveBridge's
+Developer ID, not your self-signed certificate, so macOS asks for the microphone once more;
+**Install** says so and asks first.
 
 ### Updating
 
@@ -197,11 +206,14 @@ the copy at `/Applications/LiveBridge.app` updates; any other copy says so in Se
 - Afterwards Settings says which version it updated from. If the mod could not be updated, it
   shows those two commands for you to run. Claude Code sessions already open keep the old mod
   until they restart; Settings lists the joined ones that still do.
-- The update's download sets no quarantine attribute, so macOS should not block the updated
-  app's first launch as it blocked the first download; this follows from the code and has not
-  yet been observed. The checks above are what stands in its place
-  ([SECURITY.md](SECURITY.md#what-an-update-installs)). macOS does ask for the microphone again
-  at the first **Start** after an update, because each release is signed ad hoc.
+- The update's download sets no quarantine attribute, so macOS should not stop the updated
+  app's first launch to ask, as it did after the first download; this follows from the code and
+  has not yet been observed. The checks above are what stands in its place
+  ([SECURITY.md](SECURITY.md#what-an-update-installs)). Releases after 0.4.2 are signed with
+  LiveBridge's Developer ID, so the microphone permission should carry over from one to the
+  next; this follows from how macOS keys the permission and has not yet been observed. 0.4.2 and
+  earlier were signed ad hoc, so the first update from one of them asks for the microphone once
+  more, at the first **Start**.
 
 To update by hand instead, run `/live off` in every session (the mod reopens the app at
 `/Applications` whenever the app stops answering), quit LiveBridge, install the newer image as
@@ -211,8 +223,9 @@ above and run the two `claude plugin` commands.
 
 The first Start asks macOS for the microphone. If it was refused, the call stops with a
 sentence and the menu bar menu's **Open Microphone Settings** opens Privacy & Security >
-Microphone, where you allow LiveBridge. With the ad hoc signature macOS asks again at the first
-Start after every update or rebuild (see above). macOS may also ask whether LiveBridge may find
+Microphone, where you allow LiveBridge. macOS asks again at the first Start after the first
+update from an ad hoc release, and after every rebuild from source signed ad hoc (see above).
+macOS may also ask whether LiveBridge may find
 devices on your local network. The voice line needs that second permission too; without it the
 call stops with a sentence that says where to allow it.
 
@@ -264,8 +277,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 - **The band's Start** makes its session the target and starts the call; the line it opens is seeded
   with the session's conversation, and loads a summary of the session as well when the voice would
-  lack part of it (see **Load context** below), but never while **Pause sync** is on or after a
-  pause ([details](docs/architecture/overview.md#components)). While the call talks to another
+  lack part of it (see **Load context** below), but while **Pause sync** is on or after a
+  pause only when it has none yet ([details](docs/architecture/overview.md#components)). While the call talks to another
   session, the band shows **Talk here**. If the band is not there in a joined session, `/live`
   brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
@@ -288,18 +301,18 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   not a lock: any process running as you can unmute
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** is enabled only when the voice lacks part of the target: it has no summary
-  while **Pause sync** is on, a turn did not arrive, a question or permission notice did not reach the app, turns ran while the
+  and **Pause sync** stops the next line loading one, a turn did not arrive, a question or permission notice did not reach the app, turns ran while the
   mod was off, the lines since the summary no longer all fit what the voice can carry (a long
-  conversation outgrows that), the session was paused, or its mod does not sync. Otherwise the item
+  conversation outgrows that), the session was paused and has a summary, or its mod does not sync. Otherwise the item
   reads **Context up to date** and is disabled, because the voice already has the conversation. With
-  no summary yet and nothing lost it reads **Context loads with the line** and is disabled, because
+  no line open, when the next line will load the summary and nothing else is missing, it reads **Context loads with the line** and is disabled, because
   the next line asks for one by itself. A summary carries no date, so one can be ignored while the item stays enabled
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×
   removes it and erases its own; both ask first. The voice starts afresh from the next time the line
   opens. Results it has not said yet stay and are added again; only **Stop** clears them. Claude's
   waiting questions follow other rules ([details](SECURITY.md#residual-risk-by-design)). With
-  **Pause sync** off and the session not paused, the next line loads a summary of the same session's
+  **Load a session's context on its first call** on, or **Pause sync** off and the session not paused, the next line loads a summary of the same session's
   transcript by itself, which holds the text the session read; `/clear` the session first to avoid
   that, then press **New conversation**. `/live` in a removed session joins it again.
 
@@ -315,14 +328,20 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **Pause sync while the call is stopped** (off by default): by default, what you type in a joined
   session and Claude's final answer to it are kept in that session's conversation with the voice
   even while the call is stopped, and the voice has them when the next line opens. Nothing leaves
-  the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, press Stop,
-  then type: nothing you type while the call is stopped is recorded, and the session is marked as
-  paused. While it is on, no line loads a summary by itself, and neither does one after a pause:
-  only **Load context** does, and that summary is written from the whole
-  transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
+  the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, turn off the next
+  setting if the session may have no summary yet, press Stop, then type: nothing you type while the call is stopped is recorded, and the session is marked as
+  paused. While it is on, no line loads a summary by itself, and neither does one after a pause,
+  except for a session with no summary (the next setting); otherwise only **Load context** does. That
+  summary is written from the whole transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
   it does and does not do.
+- **Load a session's context on its first call** (on by default; off if **Pause sync** was on when you updated to it): a line that
+  opens for a session the voice has no summary for asks for one even while **Pause sync** is on or
+  the session is paused, an old chat or a chat after **New conversation** included. That summary
+  is written from the whole transcript, so it carries what you paused, and it goes to OpenAI. Once
+  a session has a summary, the pause governs what follows. With this off, only **Load context**
+  loads a summary under the pause.
 - **Play sounds for requests and answers** (on by default): a short sound for each request the voice
   hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
   that reaches an open or opening line while nobody is speaking. The chime for a result that waits

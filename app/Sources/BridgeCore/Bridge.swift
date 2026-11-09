@@ -19,6 +19,8 @@ public actor Bridge: Router {
   /// Settings' "Pause sync while the call is stopped", read at each synced line, join and line
   /// that opens.
   private let pausesSync: @Sendable () -> Bool
+  /// A session's first summary is loaded under the pause too (`Settings.loadContextOnFirstCall`).
+  private let loadsContextOnFirstCall: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -70,13 +72,15 @@ public actor Bridge: Router {
     meter: UsageMeterStore, continuityFile: URL, time: any TimeSource,
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
-    pausesSync: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
+    pausesSync: @escaping @Sendable () -> Bool = { false },
+    loadsContextOnFirstCall: @escaping @Sendable () -> Bool, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
     self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
+    self.loadsContextOnFirstCall = loadsContextOnFirstCall
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -211,7 +215,7 @@ public actor Bridge: Router {
   /// Forgets the target's conversation; its next realtime session starts fresh.
   public func newConversation() async {
     guard let target = await registry.target else { return }
-    if isLineOpen, lineKnowsSession, lineSession == target { await send(.conversationChanged) }
+    if lineIsOpen(for: target) { await send(.conversationChanged) }
     await forgetConversation(of: target)
   }
 
@@ -383,14 +387,15 @@ public actor Bridge: Router {
     return await !registry.syncs(id)
   }
 
-  /// What the menu says of it: a session that has no summary and has lost nothing has one asked
-  /// for by its next line, so it is offered no press, unless the pause setting stops that line.
+  /// What the menu says of it: a session whose next line asks for the one thing missing is
+  /// offered no press, unless a line is already open, whose ask may have brought nothing. A paused
+  /// mark is no gap: all it costs the voice is the summary that line then brings.
   private func contextNeed(_ id: SessionID) async -> ContextNeed {
     guard await needsContext(id) else { return .none }
     let conversation = continuity[id]
-    let lostNothing = conversation.outOfSync == nil && !conversation.isOverSeed
+    let hasGap = conversation.outOfSync == .missed || conversation.isOverSeed
     let syncs = await registry.syncs(id)
-    return lostNothing && syncs && conversation.context == nil && !pausesSync()
+    return !hasGap && syncs && !pauseHoldsBackSummary(of: id) && !lineIsOpen(for: id)
       ? .withTheLine : .load
   }
 
@@ -398,6 +403,14 @@ public actor Bridge: Router {
   private func startOpening(preroll: Bool, waits: Bool = true) async {
     lineKnowsSession = false
     await attempt(waits: waits) { await self.openLine(preroll: preroll) }
+  }
+
+  /// Whether the pause, the setting or a session's mark, stops the next line asking for a summary,
+  /// which is written from the whole transcript, paused text included. A session with no summary
+  /// has its first one asked for all the same, if the owner left `loadsContextOnFirstCall` on.
+  private func pauseHoldsBackSummary(of id: SessionID) -> Bool {
+    if loadsContextOnFirstCall(), continuity[id].context == nil { return false }
+    return pausesSync() || continuity[id].outOfSync == .paused
   }
 
   /// Opens the line with the target's conversation, and asks the target for its context when it
@@ -410,9 +423,7 @@ public actor Bridge: Router {
     let session = await registry.target
     lineSession = session
     lineKnowsSession = true
-    if let session, !pausesSync(), continuity[session].outOfSync != .paused,
-      await needsContext(session)
-    {
+    if let session, !pauseHoldsBackSummary(of: session), await needsContext(session) {
       await askForContext(of: session)
     }
     do {
@@ -575,6 +586,10 @@ public actor Bridge: Router {
   private var pausing: Bool { pausesSync() && machine.phase == .off }
 
   private var isLineOpen: Bool { machine.phase == .connecting || machine.phase == .live }
+
+  private func lineIsOpen(for id: SessionID) -> Bool {
+    isLineOpen && lineKnowsSession && lineSession == id
+  }
 
   // MARK: Routing
 

@@ -31,8 +31,9 @@ public struct Confirmation: Sendable, Equatable {
     Confirmation(
       title: "Replace this build from source with LiveBridge \(version)?",
       message:
-        "The release image replaces the build from source. It is signed ad hoc, so a "
-        + "self-signed identity from build-app.sh --make-signing-identity no longer applies.",
+        "The release image replaces the build from source. It is signed with LiveBridge's "
+        + "Developer ID, not a self-signed identity from build-app.sh --make-signing-identity, "
+        + "so macOS asks for the microphone again.",
       confirm: "Install")
   }
 }

@@ -121,7 +121,7 @@
       </div>
       <div>
         <dt>Claude’s turns go to the work</dt>
-        <dd>Ask “what did you mean?” or “what is the risk with B?” and the voice is told to answer it from the conversation it shares with the session, so the question does not start a turn of Claude’s. Once you have decided, it hands Claude a brief, with what was said since the last request quoted after it; a question that needs the code still goes to Claude. When the voice lacks part of the session, the line asks the session’s own model for a short summary on the side (not while Pause sync is on).</dd>
+        <dd>Ask “what did you mean?” or “what is the risk with B?” and the voice is told to answer it from the conversation it shares with the session, so the question does not start a turn of Claude’s. Once you have decided, it hands Claude a brief, with what was said since the last request quoted after it; a question that needs the code still goes to Claude. When the voice lacks part of the session, the line asks the session’s own model for a short summary on the side (while Pause sync is on, only when it has no summary).</dd>
       </div>
       <div>
         <dt>Walk away while Claude works</dt>
@@ -192,13 +192,13 @@
           <button class="copy" type="button" hidden>Copy</button>
         </div>
         <p>Then open it and drag LiveBridge to Applications.</p>
-        <p>The app is not notarized, so macOS blocks it the first time you open it, however you installed it. To allow it:</p>
+        <p>Releases after 0.4.2 are signed with LiveBridge’s Developer ID and notarized by Apple. The first time you open one, macOS asks whether to open an app downloaded from the internet; click <strong>Open</strong>.</p>
+        <p>0.4.2 and earlier are not notarized, so macOS blocks them the first time you open them, however you installed them. To allow one:</p>
         <ol class="substeps">
           <li>Open LiveBridge once and close the warning.</li>
           <li>Open <strong>System Settings</strong> › <strong>Privacy &amp; Security</strong>, scroll down to <strong>Security</strong>, and click <strong>Open Anyway</strong> next to the message about LiveBridge.</li>
           <li>Confirm with <strong>Open</strong>, and enter your Mac password if asked.</li>
         </ol>
-        <p class="aside">On macOS 14 you can also Control-click LiveBridge in Applications, choose <strong>Open</strong>, then <strong>Open</strong> again.</p>
         <p class="aside">Prefer to build it yourself? With Xcode and a Swift 6.0 toolchain, clone the repository and run <code>scripts/build-app.sh --release</code>. It builds the app, installs it in <code>/Applications</code> and opens it. See <a href="https://github.com/getLiveBridge/LiveBridge#install">Install</a> in the README, which also says how to uninstall.</p>
       </li>
       <li class="step">

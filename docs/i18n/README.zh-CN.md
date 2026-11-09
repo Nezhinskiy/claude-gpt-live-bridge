@@ -86,7 +86,7 @@ scripts/build-app.sh --release
 
 模组来自本仓库的 marketplace（即[快速开始](#快速开始)中的命令），它指向最新发布版本的标签，因此你安装的就是该版本的模组。
 应用无论采用哪种方式，都安装在 `/Applications`：
-通过磁盘映像，或从源码构建。两种方式的应用都使用 ad hoc 签名，且未经公证。
+通过磁盘映像，或从源码构建。从 0.4.2 之后的第一个发布版本起，磁盘映像使用 LiveBridge 的 Developer ID 签名，并经 Apple 公证；0.4.2 及更早的版本使用 ad hoc 签名，未经公证；从源码构建的应用既未使用 Developer ID 签名，也未经公证。
 
 ### 通过磁盘映像安装
 
@@ -102,9 +102,9 @@ scripts/build-app.sh --release
 
    其中 `vX.Y.Z` 是该发布版本的标签，以其发布页面上的名称为准。只有由本仓库的[发布工作流](../../.github/workflows/release.yml)
    在 GitHub 托管的 runner 上根据该标签构建、且此后未被改动的映像才能通过验证。
-   这是映像唯一的来源证明：ad hoc 签名不指向任何人。它并不能证明有人审查过代码。
+   对于 0.4.2 之后的发布版本，Developer ID 签名由 macOS 自行检查，说明是谁签署了映像，而这项验证说明映像是由什么构建的；对于 0.4.2 及更早的版本，其 ad hoc 签名不指明任何人，这项验证是映像唯一的来源证明。它并不能证明有人审查过代码。
 3. 打开映像，把 LiveBridge 拖到“应用程序”。
-4. 首次启动时，macOS 会拦截该应用，直到你在“系统设置”>“隐私与安全性”中点击 **Open Anyway** 予以允许。
+4. 首次启动时，0.4.2 之后的发布版本会让 macOS 询问是否打开从互联网下载的应用；点击 **Open**。0.4.2 及更早的版本会被拦截，直到你在“系统设置”>“隐私与安全性”> **Open Anyway** 中允许它们。
 
 ### 通过 Homebrew 安装
 
@@ -112,7 +112,7 @@ scripts/build-app.sh --release
 brew install --cask getlivebridge/tap/livebridge
 ```
 
-这条命令从 [LiveBridge 自己的 tap](https://github.com/getLiveBridge/homebrew-tap) 安装同一个磁盘映像，它不是 Homebrew 的官方 cask。Homebrew 可能会先要求你信任这个 tap，macOS 也会像上面所说的那样阻止首次启动。之后应用会自行更新。
+这条命令从 [LiveBridge 自己的 tap](https://github.com/getLiveBridge/homebrew-tap) 安装同一个磁盘映像，它不是 Homebrew 的官方 cask。Homebrew 可能会先要求你信任这个 tap，macOS 也会像上面所说的那样在首次启动时询问。之后应用会自行更新。
 
 ### 从源码构建
 
@@ -124,8 +124,8 @@ brew install --cask getlivebridge/tap/livebridge
 marketplace 把模组固定在上一个发布版本的标签上，因此从默认分支构建的应用会搭配该版本的模组运行。若要两者一致，请构建该发布版本的标签（`git checkout vX.Y.Z`），
 或用 `claude --plugin-dir plugin` 加载工作树中的模组。
 
-从源码构建的应用只有在你于 Settings 中开启后才会自行检查更新。安装更新会用发布版本的映像替换它，该映像使用 ad hoc 签名，
-因此自签名证书将不再适用；**Install** 会说明这一点并先征求确认。
+从源码构建的应用只有在你于 Settings 中开启后才会自行检查更新。安装更新会用发布版本的映像替换它，该映像使用 LiveBridge 的 Developer ID 签名，而不是你的自签名证书，
+因此 macOS 会再次请求一次麦克风权限；**Install** 会说明这一点并先征求确认。
 
 ### 更新应用
 
@@ -141,8 +141,8 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
   `claude plugin update livebridge@livebridge` 更新模组，停止通话，一步将新应用放到原位并打开它。
 - 之后，Settings 会显示是从哪个版本更新而来。如果模组未能更新，那里会列出这两条命令，供你自己运行。
   已经打开的 Claude Code 会话在重启之前仍使用旧模组；Settings 会列出仍在使用旧模组的已加入会话。
-- 更新的下载不会设置隔离（quarantine）属性，因此 macOS 不应像拦截首次下载那样拦截更新后应用的首次启动；这是从代码推出的结论，尚未实际观察到。
-  由上述检查承担这一把关作用（[SECURITY.md](../../SECURITY.md#what-an-update-installs)）。更新后第一次点击 **Start** 时，macOS 会再次请求麦克风权限，因为每个发布版本都使用 ad hoc 签名。
+- 更新的下载不会设置隔离（quarantine）属性，因此 macOS 不应像首次下载之后那样，在更新后应用的首次启动时停下来询问；这是从代码推出的结论，尚未实际观察到。
+  由上述检查承担这一把关作用（[SECURITY.md](../../SECURITY.md#what-an-update-installs)）。0.4.2 之后的发布版本使用 LiveBridge 的 Developer ID 签名，因此麦克风权限应当会在版本之间保留；这是根据 macOS 对该权限的关联方式推断的，尚未观察到。0.4.2 及更早的版本使用 ad hoc 签名，因此从其中任一版本进行的第一次更新，会在第一次点击 **Start** 时再次请求一次麦克风权限。
 
 若要手动更新，请先在每个会话中运行 `/live off`（应用一旦停止响应，模组就会重新打开 `/Applications` 中的应用），退出 LiveBridge，
 按上文安装较新的映像，然后运行这两条 `claude plugin` 命令。
@@ -150,7 +150,7 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
 ### 权限
 
 首次点击 Start 时，macOS 会请求麦克风权限。如果被拒绝，通话会停止并给出一句提示，此时菜单栏菜单中的
-**Open Microphone Settings** 会打开“隐私与安全性”>“麦克风”，你可以在那里允许 LiveBridge。使用 ad hoc 签名时，每次更新或重新构建后
+**Open Microphone Settings** 会打开“隐私与安全性”>“麦克风”，你可以在那里允许 LiveBridge。从 ad hoc 签名的发布版本进行第一次更新后，以及每次使用 ad hoc 签名从源码重新构建后，
 第一次点击 Start，macOS 都会再次询问（见上文）。macOS 还可能询问是否允许 LiveBridge 查找本地网络上的设备。语音线路同样需要这第二项权限；
 没有它，通话会停止并给出一句提示，说明在哪里允许。
 
@@ -195,14 +195,14 @@ claude plugin uninstall livebridge@livebridge
 
 在提示输入框上方的状态条或菜单栏菜单中点击 **Start**，然后开始说话。
 
-- **状态条上的 Start** 会让它所属的会话成为目标并开始通话；它打开的线路会带上该会话的对话，并且在语音会缺少该会话的一部分时（见下文 **Load context**）另外加载摘要，但在 **Pause sync** 开启期间或暂停之后绝不加载（[详情](../../docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
+- **状态条上的 Start** 会让它所属的会话成为目标并开始通话；它打开的线路会带上该会话的对话，并且在语音会缺少该会话的一部分时（见下文 **Load context**）另外加载摘要，但在 **Pause sync** 开启期间或暂停之后，只有在尚无摘要时才加载（[详情](../../docs/architecture/overview.md#components)）。当通话正在对接另一个会话时，状态条显示 **Talk here**。若已加入的会话中没有
   状态条，`/live` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
   **Load context**、LiveBridge 保存的目标会话 **Conversation**（语音交给 Claude 的每个请求都有一行 **Task**，载入摘要的位置有一行 **Loaded context**）、用量限额、分钟数、
   **Star LiveBridge on GitHub**（打开仓库页面）、**Settings…** 和 **Quit LiveBridge**。通话期间，**Conversation** 会随着 codex 的转写显示你和语音说的话，因此你的话可能在说出后片刻才出现，语音的话可能在你听到前片刻就出现。每句话结束后，由最终文本替换这些文字。只保留最终文本：线路关闭时仍未等到最终文本的文字会消失。
 - **Mute**（在 **Stop** 旁边，位于状态条和菜单的通话卡片中；Mute 后显示 **Unmute**）会在通话继续时释放你的麦克风：Claude 的答复仍会打开线路，并交给语音去说。状态条保留阶段并加上 `· muted`；没有线路打开时，菜单显示 “Muted — line closed”。Mute 不会关闭线路：已打开的线路会在通常的无声时长后关闭：若你当时在说话，则从 Mute 起算；若线路本来就安静，Mute 不会改变它何时关闭，计费与任何无声时段相同，因此 Mute 不会节省实时分钟数。**Unmute** 会重新使用麦克风，若无法使用（被拒绝、被占用、缺失），通话会带着原因结束。**Stop** 会结束通话和 Mute；下一次 **Start** 从未 Mute 开始。Mute 不是锁：任何以你的用户身份运行的进程都可以解除它（[SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)）。
-- **Load context** 只在语音缺少目标的一部分时可用：**Pause sync** 开启时没有摘要、某一轮没有送达、某个问题或权限通知没有送到应用、模组关闭期间有轮次运行、摘要之后的行数已超出语音所能承载（较长的对话会超出）、该会话曾被暂停，或其模组不同步。否则该项显示为 **Context up to date** 且不可用，因为语音已经有了这段对话。如果还没有摘要且没有丢失任何内容，该项显示为 **Context loads with the line** 且不可用，因为下一条线路会自行请求摘要。摘要不带日期，因此它可能被忽略而该项仍保持可用（[BR-002](../../docs/bugs/BR-002.md)）。
-- **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。语音从线路下次打开时重新开始。它还没说出的结果会保留并再次加入，只有 **Stop** 会清除它们。Claude 等待中的问题遵循其他规则（[详情](../../SECURITY.md#residual-risk-by-design)）。**Pause sync** 关闭且该会话未被暂停时，下一条线路会自行加载同一会话记录的摘要，其中包括该会话读过的内容；要避免这一点，请先在该会话中执行 `/clear`，再点击 **New conversation**。在被移除的会话中执行 `/live` 可让它重新加入。
+- **Load context** 只在语音缺少目标的一部分时可用：没有摘要且 **Pause sync** 使下一条线路无法加载、某一轮没有送达、某个问题或权限通知没有送到应用、模组关闭期间有轮次运行、摘要之后的行数已超出语音所能承载（较长的对话会超出）、该会话曾被暂停且已有摘要，或其模组不同步。否则该项显示为 **Context up to date** 且不可用，因为语音已经有了这段对话。如果没有打开的线路、下一条线路将加载摘要且没有缺少其他内容，该项显示为 **Context loads with the line** 且不可用，因为下一条线路会自行请求摘要。摘要不带日期，因此它可能被忽略而该项仍保持可用（[BR-002](../../docs/bugs/BR-002.md)）。
+- **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。语音从线路下次打开时重新开始。它还没说出的结果会保留并再次加入，只有 **Stop** 会清除它们。Claude 等待中的问题遵循其他规则（[详情](../../SECURITY.md#residual-risk-by-design)）。**Load a session's context on its first call** 开启时，或 **Pause sync** 关闭且该会话未被暂停时，下一条线路会自行加载同一会话记录的摘要，其中包括该会话读过的内容；要避免这一点，请先在该会话中执行 `/clear`，再点击 **New conversation**。在被移除的会话中执行 `/live` 可让它重新加入。
 
 ### 设置
 
@@ -211,7 +211,8 @@ claude plugin uninstall livebridge@livebridge
 - **Voice**：你的 codex 提供的实时语音之一（窗口打开时由 codex 列出），或 **Codex default**。从线路下次打开起生效。
 - **Prompt**（默认为空）：你给语音的自定义指令，例如“用西班牙语和我说话”，最多 2,000 个字符。它们会追加在 LiveBridge
   为语音设定的规则之后；两者冲突时以 LiveBridge 的规则为准。从线路下次打开起生效。
-- **Pause sync while the call is stopped**（默认关闭）：默认情况下，你在已加入的会话中输入的内容以及 Claude 对此的最终答复，即使通话已停止，也会保存到该会话与语音的对话中，下一条线路打开时语音就拥有它们。在线路打开之前，没有任何内容离开这台 Mac。若不想让某些文字到达 OpenAI，请开启此项，按下 Stop，然后再输入：通话停止期间你输入的内容都不会被记录，该会话会被标记为已暂停。开启期间，没有任何线路会自行加载摘要，暂停之后也是如此：只有 **Load context** 才会加载，而该摘要由整份会话记录写成，因此会带上你暂停的内容。向正在运行语音请求的那一轮输入，会使它的答复失败，其中的任何内容都不会被记录或说出。此项不会删除已记录的任何内容，Claude 之后的答复也可能重复被暂停的文字；它做什么、不做什么，见 [SECURITY.md](../../SECURITY.md#residual-risk-by-design)。
+- **Pause sync while the call is stopped**（默认关闭）：默认情况下，你在已加入的会话中输入的内容以及 Claude 对此的最终答复，即使通话已停止，也会保存到该会话与语音的对话中，下一条线路打开时语音就拥有它们。在线路打开之前，没有任何内容离开这台 Mac。若不想让某些文字到达 OpenAI，请开启此项，若该会话可能还没有摘要，请关闭下一项设置，按下 Stop，然后再输入：通话停止期间你输入的内容都不会被记录，该会话会被标记为已暂停。开启期间，没有任何线路会自行加载摘要，暂停之后也是如此，但没有摘要的会话除外（见下一项设置）；其他情况下只有 **Load context** 才会加载。该摘要由整份会话记录写成，因此会带上你暂停的内容。向正在运行语音请求的那一轮输入，会使它的答复失败，其中的任何内容都不会被记录或说出。此项不会删除已记录的任何内容，Claude 之后的答复也可能重复被暂停的文字；它做什么、不做什么，见 [SECURITY.md](../../SECURITY.md#residual-risk-by-design)。
+- **Load a session's context on its first call**（默认开启；如果更新时 **Pause sync** 已开启，则为关闭）：为语音没有摘要的会话打开的线路会请求摘要，即使 **Pause sync** 已开启或该会话已被暂停，旧对话和 **New conversation** 之后的对话也一样。该摘要由整份会话记录写成，因此会带上你暂停的内容，并发送给 OpenAI。会话有了摘要之后，后续内容由暂停决定。关闭此项时，暂停期间只有 **Load context** 才会加载摘要。
 - **Play sounds for requests and answers**（默认开启）：语音每转交一个请求给 Claude，就播放一声短音（[原因](#已知限制)）；无人说话时，Claude 的每个回答、失败或提问到达已打开或正在打开的线路，也会播放一声。等待中结果的提示音始终播放。
 - **Notify when a result is waiting**（默认开启）：当线路关闭期间有结果在等待时，除提示音外，还会弹出一条 macOS 通知，其中写明会话名称
   （“Alpha has a new result — speak to hear it”），但绝不包含结果本身。点击通知会打开菜单栏菜单。

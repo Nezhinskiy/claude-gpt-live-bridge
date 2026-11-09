@@ -4,7 +4,7 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5.0]
 
 ### Added
 
@@ -14,6 +14,27 @@ All notable changes to this project are listed here. The format follows
   `LiveBridge.dmg.sigstore.json`.
   Adding `--bundle LiveBridge.dmg.sigstore.json` to the README's whole `gh attestation verify`
   command checks the image against that file instead of the copy GitHub stores.
+- **Load a session's context on its first call**, in Settings under Sync, on by default: a line
+  that opens for a session the voice has no summary for asks for one even while **Pause sync
+  while the call is stopped** is on or the session is paused, so an old chat or a chat after **New
+  conversation** starts with its context. That summary is written from the whole transcript,
+  paused text included, and goes to OpenAI; after it, the pause works as before. If the pause was
+  on when you update (or you had turned off the automatic summary, which became the pause), this
+  stays off; you can turn it on in Settings. A session still marked paused from an earlier pause,
+  with the pause off when you update, is not covered: the setting is on, and that session's first
+  summary carries what you paused.
+
+### Changed
+
+- The disk image and the app inside it are signed with LiveBridge's Developer ID and notarized
+  by Apple, so macOS opens the download after its usual question instead of blocking it until
+  **Open Anyway**. The release fails rather than ship without the signature.
+- With the Developer ID, the microphone permission should carry over from one release to the
+  next. The first update from 0.4.2 or earlier, which were signed ad hoc, asks for it once more.
+- `scripts/build-app.sh --package` is `--package-app` then `--package-dmg`, and signs with
+  `LIVEBRIDGE_SIGN_IDENTITY` when it is set; without it the app is signed ad hoc and the image
+  left unsigned, as before.
+  `scripts/notarize.sh` notarizes and staples either half.
 
 ## [0.4.2]
 
