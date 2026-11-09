@@ -22,6 +22,18 @@ All notable changes to this project are listed here. The format follows
   on when you update (or you had turned off the automatic summary, which became the pause), this
   stays off so nothing widens without you; you can turn it on in Settings.
 
+### Changed
+
+- The disk image and the app inside it are signed with LiveBridge's Developer ID and notarized
+  by Apple, so macOS opens the download after its usual question instead of blocking it until
+  **Open Anyway**. The release fails rather than ship without the signature.
+- With the Developer ID, the microphone permission should carry over from one release to the
+  next. The first update from 0.4.2 or earlier, which were signed ad hoc, asks for it once more.
+- `scripts/build-app.sh --package` is `--package-app` then `--package-dmg`, and signs with
+  `LIVEBRIDGE_SIGN_IDENTITY` when it is set; without it the app is signed ad hoc and the image
+  left unsigned, as before.
+  `scripts/notarize.sh` notarizes and staples either half.
+
 ## [0.4.2]
 
 ### Changed

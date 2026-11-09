@@ -82,3 +82,9 @@ Alternatives considered:
 ## Status
 
 Accepted, 2026-11-02.
+
+Later, 2026-11-08: releases after 0.4.2 are signed with a Developer ID and notarized
+([the notarized release](../specs/2026-11-08-notarized-release-design.md)). That changes the
+consequences above about the microphone prompt and about a build from source being replaced by
+an ad hoc image. The updater's checks, and this decision, are unchanged: its `codesign` check
+still names no signer, so the attestation stays the release's proof of origin.

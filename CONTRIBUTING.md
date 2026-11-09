@@ -138,13 +138,56 @@ differ (`scripts/tests/release-guards.test.sh` for the `ref`).
 
 Push the tag right after the release pull request merges: until it exists, the marketplace on the
 default branch names a tag that does not, and installing or updating the mod fails. Pushing the
-tag `v<version>` runs `.github/workflows/release.yml` on a GitHub-hosted macOS runner: it refuses
-a tag that does not match `Info.plist` or the marketplace's `ref`, builds the image with `scripts/build-app.sh --package`,
-attests it, and creates the tag's Release with `LiveBridge.dmg` and its attestation,
-`LiveBridge.dmg.sigstore.json`, attached. The app's in-app update
-verifies that attestation pinned to this workflow, the tag and GitHub-hosted runners
-([SECURITY.md](SECURITY.md#what-an-update-installs)), so a release built any other way does not
-install.
+tag `v<version>` runs `.github/workflows/release.yml` on a GitHub-hosted macOS runner, in the
+`release` environment, once the owner approves the run: it refuses a tag that does not match
+`Info.plist` or the marketplace's `ref`, and fails when a secret below is missing. It builds and
+signs the app with the owner's Developer ID (`scripts/build-app.sh --package-app`), has Apple
+notarize it and staples the ticket (`scripts/notarize.sh`), does the same for the disk image
+built from it (`--package-dmg`), attests the stapled image, and creates the tag's Release with
+`LiveBridge.dmg` and its attestation, `LiveBridge.dmg.sigstore.json`, attached. The app's
+in-app update verifies that attestation pinned to this workflow, the tag and GitHub-hosted
+runners ([SECURITY.md](SECURITY.md#what-an-update-installs)), so a release built any other way
+does not install. Without an Apple account, `scripts/build-app.sh --package` still builds the
+image from the same source, with the app signed ad hoc, the image unsigned and nothing
+notarized.
+
+Approve a release run only when its commit is the release merge on `main`: the approval screen
+does not show the workflow, and a `v*` tag on any other commit runs that commit's own
+`release.yml` with the Developer ID. A tag ruleset that lets only the owner create `v*` tags
+narrows who can start such a run.
+
+On release day, once the Release exists, move the tap's cask
+([getLiveBridge/homebrew-tap](https://github.com/getLiveBridge/homebrew-tap)) to the new
+version. For the first release after 0.4.2, also drop its caveat that the app is signed ad hoc,
+not notarized, and needs **Open Anyway**.
+
+### The release environment (once, by the owner)
+
+The Apple Developer Program's account holder does this; nothing of it is in the repository.
+
+1. **The certificate.** In Xcode, Settings > Accounts > the team > Manage Certificates > + >
+   **Developer ID Application**. In Keychain Access, under My Certificates, export
+   "Developer ID Application: …" with its private key as a `.p12`, with a strong password.
+2. **The notary key.** In App Store Connect, Users and Access > Integrations > App Store
+   Connect API > **Team Keys**, generate a key with the Developer role. Download its
+   `AuthKey_<id>.p8` (it downloads only once) and note its Key ID and the Issuer ID above the
+   list.
+3. **The environment.** In the repository's Settings > Environments, create `release`. Under
+   Deployment branches and tags choose Selected branches and tags and add the tag rule `v*`;
+   tick Required reviewers and add yourself (leave Prevent self-review off).
+4. **The secrets**, as environment secrets of `release`, from the folder holding the two files:
+
+   ```sh
+   base64 -i developer-id.p12 | gh secret set MACOS_CERTIFICATE --env release --repo getLiveBridge/LiveBridge
+   gh secret set MACOS_CERTIFICATE_PASSWORD --env release --repo getLiveBridge/LiveBridge
+   base64 -i AuthKey_<id>.p8 | gh secret set NOTARY_KEY --env release --repo getLiveBridge/LiveBridge
+   gh secret set NOTARY_KEY_ID --env release --repo getLiveBridge/LiveBridge
+   gh secret set NOTARY_ISSUER_ID --env release --repo getLiveBridge/LiveBridge
+   ```
+
+   `gh secret set` without a pipe asks for the value, so it stays out of the shell's history.
+   Keep the `.p12` and the `.p8` somewhere safe, or delete them; a new certificate or key means
+   setting its secrets again.
 
 ## Running the app while you work
 

@@ -103,8 +103,9 @@ Update, अनुमतियाँ, नए build के बाद भी microp
 
 mod इस repository के marketplace से आता है ([त्वरित शुरुआत](#त्वरित-शुरुआत) के commands), जो नवीनतम
 release के tag की ओर इशारा करता है, इसलिए आप जो mod install करते हैं वह उसी release का होता है। App
-दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके। दोनों में वह
-ad hoc signed होता है और notarized नहीं होता।
+दोनों तरीकों में `/Applications` में जाता है: disk image से, या source से build करके। 0.4.2 के बाद के पहले release से, डिस्क इमेज
+LiveBridge की Developer ID से signed और Apple द्वारा notarized है; 0.4.2 और उससे पहले के releases ad hoc
+signed थे और notarized नहीं हैं, और source से बना build न तो Developer ID से signed होता है और न notarized।
 
 ### डिस्क इमेज से
 
@@ -121,12 +122,14 @@ ad hoc signed होता है और notarized नहीं होता।
 
    जहाँ `vX.Y.Z` release का tag है, जैसा उसके page पर लिखा है। यह जाँच सिर्फ़ ऐसी image के लिए पास
    होती है जिसे इस repository के [release workflow](../../.github/workflows/release.yml) ने उसी tag से,
-   GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। image के स्रोत का
-   यही एकमात्र प्रमाण है: ad hoc signature किसी का नाम नहीं बताता। यह इस बात का प्रमाण नहीं है कि
-   किसी ने code की समीक्षा की है।
+   GitHub के अपने (GitHub-hosted) runner पर, build किया हो और जो तब से बदली न हो। 0.4.2 के बाद के release पर Developer ID
+   signature, जिसे macOS खुद जाँचता है, बताता है कि image पर किसने sign किया, और यह जाँच बताती है कि वह
+   किससे build हुई थी; 0.4.2 और उससे पहले के releases पर, जिनका ad hoc signature किसी का नाम नहीं बताता,
+   यह जाँच image के origin का इकलौता प्रमाण है। यह इस बात का प्रमाण नहीं है कि किसी ने code की समीक्षा की है।
 3. उसे खोलें और LiveBridge को Applications में drag करें।
-4. पहली बार launch करने पर macOS app को तब तक block रखता है जब तक आप उसे System Settings > Privacy &
-   Security > **Open Anyway** में अनुमति न दें।
+4. पहली बार launch करने पर, 0.4.2 के बाद के release पर macOS पूछता है कि internet से download किया गया
+   app खोलना है या नहीं; **Open** पर click करें। 0.4.2 और उससे पहले के releases तब तक blocked रहते हैं जब तक
+   आप उन्हें System Settings > Privacy & Security > **Open Anyway** में अनुमति नहीं देते।
 
 ### Homebrew से
 
@@ -135,7 +138,7 @@ brew install --cask getlivebridge/tap/livebridge
 ```
 
 यह वही डिस्क इमेज [LiveBridge के अपने tap](https://github.com/getLiveBridge/homebrew-tap) से इंस्टॉल करता है, जो Homebrew का आधिकारिक cask नहीं
-है। Homebrew पहले इस tap पर भरोसा करने को कह सकता है, और macOS पहली बार खोलने को ऊपर बताए अनुसार रोकता
+है। Homebrew पहले इस tap पर भरोसा करने को कह सकता है, और macOS पहली बार खोलने पर ऊपर बताए अनुसार पूछता
 है। इसके बाद app खुद अपडेट होता है।
 
 ### सोर्स से
@@ -153,8 +156,9 @@ marketplace mod को पिछले release के tag पर pin करत�
 `claude --plugin-dir plugin` से working tree का mod load करें।
 
 source से बना build updates की जाँच अपने-आप तभी करता है जब आप Settings में इसे चालू करें। Update
-install करने पर वह release की image से बदल जाता है, जो ad hoc signed है, इसलिए self-signed
-certificate फिर लागू नहीं रहता; **Install** यह बताता है और पहले पूछता है।
+install करने पर वह release की image से बदल जाता है, जो LiveBridge की Developer ID से signed है,
+आपके self-signed certificate से नहीं, इसलिए macOS microphone के लिए एक बार फिर पूछता है; **Install** यह
+बताता है और पहले पूछता है।
 
 ### अपडेट करना
 
@@ -178,10 +182,13 @@ LiveBridge app और अपने mod को तभी update करता ह�
   दोनों commands दिखते हैं ताकि आप इन्हें खुद चलाएँ। पहले से खुले Claude Code sessions restart होने
   तक पुराना mod ही रखते हैं; Settings उन जुड़े sessions को दिखाता है जो अब भी उसे चला रहे हैं।
 - update का download कोई quarantine attribute नहीं लगाता, इसलिए macOS को updated app का पहला launch
-  वैसे block नहीं करना चाहिए जैसे पहले download को किया था; यह code से निकलता है और अभी असल में देखा
-  नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं
-  ([SECURITY.md](../../SECURITY.md#what-an-update-installs))। हाँ, update के बाद पहले **Start** पर macOS
-  microphone के लिए दोबारा पूछता है, क्योंकि हर release ad hoc signed होता है।
+  पूछने के लिए वैसे नहीं रोकना चाहिए जैसे पहले download के बाद रोका था; यह code से निकलता है और अभी असल
+  में देखा नहीं गया है। उसकी जगह ऊपर वाली जाँचें लेती हैं
+  ([SECURITY.md](../../SECURITY.md#what-an-update-installs))। 0.4.2 के बाद के releases LiveBridge की
+  Developer ID से signed हैं, इसलिए microphone की अनुमति एक release से अगले में जानी चाहिए; यह इस पर आधारित है कि macOS
+  अनुमति को कैसे जोड़ता है, और अभी तक देखा नहीं गया है। 0.4.2 और उससे
+  पहले के releases ad hoc signed थे, इसलिए उनमें से किसी से पहला update पहले **Start** पर microphone के लिए
+  एक बार फिर पूछता है।
 
 हाथ से update करने के लिए, हर session में `/live off` चलाएँ (app जवाब देना बंद करते ही mod
 `/Applications` वाला app फिर खोल देता है), LiveBridge बंद करें, नई image ऊपर बताए तरीके से install
@@ -191,8 +198,8 @@ LiveBridge app और अपने mod को तभी update करता ह�
 
 पहली बार Start करने पर macOS से microphone माँगा जाता है। अगर मना कर दिया गया, तो call एक वाक्य के
 साथ रुक जाती है और menu bar menu का **Open Microphone Settings** Privacy & Security > Microphone खोल
-देता है, जहाँ आप LiveBridge को अनुमति देते हैं। ad hoc signature के साथ macOS हर update या नए build
-के बाद पहले Start पर फिर पूछता है (ऊपर देखें)। macOS यह भी पूछ सकता है कि क्या LiveBridge आपके local
+देता है, जहाँ आप LiveBridge को अनुमति देते हैं। macOS किसी ad hoc release से पहले update के बाद, और source से बने हर ad hoc signed rebuild के बाद, पहले
+Start पर फिर पूछता है (ऊपर देखें)। macOS यह भी पूछ सकता है कि क्या LiveBridge आपके local
 network पर devices खोज सकता है। voice line को यह दूसरी अनुमति भी चाहिए; इसके बिना call एक वाक्य के
 साथ रुक जाती है, जो बताता है कि इसे कहाँ allow करना है।
 

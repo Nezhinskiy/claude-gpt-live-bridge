@@ -1,5 +1,6 @@
-# Builds the disk image on a version tag (v0.1.0 and on), attaches it to that tag's GitHub
-# Release and attests its build provenance. A downloader checks it, with vX.Y.Z the release's tag:
+# Builds the disk image on a version tag (v0.1.0 and on), signs and notarizes it, attaches it to
+# that tag's GitHub Release and attests its build provenance. A downloader checks it, with vX.Y.Z
+# the release's tag:
 #   gh attestation verify LiveBridge.dmg --repo getLiveBridge/LiveBridge \
 #     --signer-workflow getLiveBridge/LiveBridge/.github/workflows/release.yml \
 #     --source-ref refs/tags/vX.Y.Z --deny-self-hosted-runners
@@ -7,8 +8,14 @@
 # runner, and that it is unchanged since; it does not prove that anyone reviewed the code. The
 # app's in-app update runs the same check. The Release also carries the attestation itself, as
 # LiveBridge.dmg.sigstore.json: `--bundle LiveBridge.dmg.sigstore.json` checks against that file
-# instead of the copy GitHub stores, and Scorecard counts the Release as signed. The image is
-# signed ad hoc and not notarized; no secret is used.
+# instead of the copy GitHub stores, and Scorecard counts the Release as signed.
+#
+# The app and the image are signed with the owner's Developer ID Application certificate and
+# notarized by Apple, each ticket stapled, before the attestation, so it covers the image as
+# uploaded (docs/specs/2026-11-08-notarized-release-design.md). The five secrets this needs are
+# the `release` environment's. That environment is configured in the repository's settings, not
+# here, so that only a v* tag may use it and the owner approves each run; CONTRIBUTING.md
+# (Releasing) says how. Without any one of the secrets the job fails and no Release is made.
 name: Release
 
 on:
@@ -17,10 +24,15 @@ on:
 
 permissions: {}
 
+defaults:
+  run:
+    shell: bash # -eo pipefail, so a failed decode in a pipe fails the step
+
 jobs:
   release:
     runs-on: xcode-27  # the same image as ci.yml, so the release builds with the tested toolchain
-    timeout-minutes: 30
+    timeout-minutes: 60 # two notarizations, each given 20 minutes by scripts/notarize.sh
+    environment: release
     permissions:
       contents: write # create the Release and upload the image
       id-token: write # the OIDC token Sigstore signs the attestation with
@@ -29,6 +41,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Select Xcode 27.2
+        # As ci.yml does: the build, codesign, notarytool and stapler come from the tested Xcode.
+        run: sudo xcode-select -s /Applications/Xcode_27.2.app
       - name: Show the toolchain
         run: |
           xcodebuild -version
@@ -47,8 +62,100 @@ jobs:
             echo "the tag is $GITHUB_REF_NAME but marketplace.json pins the mod to $ref" >&2
             exit 1
           fi
-      - name: Package
-        run: scripts/build-app.sh --package
+      # Secrets reach a step only through its env, never through ${{ }} in a script.
+      - name: Check the signing and notary secrets are set
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          missing=0
+          for name in MACOS_CERTIFICATE MACOS_CERTIFICATE_PASSWORD NOTARY_KEY NOTARY_KEY_ID \
+            NOTARY_ISSUER_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::the release environment has no $name secret; nothing is released"
+              missing=1
+            fi
+          done
+          exit $missing
+      # A keychain of the job's own, never added to the search list: build-app.sh hands it to
+      # codesign with --keychain. Its password is random and lives only in this step.
+      # `security import` reads the certificate's password only from its command line.
+      # codesign builds the certificate chain from the search list alone, so Apple's Developer ID
+      # intermediate must already be there; the identity is then named by its SHA-1, which is
+      # public in every signature.
+      - name: Import the Developer ID certificate into a temporary keychain
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ! security find-certificate -c "Developer ID Certification Authority" >/dev/null; then
+            echo "::error::the runner has no Developer ID Certification Authority certificate" >&2
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/livebridge-signing.keychain-db"
+          p12="$RUNNER_TEMP/developer-id.p12"
+          password=$(openssl rand -hex 24)
+          echo "::add-mask::$password"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          (umask 077 && printf '%s' "$MACOS_CERTIFICATE" | base64 --decode >"$p12")
+          security import "$p12" -k "$keychain" -f pkcs12 -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign >/dev/null
+          rm -f "$p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" \
+            "$keychain" >/dev/null
+          # Valid only: an identity whose chain to Apple's root does not build here fails now,
+          # not at notarization. The full listing says why.
+          valid=$(security find-identity -v -p codesigning "$keychain")
+          if [ "$(grep -c '"Developer ID Application: ' <<<"$valid")" != 1 ]; then
+            security find-identity -p codesigning "$keychain"
+            echo "::error::the keychain holds no single valid Developer ID Application identity" >&2
+            exit 1
+          fi
+          hash=$(awk '/"Developer ID Application: / { print $2; exit }' <<<"$valid")
+          echo "LIVEBRIDGE_SIGN_KEYCHAIN=$keychain" >>"$GITHUB_ENV"
+          echo "LIVEBRIDGE_SIGN_IDENTITY=$hash" >>"$GITHUB_ENV"
+      - name: Package and sign the app
+        run: |
+          scripts/build-app.sh --package-app
+          # The signature must chain to Apple's root through the Developer ID intermediate.
+          chain=$(codesign -dvv dist/LiveBridge.app 2>&1)
+          for authority in "Developer ID Certification Authority" "Apple Root CA"; do
+            if ! grep -qx "Authority=$authority" <<<"$chain"; then
+              echo "$chain" | grep '^Authority='
+              echo "::error::the app's signature does not chain through $authority" >&2
+              exit 1
+            fi
+          done
+      # The key is written only now and removed once the image is notarized, and the keychain
+      # goes as soon as the image is signed; the always() step below is the backstop.
+      - name: Write the notary key
+        env:
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+        run: |
+          key="$RUNNER_TEMP/notary-key.p8"
+          (umask 077 && printf '%s' "$NOTARY_KEY" | base64 --decode >"$key")
+          echo "LIVEBRIDGE_NOTARY_KEY=$key" >>"$GITHUB_ENV"
+      - name: Notarize and staple the app
+        env:
+          LIVEBRIDGE_NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          LIVEBRIDGE_NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: scripts/notarize.sh dist/LiveBridge.app
+      - name: Build and sign the disk image
+        run: scripts/build-app.sh --package-dmg
+      - name: Delete the keychain
+        run: security delete-keychain "$LIVEBRIDGE_SIGN_KEYCHAIN"
+      - name: Notarize and staple the disk image
+        env:
+          LIVEBRIDGE_NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          LIVEBRIDGE_NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: scripts/notarize.sh dist/LiveBridge.dmg
+      - name: Delete the notary key
+        run: rm -f "$LIVEBRIDGE_NOTARY_KEY"
       - id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -61,3 +168,8 @@ jobs:
           cp "$BUNDLE" dist/LiveBridge.dmg.sigstore.json
           gh release create "$GITHUB_REF_NAME" dist/LiveBridge.dmg dist/LiveBridge.dmg.sigstore.json \
             --verify-tag --generate-notes
+      - name: Delete the keychain and the notary key
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/livebridge-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/notary-key.p8" "$RUNNER_TEMP/developer-id.p12"
