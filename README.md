@@ -42,7 +42,7 @@ speak, with the conversation where you left it ([Billing](#billing-aware-by-desi
   question does not start a turn of Claude's. Once you have decided, it hands Claude a brief, with
   what was said since the last request quoted after it; a question that needs the code still goes
   to Claude. When the voice lacks part of the session, the line asks the session's own model for a
-  short summary on the side (not while **Pause sync** is on).
+  short summary on the side (while **Pause sync** is on, at most a session's first).
 - **Walk away while Claude works.** Claude's answer to your request opens the closed line again
   and the voice says it. If the voice stays silent, the answer chimes and waits, so it is not lost
   ([what can go wrong](#known-limitations)).
@@ -264,8 +264,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 - **The band's Start** makes its session the target and starts the call; the line it opens is seeded
   with the session's conversation, and loads a summary of the session as well when the voice would
-  lack part of it (see **Load context** below), but never while **Pause sync** is on or after a
-  pause ([details](docs/architecture/overview.md#components)). While the call talks to another
+  lack part of it (see **Load context** below), but while **Pause sync** is on or after a
+  pause only a session's first summary ([details](docs/architecture/overview.md#components)). While the call talks to another
   session, the band shows **Talk here**. If the band is not there in a joined session, `/live`
   brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
@@ -288,18 +288,18 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   not a lock: any process running as you can unmute
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** is enabled only when the voice lacks part of the target: it has no summary
-  while **Pause sync** is on, a turn did not arrive, a question or permission notice did not reach the app, turns ran while the
+  and **Pause sync** stops the next line loading one, a turn did not arrive, a question or permission notice did not reach the app, turns ran while the
   mod was off, the lines since the summary no longer all fit what the voice can carry (a long
-  conversation outgrows that), the session was paused, or its mod does not sync. Otherwise the item
-  reads **Context up to date** and is disabled, because the voice already has the conversation. With
-  no summary yet and nothing lost it reads **Context loads with the line** and is disabled, because
+  conversation outgrows that), the session was paused and has a summary, or its mod does not sync. Otherwise the item
+  reads **Context up to date** and is disabled, because the voice already has the conversation. When
+  the next line will load a first summary and nothing else is missing, it reads **Context loads with the line** and is disabled, because
   the next line asks for one by itself. A summary carries no date, so one can be ignored while the item stays enabled
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×
   removes it and erases its own; both ask first. The voice starts afresh from the next time the line
   opens. Results it has not said yet stay and are added again; only **Stop** clears them. Claude's
   waiting questions follow other rules ([details](SECURITY.md#residual-risk-by-design)). With
-  **Pause sync** off and the session not paused, the next line loads a summary of the same session's
+  **Load a session's context on its first call** on, or **Pause sync** off and the session not paused, the next line loads a summary of the same session's
   transcript by itself, which holds the text the session read; `/clear` the session first to avoid
   that, then press **New conversation**. `/live` in a removed session joins it again.
 
@@ -317,12 +317,18 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   even while the call is stopped, and the voice has them when the next line opens. Nothing leaves
   the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, press Stop,
   then type: nothing you type while the call is stopped is recorded, and the session is marked as
-  paused. While it is on, no line loads a summary by itself, and neither does one after a pause:
-  only **Load context** does, and that summary is written from the whole
-  transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
+  paused. While it is on, no line loads a summary by itself, and neither does one after a pause,
+  except a session's first summary (the next setting); otherwise only **Load context** does. That
+  summary is written from the whole transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
   it does and does not do.
+- **Load a session's context on its first call** (on by default; off if **Pause sync** was on when you updated to it): a line that
+  opens for a session the voice has no summary for asks for one even while **Pause sync** is on or
+  the session is paused, an old chat or a chat after **New conversation** included. That summary
+  is written from the whole transcript, so it carries what you paused, and it goes to OpenAI. Once
+  a session has a summary, the pause governs what follows. With this off, only **Load context**
+  loads a summary under the pause.
 - **Play sounds for requests and answers** (on by default): a short sound for each request the voice
   hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
   that reaches an open or opening line while nobody is speaking. The chime for a result that waits

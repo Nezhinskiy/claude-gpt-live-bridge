@@ -264,8 +264,8 @@ parlez.
 
 - **Le Start de la bande** fait de sa session la cible et démarre l'appel ; la ligne qu'il ouvre
   reçoit la conversation de la session, et charge en plus un résumé quand il manquerait à la voix
-  une partie d'elle (voir **Load context** ci-dessous), mais jamais avec **Pause sync** activé ni
-  après une pause ([détails](../../docs/architecture/overview.md#components)). Tant que l'appel parle à
+  une partie d'elle (voir **Load context** ci-dessous), mais avec **Pause sync** activé ou
+  après une pause seulement le premier résumé d'une session ([détails](../../docs/architecture/overview.md#components)). Tant que l'appel parle à
   une autre session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session
   rejointe, `/live` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
@@ -290,18 +290,18 @@ parlez.
   micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
   lever ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** n'est activé que lorsqu'il manque à la voix une partie de la cible : pas de
-  résumé alors que **Pause sync** est activé, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
+  résumé et **Pause sync** empêche la ligne suivante d'en charger un, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
-  voix peut porter (une longue conversation le dépasse), la session a été mise en pause, ou son mod
+  voix peut porter (une longue conversation le dépasse), la session a été mise en pause et a un résumé, ou son mod
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
-  déjà la conversation. Sans résumé encore et sans rien de perdu, il affiche **Context loads with the
+  déjà la conversation. Quand la ligne suivante va charger un premier résumé et que rien d'autre ne manque, il affiche **Context loads with the
   line** et est désactivé, car la prochaine ligne le demande d'elle-même. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
   reste activé ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** efface la conversation de la cible et son contexte chargé, et le × d'une
   session la retire et efface sa propre conversation ; les deux demandent confirmation. La voix
   repart de zéro à la prochaine ouverture de la ligne. Les résultats qu'elle n'a pas encore dits
   restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude en attente
-  suivent d'autres règles ([détails](../../SECURITY.md#residual-risk-by-design)). Avec **Pause sync**
+  suivent d'autres règles ([détails](../../SECURITY.md#residual-risk-by-design)). Avec **Load a session's context on its first call** activé, ou avec **Pause sync**
   désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
   transcription de la session, qui contient ce que la session a lu ; pour l'éviter, faites d'abord
   `/clear` dans la session, puis appuyez sur **New conversation**. `/live` dans une session
@@ -323,12 +323,18 @@ parlez.
   s'ouvre. Rien ne quitte le Mac avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
   voir arriver chez OpenAI, activez le réglage, appuyez sur Stop, puis tapez : rien de ce que vous
   tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
-  aucune ligne ne charge de résumé d'elle-même, ni après une pause : seul **Load context** le
-  fait, et ce résumé est écrit à partir de toute la transcription, donc il porte
+  aucune ligne ne charge de résumé d'elle-même, ni après une pause, sauf le premier résumé d'une session (le réglage suivant) ; sinon seul
+  **Load context** le fait. Ce résumé est écrit à partir de toute la transcription, donc il porte
   ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
+- **Load a session's context on its first call** (activé par défaut ; désactivé si **Pause sync** était activé lors de la mise à jour) :
+  une ligne qui s'ouvre pour une session dont la voix n'a pas de résumé en demande un même si
+  **Pause sync** est activé ou si la session est en pause, y compris pour une ancienne discussion
+  ou après **New conversation**. Ce résumé est écrit à partir de toute la transcription, donc il
+  porte ce que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
+  la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
 - **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
   voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
   question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
