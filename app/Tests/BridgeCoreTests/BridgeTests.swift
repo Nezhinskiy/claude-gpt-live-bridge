@@ -1415,6 +1415,45 @@ struct BridgeTests {
     #expect(await test.bridge.current.contextNeed == .load)
   }
 
+  /// The next line asks for it, so a press is not the only way.
+  @Test func withTheFirstCallSettingNoSummaryUnderThePauseLoadsWithTheLine() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    #expect(await test.bridge.current.contextNeed == .withTheLine)
+  }
+
+  @Test func withTheFirstCallSettingAPausedSessionWithNoSummaryLoadsWithTheLine() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    #expect(try test.saved()[test.a].outOfSync == .paused)
+    #expect(await test.bridge.current.contextNeed == .withTheLine)
+  }
+
+  @Test func withoutTheFirstCallSettingAPausedSessionWithNoSummaryNeedsAPress() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: false)
+    try await test.join(test.a, "Alpha")
+    try await test.sync(test.a, "Private thing.")
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// Once there is a summary only a press loads another under the pause.
+  @Test func withTheFirstCallSettingAPausedSessionWithASummaryNeedsAPress() async throws {
+    let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha")
+    try await test.post("/v1/context", test.context())
+    try await test.sync(test.a, "Private thing.")
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
+  /// A gap keeps the press, as it does with the pause off: it need not wait for a line.
+  @Test func withTheFirstCallSettingAGapWithNoSummaryNeedsAPress() async throws {
+    let test = try BridgeTests(loadsContextOnFirstCall: true)
+    try await test.join(test.a, "Alpha", missed: true)
+    #expect(try test.saved()[test.a].outOfSync == .missed)
+    #expect(await test.bridge.current.contextNeed == .load)
+  }
+
   /// More lines than the seed carries are lost to the voice, summary or none.
   @Test func linesTheSeedCannotCarryNeedAPress() async throws {
     try await join(a, "Alpha")

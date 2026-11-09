@@ -387,14 +387,15 @@ public actor Bridge: Router {
     return await !registry.syncs(id)
   }
 
-  /// What the menu says of it: a session that has no summary and has lost nothing has one asked
-  /// for by its next line, so it is offered no press, unless the pause setting stops that line.
+  /// What the menu says of it: a session that has no summary and no gap has one asked for by its
+  /// next line, so it is offered no press, unless the pause stops that line. A paused mark is no
+  /// gap: all it costs the voice is the summary this line then brings.
   private func contextNeed(_ id: SessionID) async -> ContextNeed {
     guard await needsContext(id) else { return .none }
     let conversation = continuity[id]
-    let lostNothing = conversation.outOfSync == nil && !conversation.isOverSeed
+    let hasGap = conversation.outOfSync == .missed || conversation.isOverSeed
     let syncs = await registry.syncs(id)
-    return lostNothing && syncs && conversation.context == nil && !pausesSync()
+    return !hasGap && syncs && conversation.context == nil && !pauseHoldsBackSummary(of: id)
       ? .withTheLine : .load
   }
 

@@ -7,7 +7,7 @@ public enum ContextNeed: Sendable, Equatable {
   /// It has no summary yet, nothing is lost, and the next line loads one by itself.
   case withTheLine
   /// A press is worth offering: a gap, a mod that does not sync or too many lines, which the next
-  /// line also asks for, or a pause, which only a press loads.
+  /// line also asks for, or a pause that holds the next line back, so only a press loads.
   case load
 }
 
