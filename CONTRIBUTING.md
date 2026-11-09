@@ -212,6 +212,12 @@ terminal, it prints the file's path there. It holds the time and numbers from We
 `getStats()` only: no audio, no transcript, no session names, and nothing leaves the Mac. A release
 build compiles all of this out; `scripts/tests/release-guards.test.sh` looks for its names.
 
+Only one copy of the app can hold the bridge's socket, and the mod of a joined session reopens
+`/Applications/LiveBridge.app` when it cannot reach it. So with an installed copy running, start
+the debug build first and then quit the installed copy: the debug build waits up to 10 s for the
+socket. The other way round, the installed copy comes back and takes the socket, the call goes
+through it, and no file is written.
+
 Note the time of the glitch and find its row. `line` changes when the line reopens, and the
 counters restart with it. All columns but `jitter` are running totals, so compare a row with the
 one before, and ignore a line's first row, where concealment is only start-up.
