@@ -94,6 +94,31 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.loadContextOnFirstCall)
   }
 
+  @Test func theLineKeepsTodaysTimersByDefault() {
+    #expect(Settings().timeouts == CallMachine.Timeouts(silence: 20, firstWord: 5, noise: 90))
+  }
+
+  @Test func aFileFromBeforeTheTimersKeepsTodaysTimers() throws {
+    #expect(try decoded(#"{"voice":"marin"}"#).timeouts == Settings().timeouts)
+  }
+
+  @Test func theLinesTimersAreKeptAcrossRestarts() throws {
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    SettingsStore(file: file).update {
+      $0.silenceSeconds = 7
+      $0.firstWordSeconds = 8
+      $0.noiseSeconds = 9
+    }
+    #expect(SettingsStore(file: file).current.timeouts == .init(silence: 7, firstWord: 8, noise: 9))
+  }
+
+  /// A hand-edited timer outside 0 to 300 reads as the nearer end.
+  @Test func aTimerOutOfRangeReadsAsTheNearerEnd() throws {
+    let settings = try decoded(#"{"silenceSeconds":-5,"noiseSeconds":9999}"#)
+    #expect(settings.silenceSeconds == 0)
+    #expect(settings.noiseSeconds == 300)
+  }
+
   @Test func changesAreKeptAcrossRestarts() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     SettingsStore(file: file).update {

@@ -29,6 +29,11 @@ public struct Settings: Codable, Sendable, Equatable {
   /// Check GitHub for a newer release once a day; nil leaves it to the build, on for a release
   /// build and off for one from source (`UpdatePolicy.checksAutomatically`).
   public var checkUpdatesAutomatically: Bool?
+  /// The line's timers in seconds (`CallMachine.Timeouts`), each read and written within
+  /// `Timeouts.range`.
+  public var silenceSeconds: Int
+  public var firstWordSeconds: Int
+  public var noiseSeconds: Int
 
   public init(
     voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
@@ -43,6 +48,14 @@ public struct Settings: Codable, Sendable, Equatable {
     self.prompt = prompt
     self.connectsOverTCP = connectsOverTCP
     self.checkUpdatesAutomatically = checkUpdatesAutomatically
+    let timeouts = CallMachine.Timeouts()
+    silenceSeconds = timeouts.silence
+    firstWordSeconds = timeouts.firstWord
+    noiseSeconds = timeouts.noise
+  }
+
+  public var timeouts: CallMachine.Timeouts {
+    .init(silence: silenceSeconds, firstWord: firstWordSeconds, noise: noiseSeconds)
   }
 
   /// The key of the setting this one replaced.
@@ -69,6 +82,13 @@ public struct Settings: Codable, Sendable, Equatable {
     connectsOverTCP = try container.decodeIfPresent(Bool.self, forKey: .connectsOverTCP) ?? false
     checkUpdatesAutomatically = try container.decodeIfPresent(
       Bool.self, forKey: .checkUpdatesAutomatically)
+    let defaults = CallMachine.Timeouts()
+    func timeout(_ key: CodingKeys, _ fallback: Int) throws -> Int {
+      CallMachine.Timeouts.clamped(try container.decodeIfPresent(Int.self, forKey: key) ?? fallback)
+    }
+    silenceSeconds = try timeout(.silenceSeconds, defaults.silence)
+    firstWordSeconds = try timeout(.firstWordSeconds, defaults.firstWord)
+    noiseSeconds = try timeout(.noiseSeconds, defaults.noise)
   }
 }
 

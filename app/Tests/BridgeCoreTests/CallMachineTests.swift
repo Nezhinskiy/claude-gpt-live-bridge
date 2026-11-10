@@ -455,6 +455,67 @@ struct CallMachineTests {
     #expect(machine.pending == row.pending)
   }
 
+  /// The effects of the last of `events`, on a machine with `timeouts`.
+  func last(_ events: [CallEvent], _ timeouts: CallMachine.Timeouts) -> [CallEffect] {
+    var machine = CallMachine()
+    machine.timeouts = timeouts
+    for event in events.dropLast() { _ = machine.handle(event) }
+    return machine.handle(events.last!)
+  }
+
+  static let set = CallMachine.Timeouts(silence: 45, firstWord: 7, noise: 33)
+
+  @Test func theSilenceIsTheSetting() {
+    #expect(last(Self.live, Self.set).contains(.armSilenceTimer(seconds: 45)))
+  }
+
+  @Test func aLineAResultOpenedWaitsTheSettingForAFirstWord() {
+    let opened = [.start, Self.opening(Self.result), .connected]
+    #expect(last(opened, Self.set).contains(.armSilenceTimer(seconds: 7)))
+  }
+
+  @Test func soundWithoutWordsIsCappedByTheSetting() {
+    #expect(last(Self.connecting + [.connected], Self.set).contains(.armSilenceTimer(seconds: 33)))
+  }
+
+  /// A first-word wait of 0 waits as long as the ordinary silence, so a line a result opened while
+  /// the owner is away never stays open for good unless the silence is off too.
+  @Test func aFirstWordWaitOfZeroWaitsTheSilence() {
+    let opened = [.start, Self.opening(Self.result), .connected]
+    let timeouts = CallMachine.Timeouts(silence: 20, firstWord: 0)
+    #expect(last(opened, timeouts).contains(.armSilenceTimer(seconds: 20)))
+  }
+
+  /// A timer turned on while an open line is quiet and nothing counts starts at once.
+  @Test func aTimerTurnedOnOnAQuietLineStarts() {
+    var machine = CallMachine()
+    machine.timeouts = .init(silence: 0)
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 30)
+    #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 30)])
+  }
+
+  /// A change never moves a timer already counting.
+  @Test func aChangeLeavesATimerThatCounts() {
+    var machine = CallMachine()
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 30)
+    #expect(machine.handle(.timeoutsChanged) == [])
+  }
+
+  /// 0 switches a timer off: the one armed before is cancelled, and none takes its place.
+  @Test(
+    arguments: [
+      (live, CallMachine.Timeouts(silence: 0)),
+      ([.start, opening(result), .connected], CallMachine.Timeouts(silence: 0, firstWord: 0)),
+      (connecting + [.connected], CallMachine.Timeouts(noise: 0)),
+    ] as [([CallEvent], CallMachine.Timeouts)])
+  func zeroSwitchesATimerOff(_ events: [CallEvent], _ timeouts: CallMachine.Timeouts) {
+    let effects = last(events, timeouts)
+    #expect(effects.contains(.cancelSilenceTimer))
+    #expect(!effects.contains { if case .armSilenceTimer = $0 { true } else { false } })
+  }
+
   /// After `/clear` the line waits for the session under its new id, and its unheard results
   /// are the new id's.
   @Test func aRenamedSessionKeepsItsWaitAndItsResults() {

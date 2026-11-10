@@ -21,6 +21,8 @@ public actor Bridge: Router {
   private let pausesSync: @Sendable () -> Bool
   /// A session's first summary is loaded under the pause too (`Settings.loadContextOnFirstCall`).
   private let loadsContextOnFirstCall: @Sendable () -> Bool
+  /// Settings' timers for the line, read before each event.
+  private let timeouts: @Sendable () -> CallMachine.Timeouts
   /// Settings' Connect over TCP, read as each line applies its answer.
   private let connectsOverTCP: @Sendable () -> Bool
   private var machine = CallMachine()
@@ -75,6 +77,7 @@ public actor Bridge: Router {
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false },
+    timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
     connectsOverTCP: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
@@ -83,6 +86,7 @@ public actor Bridge: Router {
     self.notifies = notifies
     self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
+    self.timeouts = timeouts
     self.loadsContextOnFirstCall = loadsContextOnFirstCall
     self.connectsOverTCP = connectsOverTCP
     self.registry = registry
@@ -222,6 +226,11 @@ public actor Bridge: Router {
     await send(.reconnect)
   }
 
+  /// Settings changed one of the line's timers: one turned on starts on a quiet open line.
+  public func timeoutsChanged() async {
+    await send(.timeoutsChanged)
+  }
+
   /// Forgets the target's conversation; its next realtime session starts fresh.
   public func newConversation() async {
     guard let target = await registry.target else { return }
@@ -306,6 +315,7 @@ public actor Bridge: Router {
 
   private func send(_ event: CallEvent) async {
     let before = machine.phase
+    machine.timeouts = timeouts()
     let effects = machine.handle(event)
     let now = time.now  // read before any await, so an interleaved event cannot shift it
     if before != .live, machine.phase == .live { await meter.opened(at: now) }
@@ -339,6 +349,9 @@ public actor Bridge: Router {
     case .addContext(let line): try? await realtime?.addContext(line.text)
     case .speak(let line): try? await realtime?.speak(line.text)
     case .armSilenceTimer(let seconds): arm(.silence, after: .seconds(seconds))
+    case .cancelSilenceTimer:
+      timers[.silence]?.cancel()
+      timers[.silence] = nil
     case .armResultWindow(let seconds): arm(.resultWindow, after: .seconds(seconds))
     case .armGrace(let milliseconds): arm(.grace, after: .milliseconds(milliseconds))
     case .chime:

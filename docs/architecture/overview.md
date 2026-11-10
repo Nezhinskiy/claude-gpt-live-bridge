@@ -46,7 +46,7 @@ microphone or Claude:
   `connecting`, `live` (a realtime session is open) — and the effects of each event. It also keeps
   `isMuted`, orthogonal to the phase: while muted the microphone is released, speech is ignored, and
   a result from Claude still opens the line. Mute closes no line. It ends the owner's speech only if
-  they were speaking; then an open line's silence is counted from Mute (20 s), as if they had
+  they were speaking; then an open line's silence is counted from Mute, as if they had
   stopped speaking when they pressed it, and a line that was already quiet closes when it would have
   without Mute. A handoff whose answer is still awaited can still keep a line open, up to 120 s
   after the handoff, as without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs
@@ -215,10 +215,10 @@ request is queued for a session, in any phase of the line, the app plays a short
 ([BR-001](../bugs/BR-001.md); [render-sound.mjs](../../scripts/render-sound.mjs) says what each part
 of the app's two sounds means). The line stays open for its result up to
 `CallMachine.resultWindowSeconds` (120 s) after the latest handoff, however silent it is (sound
-without words still closes it after 90 s). A result from a session handed a request in that window
+without words still closes it after the noise timeout). A result from a session handed a request in that window
 is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the
 owner (local voice detection) nor the voice is speaking; when either was, the bridge waits until
-both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
+both are silent and then a grace of 0.8 s. The window then ends and the silence rule closes the
 line. A window that passes with no result closes the line once it is silent; when the result comes,
 it opens the line again, as below. A question or an approval notice of the session the open line is
 about goes the same way, whoever started the turn, and ends no wait for a result; another session's
@@ -255,12 +255,16 @@ sequenceDiagram
   Mod->>Bridge: POST /v1/answer ok
   Bridge->>Codex: appendSpeech "[RESULT] label: …" (once nobody is speaking)
   Codex-->>Owner: the result
-  Bridge->>Bridge: 20 s of silence (live → listening)
+  Bridge->>Bridge: silence (live → listening)
 ```
 
 ### Silent hang-up
 
-The realtime session is billed while open, so silence closes it. Voice detection keeps running
+The realtime session is billed while open, so silence closes it. How long each quiet lasts is the
+owner's: `CallMachine.Timeouts`, from Settings ([README](../../README.md#settings) has the
+defaults), read before each event. A timeout of 0 cancels the armed timer and arms none, except a
+first-word wait of 0, which waits the silence. A change in Settings arms a timer turned on at once
+when the line is quiet and none counts (`timeoutsChanged`); one already counting is not moved. Voice detection keeps running
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
@@ -276,8 +280,8 @@ sequenceDiagram
   participant Codex as codex + OpenAI
   Owner->>Page: stops talking
   Page->>Bridge: speechEnded
-  Bridge->>Bridge: arm the 20 s silence timer
-  Note over Bridge: speech, recognised words and the voice's own speech re-arm it (90 s while sound goes on)
+  Bridge->>Bridge: arm the silence timer
+  Note over Bridge: speech, recognised words and the voice's own speech re-arm it (the noise timeout while sound goes on)
   Bridge->>Bridge: silence elapsed (live → listening)
   Bridge->>Page: closePeer
   Bridge->>Codex: thread/realtime/stop
@@ -294,7 +298,7 @@ the conversation, and passes it with the delivery. The new realtime session is s
 target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
 the voice often says it unprompted, and sometimes says nothing ([ADR
 0001](../adr/0001-platform-findings.md) (n)). Until the owner or the voice speaks on such a line,
-its silence is `CallMachine.firstWordSeconds` (5 s) instead of 20 s, also after another line
+its silence is the first-word timeout instead of the silence, also after another line
 arrives; then the line closes, and the line chimes and waits as below. A voice that starts later is
 cut off. The mod's request that brought the line does not wait for the connect, and a question or
 approval the owner settles at the keyboard while its line still connects closes that line.

@@ -37,7 +37,7 @@ dans la session et ce que Claude répond, vous pouvez donc passer de la parole a
 
 *Le texte anglais fait foi ([README.md](../../README.md)) ; cette traduction peut avoir du retard.*
 
-**Une conversation, pas une dictée.** GPT-Live écoute pendant qu'il parle : coupez-le et il s'arrête pour vous écouter ; pensez à voix haute et il peut glisser un petit « mm-hmm ». **Vous cessez de payer le silence :** OpenAI facture la voix à la minute, donc après 20 secondes de silence la ligne se ferme et se rouvre dès que vous parlez, la conversation reprenant là où vous l'aviez laissée ([Facturation](#facturation-maîtrisée-par-conception)).
+**Une conversation, pas une dictée.** GPT-Live écoute pendant qu'il parle : coupez-le et il s'arrête pour vous écouter ; pensez à voix haute et il peut glisser un petit « mm-hmm ». **Vous cessez de payer le silence :** OpenAI facture la voix à la minute, donc après un temps de silence que vous réglez dans [Settings](#réglages) la ligne se ferme et se rouvre dès que vous parlez, la conversation reprenant là où vous l'aviez laissée ([Facturation](#facturation-maîtrisée-par-conception)).
 
 <p align="center"><img src="../assets/readme-demo.gif" alt="Conversation avec une session Claude Code via LiveBridge" width="100%"></p>
 
@@ -321,7 +321,8 @@ parlez.
 
 ### Réglages
 
-**Settings…** ouvre la fenêtre Settings de LiveBridge :
+**Settings…** ouvre la fenêtre Settings de LiveBridge, en deux onglets. **Voice** regroupe ce que
+vous entendez pendant un appel :
 
 - **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
   de la fenêtre, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.
@@ -336,6 +337,26 @@ parlez.
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
   ouverture de la ligne.
+- **Silence before the line closes** (20 secondes par défaut), **Wait for a first word on a line
+  a result opened** (5 secondes) et **Sound without words before the line closes** (90 secondes) :
+  combien de temps chaque sorte de silence garde une ligne ouverte, de 0 à 300 secondes. 0 désactive
+  le silence ou le son sans paroles, et une attente du premier mot à 0 attend aussi longtemps que le
+  silence. Avec les trois à 0, le silence ne ferme jamais la ligne : elle reste ouverte, facturée
+  tout ce temps ([Facturation](#facturation-maîtrisée-par-conception)), jusqu'à ce que vous appuyiez
+  sur Stop, changiez de cible ou qu'OpenAI la ferme. Un silence court ferme la ligne au milieu de
+  pauses ordinaires, et chaque réouverture prend quelques secondes avant que la voix réponde, donc
+  Settings avertit de 1 à 9 secondes ; il fait de même pour le son sans paroles, car votre parole
+  compte comme tel tant qu'elle n'est pas reconnue, et de 1 à 3 secondes pour le premier mot, car la
+  voix commence souvent environ 2 secondes après la connexion de la ligne. Un minuteur que vous
+  activez démarre aussitôt sur une ligne ouverte et silencieuse ; celui qui compte déjà garde son
+  temps.
+- **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
+  voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
+  question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
+  parle. Le signal d'un résultat en attente retentit dans tous les cas.
+
+**General** regroupe le reste :
+
 - **Pause sync while the call is stopped** (désactivé par défaut) : par défaut, ce que vous tapez
   dans une session rejointe et la réponse finale de Claude sont gardés dans la conversation de cette
   session avec la voix même quand l'appel est arrêté, et la voix les a quand la ligne suivante
@@ -354,10 +375,6 @@ parlez.
   ou après **New conversation**. Ce résumé est écrit à partir de toute la transcription, donc il
   porte ce que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
   la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
-- **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
-  voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
-  question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
-  parle. Le signal d'un résultat en attente retentit dans tous les cas.
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
   attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
   new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
@@ -422,13 +439,13 @@ attend votre autorisation :
   Tant que Mute est actif, LiveBridge ne détient aucun microphone, et l'indicateur de microphone de macOS le montre.
 - Quand vous commencez à parler, la ligne s'ouvre. Les 2 secondes précédant votre prise de parole
   sont conservées et envoyées en premier, afin que vos premiers mots ne soient pas perdus.
-- La ligne se ferme après 20 secondes de silence. Un son sans paroles (musique, télévision) la
-  ferme après 90 secondes.
+- La ligne se ferme après un temps de silence, et un son sans paroles (musique, télévision) la
+  ferme après un temps qui lui est propre. [Settings](#réglages) règle chacun ; à 0, celui-là ne la
+  ferme pas.
 - Quand la voix transmet une demande à Claude (un transfert), la ligne reste ouverte jusqu'à 2
   minutes après ce transfert, facturée comme n'importe quelle ligne ouverte, et la réponse de Claude
   passe à la voix pour qu'elle la dise dès que plus personne ne parle. Un transfert ultérieur
-  relance les 2 minutes ; un échange qui n'envoie rien à Claude se ferme après les 20 secondes de
-  silence habituelles.
+  relance les 2 minutes ; un échange qui n'envoie rien à Claude se ferme après le silence habituel.
 - La réponse de Claude à une demande confiée à la session à laquelle vous parlez, une question que
   Claude vous y pose ou une demande d'autorisation qu'il attend rouvre la ligne si elle arrive alors
   que la ligne est fermée, et elle est donnée à la voix pour qu'elle la dise, facturée comme toute
@@ -587,9 +604,10 @@ session.
   à la fermeture de la ligne.
 - Quand la réponse de Claude rouvre la ligne, la voix peut rester muette : c'est arrivé dans 4 des
   14 essais mesurés, un petit échantillon ([ADR 0001 (n)](../../docs/adr/0001-platform-findings.md)). La
-  ligne se ferme alors 5 secondes après sa connexion, et la réponse joue un carillon et attend,
-  comme ci-dessous. Quand la voix a parlé, elle a commencé dans les 2 secondes environ après la
-  connexion ; une voix qui commencerait après ces 5 secondes est coupée.
+  ligne se ferme alors dès que finit son attente d'un premier mot ([Settings](#réglages)), et la
+  réponse joue un carillon et attend, comme ci-dessous. Quand la voix a parlé, elle a commencé dans
+  les 2 secondes environ après la connexion ; une voix qui commencerait après cette attente est
+  coupée.
 - Quand vos prochains mots rouvrent la ligne, la voix répond parfois uniquement à ceux-ci sans
   dire le résultat en attente. Le résultat n'est pas perdu : il reste en attente, déclenche un
   carillon et publie une notification à la fermeture de la ligne, et il est de nouveau transmis à

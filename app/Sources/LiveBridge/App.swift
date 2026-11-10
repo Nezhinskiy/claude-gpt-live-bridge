@@ -95,6 +95,8 @@ final class AppModel {
   /// app does not start, and the window keeps no change.
   @ObservationIgnored let settings: SettingsStore
   @ObservationIgnored private var settingsWindow: SettingsWindow?
+  /// The Settings tab shown; the window opens on the one last shown.
+  var settingsTab = SettingsTab.voice
   @ObservationIgnored private var codexCwd: URL?
   /// When codex's usage is read, and the last reading.
   private(set) var limitsPoll = LimitsPoll()
@@ -165,6 +167,7 @@ final class AppModel {
         notifies: { settings.current.notifyResults },
         confirmsWithSound: { settings.current.confirmHandoffs },
         pausesSync: { settings.current.pauseSyncWhileStopped },
+        timeouts: { settings.current.timeouts },
         loadsContextOnFirstCall: { settings.current.loadContextOnFirstCall },
         connectsOverTCP: { settings.current.connectsOverTCP }, appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
@@ -312,6 +315,7 @@ final class AppModel {
   /// A notice's Install: opens Settings on the update and installs `version`, checking first
   /// when this run has not found it (a notice from before a relaunch).
   func installUpdate(_ version: AppVersion) {
+    settingsTab = .general
     showSettings()
     if available?.version == version { return installUpdate() }
     guard let updater else { return }
@@ -357,6 +361,12 @@ final class AppModel {
     settings.update { $0.connectsOverTCP = on }
     if lineIsOpen { Task { await bridge?.reconnect() } }
     return true
+  }
+
+  /// One of Settings' timers for the line, kept in range; one turned on starts on a quiet open line.
+  func setTimeout(_ key: WritableKeyPath<BridgeCore.Settings, Int>, _ seconds: Int) {
+    settings.update { $0[keyPath: key] = CallMachine.Timeouts.clamped(seconds) }
+    Task { await bridge?.timeoutsChanged() }
   }
 
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
