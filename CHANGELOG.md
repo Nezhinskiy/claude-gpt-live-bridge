@@ -13,6 +13,12 @@ All notable changes to this project are listed here. The format follows
   without words before the line closes** (90 seconds), each from 0 to 300 seconds. 0 switches that
   one off, so with all three at 0 the line stays open, and billed, until you press Stop. The
   defaults are the old fixed values, so nothing changes until you change them.
+- **Connect over TCP**, in Settings under Voice, off by default: if the voice breaks up on a poor
+  connection, turn it on and the line prefers the media server's TCP route (port 443 in the answers
+  seen) to UDP, which can turn breakups into short pauses; it can still fall back to UDP. Changing
+  it while a line is open asks first, then opens the line again over the new transport, still
+  waiting for what it was waiting for.
+- A debug build's `--call-stats` records which transport the line took (`onTcp`).
 
 ### Changed
 

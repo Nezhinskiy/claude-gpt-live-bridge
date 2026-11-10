@@ -23,6 +23,8 @@ public actor Bridge: Router {
   private let loadsContextOnFirstCall: @Sendable () -> Bool
   /// Settings' timers for the line, read before each event.
   private let timeouts: @Sendable () -> CallMachine.Timeouts
+  /// Settings' Connect over TCP, read as each line applies its answer.
+  private let connectsOverTCP: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -76,7 +78,8 @@ public actor Bridge: Router {
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false },
     timeouts: @escaping @Sendable () -> CallMachine.Timeouts = { .init() },
-    loadsContextOnFirstCall: @escaping @Sendable () -> Bool, appVersion: AppVersion?
+    loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
+    connectsOverTCP: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
@@ -85,6 +88,7 @@ public actor Bridge: Router {
     self.pausesSync = pausesSync
     self.timeouts = timeouts
     self.loadsContextOnFirstCall = loadsContextOnFirstCall
+    self.connectsOverTCP = connectsOverTCP
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -216,6 +220,12 @@ public actor Bridge: Router {
     await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
   }
 
+  /// Settings' Connect over TCP changed and the owner chose Reconnect: a line connecting or open
+  /// closes and opens again at once, over the new transport. With no line, the next one takes it.
+  public func reconnect() async {
+    await send(.reconnect)
+  }
+
   /// Forgets the target's conversation; its next realtime session starts fresh.
   public func newConversation() async {
     guard let target = await registry.target else { return }
@@ -313,11 +323,13 @@ public actor Bridge: Router {
     switch effect {
     case .openRealtime: await startOpening(preroll: true)
     case .openRealtimeForResult: await startOpening(preroll: false, waits: false)
-    case .closeRealtime:
-      connecting?.cancel()
-      connecting = nil
-      await audio.closePeer()
-      await realtime?.close()
+    case .reopenRealtime(let preroll):
+      await closeLine()
+      // A Stop, a new target or another reconnect may have come during the close.
+      guard machine.phase == .connecting, connecting == nil else { return }
+      growing = GrowingLines()  // no final text comes for what the closed line said
+      await startOpening(preroll: preroll, waits: false)
+    case .closeRealtime: await closeLine()
     case .startLocalVAD:
       // a Mute meanwhile does not cancel a Start: the page records it, and listens muted
       if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
@@ -344,6 +356,13 @@ public actor Bridge: Router {
     case .confirmAnswer: if confirmsWithSound() { await audio.confirmAnswer() }
     case .problem(let shown): problem = shown
     }
+  }
+
+  private func closeLine() async {
+    connecting?.cancel()
+    connecting = nil
+    await audio.closePeer()
+    await realtime?.close()
   }
 
   /// Asks macOS for the microphone, whose first-run prompt stays up until the owner answers it;
@@ -451,7 +470,7 @@ public actor Bridge: Router {
       machine.dropSynced()
       let answer = try await voice.open(offerSDP: offer, items: items)
       try Task.checkCancellation()
-      try await audio.applyAnswer(answer)
+      try await audio.applyAnswer(connectsOverTCP() ? AnswerSDP.preferringTCP(answer) : answer)
       try Task.checkCancellation()
       await send(.connected)
       if let held = heldContext, held.session == lineSession, held.text != seededContext,

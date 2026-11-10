@@ -39,6 +39,16 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.pauseSyncWhileStopped)
   }
 
+  /// UDP by default, an older file included; the choice is kept.
+  @Test func tcpIsOffUntilTurnedOn() throws {
+    #expect(!Settings().connectsOverTCP)
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
+    #expect(!SettingsStore(file: file).current.connectsOverTCP)
+    SettingsStore(file: file).update { $0.connectsOverTCP = true }
+    #expect(SettingsStore(file: file).current.connectsOverTCP)
+  }
+
   @Test func aFreshInstallLoadsContextOnTheFirstCall() {
     #expect(Settings().loadContextOnFirstCall)
   }
