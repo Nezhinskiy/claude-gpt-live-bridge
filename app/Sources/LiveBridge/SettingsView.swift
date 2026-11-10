@@ -2,10 +2,13 @@ import AppKit
 import BridgeCore
 import SwiftUI
 
-/// LiveBridge's Settings: the voice and its prompt, notifications, automatic context, Open at
-/// login and updates. The settings are read from and written to `AppModel.settings`, their one copy.
+/// LiveBridge's Settings: the voice, how it connects and its prompt, notifications, automatic
+/// context, Open at login and updates. The settings are read from and written to
+/// `AppModel.settings`, their one copy.
 struct SettingsView: View {
   @Bindable var model: AppModel
+  /// Counts the reconnects the owner cancelled, so the switch is drawn again as it was.
+  @State private var cancelledReconnects = 0
 
   var body: some View {
     Form {
@@ -21,6 +24,20 @@ struct SettingsView: View {
         }
         Text("A new voice is heard from the next time the voice line opens.")
           .font(.caption).foregroundStyle(.secondary)
+        Toggle(
+          "Connect over TCP",
+          isOn: Binding {
+            model.settings.current.connectsOverTCP
+          } set: {
+            if !model.setConnectsOverTCP($0) { cancelledReconnects += 1 }
+          }
+        )
+        .id(cancelledReconnects)
+        Text(
+          "If the voice breaks up on a poor connection, turn this on: the voice may pause briefly "
+            + "between phrases, but no audio is lost. An open voice line reconnects."
+        )
+        .font(.caption).foregroundStyle(.secondary)
       }
       Section("Prompt") {
         TextField(

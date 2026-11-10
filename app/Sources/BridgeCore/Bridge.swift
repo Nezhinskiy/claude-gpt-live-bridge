@@ -21,6 +21,8 @@ public actor Bridge: Router {
   private let pausesSync: @Sendable () -> Bool
   /// A session's first summary is loaded under the pause too (`Settings.loadContextOnFirstCall`).
   private let loadsContextOnFirstCall: @Sendable () -> Bool
+  /// Settings' Connect over TCP, read as each line applies its answer.
+  private let connectsOverTCP: @Sendable () -> Bool
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -73,7 +75,8 @@ public actor Bridge: Router {
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false },
-    loadsContextOnFirstCall: @escaping @Sendable () -> Bool, appVersion: AppVersion?
+    loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
+    connectsOverTCP: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
     self.notifier = notifier
@@ -81,6 +84,7 @@ public actor Bridge: Router {
     self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
     self.loadsContextOnFirstCall = loadsContextOnFirstCall
+    self.connectsOverTCP = connectsOverTCP
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -210,6 +214,12 @@ public actor Bridge: Router {
   public func remove(_ id: SessionID) async {
     if let delivery = await registry.remove(id) { await deliver(delivery) }
     await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
+  }
+
+  /// Settings' Connect over TCP changed and the owner chose Reconnect: a line connecting or open
+  /// closes and opens again at once, over the new transport. With no line, the next one takes it.
+  public func reconnect() async {
+    await send(.reconnect)
   }
 
   /// Forgets the target's conversation; its next realtime session starts fresh.
@@ -443,7 +453,7 @@ public actor Bridge: Router {
       machine.dropSynced()
       let answer = try await voice.open(offerSDP: offer, items: items)
       try Task.checkCancellation()
-      try await audio.applyAnswer(answer)
+      try await audio.applyAnswer(connectsOverTCP() ? AnswerSDP.preferringTCP(answer) : answer)
       try Task.checkCancellation()
       await send(.connected)
       if let held = heldContext, held.session == lineSession, held.text != seededContext,

@@ -65,6 +65,8 @@ public enum CallEvent: Equatable, Sendable {
   /// The open line carries a conversation that is not the target's any more: another session
   /// became the target, or the target's conversation was erased.
   case conversationChanged
+  /// The owner changed how the line connects (Settings' Connect over TCP) and chose Reconnect.
+  case reconnect
   /// A line of a turn that is not a voice request (`.typed` or `.claude`): the voice is given it
   /// as context, not delivered to be said. It chimes and opens nothing.
   case synced(VoiceLine)
@@ -298,6 +300,12 @@ public struct CallMachine: Sendable {
       return isSilenceDue ? [.closeRealtime] + hangUp() : []
     case (.connecting, .conversationChanged), (.live, .conversationChanged):
       return [.closeRealtime] + hangUp()
+    case (.connecting, .reconnect), (.live, .reconnect):
+      // the new line has what was not heard; nobody spoke on it yet
+      _ = hangUp()
+      phase = .connecting
+      isAwaitingFirstWord = true
+      return [.closeRealtime, .openRealtimeForResult]
     case (.live, .silenceElapsed):
       if !awaited.isEmpty, !isSoundOn {
         isSilenceDue = true

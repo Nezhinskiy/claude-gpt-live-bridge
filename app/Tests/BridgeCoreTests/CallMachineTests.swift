@@ -412,6 +412,18 @@ struct CallMachineTests {
       "targetChangeWhileConnectingCloses", connecting, .conversationChanged, .listening,
       [.closeRealtime]),
     row("targetChangeWhileListeningChangesNothing", [.start], .conversationChanged, .listening, []),
+    // a new transport: the line closes and opens again at once, keeping what was not heard
+    row(
+      "reconnectReopensTheOpenLine", live + [deliver(a)], .reconnect, .connecting,
+      [.closeRealtime, .openRealtimeForResult], pending: [a]),
+    row(
+      "reconnectWhileConnectingReopens", connecting, .reconnect, .connecting,
+      [.closeRealtime, .openRealtimeForResult]),
+    row("reconnectWhileListeningChangesNothing", [.start], .reconnect, .listening, []),
+    row("reconnectWhileOffChangesNothing", [], .reconnect, .off, []),
+    row(
+      "aReconnectedLineWaitsForTheFirstWord", live + [.reconnect], .connected, .live,
+      [.problem(nil), .flushPreroll, firstWord]),
   ]
 
   @Test(arguments: table) func transition(_ row: Transition) {

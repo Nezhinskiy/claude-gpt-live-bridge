@@ -26,6 +26,18 @@ public struct Confirmation: Sendable, Equatable {
       confirm: "Remove")
   }
 
+  /// Settings' Connect over TCP changed while a line is connecting or open.
+  public static func reconnect(overTCP: Bool) -> Confirmation {
+    Confirmation(
+      title: "Reconnect the voice over \(overTCP ? "TCP" : "UDP")?",
+      message: overTCP
+        ? "The current voice line closes now and opens again over TCP. On TCP the voice may "
+          + "pause briefly between phrases, but no audio is lost, so speech comes through more "
+          + "clearly."
+        : "The current voice line closes now and opens again over UDP, the default.",
+      confirm: "Reconnect")
+  }
+
   /// Install, in a build from source (`build-app.sh --release`), of release `version`.
   public static func replaceSourceBuild(version: AppVersion) -> Confirmation {
     Confirmation(

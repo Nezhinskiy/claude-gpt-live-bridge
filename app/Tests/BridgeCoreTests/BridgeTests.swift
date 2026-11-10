@@ -25,6 +25,10 @@ actor FakeVoice: RealtimeControlling {
     heldOpens = []
   }
 
+  /// The SDP answer each open gives.
+  var answer = "answer"
+  func answer(with sdp: String) { answer = sdp }
+
   func open(offerSDP: String, items: [InitialItem]) async throws -> String {
     if holdsOpen {
       holdsOpen = false
@@ -32,7 +36,7 @@ actor FakeVoice: RealtimeControlling {
     }
     if let failure { throw failure }
     opens.append(items)
-    return "answer"
+    return answer
   }
   func close() { closes += 1 }
   func addContext(_ text: String) { added.append(text) }
@@ -114,9 +118,12 @@ actor FakeAudio: AudioSide {
     offers.append(preroll)
     return "offer"
   }
+  /// The answers applied, in order.
+  var answers: [String] = []
   func applyAnswer(_ sdp: String) throws {
     if answerFails { throw CodexProblem.protocolMismatch("no session.started") }
     calls.append("applyAnswer")
+    answers.append(sdp)
     time.advance(by: .seconds(1))
   }
   func flushPreroll() { calls.append("flushPreroll") }
@@ -160,6 +167,8 @@ struct BridgeTests {
   let dir: URL
   /// Settings' pause, which a test may flip.
   let pause: OSAllocatedUnfairLock<Bool>
+  /// Settings' Connect over TCP, which a test may flip.
+  let tcp = OSAllocatedUnfairLock(initialState: false)
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
@@ -183,7 +192,8 @@ struct BridgeTests {
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
       pausesSync: { pause.withLock { $0 } },
-      loadsContextOnFirstCall: { loadsContextOnFirstCall }, appVersion: appVersion)
+      loadsContextOnFirstCall: { loadsContextOnFirstCall },
+      connectsOverTCP: { [tcp] in tcp.withLock { $0 } }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -251,6 +261,52 @@ struct BridgeTests {
     if await registry.target == nil { try? await join(a, "Alpha") }
     await bridge.perform(.start)
     await bridge.audioEvent(.speechStarted)
+  }
+
+  /// An answer with UDP and TCP candidates, as the media server gives.
+  static let candidates = AnswerSDPTests.answer([AnswerSDPTests.udp, AnswerSDPTests.tcp])
+
+  @Test func aLineOverUDPAppliesTheAnswerAsItCame() async throws {
+    let test = try BridgeTests()
+    await test.voice.answer(with: Self.candidates)
+    await test.live()
+    #expect(await test.audio.answers == [Self.candidates])
+  }
+
+  @Test func aLineOverTCPAppliesTheAnswerPreferringTCP() async throws {
+    let test = try BridgeTests()
+    test.tcp.withLock { $0 = true }
+    await test.voice.answer(with: Self.candidates)
+    await test.live()
+    #expect(await test.audio.answers == [AnswerSDP.preferringTCP(Self.candidates)])
+  }
+
+  /// The setting changed and the owner chose Reconnect: the open line closes and opens again at
+  /// once, over the new transport, without the pre-roll.
+  @Test func reconnectReopensTheOpenLineOverTheNewTransport() async throws {
+    let test = try BridgeTests()
+    await test.voice.answer(with: Self.candidates)
+    await test.live()
+    test.tcp.withLock { $0 = true }
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.audio.answers.count == 2 })
+    #expect(
+      await test.audio.answers == [Self.candidates, AnswerSDP.preferringTCP(Self.candidates)])
+    #expect(await test.voice.closes == 1)
+    #expect(await test.audio.offers == [true, false])
+    #expect(await test.bridge.status.call == .live)
+  }
+
+  /// With no line open the next line takes the setting by itself: nothing opens.
+  @Test func reconnectWithNoLineOpensNone() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.bridge.reconnect()
+    await test.bridge.perform(.stop)
+    await test.bridge.reconnect()
+    #expect(await test.voice.opens.isEmpty)
+    #expect(await test.audio.offers.isEmpty)
   }
 
   @Test func muteReachesTheAudioSide() async throws {

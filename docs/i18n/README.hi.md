@@ -295,6 +295,10 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 - **Voice**: आपका codex जो realtime voices देता है उनमें से एक, जिनकी सूची codex window खुलने पर
   देता है, या **Codex default**। यह अगली बार line खुलने से सुनाई देती है।
+- **Connect over TCP** (डिफ़ॉल्ट रूप से बंद): अगर खराब connection पर voice टूटती है, तो इसे चालू
+  करें। तब line UDP के बजाय TCP port 443 को प्राथमिकता देती है: voice phrases के बीच थोड़ा रुक सकती
+  है, पर कोई audio नहीं खोता। बदलते समय खुली line आपकी पुष्टि के बाद तुरंत बंद होकर फिर खुलती है;
+  voice जो कह रही थी वह कट जाता है। line ने कौन-सा transport लिया, यह कहीं नहीं दिखता।
 - **Prompt** (डिफ़ॉल्ट रूप से खाली): voice के लिए आपके अपने निर्देश, जैसे "मुझसे Spanish में बात
   करो", अधिकतम 2,000 अक्षर। ये LiveBridge के अपने voice नियमों के बाद जोड़े जाते हैं, और दोनों में
   टकराव होने पर उन्हीं नियमों की चलती है, और अगली बार line खुलने से लागू होते हैं।
@@ -452,6 +456,9 @@ session के ज़रिए OpenAI को यह जाता है:
   अगर title न हो तो session folder का नाम। label redact नहीं होता और pause उसे नहीं छूता, इसलिए
   paused text से लिखा गया title हर पंक्ति के साथ जाता है;
 - WebRTC offer, जो Mac के local network addresses को connection candidates के रूप में सूचीबद्ध करता है।
+
+**Connect over TCP** चालू होने पर audio अब भी OpenAI के media server पर जाता है, UDP के बजाय TCP
+port 443 से।
 
 नतीजे, सवाल, updates, सारांश और टाइप किए गए turns की पंक्तियाँ पहले जानी-पहचानी credential आकृतियों (private keys, JWTs, आम API
 tokens, URL में passwords, `password=` जैसे fields) के redactor से गुज़रते हैं। यह patterns की सूची है,

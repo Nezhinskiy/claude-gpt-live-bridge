@@ -6,6 +6,13 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Connect over TCP**, in Settings under Voice, off by default: if the voice breaks up on a poor
+  connection, turn it on and the line prefers TCP port 443 to UDP, so the voice may pause briefly
+  between phrases but no audio is lost. Changing it while a line is open asks first, then closes
+  the line and opens it again over the new transport.
+
 ### Changed
 
 - While the call is stopped, the menu bar icon no longer turns its ring for a session where Claude

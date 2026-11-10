@@ -325,6 +325,11 @@ parlez.
 
 - **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
   de la fenêtre, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.
+- **Connect over TCP** (désactivé par défaut) : si la voix se hache sur une mauvaise connexion,
+  activez-le. La ligne préfère alors le port TCP 443 à UDP : la voix peut marquer de courtes pauses
+  entre les phrases, mais aucun son n'est perdu. Une ligne ouverte au moment du changement se
+  ferme et se rouvre aussitôt, après votre confirmation ; ce que la voix disait est coupé. Rien
+  n'indique quel transport une ligne a pris.
 - **Prompt** (vide par défaut) : vos propres instructions pour la voix, par exemple « Parle-moi
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
@@ -497,6 +502,9 @@ OpenAI, via la session temps réel de codex :
   pas masqué et la pause n'y touche pas, donc un titre écrit à partir d'un texte mis en pause part
   sur chaque ligne ;
 - l'offre WebRTC, qui liste les adresses réseau locales du Mac comme candidats de connexion.
+
+Avec **Connect over TCP** activé, l'audio va toujours au serveur média d'OpenAI, par le port
+TCP 443 au lieu d'UDP.
 
 Les résultats, questions, mises à jour, résumés et lignes des tours tapés passent d'abord par un masqueur de formes
 connues d'identifiants (clés privées, JWT, jetons d'API courants, mots de passe dans les URL,

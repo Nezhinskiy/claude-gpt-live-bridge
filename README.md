@@ -323,6 +323,10 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 - **Voice**: one of the realtime voices your codex offers, which codex lists when the window
   opens, or **Codex default**. It is heard from the next time the line opens.
+- **Connect over TCP** (off by default): if the voice breaks up on a poor connection, turn this on.
+  The line then prefers TCP port 443 to UDP: the voice may pause briefly between phrases, but no
+  audio is lost. A line that is open when you change it closes and opens again at once, after you
+  confirm; what the voice was saying is cut off. Nothing shows which transport a line took.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
@@ -476,6 +480,9 @@ session:
   or the session folder's name when it has none. The label is not redacted and the pause does not
   touch it, so a title written from text you paused goes out on every line;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
+
+With **Connect over TCP** on, the audio still goes to OpenAI's media server, over TCP port 443
+instead of UDP.
 
 Results, questions, updates, summaries and the lines of typed turns pass through a redactor of
 known credential shapes first (private keys, JWTs, common API tokens, URL passwords,
