@@ -1,5 +1,5 @@
 /// The media server's SDP answer, as the audio page applies it.
-public enum AnswerSDP {
+enum AnswerSDP {
   /// The priority the UDP candidates get under **Connect over TCP**, far below the TCP
   /// candidates' in the answers seen; the value tested on a real call (2026-11-10).
   static let udpPriority = "1000"
@@ -8,7 +8,7 @@ public enum AnswerSDP {
   /// (port 443) and can still fall back to UDP. An answer with no TCP candidate is returned as it
   /// came. Only the priority field of `a=candidate:` lines whose transport is `udp`, in any case,
   /// changes; every other byte, line endings included, stays.
-  public static func preferringTCP(_ sdp: String) -> String {
+  static func preferringTCP(_ sdp: String) -> String {
     var lines = sdp.components(separatedBy: "\n").map { $0.components(separatedBy: " ") }
     guard lines.contains(where: { isCandidate($0, over: "tcp") }) else { return sdp }
     for index in lines.indices where isCandidate(lines[index], over: "udp") {

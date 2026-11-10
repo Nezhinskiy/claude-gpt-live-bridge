@@ -20,10 +20,13 @@ struct AnswerSDPTests {
         == Self.answer([Self.lowered, Self.tcp]))
   }
 
+  /// With bare newlines a short candidate line ends in `udp` itself, so only its length keeps
+  /// it from being read as having a priority.
   @Test func keepsBareNewlines() {
+    let short = "a=candidate:9 1 udp"
     #expect(
-      AnswerSDP.preferringTCP(Self.answer([Self.udp, Self.tcp], ending: "\n"))
-        == Self.answer([Self.lowered, Self.tcp], ending: "\n"))
+      AnswerSDP.preferringTCP(Self.answer([short, Self.udp, Self.tcp], ending: "\n"))
+        == Self.answer([short, Self.lowered, Self.tcp], ending: "\n"))
   }
 
   @Test func readsTheTransportInAnyCase() {
@@ -44,7 +47,7 @@ struct AnswerSDPTests {
   /// too short to have a priority, stay as they were.
   @Test func leavesEveryOtherLineUntouched() {
     let others = [
-      "a=rtcp-fb:111 transport-cc", "a=x-note udp 5 udp", "a=candidate:9 1 udp",
+      "a=rtcp-fb:111 transport-cc", "a=x-note 1 udp 5 more", "a=candidate:9 1 udp",
       "a=candidate:9 1 udp high 192.0.2.10 3478 typ host",
     ]
     #expect(
