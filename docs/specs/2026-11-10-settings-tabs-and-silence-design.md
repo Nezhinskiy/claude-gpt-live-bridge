@@ -34,20 +34,21 @@ The window has two tabs, **Voice** and **General**, chosen by the owner:
 Everything the owner hears during a call is on **Voice**. Today's Notifications section splits: its
 sound toggle goes to **Voice**, its notification toggle stays under **General**.
 
-- The window opens on **Voice**. A notice's **Install** opens it on **General**, where the update is.
+- The window first opens on **Voice**, then on the tab last shown. A notice's **Install** opens it
+  on **General**, where the update is.
 - The tabs are SwiftUI's `TabView` with `tabItem` labels, so they take the keyboard (Full Keyboard
   Access) and VoiceOver reads each tab by its name.
 
 ### The line's three timers
 
-The **Line** section has three number fields, each with a stepper, each a whole number of seconds
+The **Line** section has three number fields, each with a stepper and an "s" after it, each a whole number of seconds
 from 0 to 300, and each keeping today's value as its default:
 
 | Field | Default | What it counts |
 |---|---|---|
-| **Close the line after [20] seconds of silence** | 20 | silence since the last speech, recognised words or reply (`silenceSeconds`) |
-| **Close a line a result opened after [5] seconds without a first word** | 5 | a line a result opened, until the owner or the voice speaks on it (`firstWordSeconds`) |
-| **Close the line after [90] seconds of sound without words** | 90 | sound the Mac's voice detection hears that gives no recognised words (`noiseSeconds`) |
+| **Silence before the line closes** | 20 | silence since the last speech, recognised words or reply (`silenceSeconds`) |
+| **Wait for a first word on a line a result opened** | 5 | a line a result opened, until the owner or the voice speaks on it (`firstWordSeconds`) |
+| **Sound without words before the line closes** | 90 | sound the Mac's voice detection hears that gives no recognised words (`noiseSeconds`) |
 
 - A value outside 0 to 300 becomes the nearer end, and text that is not a number goes back to the
   value before.
