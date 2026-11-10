@@ -9,9 +9,11 @@ All notable changes to this project are listed here. The format follows
 ### Added
 
 - **Connect over TCP**, in Settings under Voice, off by default: if the voice breaks up on a poor
-  connection, turn it on and the line prefers TCP port 443 to UDP, so the voice may pause briefly
-  between phrases but no audio is lost. Changing it while a line is open asks first, then closes
-  the line and opens it again over the new transport.
+  connection, turn it on and the line prefers the media server's TCP route (port 443 in the answers
+  seen) to UDP, which can turn breakups into short pauses; it can still fall back to UDP. Changing
+  it while a line is open asks first, then opens the line again over the new transport, still
+  waiting for what it was waiting for.
+- A debug build's `--call-stats` records which transport the line took (`onTcp`).
 
 ### Changed
 

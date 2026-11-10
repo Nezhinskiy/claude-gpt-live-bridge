@@ -324,9 +324,11 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **Voice**: one of the realtime voices your codex offers, which codex lists when the window
   opens, or **Codex default**. It is heard from the next time the line opens.
 - **Connect over TCP** (off by default): if the voice breaks up on a poor connection, turn this on.
-  The line then prefers TCP port 443 to UDP: the voice may pause briefly between phrases, but no
-  audio is lost. A line that is open when you change it closes and opens again at once, after you
-  confirm; what the voice was saying is cut off. Nothing shows which transport a line took.
+  The line then prefers the TCP route the media server offers (port 443 in the answers seen) to
+  UDP, and can still fall back to UDP. On a lossy connection that can turn breakups into short
+  pauses between phrases ([how far it is tested](#known-limitations)). A line that is open when you
+  change it closes and opens again at once, after you confirm; what the voice was saying is cut
+  off, and a result the line was waiting for still comes to the new one.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
@@ -481,8 +483,8 @@ session:
   touch it, so a title written from text you paused goes out on every line;
 - the WebRTC offer, which lists the Mac's local network addresses as connection candidates.
 
-With **Connect over TCP** on, the audio still goes to OpenAI's media server, over TCP port 443
-instead of UDP.
+With **Connect over TCP** on, the audio still goes to OpenAI's media server, and may go over TCP
+(port 443 in the answers seen) instead of UDP.
 
 Results, questions, updates, summaries and the lines of typed turns pass through a redactor of
 known credential shapes first (private keys, JWTs, common API tokens, URL passwords,
@@ -523,6 +525,11 @@ can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
+- **Connect over TCP** prefers TCP; it does not force it, and nothing in the app shows which
+  transport a line took, so a line that fell back to UDP can still break up. The route was measured
+  once, in a debug build that removed the UDP candidates (no audio lost in 10 minutes); the shipped
+  way, lowering their priority, was seen once to choose TCP. A debug build's `--call-stats` records
+  the transport (`onTcp`) ([CONTRIBUTING.md](CONTRIBUTING.md#reading---call-stats)).
 - The voice sometimes says it is looking ("On it", "Looking now") without handing the request off,
   so nothing reaches Claude: about one request in five with the rule as first written, and 0 of 20
   with the rule now, too few to tell from luck ([BR-001](docs/bugs/BR-001.md)). It can also claim

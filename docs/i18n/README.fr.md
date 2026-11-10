@@ -326,10 +326,12 @@ parlez.
 - **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
   de la fenêtre, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.
 - **Connect over TCP** (désactivé par défaut) : si la voix se hache sur une mauvaise connexion,
-  activez-le. La ligne préfère alors le port TCP 443 à UDP : la voix peut marquer de courtes pauses
-  entre les phrases, mais aucun son n'est perdu. Une ligne ouverte au moment du changement se
-  ferme et se rouvre aussitôt, après votre confirmation ; ce que la voix disait est coupé. Rien
-  n'indique quel transport une ligne a pris.
+  activez-le. La ligne préfère alors la route TCP que propose le serveur média (le port 443 dans
+  les réponses observées) à UDP, et peut encore revenir à UDP. Sur une connexion qui perd des
+  paquets, cela peut changer les coupures en courtes pauses entre les phrases ([jusqu'où c'est
+  testé](#limitations-connues)). Une ligne ouverte au moment du changement se ferme et se rouvre
+  aussitôt, après votre confirmation ; ce que la voix disait est coupé, et un résultat que la ligne
+  attendait arrive quand même sur la nouvelle.
 - **Prompt** (vide par défaut) : vos propres instructions pour la voix, par exemple « Parle-moi
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
@@ -503,8 +505,8 @@ OpenAI, via la session temps réel de codex :
   sur chaque ligne ;
 - l'offre WebRTC, qui liste les adresses réseau locales du Mac comme candidats de connexion.
 
-Avec **Connect over TCP** activé, l'audio va toujours au serveur média d'OpenAI, par le port
-TCP 443 au lieu d'UDP.
+Avec **Connect over TCP** activé, l'audio va toujours au serveur média d'OpenAI, et peut passer par
+TCP (le port 443 dans les réponses observées) au lieu d'UDP.
 
 Les résultats, questions, mises à jour, résumés et lignes des tours tapés passent d'abord par un masqueur de formes
 connues d'identifiants (clés privées, JWT, jetons d'API courants, mots de passe dans les URL,
@@ -550,6 +552,11 @@ session.
 
 ## Limitations connues
 
+- **Connect over TCP** préfère TCP sans l'imposer, et rien dans l'app ne montre quel transport une
+  ligne a pris : une ligne revenue à UDP peut encore se hacher. La route a été mesurée une fois,
+  dans une version de débogage qui retirait les candidats UDP (aucun son perdu en 10 minutes) ; la
+  méthode livrée, baisser leur priorité, a choisi TCP une fois. `--call-stats` d'une version de
+  débogage enregistre le transport (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading---call-stats)).
 - La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande, si
   bien que rien n'arrive à Claude : environ une demande sur cinq avec la règle telle qu'écrite au
   départ, et 0 sur 20 avec la règle actuelle, trop peu pour distinguer cela du hasard

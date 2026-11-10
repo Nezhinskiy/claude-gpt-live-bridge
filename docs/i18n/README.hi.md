@@ -296,9 +296,11 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **Voice**: आपका codex जो realtime voices देता है उनमें से एक, जिनकी सूची codex window खुलने पर
   देता है, या **Codex default**। यह अगली बार line खुलने से सुनाई देती है।
 - **Connect over TCP** (डिफ़ॉल्ट रूप से बंद): अगर खराब connection पर voice टूटती है, तो इसे चालू
-  करें। तब line UDP के बजाय TCP port 443 को प्राथमिकता देती है: voice phrases के बीच थोड़ा रुक सकती
-  है, पर कोई audio नहीं खोता। बदलते समय खुली line आपकी पुष्टि के बाद तुरंत बंद होकर फिर खुलती है;
-  voice जो कह रही थी वह कट जाता है। line ने कौन-सा transport लिया, यह कहीं नहीं दिखता।
+  करें। तब line UDP के बजाय media server के दिए TCP रास्ते (देखे गए answers में port 443) को
+  प्राथमिकता देती है, और फिर भी UDP पर लौट सकती है। packets खोने वाले connection पर इससे टूटन
+  phrases के बीच छोटे ठहराव बन सकती है ([यह कितना परखा गया](#ज्ञात-सीमाएँ))। बदलते समय खुली line
+  आपकी पुष्टि के बाद तुरंत बंद होकर फिर खुलती है; voice जो कह रही थी वह कट जाता है, और line जिस
+  नतीजे का इंतज़ार कर रही थी वह फिर भी नई line में आता है।
 - **Prompt** (डिफ़ॉल्ट रूप से खाली): voice के लिए आपके अपने निर्देश, जैसे "मुझसे Spanish में बात
   करो", अधिकतम 2,000 अक्षर। ये LiveBridge के अपने voice नियमों के बाद जोड़े जाते हैं, और दोनों में
   टकराव होने पर उन्हीं नियमों की चलती है, और अगली बार line खुलने से लागू होते हैं।
@@ -457,8 +459,8 @@ session के ज़रिए OpenAI को यह जाता है:
   paused text से लिखा गया title हर पंक्ति के साथ जाता है;
 - WebRTC offer, जो Mac के local network addresses को connection candidates के रूप में सूचीबद्ध करता है।
 
-**Connect over TCP** चालू होने पर audio अब भी OpenAI के media server पर जाता है, UDP के बजाय TCP
-port 443 से।
+**Connect over TCP** चालू होने पर audio अब भी OpenAI के media server पर जाता है, और UDP के बजाय TCP
+(देखे गए answers में port 443) से जा सकता है।
 
 नतीजे, सवाल, updates, सारांश और टाइप किए गए turns की पंक्तियाँ पहले जानी-पहचानी credential आकृतियों (private keys, JWTs, आम API
 tokens, URL में passwords, `password=` जैसे fields) के redactor से गुज़रते हैं। यह patterns की सूची है,
@@ -498,6 +500,11 @@ Uninstall करने से वे सब हट जाती हैं। mod
 
 ## ज्ञात सीमाएँ
 
+- **Connect over TCP** TCP को प्राथमिकता देता है, उसे मजबूर नहीं करता, और app कहीं नहीं दिखाता कि line
+  ने कौन-सा transport लिया, इसलिए UDP पर लौटी line अब भी टूट सकती है। यह रास्ता एक बार मापा गया, एक
+  debug build में जिसने UDP candidates हटा दिए थे (10 मिनट में कोई audio नहीं खोया); भेजा गया तरीका,
+  उनकी priority घटाना, एक बार TCP चुनते देखा गया। debug build का `--call-stats` transport दर्ज करता
+  है (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading---call-stats))।
 - voice कभी-कभी कहता है कि वह देख रहा है ("On it", "Looking now"), पर अनुरोध Claude को नहीं सौंपता,
   इसलिए Claude तक कुछ नहीं पहुँचता: पहले लिखे गए नियम के साथ लगभग पाँच में से एक अनुरोध, और अब के
   नियम के साथ 20 में से 0, जो किस्मत से अलग बताने के लिए बहुत कम है ([BR-001](../../docs/bugs/BR-001.md))।

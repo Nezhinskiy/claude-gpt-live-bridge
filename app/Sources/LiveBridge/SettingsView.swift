@@ -34,8 +34,9 @@ struct SettingsView: View {
         )
         .id(cancelledReconnects)
         Text(
-          "If the voice breaks up on a poor connection, turn this on: the voice may pause briefly "
-            + "between phrases, but no audio is lost. An open voice line reconnects."
+          "If the voice breaks up on a poor connection, turn this on: the line prefers TCP, which "
+            + "can turn breakups into short pauses, and can still fall back to UDP. An open voice "
+            + "line reconnects."
         )
         .font(.caption).foregroundStyle(.secondary)
       }

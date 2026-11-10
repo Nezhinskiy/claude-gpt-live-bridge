@@ -30,11 +30,9 @@ public struct Confirmation: Sendable, Equatable {
   public static func reconnect(overTCP: Bool) -> Confirmation {
     Confirmation(
       title: "Reconnect the voice over \(overTCP ? "TCP" : "UDP")?",
-      message: overTCP
-        ? "The current voice line closes now and opens again over TCP. On TCP the voice may "
-          + "pause briefly between phrases, but no audio is lost, so speech comes through more "
-          + "clearly."
-        : "The current voice line closes now and opens again over UDP, the default.",
+      message:
+        "The current voice line closes now and opens again over \(overTCP ? "TCP" : "UDP"). "
+        + "What the voice is saying is cut off.",
       confirm: "Reconnect")
   }
 

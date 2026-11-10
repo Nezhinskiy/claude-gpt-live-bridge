@@ -1,6 +1,7 @@
 # Connect the voice over TCP
 
-Status: in progress, 2026-11-10.
+Status: in progress, 2026-11-10; revised that day after the review
+(`docs/reviews/2026-11-10-voice-transport-review.md` on branch `review/pr79-voice-transport`).
 
 ## Why
 
@@ -18,25 +19,27 @@ Two debug experiments in `AudioHost.applyAnswer` moved the line to TCP on real c
 | UDP candidates' priority lowered to 1000 | WebKit chose TCP, with UDP still in the answer (2026-11-10) |
 
 By ear, on a poor connection TCP turns speech breaking apart into short pauses between phrases,
-which the owner prefers. UDP stays the default: on a good connection it has the least delay.
+which the owner prefers. UDP stays the default: on a good connection it has the least delay. The
+loss figure is from the removal; the shipped way, lowering the priority, was seen once to choose
+TCP and has no loss figure of its own.
 
 ## What the owner sees
 
 Settings, in the Voice section, has **Connect over TCP**, off by default, with the caption: if the
-voice breaks up on a poor connection, turn this on; the voice may pause briefly between phrases,
-but no audio is lost, so speech comes through more clearly.
+voice breaks up on a poor connection, turn this on; the line prefers TCP, which can turn breakups
+into short pauses, and can still fall back to UDP. An open voice line reconnects.
 
 - With no line open (the call off, or listening), the change is saved and the next line uses it.
 - With a line connecting or open, the switch first asks: the current line closes now and opens
-  again over the chosen transport; on TCP the voice may pause briefly between phrases, but no
-  audio is lost. **Reconnect** saves the setting, closes the line and opens a new one at once;
-  **Cancel** leaves both the setting and the line as they were.
+  again over the chosen transport, and what the voice is saying is cut off. **Reconnect** saves the
+  setting and reopens the line at once; **Cancel** leaves both the setting and the line as they
+  were. The trade-off is in the caption only.
 - The reopened line is a new realtime session that continues the conversation, as any line does
-  (the same seed: the session's recent lines, context and open tasks). What the voice was saying
-  at that moment is cut off; a result the line was waiting for stays unheard and goes to the new
-  line. Nobody spoke on the new line yet, so it closes after 5 s if nobody speaks
-  (`firstWordSeconds`), as a line an answer opens does.
-- Nothing shows which transport a line actually took (see No statistics).
+  (the same seed: the session's recent lines, context and open tasks). Everything else about the
+  call stays as it was: a result the line was waiting for is still awaited and said when it
+  comes, results not yet heard stay, and the silence and first-word waits are those of the line
+  before. The words of the cut-off reply leave the menu, since no final text comes for them.
+- Nothing in the app shows which transport a line actually took (see No statistics).
 
 ## Decisions
 
@@ -46,6 +49,14 @@ but no audio is lost, so speech comes through more clearly.
   and gives one answer ([ADR 0001](../adr/0001-platform-findings.md)). The owner chose closing
   and reopening the line at once, behind a confirmation, over waiting for the line to close by
   itself.
+- **A reconnect changes the transport and nothing else.** `CallEvent.reconnect` keeps what is
+  awaited and unheard and every timer state, and clears only what belonged to the cut-off reply
+  (the voice speaking, an unfinished acknowledgement). It gives one effect,
+  `reopenRealtime(preroll:)`, with the pre-roll while the owner is speaking. The bridge runs it as
+  one step: it closes the line, then opens it again only if the call is still connecting with no
+  other attempt under way, so a Stop, a new target or a second reconnect during the close opens
+  nothing. (The first version reused the hang-up and the "a result opened this line" path, which
+  forgot awaited results and let a Stop during the close open a line; the review found both.)
 - **The bridge decides, the window only asks.** The window asks only when its last status shows a
   line connecting or open. The bridge's reconnect does nothing unless a line is connecting or
   open at that moment, so a line that closed while the question was up is not opened again. The
@@ -65,27 +76,32 @@ but no audio is lost, so speech comes through more clearly.
 ## No statistics
 
 The README and SECURITY.md promise no telemetry. This change adds no `getStats` call, counter or
-log: a release build has no call statistics, and so no way to show which transport a line took.
-The call statistics stay PR #72's debug-only tool.
+log to a release build, so the app cannot show which transport a line took; the README's known
+limitations say so. The debug-only `--call-stats` gains an `onTcp` column, read from the selected
+candidate pair's local candidate (1 for TCP, 0 for UDP), compiled out of a release like the rest
+of it.
 
 ## Privacy wording
 
-The README's Settings section describes the switch. Its Privacy section adds that with **Connect
-over TCP** on the audio still goes to OpenAI's media server, over TCP port 443 instead of UDP. The
-offer is unchanged: it lists the same local candidates either way.
+The README's Settings section describes the switch as a preference, not a guarantee. Its Privacy
+section adds that with **Connect over TCP** on the audio still goes to OpenAI's media server, and
+may go over TCP (port 443 in the answers seen) instead of UDP: the port is the server's choice,
+not LiveBridge's. The offer is unchanged: it lists the same local candidates either way.
 
 ## Not verified without a real call
 
 - That a line with the setting on connects over TCP in the shipped code path, not only in the
-  debug experiment. Check: one call with the setting on in a debug build with `--call-stats`,
-  whose loss figures show whether packets are still lost. It does not record the selected
-  candidate pair; the experiment read it with a local, debug-only addition (`onTcp`, from the
-  `transport` stats' selected pair), which would have to be added again for this check.
+  debug experiment, and what it then loses. Check: one call with the setting on in a debug build
+  with `--call-stats`, reading `onTcp` and the loss columns. Watch also for a line that moves back
+  to UDP mid-call (`onTcp` going to 0), which an ICE agent may do when a TCP pair stalls.
 - The UDP fallback when the answer has a TCP candidate but no TCP pair connects. Check: one call
   with outbound TCP to port 443 blocked by a temporary `pf` rule for the media server's address;
   the line should connect over UDP, maybe after a few seconds. The page gives up after 10 s.
 - That **Reconnect** during a live line reopens it cleanly on real codex. The unit tests cover the
-  bridge's steps against a fake codex and audio page.
+  bridge's steps against a fake codex and audio page, a Stop, a new target and an open in flight
+  during it included.
+- The Settings switch, its confirmation, and that **Cancel** draws the switch back: the alert
+  shows only with a line open.
 
 Each of these spends realtime minutes, so none runs without the owner's go-ahead.
 

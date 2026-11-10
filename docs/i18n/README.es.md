@@ -311,10 +311,12 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir la
   ventana, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
 - **Connect over TCP** (desactivado por defecto): si la voz se corta con una conexión mala,
-  actívalo. La línea prefiere entonces el puerto TCP 443 a UDP: la voz puede hacer pausas breves
-  entre frases, pero no se pierde audio. Una línea abierta cuando lo cambias se cierra y se vuelve
-  a abrir en el acto, tras confirmarlo; lo que la voz estaba diciendo se corta. Nada muestra qué
-  transporte tomó una línea.
+  actívalo. La línea prefiere entonces la ruta TCP que ofrece el servidor de medios (el puerto 443
+  en las respuestas vistas) a UDP, y aún puede volver a UDP. En una conexión con pérdidas eso puede
+  convertir los cortes en pausas breves entre frases ([hasta dónde está probado](#limitaciones-conocidas)).
+  Una línea abierta cuando lo cambias se cierra y se vuelve a abrir en el acto, tras confirmarlo; lo
+  que la voz estaba diciendo se corta, y un resultado que la línea esperaba llega igualmente a la
+  nueva.
 - **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
   hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
@@ -482,8 +484,8 @@ la sesión en tiempo real de codex:
   pausa no la toca, así que un título escrito a partir de texto en pausa sale en cada línea;
 - la oferta WebRTC, que enumera las direcciones de red local del Mac como candidatas de conexión.
 
-Con **Connect over TCP** activado, el audio sigue yendo al servidor de medios de OpenAI, por el
-puerto TCP 443 en lugar de UDP.
+Con **Connect over TCP** activado, el audio sigue yendo al servidor de medios de OpenAI, y puede ir
+por TCP (el puerto 443 en las respuestas vistas) en lugar de UDP.
 
 Los resultados, las preguntas, las actualizaciones, los resúmenes y las líneas de los turnos escritos pasan antes por un redactor de
 formatos de credenciales conocidos (claves privadas, JWT, tokens de API comunes, contraseñas en
@@ -525,6 +527,11 @@ sesión.
 
 ## Limitaciones conocidas
 
+- **Connect over TCP** prefiere TCP pero no lo impone, y nada en la app muestra qué transporte tomó
+  una línea, así que una línea que volvió a UDP aún puede cortarse. La ruta se midió una vez, en
+  una compilación de depuración que quitaba los candidatos UDP (ningún audio perdido en 10
+  minutos); la forma que se distribuye, bajar su prioridad, eligió TCP una vez. `--call-stats` de
+  una compilación de depuración registra el transporte (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading---call-stats)).
 - A veces la voz dice que está mirando ("On it", "Looking now") sin pasar la petición, así que a
   Claude no le llega nada: más o menos una petición de cada cinco con la regla tal como se escribió
   primero, y 0 de 20 con la regla actual, muy pocas para distinguirlo de la suerte
