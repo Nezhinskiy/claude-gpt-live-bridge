@@ -25,6 +25,9 @@ final class AudioHost: NSObject, AudioSide {
   private var waiting: [CheckedContinuation<Void, Never>] = []
   private let chimeSound = bundledSound("chime")
   private let handoffSound = bundledSound("handoff")
+  #if DEBUG
+    private var callStats: CallStatsRecorder?
+  #endif
 
   /// `fakeMic` (debug builds only) replaces the microphone with a WAV file.
   init(fakeMic: URL?) {
@@ -36,6 +39,9 @@ final class AudioHost: NSObject, AudioSide {
     webView = WKWebView(frame: .zero, configuration: config)
     super.init()
     config.userContentController.add(self, name: "bridge")
+    #if DEBUG
+      callStats = CallStatsRecorder.install(in: config)
+    #endif
     webView.navigationDelegate = self
     webView.uiDelegate = self
     window.contentView = webView
@@ -78,7 +84,12 @@ final class AudioHost: NSObject, AudioSide {
     await run("return await LB.listen(fake)", ["fake": fakeMic != nil], failing: "start")
   }
 
-  func stopListening() async { _ = try? await call("LB.stop()") }
+  func stopListening() async {
+    _ = try? await call("LB.stop()")
+    #if DEBUG
+      callStats?.endCall()
+    #endif
+  }
 
   /// Fails closed: a page that cannot confirm the release ends the call, whose `LB.stop`
   /// releases the microphone, rather than showing Muted over an open microphone.
