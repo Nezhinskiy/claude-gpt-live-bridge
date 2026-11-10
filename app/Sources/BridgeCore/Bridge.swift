@@ -318,11 +318,13 @@ public actor Bridge: Router {
     switch effect {
     case .openRealtime: await startOpening(preroll: true)
     case .openRealtimeForResult: await startOpening(preroll: false, waits: false)
-    case .closeRealtime:
-      connecting?.cancel()
-      connecting = nil
-      await audio.closePeer()
-      await realtime?.close()
+    case .reopenRealtime(let preroll):
+      await closeLine()
+      // A Stop, a new target or another reconnect may have come during the close.
+      guard machine.phase == .connecting, connecting == nil else { return }
+      growing = GrowingLines()  // no final text comes for what the closed line said
+      await startOpening(preroll: preroll, waits: false)
+    case .closeRealtime: await closeLine()
     case .startLocalVAD:
       // a Mute meanwhile does not cancel a Start: the page records it, and listens muted
       if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
@@ -346,6 +348,13 @@ public actor Bridge: Router {
     case .confirmAnswer: if confirmsWithSound() { await audio.confirmAnswer() }
     case .problem(let shown): problem = shown
     }
+  }
+
+  private func closeLine() async {
+    connecting?.cancel()
+    connecting = nil
+    await audio.closePeer()
+    await realtime?.close()
   }
 
   /// Asks macOS for the microphone, whose first-run prompt stays up until the owner answers it;

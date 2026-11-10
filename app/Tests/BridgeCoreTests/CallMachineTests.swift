@@ -412,18 +412,39 @@ struct CallMachineTests {
       "targetChangeWhileConnectingCloses", connecting, .conversationChanged, .listening,
       [.closeRealtime]),
     row("targetChangeWhileListeningChangesNothing", [.start], .conversationChanged, .listening, []),
-    // a new transport: the line closes and opens again at once, keeping what was not heard
+    // a new transport: the line is opened again in one step, and the call's state stays
     row(
       "reconnectReopensTheOpenLine", live + [deliver(a)], .reconnect, .connecting,
-      [.closeRealtime, .openRealtimeForResult], pending: [a]),
+      [.reopenRealtime(preroll: false)], pending: [a]),
     row(
-      "reconnectWhileConnectingReopens", connecting, .reconnect, .connecting,
-      [.closeRealtime, .openRealtimeForResult]),
+      "reconnectWhileTheOwnerSpeaksKeepsThePreroll", connecting, .reconnect, .connecting,
+      [.reopenRealtime(preroll: true)]),
     row("reconnectWhileListeningChangesNothing", [.start], .reconnect, .listening, []),
     row("reconnectWhileOffChangesNothing", [], .reconnect, .off, []),
     row(
-      "aReconnectedLineWaitsForTheFirstWord", live + [.reconnect], .connected, .live,
-      [.problem(nil), .flushPreroll, firstWord]),
+      "aLineReconnectedForTheOwnerWaitsTheUsualSilence", live + [.reconnect], .connected, .live,
+      [.problem(nil), .flushPreroll, arm]),
+    row(
+      "aLineReconnectedBeforeItsFirstWordStillWaitsForIt", [.start, opening(result), .reconnect],
+      .connected, .live, [.problem(nil), .flushPreroll, .addContext(result), firstWord],
+      pending: [result]),
+    // the handoff's result is still awaited on the new line: silence does not close it
+    row(
+      "aReconnectedLineKeepsWaitingForTheResult",
+      waiting + [.reconnect, .connected], .silenceElapsed, .live, []),
+    row(
+      "aReconnectedLineSpeaksTheAwaitedResult", waiting + [.reconnect, .connected], fromAlpha,
+      .live, [.confirmAnswer, .speak(result), arm], pending: [result]),
+    // the result window ending while the line reconnects still ends the wait
+    row(
+      "theResultWindowEndsWhileReconnecting",
+      waiting + [.reconnect, .resultWindowElapsed, .connected], .silenceElapsed, .listening,
+      [.closeRealtime]),
+    // the cut-off reply never finishes, so it holds back no result on the new line
+    row(
+      "aReplyCutOffByAReconnectDoesNotHoldTheResult",
+      waiting + [.assistantSpeaking, .reconnect, .connected], fromAlpha, .live,
+      [.confirmAnswer, .speak(result), arm], pending: [result]),
   ]
 
   @Test(arguments: table) func transition(_ row: Transition) {
@@ -473,6 +494,14 @@ struct CallMachineTests {
       _ = machine.handle(event)
     }
     #expect(machine.withdraw { $0 == Self.asking } == [])
+    #expect(machine.phase == .connecting)
+  }
+
+  /// A reconnect is not a line a result opened: withdrawing nothing leaves it connecting.
+  @Test func withdrawingKeepsAReconnectedLine() {
+    var machine = CallMachine()
+    for event in Self.live + [.reconnect] { _ = machine.handle(event) }
+    #expect(machine.withdraw { _ in false } == [])
     #expect(machine.phase == .connecting)
   }
 
