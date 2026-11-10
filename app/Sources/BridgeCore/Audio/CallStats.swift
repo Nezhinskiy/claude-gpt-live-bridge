@@ -18,7 +18,11 @@
       "removedSamplesForAcceleration", "jitterBufferDelay", "jitterBufferEmittedCount",
     ]
 
-    static let header = (["time", "line"] + fields).joined(separator: ",")
+    /// What is read from the selected candidate pair: `onTcp`, 1 when the line's local candidate
+    /// is TCP and 0 for UDP, which shows what Settings' Connect over TCP did.
+    static let pathFields = ["onTcp"]
+
+    static let header = (["time", "line"] + fields + pathFields).joined(separator: ",")
 
     /// Runs before the page's own script, so the page needs no code for this: every peer it makes
     /// is sampled once a second until it closes. Only the numbers in `fields` leave the report.
@@ -28,10 +32,23 @@
         const handler = window.webkit.messageHandlers.\(handlerName);
         let lines = 0;
 
+        function onTcp(report) {
+          let value;
+          report.forEach((entry) => {
+            if (entry.type !== 'transport' || !entry.selectedCandidatePairId) return;
+            const pair = report.get(entry.selectedCandidatePairId);
+            const local = pair && report.get(pair.localCandidateId);
+            if (local) value = local.protocol === 'tcp' ? 1 : 0;
+          });
+          return value;
+        }
+
         function sample(report, line) {
+          const tcp = onTcp(report);
           report.forEach((entry) => {
             if (entry.type !== 'inbound-rtp' || entry.kind !== 'audio') return;
             const numbers = { line };
+            if (tcp !== undefined) numbers.onTcp = tcp;
             for (const name of fields) {
               if (typeof entry[name] === 'number') numbers[name] = entry[name];
             }
@@ -66,7 +83,8 @@
       let time = ISO8601DateFormatter()
       time.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
       time.timeZone = timeZone
-      let cells = [time.string(from: date), line] + fields.map { number(sample[$0]) ?? "" }
+      let cells =
+        [time.string(from: date), line] + (fields + pathFields).map { number(sample[$0]) ?? "" }
       return cells.joined(separator: ",")
     }
 

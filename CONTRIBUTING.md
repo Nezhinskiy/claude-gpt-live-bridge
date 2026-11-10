@@ -229,6 +229,8 @@ one before, and ignore a line's first row, where concealment is only start-up.
 - `packetsDiscarded`, `jitter`, or `concealedSamples` minus `silentConcealedSamples` rising without
   loss means audio arrived late or not at all: the network or the server, which these numbers
   cannot separate.
+- `onTcp` is 1 while the line runs over TCP and 0 over UDP: with Settings' **Connect over TCP**
+  on, a 0 means the line fell back to UDP.
 - Clean numbers rule out delivery of the incoming audio. That leaves what the server generated and
   the local audio output (Bluetooth, echo cancellation), which these numbers cannot separate either.
 

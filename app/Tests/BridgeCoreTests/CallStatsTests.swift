@@ -60,7 +60,7 @@ struct CallStatsRowTests {
   /// The numbers the owner reads a glitch by.
   @Test(arguments: [
     "packetsLost", "packetsReceived", "jitter", "concealedSamples", "totalSamplesReceived",
-    "jitterBufferDelay", "packetsDiscarded",
+    "jitterBufferDelay", "packetsDiscarded", "onTcp",
   ])
   func theColumnIsWritten(_ name: String) throws {
     #expect(try cells(["line": 1, name: 7])[name] == "7")
@@ -155,7 +155,7 @@ struct CallStatsPageScriptTests {
           this.reports = [];
         }
         getStats() {
-          return Promise.resolve(new Map(this.reports.map((report, i) => [i, report])));
+          return Promise.resolve(new Map(this.reports.map((report, i) => [report.id ?? i, report])));
         }
       };
       var Native = window.RTCPeerConnection;
@@ -181,6 +181,29 @@ struct CallStatsPageScriptTests {
   @Test func onlyNumbersLeaveThePage() {
     run("var peer = new RTCPeerConnection(); peer.reports = [audio]; tick();")
     #expect(text("Object.keys(posted[0]).sort().join()") == "jitter,line,packetsLost")
+  }
+
+  /// The selected pair's local candidate, as Connect over TCP needs to see which transport the
+  /// line took: 1 for TCP, 0 for UDP.
+  func path(_ protocolName: String) -> String {
+    """
+    peer.reports = [audio,
+      { type: 'transport', id: 'T', selectedCandidatePairId: 'P' },
+      { type: 'candidate-pair', id: 'P', localCandidateId: 'L' },
+      { type: 'local-candidate', id: 'L', protocol: '\(protocolName)', address: 'secret' }];
+    tick();
+    """
+  }
+
+  @Test func aLineOverTCPIsMarked() {
+    run("var peer = new RTCPeerConnection();" + path("tcp"))
+    #expect(number("posted[0].onTcp") == 1)
+  }
+
+  @Test func aLineOverUDPIsMarkedToo() {
+    run("var peer = new RTCPeerConnection();" + path("udp"))
+    #expect(number("posted[0].onTcp") == 0)
+    #expect(text("Object.keys(posted[0]).sort().join()") == "jitter,line,onTcp,packetsLost")
   }
 
   @Test func theFieldsAreSampledOnceASecond() {
