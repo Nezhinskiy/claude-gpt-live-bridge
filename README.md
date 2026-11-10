@@ -336,12 +336,15 @@ during a call:
   which win where the two disagree, and apply from the next time the line opens.
 - **Silence before the line closes** (20 seconds by default), **Wait for a first word on a line
   a result opened** (5 seconds) and **Sound without words before the line closes** (90 seconds):
-  how long each kind of quiet keeps an open line, from 0 to 300 seconds. 0 switches that one off;
-  with all three at 0 the line stays open until you press Stop, billed all the while
-  ([Billing](#billing-aware-by-design)). A short silence closes the line inside ordinary pauses,
-  and each reopening takes a few seconds before the voice answers, so Settings warns below 10
-  seconds; so it does for sound without words, which your speech counts as until it is
-  recognised. A change applies from the next words.
+  how long each kind of quiet keeps an open line, from 0 to 300 seconds. 0 switches the silence or
+  the sound without words off, and a first-word wait of 0 waits as long as the silence. With all
+  three at 0, quiet never closes the line: it stays open, billed all the while
+  ([Billing](#billing-aware-by-design)), until you press Stop, change the target or OpenAI closes
+  it. A short silence closes the line inside ordinary pauses, and each reopening takes a few
+  seconds before the voice answers, so Settings warns at 1 to 9 seconds; so it does for sound
+  without words, which your speech counts as until it is recognised, and at 1 to 3 seconds for the
+  first word, as the voice often starts about 2 seconds after the line connects. A timer you turn
+  on starts at once on a quiet open line; one already counting keeps its time.
 - **Play sounds for requests and answers** (on by default): a short sound for each request the voice
   hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
   that reaches an open or opening line while nobody is speaking. The chime for a result that waits
@@ -423,7 +426,7 @@ a question Claude asks you, or that Claude waits for your approval:
 - When you start speaking, the line opens. The 2 seconds before you started are kept and sent
   first, so your first words are not lost.
 - The line closes after a stretch of silence, and sound without words (music, a TV) closes it after
-  a longer one. [Settings](#settings) sets both; at 0, neither closes it.
+  a stretch of its own. [Settings](#settings) sets each; at 0, that one does not close it.
 - When the voice hands a request to Claude (a handoff), the line stays open for up to 2 minutes
   after that handoff, billed like any open line, and Claude's answer goes to the voice to say once
   nobody is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to

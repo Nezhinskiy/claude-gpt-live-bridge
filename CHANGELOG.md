@@ -10,9 +10,11 @@ All notable changes to this project are listed here. The format follows
 
 - Settings sets how long the line stays open in quiet: **Silence before the line closes** (20
   seconds by default), **Wait for a first word on a line a result opened** (5 seconds) and **Sound
-  without words before the line closes** (90 seconds), each from 0 to 300 seconds. 0 switches that
-  one off, so with all three at 0 the line stays open, and billed, until you press Stop. The
-  defaults are the old fixed values, so nothing changes until you change them.
+  without words before the line closes** (90 seconds), each from 0 to 300 seconds. 0 switches the
+  silence or the sound without words off, and a first-word wait of 0 waits as long as the silence,
+  so with all three at 0 quiet never closes the line, which stays open and billed. A timer turned
+  on starts at once on a quiet open line. The defaults are the old fixed values, so nothing changes
+  until you change them.
 - **Connect over TCP**, in Settings under Voice, off by default: if the voice breaks up on a poor
   connection, turn it on and the line prefers the media server's TCP route (port 443 in the answers
   seen) to UDP, which can turn breakups into short pauses; it can still fall back to UDP. Changing

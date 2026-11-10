@@ -340,12 +340,16 @@ vous entendez pendant un appel :
 - **Silence before the line closes** (20 secondes par défaut), **Wait for a first word on a line
   a result opened** (5 secondes) et **Sound without words before the line closes** (90 secondes) :
   combien de temps chaque sorte de silence garde une ligne ouverte, de 0 à 300 secondes. 0 désactive
-  celui-là ; avec les trois à 0, la ligne reste ouverte jusqu'à ce que vous appuyiez sur Stop,
-  facturée tout ce temps ([Facturation](#facturation-maîtrisée-par-conception)). Un silence court
-  ferme la ligne au milieu de pauses ordinaires, et chaque réouverture prend quelques secondes avant
-  que la voix réponde, donc Settings avertit en dessous de 10 secondes ; il fait de même pour le son
-  sans paroles, car votre parole compte comme tel tant qu'elle n'est pas reconnue. Un changement
-  s'applique dès les mots suivants.
+  le silence ou le son sans paroles, et une attente du premier mot à 0 attend aussi longtemps que le
+  silence. Avec les trois à 0, le silence ne ferme jamais la ligne : elle reste ouverte, facturée
+  tout ce temps ([Facturation](#facturation-maîtrisée-par-conception)), jusqu'à ce que vous appuyiez
+  sur Stop, changiez de cible ou qu'OpenAI la ferme. Un silence court ferme la ligne au milieu de
+  pauses ordinaires, et chaque réouverture prend quelques secondes avant que la voix réponde, donc
+  Settings avertit de 1 à 9 secondes ; il fait de même pour le son sans paroles, car votre parole
+  compte comme tel tant qu'elle n'est pas reconnue, et de 1 à 3 secondes pour le premier mot, car la
+  voix commence souvent environ 2 secondes après la connexion de la ligne. Un minuteur que vous
+  activez démarre aussitôt sur une ligne ouverte et silencieuse ; celui qui compte déjà garde son
+  temps.
 - **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
   voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
   question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
@@ -436,7 +440,8 @@ attend votre autorisation :
 - Quand vous commencez à parler, la ligne s'ouvre. Les 2 secondes précédant votre prise de parole
   sont conservées et envoyées en premier, afin que vos premiers mots ne soient pas perdus.
 - La ligne se ferme après un temps de silence, et un son sans paroles (musique, télévision) la
-  ferme après un temps plus long. [Settings](#réglages) règle les deux ; à 0, aucun ne la ferme.
+  ferme après un temps qui lui est propre. [Settings](#réglages) règle chacun ; à 0, celui-là ne la
+  ferme pas.
 - Quand la voix transmet une demande à Claude (un transfert), la ligne reste ouverte jusqu'à 2
   minutes après ce transfert, facturée comme n'importe quelle ligne ouverte, et la réponse de Claude
   passe à la voix pour qu'elle la dise dès que plus personne ne parle. Un transfert ultérieur

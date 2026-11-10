@@ -324,11 +324,15 @@ durante una llamada:
 - **Silence before the line closes** (20 segundos por defecto), **Wait for a first word on a line
   a result opened** (5 segundos) y **Sound without words before the line closes** (90 segundos):
   cuánto tiempo mantiene abierta la línea cada tipo de silencio, de 0 a 300 segundos. 0 desactiva
-  ese temporizador; con los tres en 0 la línea sigue abierta hasta que pulsas Stop, facturada todo
-  ese tiempo ([Facturación](#facturación-bajo-control-por-diseño)). Un silencio corto cierra la línea
-  dentro de las pausas normales, y cada reapertura tarda unos segundos antes de que la voz responda,
-  así que Settings avisa por debajo de 10 segundos; lo mismo hace con el sonido sin palabras, pues tu
-  habla cuenta como tal hasta que se reconoce. Un cambio se aplica a partir de las siguientes palabras.
+  el silencio o el sonido sin palabras, y una espera de primera palabra en 0 dura lo mismo que el
+  silencio. Con los tres en 0, el silencio nunca cierra la línea: sigue abierta, facturada todo ese
+  tiempo ([Facturación](#facturación-bajo-control-por-diseño)), hasta que pulsas Stop, cambias el
+  destino u OpenAI la cierra. Un silencio corto cierra la línea dentro de las pausas normales, y cada
+  reapertura tarda unos segundos antes de que la voz responda, así que Settings avisa de 1 a 9
+  segundos; lo mismo hace con el sonido sin palabras, pues tu habla cuenta como tal hasta que se
+  reconoce, y de 1 a 3 segundos para la primera palabra, ya que la voz suele empezar unos 2 segundos
+  después de que la línea se conecta. Un temporizador que activas empieza enseguida en una línea
+  abierta en silencio; uno que ya cuenta conserva su tiempo.
 - **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
   la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
   de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
@@ -418,7 +422,7 @@ permiso:
 - Cuando empiezas a hablar, se abre la línea. Los 2 segundos anteriores a que empezaras se
   conservan y se envían primero, para que no se pierdan tus primeras palabras.
 - La línea se cierra tras un rato de silencio, y el sonido sin palabras (música, una tele) la cierra
-  tras uno más largo. [Ajustes](#ajustes) fija ambos; en 0, ninguno la cierra.
+  tras un rato propio. [Ajustes](#ajustes) fija cada uno; en 0, ese no la cierra.
 - Cuando la voz pasa una petición a Claude (un traspaso), la línea permanece abierta hasta 2 minutos
   después de ese traspaso, facturada como cualquier línea abierta, y la respuesta de Claude pasa a
   la voz para que la diga cuando nadie esté hablando. Un traspaso posterior reinicia los 2 minutos;
