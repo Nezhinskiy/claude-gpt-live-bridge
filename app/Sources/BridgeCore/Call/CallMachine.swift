@@ -65,6 +65,8 @@ public enum CallEvent: Equatable, Sendable {
   /// The open line carries a conversation that is not the target's any more: another session
   /// became the target, or the target's conversation was erased.
   case conversationChanged
+  /// The owner changed how the line connects (Settings' Connect over TCP) and chose Reconnect.
+  case reconnect
   /// A line of a turn that is not a voice request (`.typed` or `.claude`): the voice is given it
   /// as context, not delivered to be said. It chimes and opens nothing.
   case synced(VoiceLine)
@@ -80,6 +82,9 @@ public enum CallEffect: Equatable, Sendable {
   /// Opens the line for a line that arrived: without the pre-roll, as nobody spoke, and without
   /// holding up the delivery while it connects.
   case openRealtimeForResult
+  /// Closes the open line and, if the call still wants it once that is done, opens it again: a
+  /// new transport for the same line. `preroll` while the owner is speaking.
+  case reopenRealtime(preroll: Bool)
   case addContext(VoiceLine)
   /// Replaces any armed timer; when it elapses the bridge sends `silenceElapsed`.
   case armSilenceTimer(seconds: Int)
@@ -292,12 +297,21 @@ public struct CallMachine: Sendable {
       guard !held.isEmpty, !isSoundOn, !isVoiceSpeaking else { return [] }
       unheard = withoutHolds
       return held.map { .speak($0) } + [armSilence()]
-    case (.live, .resultWindowElapsed):
+    case (.live, .resultWindowElapsed), (.connecting, .resultWindowElapsed):
+      // connecting here only when a reconnect reopens the line; its silence is armed again
       guard !awaited.isEmpty else { return [] }
       awaited = []
-      return isSilenceDue ? [.closeRealtime] + hangUp() : []
+      return isSilenceDue && phase == .live ? [.closeRealtime] + hangUp() : []
     case (.connecting, .conversationChanged), (.live, .conversationChanged):
       return [.closeRealtime] + hangUp()
+    case (.connecting, .reconnect), (.live, .reconnect):
+      // Only the transport changes: what is awaited, unheard and timed stays. The old line's
+      // reply is cut off, and no end of it will come.
+      phase = .connecting
+      isVoiceSpeaking = false
+      isAckUnfinished = false
+      replyCanSay = nil
+      return [.reopenRealtime(preroll: isSoundOn)]
     case (.live, .silenceElapsed):
       if !awaited.isEmpty, !isSoundOn {
         isSilenceDue = true

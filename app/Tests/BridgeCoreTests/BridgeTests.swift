@@ -25,6 +25,10 @@ actor FakeVoice: RealtimeControlling {
     heldOpens = []
   }
 
+  /// The SDP answer each open gives.
+  var answer = "answer"
+  func setAnswer(_ sdp: String) { answer = sdp }
+
   func open(offerSDP: String, items: [InitialItem]) async throws -> String {
     if holdsOpen {
       holdsOpen = false
@@ -32,7 +36,7 @@ actor FakeVoice: RealtimeControlling {
     }
     if let failure { throw failure }
     opens.append(items)
-    return "answer"
+    return answer
   }
   func close() { closes += 1 }
   func addContext(_ text: String) { added.append(text) }
@@ -114,13 +118,30 @@ actor FakeAudio: AudioSide {
     offers.append(preroll)
     return "offer"
   }
+  /// The answers applied, in order.
+  var answers: [String] = []
   func applyAnswer(_ sdp: String) throws {
     if answerFails { throw CodexProblem.protocolMismatch("no session.started") }
     calls.append("applyAnswer")
+    answers.append(sdp)
     time.advance(by: .seconds(1))
   }
   func flushPreroll() { calls.append("flushPreroll") }
-  func closePeer() { calls.append("closePeer") }
+  /// While set, the next close waits for `releaseClose()`, as the page and codex take a moment.
+  var holdsClose = false
+  private var heldCloses: [CheckedContinuation<Void, Never>] = []
+  var closeWaiting: Int { heldCloses.count }
+  func holdClose() { holdsClose = true }
+  func releaseClose() {
+    for wait in heldCloses { wait.resume() }
+    heldCloses = []
+  }
+  func closePeer() async {
+    calls.append("closePeer")
+    guard holdsClose else { return }
+    holdsClose = false
+    await withCheckedContinuation { heldCloses.append($0) }
+  }
   func chime() { calls.append("chime") }
   /// While set, the next answer's sound waits for `releaseSound()`, as a hop to the main actor
   /// lets others in.
@@ -160,6 +181,8 @@ struct BridgeTests {
   let dir: URL
   /// Settings' pause, which a test may flip.
   let pause: OSAllocatedUnfairLock<Bool>
+  /// Settings' Connect over TCP, which a test may flip.
+  let tcp = OSAllocatedUnfairLock(initialState: false)
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
@@ -183,7 +206,8 @@ struct BridgeTests {
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
       pausesSync: { pause.withLock { $0 } },
-      loadsContextOnFirstCall: { loadsContextOnFirstCall }, appVersion: appVersion)
+      loadsContextOnFirstCall: { loadsContextOnFirstCall },
+      connectsOverTCP: { [tcp] in tcp.withLock { $0 } }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -251,6 +275,111 @@ struct BridgeTests {
     if await registry.target == nil { try? await join(a, "Alpha") }
     await bridge.perform(.start)
     await bridge.audioEvent(.speechStarted)
+  }
+
+  /// An answer with UDP and TCP candidates, as the media server gives.
+  static let candidates = AnswerSDPTests.answer([AnswerSDPTests.udp, AnswerSDPTests.tcp])
+
+  @Test func aLineOverUDPAppliesTheAnswerAsItCame() async throws {
+    let test = try BridgeTests()
+    await test.voice.setAnswer(Self.candidates)
+    await test.live()
+    #expect(await test.audio.answers == [Self.candidates])
+  }
+
+  @Test func aLineOverTCPAppliesTheAnswerPreferringTCP() async throws {
+    let test = try BridgeTests()
+    test.tcp.withLock { $0 = true }
+    await test.voice.setAnswer(Self.candidates)
+    await test.live()
+    #expect(await test.audio.answers == [AnswerSDP.preferringTCP(Self.candidates)])
+  }
+
+  /// The setting changed and the owner chose Reconnect: the open line closes and opens again at
+  /// once, over the new transport, without the pre-roll.
+  @Test func reconnectReopensTheOpenLineOverTheNewTransport() async throws {
+    let test = try BridgeTests()
+    await test.voice.setAnswer(Self.candidates)
+    await test.live()
+    await test.bridge.audioEvent(.speechEnded)
+    test.tcp.withLock { $0 = true }
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.audio.answers.count == 2 })
+    #expect(
+      await test.audio.answers == [Self.candidates, AnswerSDP.preferringTCP(Self.candidates)])
+    #expect(await test.voice.closes == 1)
+    #expect(await test.audio.offers == [true, false])
+    #expect(await test.bridge.status.call == .live)
+  }
+
+  /// A Stop while the reconnect closes the old line: no new line opens, and codex is not
+  /// launched again for a call that is over.
+  @Test func aStopDuringTheReconnectOpensNoLine() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    await test.audio.holdClose()
+    async let reconnect: Void = test.bridge.reconnect()
+    #expect(await eventually { await test.audio.closeWaiting == 1 })
+    await test.bridge.perform(.stop)
+    await test.audio.releaseClose()
+    _ = await reconnect
+    #expect(await test.bridge.status.call == .off)
+    #expect(await test.voice.opens.count == 1)
+  }
+
+  /// The same for a new target: its line opens when the owner speaks, not by itself.
+  @Test func aTargetChangeDuringTheReconnectOpensNoLine() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    try await test.join(test.b, "Beta")
+    await test.audio.holdClose()
+    async let reconnect: Void = test.bridge.reconnect()
+    #expect(await eventually { await test.audio.closeWaiting == 1 })
+    await test.bridge.setTarget(test.b)
+    await test.audio.releaseClose()
+    _ = await reconnect
+    #expect(await test.bridge.status.call == .listening)
+    #expect(await test.voice.opens.count == 1)
+  }
+
+  /// A reconnect while the line is still opening replaces that attempt: one line, one answer.
+  @Test func aReconnectDuringAnOpenOpensOneLine() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.voice.holdOpen()
+    async let speech: Void = test.bridge.audioEvent(.speechStarted)
+    #expect(await eventually { await test.voice.openWaiting == 1 })
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await test.voice.releaseOpen()
+    _ = await speech
+    #expect(await test.audio.answers.count == 1)
+    #expect(await test.bridge.status.call == .live)
+  }
+
+  /// What the cut-off line was saying gets no final text: it does not join the new line's words.
+  @Test func aReconnectDropsTheCutOffWords() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    test.voice.emit(.assistantSpeaking(" The build is half"))
+    #expect(await eventually { await test.lines() == ["Voice: The build is half"] })
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.audio.answers.count == 2 })
+    test.voice.emit(.assistantSpeaking(" Hello again"))
+    #expect(await eventually { await test.lines() == ["Voice: Hello again"] })
+  }
+
+  /// With no line open the next line takes the setting by itself: nothing opens.
+  @Test func reconnectWithNoLineOpensNone() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.bridge.reconnect()
+    await test.bridge.perform(.stop)
+    await test.bridge.reconnect()
+    #expect(await test.voice.opens.isEmpty)
+    #expect(await test.audio.offers.isEmpty)
   }
 
   @Test func muteReachesTheAudioSide() async throws {

@@ -23,6 +23,9 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.
   public var prompt: String
+  /// Prefer TCP port 443 over UDP for the voice line's audio, for a connection that loses
+  /// packets (`AnswerSDP.preferringTCP`); each line reads it when it opens.
+  public var connectsOverTCP: Bool
   /// Check GitHub for a newer release once a day; nil leaves it to the build, on for a release
   /// build and off for one from source (`UpdatePolicy.checksAutomatically`).
   public var checkUpdatesAutomatically: Bool?
@@ -30,7 +33,7 @@ public struct Settings: Codable, Sendable, Equatable {
   public init(
     voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
     notifyResults: Bool = true, confirmHandoffs: Bool = true, prompt: String = "",
-    checkUpdatesAutomatically: Bool? = nil
+    connectsOverTCP: Bool = false, checkUpdatesAutomatically: Bool? = nil
   ) {
     self.voice = voice
     self.pauseSyncWhileStopped = pauseSyncWhileStopped
@@ -38,6 +41,7 @@ public struct Settings: Codable, Sendable, Equatable {
     self.notifyResults = notifyResults
     self.confirmHandoffs = confirmHandoffs
     self.prompt = prompt
+    self.connectsOverTCP = connectsOverTCP
     self.checkUpdatesAutomatically = checkUpdatesAutomatically
   }
 
@@ -62,6 +66,7 @@ public struct Settings: Codable, Sendable, Equatable {
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     confirmHandoffs = try container.decodeIfPresent(Bool.self, forKey: .confirmHandoffs) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
+    connectsOverTCP = try container.decodeIfPresent(Bool.self, forKey: .connectsOverTCP) ?? false
     checkUpdatesAutomatically = try container.decodeIfPresent(
       Bool.self, forKey: .checkUpdatesAutomatically)
   }

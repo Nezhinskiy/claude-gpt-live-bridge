@@ -166,7 +166,7 @@ final class AppModel {
         confirmsWithSound: { settings.current.confirmHandoffs },
         pausesSync: { settings.current.pauseSyncWhileStopped },
         loadsContextOnFirstCall: { settings.current.loadContextOnFirstCall },
-        appVersion: appVersion)
+        connectsOverTCP: { settings.current.connectsOverTCP }, appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge
       self.server = server
@@ -347,6 +347,18 @@ final class AppModel {
       await refreshNotificationStatus()
     }
   }
+
+  /// Settings' Connect over TCP. A line connecting or open is reconnected over the new transport
+  /// once the owner confirms it, and the bridge reconnects only a line still open by then; with
+  /// none, the next line takes it. False when the owner cancelled, and nothing changed.
+  func setConnectsOverTCP(_ on: Bool) -> Bool {
+    let lineIsOpen = status.map { [.connecting, .live].contains($0.call) } ?? false
+    if lineIsOpen, !Confirm.ask(.reconnect(overTCP: on)) { return false }
+    settings.update { $0.connectsOverTCP = on }
+    if lineIsOpen { Task { await bridge?.reconnect() } }
+    return true
+  }
+
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
 
   /// The session row's ×, once the owner confirms it; the menu has closed by then.
