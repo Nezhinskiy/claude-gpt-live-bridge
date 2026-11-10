@@ -274,3 +274,104 @@ In the harness, `LB.listen` called straight after `AudioHost.init` failed with `
 LB`, with the flag on or off, and worked after a 1 s wait. So `didFinish` may arrive before the
 page's module has run. It was seen only in a command-line harness, not in the app, and this PR did
 not cause it.
+
+## Re-review at a61eb3c, 2026-11-10
+
+Head `a61eb3c`, merge-base with `dev` `334a186` (0.5.0). The PR is now +501 −10 across 7 files,
+down from +515 −12 across 8. CI is green (`check`, CodeQL), and GitHub reports it mergeable and
+clean. I checked the implementer's reply on the PR against the code, not against the reply.
+
+### Each finding
+
+| # | Reply | At a61eb3c |
+|---|---|---|
+| 1 | Accepted | **Fixed.** `CONTRIBUTING.md:225-230` names the network only for `packetsLost`; concealment, jitter and discards without loss name "the network or the server"; clean numbers rule out delivery only; `:223` says to ignore a line's first row. |
+| 2 | Accepted | **Fixed.** `release-guards.test.sh:32-36` exits 1 on a missing bundle, and `:37-42` searches binary and bundle in one `grep`. Reproduced below: the renamed bundle now exits 1. |
+| 3 | Accepted | **Fixed.** `CONTRIBUTING.md:212-213` and `CallStats.swift:1-4`: `#if DEBUG` compiles it out, and the guard looks for its names. |
+| 4 | Accepted | **Fixed.** `CONTRIBUTING.md:210-211` and `scripts/build-app.sh:24` say the path prints when started from a terminal; `CallStatsRecorder.swift:14-15` says only a terminal shows the reason. |
+| 5 | Partly | **Fixed in what it cost; the rejection holds.** The `set --` loop is gone. `build-app.sh:117-121` is the old fixed-order `--fake-mic` block, which now also keeps any later arguments, and `:122-126` reads `tty` only when `--call-stats` is present. Keeping stdout over `Logger` because the owner reads the path in the launching terminal is a requirement, not a defect. |
+| 6 | Accepted | **Fixed.** `CallStatsRecorder.install` (`:16-17`) reads the flag and returns nil without it. `AudioHost.swift:43` calls it unconditionally inside `#if DEBUG`, `AudioHost` no longer names `AppModel`, and `App.swift` is out of the diff. |
+| 7 | Accepted | **Fixed.** `build-app.sh:24-25` links to the guide instead of copying it. |
+| 8 | Accepted | **Fixed.** The fixture's listed `packetsReceived` is a string. Weakening `typeof` to `!== 'undefined'` now fails `onlyNumbersLeaveThePage` (it survived before). |
+| 9 | Partly | **Fixed for discards; the rejection holds for RTT.** `packetsDiscarded` is in `fields`, a test pins its column, and the loopback below wrote it. RTT needs a second report type and was not asked for; adding it after a real call shows the need is reasonable. |
+
+The proportion table:
+- The single `ownerOnlyDirectory` call is in. A fresh home showed `debug/` created at 0700 too.
+- `theColumnIsWritten` now writes a value through `row`, and dropping `packetsDiscarded` from
+  `fields` fails it.
+- The `endCall` test that could not fail is gone.
+
+The three rejections hold:
+- **`timeZone`:** a fixed zone is what lets the file-name and time-cell tests be exact.
+- **Whole numbers and fractions:** these are separate behaviours, since an integer cast would break
+  only `jitter`.
+- **The once-a-second test:** it pins a stated requirement, and it killed the interval mutation.
+
+### Nothing new reaches the release
+
+I built `swift build -c release` for the merge-base and for `a61eb3c` at one path, from clean.
+
+- The binaries are the same size (3,597,176 bytes), and 196 bytes differ: `LC_UUID`, the ad hoc
+  signature, and the same 10 line-number immediates (+11, +6) as before, because the shape of
+  `AudioHost.swift` did not change.
+- The disassembly is otherwise identical (271,526 lines), and the audio-page bundle is
+  byte-identical.
+- None of these is in the binary: `getStats`, `packetsLost`, `packetsDiscarded`, `callStats`,
+  `CallStats`, `call-stats`, `recordsCallStats`, `inbound-rtp`, `concealedSamples`,
+  `jitterBuffer`, `RTCPeerConnection`.
+- None of the main names is in the dSYM or `libBridgeCore.a`.
+
+Guard, at `a61eb3c`:
+
+| Mutation | Guard |
+|---|---|
+| None | exit 0 |
+| Only `CallStats.swift`'s `#if DEBUG` set to `#if true` | exit 1, all three names |
+| Every directive of the tool set to `#if true` | exit 1, all three names |
+| `getStats` planted in `audio.js` | exit 1, the binary or its audio page |
+| Bundle renamed, `getStats` planted, clean build | **exit 1**, the bundle is missing (was exit 0) |
+
+A note for anyone repeating this: the new header comment in `CallStats.swift:3` contains the text
+`#if DEBUG`, so a first-match substitution hits the comment, not the directive. My first run did,
+then failed to compile; the table is from the rerun on the directive lines.
+
+### Tests and the real page
+
+- **Tests:** 16 mutations of `CallStats.swift` against 23 passing tests. 15 were killed, including
+  the weakened `typeof` and a dropped `packetsDiscarded`. One survived: dropping
+  `removedSamplesForAcceleration` from `fields`, which no test pins and no requirement names.
+- **Loopback:** the same harness as before (the unmodified `AudioHost.swift` and
+  `CallStatsRecorder.swift` from `a61eb3c`, the real `audio.js`, a fake microphone and a local
+  answering peer; no codex, no server, no voice).
+  - With the flag off, there was no folder and no file, and the calls ran the same.
+  - With the flag on, one file per call: lines 1 and 2 in the first, line 3 in the second. The
+    `packetsDiscarded` column was filled, `debug/` and `call-stats/` were 0700, and no row
+    followed a close.
+
+### The new commits
+
+- **`a61eb3c` (start the debug build before quitting the installed app): the paragraph holds.**
+  - `UnixHTTPServer.start(retryFor:)` retries every 200 ms, and `App.swift:194` passes 10 s.
+  - The mod calls `ensureApp` when a poll gets no reply (`register.tsx:268-272`), which opens
+    `/Applications/LiveBridge.app` first (`link.ts:165-166`, `register.tsx:552`).
+  - `build-app.sh`'s `quit` matches only the debug app's path, so the installed copy is left for
+    the owner to quit.
+- **`8873bad`, `48ab367`, `8be629e`, `1b266cb`, `14399d1`:** nothing found beyond the rows above.
+  `case " $* "` would also match a WAV path spelled `--call-stats`, which is not worth handling.
+- **Commit messages:** the six new commits carry no attribution lines.
+
+**Non-blocking, the PR description only.** Three lines no longer match the code, and none is in
+the repository:
+- It still lists "the three touch points in `AudioHost` and `App`". `App.swift` is out.
+- It says "and prints the path" without the terminal condition.
+- It says the loopback's `concealedSamples` "stayed 0". The first row of each line had start-up
+  concealment.
+
+### Verdict
+
+**Merge.** Every finding is fixed or rejected for a reason that holds. The release binary is
+unchanged apart from its UUID, its signature and line numbers. Nothing remains for the
+implementer. The three stale lines in the PR description can be corrected at merge.
+
+Still not verified, as in the first round: a real GPT-Live call, numbers during a real network
+glitch, and the packaged or notarized app.
