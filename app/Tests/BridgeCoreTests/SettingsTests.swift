@@ -84,6 +84,14 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.loadContextOnFirstCall)
   }
 
+  @Test func theLineKeepsTodaysTimersByDefault() {
+    #expect(Settings().timeouts == CallMachine.Timeouts(silence: 20, firstWord: 5, noise: 90))
+  }
+
+  @Test func aFileFromBeforeTheTimersKeepsTodaysTimers() throws {
+    #expect(try decoded(#"{"voice":"marin"}"#).timeouts == Settings().timeouts)
+  }
+
   @Test func changesAreKeptAcrossRestarts() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     SettingsStore(file: file).update {

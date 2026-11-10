@@ -160,6 +160,8 @@ struct BridgeTests {
   let dir: URL
   /// Settings' pause, which a test may flip.
   let pause: OSAllocatedUnfairLock<Bool>
+  /// Settings' timers for the line, which a test may change.
+  let timeouts = OSAllocatedUnfairLock(initialState: CallMachine.Timeouts())
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
@@ -182,7 +184,7 @@ struct BridgeTests {
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
-      pausesSync: { pause.withLock { $0 } },
+      pausesSync: { pause.withLock { $0 } }, timeouts: { [timeouts] in timeouts.withLock { $0 } },
       loadsContextOnFirstCall: { loadsContextOnFirstCall }, appVersion: appVersion)
   }
 
@@ -895,7 +897,7 @@ struct BridgeTests {
     let notice = "[APPROVAL] Alpha: Claude is waiting for your approval"
     #expect(await eventually { await voice.spoken == [notice] })
     #expect(await eventually { time.sleepers >= 5 })  // sweep, 3 silence timers, window
-    for _ in 0...CallMachine.silenceSeconds {
+    for _ in 0...CallMachine.Timeouts().silence {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined
     }
@@ -934,7 +936,7 @@ struct BridgeTests {
     for second in 1..<CallMachine.resultWindowSeconds {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined
-      if second == CallMachine.silenceSeconds + 1 { #expect(await bridge.status.call == .live) }
+      if second == CallMachine.Timeouts().silence + 1 { #expect(await bridge.status.call == .live) }
     }
     #expect(await bridge.status.call == .live)
     time.advance(by: .seconds(1))
@@ -2320,13 +2322,44 @@ struct BridgeTests {
     #expect(await eventually { await lines() == ["Voice: Option B"] })
   }
 
+  /// The silence is read from Settings each time it is counted, so a change made on an open line
+  /// holds from the owner's next words.
+  @Test func aLineClosesAfterTheSilenceSet() async throws {
+    await live()
+    #expect(await eventually { await bridge.status.call == .live })
+    timeouts.withLock { $0.silence = 7 }
+    await bridge.audioEvent(.speechEnded)
+    let closing = time.now + 7
+    #expect(await eventually { time.deadlines.contains(closing) })
+    time.advance(by: .seconds(6))
+    _ = try await registry.poll(a)  // the session stays joined
+    #expect(await bridge.status.call == .live)
+    time.advance(by: .seconds(1))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
+  /// With the silence at 0, quiet never closes the line.
+  @Test func aSilenceOfZeroKeepsTheLineOpen() async throws {
+    timeouts.withLock { $0.silence = 0 }
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    #expect(await eventually { await bridge.status.call == .live })
+    try await Task.sleep(for: .milliseconds(50))  // a silence timer, if any, is armed by now
+    for _ in 0...CallMachine.Timeouts.range.upperBound {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)
+    }
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await bridge.status.call == .live)
+  }
+
   /// The owner's words trail their voice, so they say nothing about whether the owner still
   /// speaks: the line hangs up when it would have without them.
   @Test func theOwnersWordsDoNotMoveTheSilenceHangUp() async throws {
     await live()
     await bridge.audioEvent(.speechEnded)
     #expect(await eventually { time.sleepers >= 3 })  // sweep, 2 silence timers
-    for _ in 1..<CallMachine.silenceSeconds {
+    for _ in 1..<CallMachine.Timeouts().silence {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined
     }

@@ -165,6 +165,7 @@ final class AppModel {
         notifies: { settings.current.notifyResults },
         confirmsWithSound: { settings.current.confirmHandoffs },
         pausesSync: { settings.current.pauseSyncWhileStopped },
+        timeouts: { settings.current.timeouts },
         loadsContextOnFirstCall: { settings.current.loadContextOnFirstCall },
         appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)

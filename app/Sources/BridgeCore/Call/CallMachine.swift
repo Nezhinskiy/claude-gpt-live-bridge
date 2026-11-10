@@ -83,6 +83,8 @@ public enum CallEffect: Equatable, Sendable {
   case addContext(VoiceLine)
   /// Replaces any armed timer; when it elapses the bridge sends `silenceElapsed`.
   case armSilenceTimer(seconds: Int)
+  /// Cancels the armed silence timer: the timeout that would replace it is off.
+  case cancelSilenceTimer
   /// Replaces any armed window; when it elapses the bridge sends `resultWindowElapsed`.
   case armResultWindow(seconds: Int)
   /// Replaces any armed grace; when it elapses the bridge sends `graceElapsed`.
@@ -148,15 +150,12 @@ public struct CallMachine: Sendable {
   /// The next finished reply is the handoff's acknowledgement, which says no result.
   private var isAckUnfinished = false
   /// A line that arrived opened this line, and neither the owner nor the voice has spoken on it
-  /// yet: its silence is `firstWordSeconds`.
+  /// yet: its silence is `timeouts.firstWord`.
   private var isAwaitingFirstWord = false
-  /// Local voice detection hears sound; the timer then allows `noiseCapSeconds`.
+  /// Local voice detection hears sound; the timer then allows `timeouts.noise`.
   private var isSoundOn = false
-  public static let silenceSeconds = 20
-  /// How long a line a result opened waits for the first word before it closes and the result
-  /// chimes (ADR 0001 (n)).
-  public static let firstWordSeconds = 5
-  public static let noiseCapSeconds = 90
+  /// The line's timers, which Settings holds.
+  public var timeouts = Timeouts()
   /// How long after the latest handoff the line stays open for its result. Billed.
   public static let resultWindowSeconds = 120
   /// How long everyone must have been silent before a held result is said.
@@ -164,12 +163,32 @@ public struct CallMachine: Sendable {
 
   public init() {}
 
+  /// How long quiet lasts before the line closes, in seconds; 0 switches that timer off.
+  public struct Timeouts: Equatable, Sendable {
+    /// Silence since the last speech, recognised words or reply.
+    public var silence: Int
+    /// A line a result opened, until the owner or the voice speaks on it: then the line closes
+    /// and the result chimes (ADR 0001 (n)).
+    public var firstWord: Int
+    /// Sound the voice detection hears that gives no recognised words.
+    public var noise: Int
+    /// What Settings offers.
+    public static let range = 0...300
+
+    public init(silence: Int = 20, firstWord: Int = 5, noise: Int = 90) {
+      self.silence = silence
+      self.firstWord = firstWord
+      self.noise = noise
+    }
+  }
+
   /// Silence is counted from the last speech, recognised words or reply; while sound goes on
-  /// without words, the line still closes after `noiseCapSeconds`.
+  /// without words, the line closes after the noise timeout instead.
   private mutating func armSilence() -> CallEffect {
     isSilenceDue = false
-    let quiet = isAwaitingFirstWord ? Self.firstWordSeconds : Self.silenceSeconds
-    return .armSilenceTimer(seconds: isSoundOn ? Self.noiseCapSeconds : quiet)
+    let quiet = isAwaitingFirstWord ? timeouts.firstWord : timeouts.silence
+    let seconds = isSoundOn ? timeouts.noise : quiet
+    return seconds > 0 ? .armSilenceTimer(seconds: seconds) : .cancelSilenceTimer
   }
 
   /// The grace before a held result is said, once neither the owner nor the voice is speaking.

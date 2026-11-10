@@ -26,11 +26,16 @@ public struct Settings: Codable, Sendable, Equatable {
   /// Check GitHub for a newer release once a day; nil leaves it to the build, on for a release
   /// build and off for one from source (`UpdatePolicy.checksAutomatically`).
   public var checkUpdatesAutomatically: Bool?
+  /// The line's timers in seconds, 0 switching one off (`CallMachine.Timeouts`); Settings keeps
+  /// each in `Timeouts.range`.
+  public var silenceSeconds: Int
+  public var firstWordSeconds: Int
+  public var noiseSeconds: Int
 
   public init(
     voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
     notifyResults: Bool = true, confirmHandoffs: Bool = true, prompt: String = "",
-    checkUpdatesAutomatically: Bool? = nil
+    checkUpdatesAutomatically: Bool? = nil, timeouts: CallMachine.Timeouts = .init()
   ) {
     self.voice = voice
     self.pauseSyncWhileStopped = pauseSyncWhileStopped
@@ -39,6 +44,13 @@ public struct Settings: Codable, Sendable, Equatable {
     self.confirmHandoffs = confirmHandoffs
     self.prompt = prompt
     self.checkUpdatesAutomatically = checkUpdatesAutomatically
+    silenceSeconds = timeouts.silence
+    firstWordSeconds = timeouts.firstWord
+    noiseSeconds = timeouts.noise
+  }
+
+  public var timeouts: CallMachine.Timeouts {
+    .init(silence: silenceSeconds, firstWord: firstWordSeconds, noise: noiseSeconds)
   }
 
   /// The key of the setting this one replaced.
@@ -64,6 +76,12 @@ public struct Settings: Codable, Sendable, Equatable {
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     checkUpdatesAutomatically = try container.decodeIfPresent(
       Bool.self, forKey: .checkUpdatesAutomatically)
+    let defaults = CallMachine.Timeouts()
+    silenceSeconds =
+      try container.decodeIfPresent(Int.self, forKey: .silenceSeconds) ?? defaults.silence
+    firstWordSeconds =
+      try container.decodeIfPresent(Int.self, forKey: .firstWordSeconds) ?? defaults.firstWord
+    noiseSeconds = try container.decodeIfPresent(Int.self, forKey: .noiseSeconds) ?? defaults.noise
   }
 }
 

@@ -21,6 +21,8 @@ public actor Bridge: Router {
   private let pausesSync: @Sendable () -> Bool
   /// A session's first summary is loaded under the pause too (`Settings.loadContextOnFirstCall`).
   private let loadsContextOnFirstCall: @Sendable () -> Bool
+  /// Settings' timers for the line, read before each event.
+  private let timeouts: @Sendable () -> CallMachine.Timeouts
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -73,6 +75,7 @@ public actor Bridge: Router {
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false },
+    timeouts: @escaping @Sendable () -> CallMachine.Timeouts = { .init() },
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool, appVersion: AppVersion?
   ) {
     self.appVersion = appVersion
@@ -80,6 +83,7 @@ public actor Bridge: Router {
     self.notifies = notifies
     self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
+    self.timeouts = timeouts
     self.loadsContextOnFirstCall = loadsContextOnFirstCall
     self.registry = registry
     makeRealtime = realtime
@@ -296,6 +300,7 @@ public actor Bridge: Router {
 
   private func send(_ event: CallEvent) async {
     let before = machine.phase
+    machine.timeouts = timeouts()
     let effects = machine.handle(event)
     let now = time.now  // read before any await, so an interleaved event cannot shift it
     if before != .live, machine.phase == .live { await meter.opened(at: now) }
@@ -327,6 +332,9 @@ public actor Bridge: Router {
     case .addContext(let line): try? await realtime?.addContext(line.text)
     case .speak(let line): try? await realtime?.speak(line.text)
     case .armSilenceTimer(let seconds): arm(.silence, after: .seconds(seconds))
+    case .cancelSilenceTimer:
+      timers[.silence]?.cancel()
+      timers[.silence] = nil
     case .armResultWindow(let seconds): arm(.resultWindow, after: .seconds(seconds))
     case .armGrace(let milliseconds): arm(.grace, after: .milliseconds(milliseconds))
     case .chime:
