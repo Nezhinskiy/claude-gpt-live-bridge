@@ -305,3 +305,46 @@ move one finished toggle into **Line**, which its spec already expects.
 - Automatic transport choice (default TCP, or switching on measured loss): raised by the
   altitude seat, but auto-detection needs `getStats` in a release build, which the no-telemetry
   promise rules out, and default TCP is the owner's settled "UDP stays the default".
+
+## Re-review at `b1f4b2e` (merged as `fe34ff5`), 2026-11-10
+
+The owner merged PR #79 at 17:04 UTC, before this re-review ran; it checks the merged code.
+**Verdict: the fixes hold; nothing blocks.** CI on the PR was green (`check`, CodeQL ×3,
+documents-only), and all 703 BridgeCore tests pass on `fe34ff5` locally.
+
+- **F6 took design (b).** `CallEvent.reconnect` now only changes the transport: it keeps
+  `awaited`, `unheard`, `isSoundOn` and the silence and first-word state, clears the cut-off
+  reply's state, and emits one `reopenRealtime(preroll: isSoundOn)`. `Bridge` closes the line, then
+  opens only if `phase == .connecting && connecting == nil` (`Bridge.swift:321-327`). That
+  removes F1's window at its root and F2, F4 and F8 by not resetting state.
+- **F8's pre-roll, by reading `preroll.js`:** `closePeer` clears the catch-up queue and stops
+  holding, so frames from the close onward fill the 2 s ring, which `makeOffer(true)` drains into
+  the new line. What the owner says during the close reaches the new line, and nothing is sent
+  twice. Words older than 2 s in a long close are lost, which is acceptable.
+- **F3, F11, F12, F13:** the docs, the caption, the confirmation and the known limitations now say
+  "prefers", "can still fall back to UDP" and "port 443 in the answers seen". The measurement is
+  attributed to the removal experiment. **F5:** `onTcp` is in `CallStats`, inside its `#if DEBUG`.
+  **F9:** both guards are pinned. **F14:** done.
+
+Mutations on `fe34ff5` (BridgeTests and CallMachineTests):
+
+| Mutation | Result |
+|---|---|
+| drop `machine.phase == .connecting` from the reopen guard | red (`aTargetChangeDuringTheReconnectOpensNoLine`) |
+| keep the cut-off reply's growing words | red (`aReconnectDropsTheCutOffWords`) |
+| reopen without the pre-roll | red (table row) |
+| drop `(.connecting, .resultWindowElapsed)` | red (table row) |
+| keep `replyCanSay` / `isVoiceSpeaking` / `isAckUnfinished` | red |
+| drop `connecting == nil` from the reopen guard | **green** |
+| drop `&& phase == .live` from the result window's close | **green** |
+
+Low, left as follow-ups and not required:
+- **R1.** `connecting == nil` (`Bridge.swift:323`) is untested. It matters when a second
+  reconnect lands during the first one's close. Without it both would open, and the first attempt
+  would be orphaned. Each reconnect needs its own confirmation, so this is unlikely.
+- **R2.** `&& phase == .live` (`CallMachine.swift:304`) is untested. Without it, a result window
+  that ends during a reconnect with silence already due closes the line instead of reopening it
+  and closing it 20 s later. Both behaviours are defensible.
+- **R3.** `aStopDuringTheReconnectOpensNoLine` stays green with the phase guard removed, because
+  the Stop is stopped elsewhere in the open path. The guard is pinned only by the target-change
+  test.
