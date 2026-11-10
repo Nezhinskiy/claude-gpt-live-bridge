@@ -344,6 +344,27 @@ struct BridgeTests {
     #expect(await test.voice.opens.count == 1)
   }
 
+  /// A second reconnect while the first still closes the old line: the second one's line is the
+  /// only one, so the first, once its close ends with that line still opening, opens none beside
+  /// it.
+  @Test func aSecondReconnectDuringTheFirstOpensOneLine() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    await test.audio.holdClose()
+    async let first: Void = test.bridge.reconnect()
+    #expect(await eventually { await test.audio.closeWaiting == 1 })
+    await test.voice.holdOpen()
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.voice.openWaiting == 1 })
+    await test.audio.releaseClose()
+    _ = await first
+    await test.voice.releaseOpen()
+    #expect(await eventually { await test.audio.answers.count == 2 })
+    try await Task.sleep(for: .milliseconds(100))  // a line opened beside it would be there by now
+    #expect(await test.voice.opens.count == 2)
+    #expect(await test.bridge.status.call == .live)
+  }
+
   /// A reconnect while the line is still opening replaces that attempt: one line, one answer.
   @Test func aReconnectDuringAnOpenOpensOneLine() async throws {
     let test = try BridgeTests()

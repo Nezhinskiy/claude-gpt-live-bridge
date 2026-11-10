@@ -440,6 +440,11 @@ struct CallMachineTests {
       "theResultWindowEndsWhileReconnecting",
       waiting + [.reconnect, .resultWindowElapsed, .connected], .silenceElapsed, .listening,
       [.closeRealtime]),
+    // with the silence already due, the window ending mid-reconnect lets the new line open;
+    // its own silence closes it
+    row(
+      "theResultWindowEndingWhileReconnectingClosesNothing",
+      waiting + [.silenceElapsed, .reconnect], .resultWindowElapsed, .connecting, []),
     // the cut-off reply never finishes, so it holds back no result on the new line
     row(
       "aReplyCutOffByAReconnectDoesNotHoldTheResult",
