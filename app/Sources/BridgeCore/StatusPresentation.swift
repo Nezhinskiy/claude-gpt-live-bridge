@@ -2,7 +2,8 @@
 /// the bars' shape, this badge and the broken deck carry it.
 public enum Badge: Sendable, Equatable {
   case none
-  /// A session is working on a request: a turning ring.
+  /// A session is working on a request while the call is on: a turning ring. A stopped call shows
+  /// none, so the menu bar stays still; the session's row still says Claude is working.
   case working
   /// A session waits for the owner's approval: a pulsing diamond.
   case approval
@@ -46,7 +47,7 @@ public struct StatusPresentation: Sendable, Equatable {
   public static let joinCommand = "/live"
 
   /// A problem outranks everything; then a session waiting for approval, results the owner has
-  /// not heard, and a session at work.
+  /// not heard, and a session at work during a call.
   public init(_ s: StatusReply) {
     let activities = Set(s.sessions.map(\.activity))
     bars = s.call
@@ -55,7 +56,7 @@ public struct StatusPresentation: Sendable, Equatable {
     badge =
       if s.problem != nil { .problem } else if activities.contains(.approval) {
         .approval
-      } else if s.unheard > 0 { .unheard } else if activities.contains(.working) {
+      } else if s.unheard > 0 { .unheard } else if activities.contains(.working) && s.call != .off {
         .working
       } else { .none }
     tint =

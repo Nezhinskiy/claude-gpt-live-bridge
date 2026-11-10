@@ -588,7 +588,7 @@ sesión.
   solicitud de permiso esperando. El guardián integrado de Claude Code se carga en un equipo con
   ajustes administrados y en una sesión iniciada con un plan Team o Enterprise, y ahí los hooks de
   permisos del mod no se ejecutan. La solicitud sigue apareciendo en Claude Code y sigue
-  esperándote, pero la voz no dice nada de ella y la barra de menús muestra a Claude trabajando,
+  esperándote, pero la voz no dice nada de ella y el menú muestra a Claude trabajando,
   así que mira Claude Code si una respuesta parece tardar. `/plugin` nombra los hooks, y las
   versiones recientes de Claude Code también imprimen una línea que dice que un hook se omitió.
   Las preguntas de Claude siguen llegando a la voz. Los hooks se

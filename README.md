@@ -582,7 +582,7 @@ can become a request that Claude runs under the session's own permission mode.
   prompt is waiting. Claude Code's built-in guard loads on a machine with managed settings and in
   a session signed in to a Team or Enterprise plan, and there the mod's permission hooks do not
   run. The prompt still appears in Claude Code and still waits for you, but the voice says nothing
-  about it and the menu bar shows Claude working, so look at Claude Code if an answer seems late.
+  about it and the menu shows Claude working, so look at Claude Code if an answer seems late.
   `/plugin` names the hooks, and recent versions of Claude Code also print a line saying a hook
   was skipped. Claude's questions still reach the voice. The hooks were
   [measured](docs/adr/0001-platform-findings.md) in a Linux container; what the voice and the menu
