@@ -37,7 +37,7 @@ responde Claude, así que puedes alternar entre hablar y escribir.
 
 *El texto en inglés es el canónico ([README.md](../../README.md)); esta traducción puede ir por detrás.*
 
-**Una conversación, no un dictado.** GPT-Live escucha mientras habla: interrúmpelo y se detiene para oírte; piensa en voz alta y puede soltar un breve «ajá». **Dejas de pagar por el silencio:** OpenAI cobra la voz por minuto, así que tras 20 segundos de silencio la línea se cierra y se abre de nuevo cuando hablas, con la conversación donde la dejaste ([Facturación](#facturación-bajo-control-por-diseño)).
+**Una conversación, no un dictado.** GPT-Live escucha mientras habla: interrúmpelo y se detiene para oírte; piensa en voz alta y puede soltar un breve «ajá». **Dejas de pagar por el silencio:** OpenAI cobra la voz por minuto, así que tras un rato de silencio que fijas en [Ajustes](#ajustes) la línea se cierra y se abre de nuevo cuando hablas, con la conversación donde la dejaste ([Facturación](#facturación-bajo-control-por-diseño)).
 
 <p align="center"><img src="../assets/readme-demo.gif" alt="Hablando con una sesión de Claude Code a través de LiveBridge" width="100%"></p>
 
@@ -306,13 +306,29 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 
 ### Ajustes
 
-**Settings…** abre la ventana Settings de LiveBridge:
+**Settings…** abre la ventana Settings de LiveBridge, en dos pestañas. **Voice** reúne lo que oyes
+durante una llamada:
 
 - **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir la
   ventana, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
 - **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
   hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
+- **Silence before the line closes** (20 segundos por defecto), **Wait for a first word on a line
+  a result opened** (5 segundos) y **Sound without words before the line closes** (90 segundos):
+  cuánto tiempo mantiene abierta la línea cada tipo de silencio, de 0 a 300 segundos. 0 desactiva
+  ese temporizador; con los tres en 0 la línea sigue abierta hasta que pulsas Stop, facturada todo
+  ese tiempo ([Facturación](#facturación-bajo-control-por-diseño)). Un silencio corto cierra la línea
+  dentro de las pausas normales, y cada reapertura tarda unos segundos antes de que la voz responda,
+  así que Settings avisa por debajo de 10 segundos; lo mismo hace con el sonido sin palabras, pues tu
+  habla cuenta como tal hasta que se reconoce. Un cambio se aplica a partir de las siguientes palabras.
+- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
+  la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
+  de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
+  resultado en espera suena de todos modos.
+
+**General** reúne el resto:
+
 - **Pause sync while the call is stopped** (desactivado por defecto): por defecto, lo que escribes
   en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
   la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
@@ -331,10 +347,6 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   conversation**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
   pausaste, y va a OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
   Desactivado, bajo la pausa solo **Load context** carga un resumen.
-- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
-  la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
-  de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
-  resultado en espera suena de todos modos.
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
@@ -398,12 +410,12 @@ permiso:
   Mientras está silenciado, LiveBridge no tiene el micrófono, y el indicador de micrófono de macOS lo muestra.
 - Cuando empiezas a hablar, se abre la línea. Los 2 segundos anteriores a que empezaras se
   conservan y se envían primero, para que no se pierdan tus primeras palabras.
-- La línea se cierra tras 20 segundos de silencio. El sonido sin palabras (música, una tele) la
-  cierra tras 90 segundos.
+- La línea se cierra tras un rato de silencio, y el sonido sin palabras (música, una tele) la cierra
+  tras uno más largo. [Ajustes](#ajustes) fija ambos; en 0, ninguno la cierra.
 - Cuando la voz pasa una petición a Claude (un traspaso), la línea permanece abierta hasta 2 minutos
   después de ese traspaso, facturada como cualquier línea abierta, y la respuesta de Claude pasa a
   la voz para que la diga cuando nadie esté hablando. Un traspaso posterior reinicia los 2 minutos;
-  un intercambio que no envía nada a Claude se cierra tras los 20 segundos habituales de silencio.
+  un intercambio que no envía nada a Claude se cierra tras el silencio habitual.
 - La respuesta de Claude a una petición que le diste a la sesión con la que hablas, una pregunta que
   Claude te hace en ella o una solicitud de permiso que espera vuelve a abrir la línea si llega con
   la línea cerrada, y se da a la voz para que la diga, con el coste de cualquier línea abierta. Todo
@@ -546,10 +558,10 @@ sesión.
   pasar a la voz con tus siguientes palabras, o suena un timbre cuando se cierra la línea.
 - Cuando la respuesta de Claude vuelve a abrir la línea, la voz puede quedarse callada: ocurrió en 4
   de 14 ejecuciones medidas, una muestra pequeña ([ADR 0001
-  (n)](../../docs/adr/0001-platform-findings.md)). La línea se cierra entonces 5 segundos después de
-  conectarse, y la respuesta suena con un timbre y queda en espera, como abajo. Cuando la voz habló,
-  empezó en unos 2 segundos tras la conexión; una voz que empezara después de esos 5 segundos queda
-  cortada.
+  (n)](../../docs/adr/0001-platform-findings.md)). La línea se cierra entonces cuando
+  termina su espera de una primera palabra ([Ajustes](#ajustes)), y la respuesta suena con un timbre y
+  queda en espera, como abajo. Cuando la voz habló, empezó en unos 2 segundos tras la conexión; una
+  voz que empezara después de esa espera queda cortada.
 - Cuando tus siguientes palabras reabren la línea, a veces la voz responde solo a ellas y no dice el
   resultado en espera. El resultado no se pierde: sigue esperando, suena un timbre y publica una
   notificación cuando se cierra la línea, y vuelve a pasar a la voz la próxima vez que se abre la

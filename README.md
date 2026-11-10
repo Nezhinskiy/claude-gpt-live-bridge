@@ -35,8 +35,9 @@ answers, so you can switch between speaking and typing.
 
 **A conversation, not dictation.** GPT-Live listens while it talks: cut in and it stops and hears you
 out, think out loud and it can drop in a quick "mm-hmm". **You stop paying for silence:** OpenAI
-prices voice by the minute, so after 20 seconds of quiet the line closes, and it opens again when you
-speak, with the conversation where you left it ([Billing](#billing-aware-by-design)).
+prices voice by the minute, so after a stretch of quiet you set in [Settings](#settings) the line
+closes, and it opens again when you speak, with the conversation where you left it
+([Billing](#billing-aware-by-design)).
 
 - **Claude's turns go to the work.** Ask "what did you mean?" or "what is the risk with B?" and
   the voice is told to answer it from the conversation it shares with the session, so the
@@ -319,13 +320,29 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 ### Settings
 
-**Settings…** opens LiveBridge's Settings window:
+**Settings…** opens LiveBridge's Settings window, in two tabs. **Voice** holds what you hear
+during a call:
 
 - **Voice**: one of the realtime voices your codex offers, which codex lists when the window
   opens, or **Codex default**. It is heard from the next time the line opens.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
+- **Silence before the line closes** (20 seconds by default), **Wait for a first word on a line
+  a result opened** (5 seconds) and **Sound without words before the line closes** (90 seconds):
+  how long each kind of quiet keeps an open line, from 0 to 300 seconds. 0 switches that one off;
+  with all three at 0 the line stays open until you press Stop, billed all the while
+  ([Billing](#billing-aware-by-design)). A short silence closes the line inside ordinary pauses,
+  and each reopening takes a few seconds before the voice answers, so Settings warns below 10
+  seconds; so it does for sound without words, which your speech counts as until it is
+  recognised. A change applies from the next words.
+- **Play sounds for requests and answers** (on by default): a short sound for each request the voice
+  hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
+  that reaches an open or opening line while nobody is speaking. The chime for a result that waits
+  plays either way.
+
+**General** holds the rest:
+
 - **Pause sync while the call is stopped** (off by default): by default, what you type in a joined
   session and Claude's final answer to it are kept in that session's conversation with the voice
   even while the call is stopped, and the voice has them when the next line opens. Nothing leaves
@@ -343,10 +360,6 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   is written from the whole transcript, so it carries what you paused, and it goes to OpenAI. Once
   a session has a summary, the pause governs what follows. With this off, only **Load context**
   loads a summary under the pause.
-- **Play sounds for requests and answers** (on by default): a short sound for each request the voice
-  hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
-  that reaches an open or opening line while nobody is speaking. The chime for a result that waits
-  plays either way.
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
   speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
@@ -403,12 +416,12 @@ a question Claude asks you, or that Claude waits for your approval:
   While muted, LiveBridge holds no microphone, and macOS's microphone indicator shows that.
 - When you start speaking, the line opens. The 2 seconds before you started are kept and sent
   first, so your first words are not lost.
-- The line closes after 20 seconds of silence. Sound without words (music, a TV) closes it after
-  90 seconds.
+- The line closes after a stretch of silence, and sound without words (music, a TV) closes it after
+  a longer one. [Settings](#settings) sets both; at 0, neither closes it.
 - When the voice hands a request to Claude (a handoff), the line stays open for up to 2 minutes
   after that handoff, billed like any open line, and Claude's answer goes to the voice to say once
   nobody is talking. A later handoff starts the 2 minutes again; an exchange that sends nothing to
-  Claude closes after the usual 20 seconds of silence.
+  Claude closes after the usual silence.
 - Claude's answer to a request you handed the session you are talking to, a question Claude asks you
   there, or a permission prompt it waits on opens the line again when it comes after the line
   closed, and is given to the voice to say, billed like any open line. Anything else that arrives
@@ -543,10 +556,10 @@ can become a request that Claude runs under the session's own permission mode.
   few seconds. If it does not, the result stays unheard: it goes to the voice again with your next
   words, or it chimes when the line closes.
 - When Claude's answer opens the line again, the voice can stay silent: it did in 4 of 14 measured
-  runs, a small sample ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). The line then closes 5
-  seconds after it connects, and the answer chimes and waits, as below. Where the voice spoke, it
-  started within about 2 seconds of the connect; one that would start after the 5 seconds is cut
-  off.
+  runs, a small sample ([ADR 0001 (n)](docs/adr/0001-platform-findings.md)). The line then closes
+  once its wait for a first word ends ([Settings](#settings)), and the answer chimes and waits, as
+  below. Where the voice spoke, it started within about 2 seconds of the connect; one that would
+  start after the wait is cut off.
 - When your next words reopen the line, the voice sometimes answers only them and does not say
   the waiting result. The result is not lost: it stays waiting, chimes and posts a notification
   when the line closes, and goes to the voice again the next time the line opens.
