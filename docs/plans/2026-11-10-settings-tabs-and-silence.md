@@ -67,7 +67,7 @@ test `SettingsTests.swift`.
 **Files:** `SettingsView.swift`, `UpdateSection.swift`, `App.swift`. No test: no rule lives here.
 
 - [ ] `TabView` of **Voice** (Voice, Prompt, Line, Sounds) and **General** (Sync, Notifications,
-      General, Updates); a `settingsTab` on the model, set to General by a notice's Install.
+      Login, Updates); a `settingsTab` on the model, set to General by a notice's Install.
 - [ ] Three `TextField(value:format:)` with a `Stepper`, clamped to `Timeouts.range`, the warnings
       and the billing caption.
 

@@ -2467,6 +2467,20 @@ struct BridgeTests {
     #expect(await eventually { await bridge.status.call == .listening })
   }
 
+  /// A silence turned back on while the line is quiet starts counting from the change.
+  @Test func aSilenceTurnedOnClosesAQuietLine() async throws {
+    timeouts.withLock { $0.silence = 0 }
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    #expect(await eventually { await bridge.status.call == .live })
+    timeouts.withLock { $0.silence = 7 }
+    await bridge.timeoutsChanged()
+    let closing = time.now + 7
+    #expect(await eventually { time.deadlines.contains(closing) })
+    time.advance(by: .seconds(7))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
   /// With the silence at 0, quiet never closes the line.
   @Test func aSilenceOfZeroKeepsTheLineOpen() async throws {
     timeouts.withLock { $0.silence = 0 }

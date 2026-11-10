@@ -77,7 +77,7 @@ public actor Bridge: Router {
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false },
-    timeouts: @escaping @Sendable () -> CallMachine.Timeouts = { .init() },
+    timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
     connectsOverTCP: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
   ) {
@@ -224,6 +224,11 @@ public actor Bridge: Router {
   /// closes and opens again at once, over the new transport. With no line, the next one takes it.
   public func reconnect() async {
     await send(.reconnect)
+  }
+
+  /// Settings changed one of the line's timers: one turned on starts on a quiet open line.
+  public func timeoutsChanged() async {
+    await send(.timeoutsChanged)
   }
 
   /// Forgets the target's conversation; its next realtime session starts fresh.

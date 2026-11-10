@@ -67,6 +67,8 @@ public enum CallEvent: Equatable, Sendable {
   case conversationChanged
   /// The owner changed how the line connects (Settings' Connect over TCP) and chose Reconnect.
   case reconnect
+  /// The owner changed one of the line's timers in Settings.
+  case timeoutsChanged
   /// A line of a turn that is not a voice request (`.typed` or `.claude`): the voice is given it
   /// as context, not delivered to be said. It chimes and opens nothing.
   case synced(VoiceLine)
@@ -116,7 +118,7 @@ public enum CallEffect: Equatable, Sendable {
 /// Pure: the bridge runs the effects.
 public struct CallMachine: Sendable {
   public static let noise = Problem.other(
-    "The voice hung up: the microphone heard sound but no words for 90 seconds.")
+    "The voice hung up: the microphone heard sound but no words for as long as Settings allows.")
   public private(set) var phase: CallPhase = .off
   /// The owner released the microphone: no speech opens the line, but a line that arrived does.
   public private(set) var isMuted = false
@@ -159,6 +161,8 @@ public struct CallMachine: Sendable {
   private var isAwaitingFirstWord = false
   /// Local voice detection hears sound; the timer then allows `timeouts.noise`.
   private var isSoundOn = false
+  /// A silence timer is counting: armed, and neither elapsed nor cancelled since.
+  private var isSilenceArmed = false
   /// The line's timers, which Settings holds.
   public var timeouts = Timeouts()
   /// How long after the latest handoff the line stays open for its result. Billed.
@@ -173,12 +177,18 @@ public struct CallMachine: Sendable {
     /// Silence since the last speech, recognised words or reply.
     public var silence: Int
     /// A line a result opened, until the owner or the voice speaks on it: then the line closes
-    /// and the result chimes (ADR 0001 (n)).
+    /// and the result chimes (ADR 0001 (n)). 0 waits `silence` instead, so a line that opened while
+    /// the owner was away stays open for good only with the silence off too.
     public var firstWord: Int
     /// Sound the voice detection hears that gives no recognised words.
     public var noise: Int
     /// What Settings offers.
     public static let range = 0...300
+
+    /// `seconds` as Settings keeps it: the nearer end of `range` when outside it.
+    public static func clamped(_ seconds: Int) -> Int {
+      min(max(seconds, range.lowerBound), range.upperBound)
+    }
 
     public init(silence: Int = 20, firstWord: Int = 5, noise: Int = 90) {
       self.silence = silence
@@ -191,9 +201,11 @@ public struct CallMachine: Sendable {
   /// without words, the line closes after the noise timeout instead.
   private mutating func armSilence() -> CallEffect {
     isSilenceDue = false
-    let quiet = isAwaitingFirstWord ? timeouts.firstWord : timeouts.silence
+    let firstWord = timeouts.firstWord > 0 ? timeouts.firstWord : timeouts.silence
+    let quiet = isAwaitingFirstWord ? firstWord : timeouts.silence
     let seconds = isSoundOn ? timeouts.noise : quiet
-    return seconds > 0 ? .armSilenceTimer(seconds: seconds) : .cancelSilenceTimer
+    isSilenceArmed = seconds > 0
+    return isSilenceArmed ? .armSilenceTimer(seconds: seconds) : .cancelSilenceTimer
   }
 
   /// The grace before a held result is said, once neither the owner nor the voice is speaking.
@@ -331,7 +343,13 @@ public struct CallMachine: Sendable {
       isAckUnfinished = false
       replyCanSay = nil
       return [.reopenRealtime(preroll: isSoundOn)]
+    case (.live, .timeoutsChanged):
+      // a timer turned on starts now; one already counting is not moved
+      guard !isSilenceArmed, !isSilenceDue else { return [] }
+      let arm = armSilence()
+      return isSilenceArmed ? [arm] : []
     case (.live, .silenceElapsed):
+      isSilenceArmed = false
       if !awaited.isEmpty, !isSoundOn {
         isSilenceDue = true
         return []
@@ -400,6 +418,7 @@ public struct CallMachine: Sendable {
       awaited = []
       unheard = withoutHolds
       isSilenceDue = false
+      isSilenceArmed = false
       isVoiceSpeaking = false
       isAckUnfinished = false
       replyCanSay = nil

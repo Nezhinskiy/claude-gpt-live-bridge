@@ -478,11 +478,36 @@ struct CallMachineTests {
     #expect(last(Self.connecting + [.connected], Self.set).contains(.armSilenceTimer(seconds: 33)))
   }
 
+  /// A first-word wait of 0 waits as long as the ordinary silence, so a line a result opened while
+  /// the owner is away never stays open for good unless the silence is off too.
+  @Test func aFirstWordWaitOfZeroWaitsTheSilence() {
+    let opened = [.start, Self.opening(Self.result), .connected]
+    let timeouts = CallMachine.Timeouts(silence: 20, firstWord: 0)
+    #expect(last(opened, timeouts).contains(.armSilenceTimer(seconds: 20)))
+  }
+
+  /// A timer turned on while an open line is quiet and nothing counts starts at once.
+  @Test func aTimerTurnedOnOnAQuietLineStarts() {
+    var machine = CallMachine()
+    machine.timeouts = .init(silence: 0)
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 30)
+    #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 30)])
+  }
+
+  /// A change never moves a timer already counting.
+  @Test func aChangeLeavesATimerThatCounts() {
+    var machine = CallMachine()
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 30)
+    #expect(machine.handle(.timeoutsChanged) == [])
+  }
+
   /// 0 switches a timer off: the one armed before is cancelled, and none takes its place.
   @Test(
     arguments: [
       (live, CallMachine.Timeouts(silence: 0)),
-      ([.start, opening(result), .connected], CallMachine.Timeouts(firstWord: 0)),
+      ([.start, opening(result), .connected], CallMachine.Timeouts(silence: 0, firstWord: 0)),
       (connecting + [.connected], CallMachine.Timeouts(noise: 0)),
     ] as [([CallEvent], CallMachine.Timeouts)])
   func zeroSwitchesATimerOff(_ events: [CallEvent], _ timeouts: CallMachine.Timeouts) {

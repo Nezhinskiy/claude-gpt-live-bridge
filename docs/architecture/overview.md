@@ -262,7 +262,9 @@ sequenceDiagram
 
 The realtime session is billed while open, so silence closes it. How long each quiet lasts is the
 owner's: `CallMachine.Timeouts`, from Settings ([README](../../README.md#settings) has the
-defaults), read before each event, a timeout of 0 arming no timer. Voice detection keeps running
+defaults), read before each event. A timeout of 0 cancels the armed timer and arms none, except a
+first-word wait of 0, which waits the silence. A change in Settings arms a timer turned on at once
+when the line is quiet and none counts (`timeoutsChanged`); one already counting is not moved. Voice detection keeps running
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
