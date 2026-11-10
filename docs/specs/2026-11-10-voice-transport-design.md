@@ -77,8 +77,10 @@ offer is unchanged: it lists the same local candidates either way.
 ## Not verified without a real call
 
 - That a line with the setting on connects over TCP in the shipped code path, not only in the
-  debug experiment. Check: one call with the setting on, read in a debug build's call statistics
-  (PR #72) or Safari's Web Inspector which candidate pair is selected.
+  debug experiment. Check: one call with the setting on in a debug build with `--call-stats`,
+  whose loss figures show whether packets are still lost. It does not record the selected
+  candidate pair; the experiment read it with a local, debug-only addition (`onTcp`, from the
+  `transport` stats' selected pair), which would have to be added again for this check.
 - The UDP fallback when the answer has a TCP candidate but no TCP pair connects. Check: one call
   with outbound TCP to port 443 blocked by a temporary `pf` rule for the media server's address;
   the line should connect over UDP, maybe after a few seconds. The page gives up after 10 s.
