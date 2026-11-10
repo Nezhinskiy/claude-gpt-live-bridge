@@ -10,15 +10,17 @@ Method: `superpowers:requesting-code-review` (one independent reviewer given the
 findings), `simplify` (reuse, simplification, efficiency and altitude, one reviewer each, report
 only), `security-review` (on the proposed design; the diff itself is prose, which that skill's rules
 exclude). Every finding below was checked against the code or the types by the author of this file;
-a reviewer's suggestion that did not survive is listed as declined, with the reason.
+a reviewer's suggestion that did not survive is listed as declined, with the reason. The
+independent reviewer found F1 to F4, F9 and F13 on its own, and added F20 to F23.
 
 Spec line numbers are of the spec at `85a67e1`.
 
 ## Verdict
 
 **Not ready to plan from.** One blocker: the spec records a fallback between models that the owner's
-decision, as relayed to this review, rules out (F1). Four gaps in the wait would each surface as a
-bug in the first build (F2 to F5). The rest is accuracy, simplification and documentation. The
+decision, as relayed to this review, rules out (F1). Three gaps in the wait would each surface as a
+bug in the first build (F2 to F4), two more need a sentence each (F20, F21), and the evidence for
+the limits leaves out the number that matters most (F5). The rest is accuracy, simplification and documentation. The
 registration in `trail.toml` and `roadmap.md` is correct.
 
 What is good: the spec checks itself against the engine's types and says what it did not verify;
@@ -29,6 +31,8 @@ and every paid run wait for the owner.
 
 ## Findings, most severe first
 
+Numbered in the order found; the table is in order of severity.
+
 | # | Severity | Where (spec) | In short |
 |---|---|---|---|
 | F1 | Blocker | 28-29, 46-51, 82-83, 150-153, 208-242, 359-360 | A fallback to Sonnet 5.5 contradicts "no fallback between models" |
@@ -36,11 +40,13 @@ and every paid run wait for the owner.
 | F3 | Important | 99-101, 266 | A result during Start's loading opens a line today; the spec assumes it only chimes |
 | F4 | Important | 262 | A summary that lands before `.start` is lost to the machine; the wait runs to its limit |
 | F5 | Important | 292-297, 333-337 | The evidence leaves out the measured end-to-end time, which puts the line limit in doubt |
-| F6 | Medium | 336-339, 363-370 | Pinned ids may fail on Bedrock, Vertex and Foundry; no README limitation says so |
+| F6 | Medium | 336-339, 363-370 | Pinned ids map to the provider's ids since 2.1.200; where a provider lacks the model, no README line says so |
 | F7 | Medium | 67-79, 155, 213-216 | The check refuses a working model on a passing overload; the result drops the error kind |
 | F8 | Medium | 352-361 | Security understates the check's spoofing and leaves out `model.complete` hooks |
 | F9 | Medium | 99 | "Start does nothing (`connecting` is set)" is untrue in the spec's own design |
 | F10 | Medium | 253 | Wait rule 3 (3 s hand-over) repeats the registry's 5 s drop and the limit |
+| F20 | Medium | 254-257 | A stale summary's post ends the wait and, by rule 4, disarms every later wait in the call |
+| F21 | Medium | 170-172, 262 | Whether Start asks a session on an older mod is unsaid; if it does, Start costs a fork |
 | F11 | Low | 157, 164-166 | `StatusReply.isLoadingContext` has almost no reader |
 | F12 | Low | 174-176 | `$.model.fork` is kept as a second summary path for an older app alone |
 | F13 | Low | 282-283 | The ICE caveat is moot: the page uses no ICE server |
@@ -49,7 +55,9 @@ and every paid run wait for the owner.
 | F16 | Low | 313-317, 153 | Model names from the socket reach the log and Settings unchecked |
 | F17 | Low | 363-370 | The documents list misses four places |
 | F18 | Low | 99-102, 104-110 | A target change during a later line's wait drops what was said; unstated |
-| F19 | Low | 235-236, 241, 257 | Three small accuracy points for the builder |
+| F19 | Low | 235-236, 241 | Two small accuracy points for the builder |
+| F22 | Low | 301-305 | A 200 ms tick also reads the session's registry file and follows its title |
+| F23 | Low | 120-121 | No answer for a floor run that finds `complete`'s options missing on 2.1.301 |
 
 ### F1. Blocker: the fallback contradicts the owner's decision as relayed
 
@@ -100,7 +108,9 @@ whenever its conversation has a line of the owner's (`Bridge.swift:547-551`), th
 second call. The voice would then speak before the context is in, which the owner's decision rules
 out. The spec must state the new machine rule (in `.listening` while loading, a delivery appends
 and chimes) and its test. Whether the owner prefers that, or the result's line to open at once,
-is question O3 below.
+is question O3 below. If it only chimes, the spec should also say whether `.contextSettled` opens
+the line for a result that would have opened it, so the owner who walked away still hears the answer
+once the context is in.
 
 ### F4. Important: a summary that lands before `.start` is lost to the machine
 
@@ -126,14 +136,21 @@ the later line's limit (at most 15 s) passes on most lines, so the later-line wa
 should cite the end-to-end figure next to the estimate, and say what happens if Sonnet low is near
 20 s: then the default and the limits go back to the owner before the wait is built, not after.
 
-### F6. Medium: pinned ids on Bedrock, Vertex and Foundry need a README limitation
+### F6. Medium: what a pinned id does on Bedrock, Vertex and Foundry, and the README line it needs
 
-The spec notes that a pinned first-party id "can fail" off the first-party API and that the default
-then fails too (337-339). Today's fork works on any provider, so on those providers this change can
-turn a working summary into none after an update. The owner confirmed pinned ids (36-38), so this
-is not a reopening, but the README's known limitations and the CHANGELOG line (370) must say it, and
-the documents list (363-370) does not include the limitation. Whether `claude-sonnet-5-5` resolves on
-those providers is unverified; the builder can check Claude Code's model-configuration documents.
+The spec says a pinned first-party id "can fail" off the first-party API, and the default with it
+(337-339). Claude Code's documents say more (code.claude.com, `amazon-bedrock` and `model-config`,
+read 2026-11-10 through Context7): since 2.1.200, an Anthropic model id passed as `--model` is
+mapped to the provider's built-in id, to an inference profile found at startup, or to the
+`modelOverrides` setting; before 2.1.200 it went to Bedrock as written. The README's floor is
+2.1.301, and `complete` resolves "like a `--model` value". So `claude-sonnet-5-5` should resolve on
+those providers where they offer Sonnet 5.5 and the organisation allows it, and fail where they do
+not. Unverified on a real provider; the spec should state the rule, not "can fail".
+
+Today's fork works wherever the session works, so where the provider lacks the pinned model, an
+update turns a working summary into none. The owner confirmed pinned ids (36-38), so this is not a
+reopening, but the README's known limitations and the CHANGELOG line (370) must say it, and the
+documents list (363-370) does not include it.
 
 ### F7. Medium: the check conflates a passing overload with a bad model
 
@@ -186,8 +203,10 @@ Rule 3 ends the wait when `GET /v1/next` has not handed over the ask within 3 s 
 that stops polling is dropped after 5 s, which ends the wait (257; `SessionRegistry.swift:58`), and
 a session that polls hands the ask over within one poll (`SessionRegistry.poll`, 160-186: a reply
 or a queued request goes first, one per poll, 0.2 s each for the target). So rule 3 saves at most 2 s
-in a case the drop already ends, at the cost of a second timer and its tests. Drop it, or say what
-case it covers that the drop and the limit do not.
+in a case the drop already ends, at the cost of a second timer and its tests. It also has nothing to
+read today: `wantsContext` is a flag that `poll` clears without recording when
+(`SessionRegistry.swift:80`, 184-185), so rule 3 needs new registry state the spec does not name.
+Drop it, or name that state and the case the drop and the limit do not cover.
 
 ### F11. Low: `StatusReply.isLoadingContext` has almost no reader
 
@@ -241,7 +260,11 @@ Besides those at 363-370:
   output out;
 - `plugin/types/index.d.ts` `BandStatus`, if `isLoadingContext` stays (F11);
 - `plugin/hooks/wire.ts:1-9`, the route list in the header, gains `POST /v1/model-check`;
-- `docs/architecture/overview.md`'s route table (around line 195) gains the same route.
+- `docs/architecture/overview.md`'s route table (around line 195) gains the same route;
+- the doc comment on `Bridge.context(_:)` (`Bridge.swift:703-707`), "the mod never sends one" of an
+  empty summary, which a `writesSummaries` mod now does.
+
+And the README sentence named as "line 44" (365) is at line 45.
 
 ### F18. Low: a target change during a later line's wait drops what was said
 
@@ -249,15 +272,48 @@ A new target cancels the attempt (`Bridge.swift:27-29`), and `closePeer` clears 
 (`audio.js` `closePeer`, `line.clear()`), so words said to the old target during its wait are lost.
 That is today's behaviour while a line connects, now for up to 15 s longer. Say it in the spec.
 
-### F19. Low: three small accuracy points
+### F19. Low: small accuracy points
 
 - 235-236, "since `context` is still nil": the next line asks because `needsContext` holds
   (`Bridge.swift:385-388`), which also covers a session with an older summary and a gap.
 - 241 and `register.tsx` `contextAsked`: a second ask with a different model joins the summary on
   its way (`sending ??=`), which the first model writes. Harmless; say that a change of model takes
   effect at the next ask that finds none in flight.
-- 257, "ends at the first `POST /v1/context` ... whatever it carries": `Bridge.context(_:)` returns
-  early for a stale ask (`Bridge.swift:715`); the wait's end must come before that guard.
+- 215-216: an unknown model sits under `model-refused` (the engine rejects) in one row and a bad id
+  under `api-error` in the next. Which one an unknown id gives is unverified; say so, as the spec does
+  for a refusal.
+
+### F20. Medium: a stale summary's post ends the wait and disarms the rest of the call
+
+The wait ends at "the first `POST /v1/context` from that session, whatever it carries" (257). A
+summary asked for before a gap or a forget is ignored (`Bridge.context(_:)` returns at the
+`takeSummaryAsk` guard, `Bridge.swift:715`; `Continuity.swift:134-136`), yet it would still end the
+wait, and rule 4 (254-255) would then count the session as having ended a wait with no summary, so
+no later line in that call waits, although the next ask would succeed. The spec should say whether
+an ignored post ends the wait (it should not, or the limit decides), and that only a post with no
+summary, or a `failure`, counts for rule 4. The wait's end must sit before the guard either way.
+
+### F21. Medium: whether Start asks a session on an older mod is unsaid
+
+Today only a line that opens asks (`Bridge.swift:426-428`); the spec moves an ask to the press
+(262). It says no wait applies to an older mod (170-172), not whether the press asks it. If it does,
+pressing Start on an older mod's session costs a fork on the session's own model and effort, Opus
+5.5 at High for the owner, before anyone speaks and even if nobody does. Say that the press asks
+only a session whose mod said `writesSummaries`, and that an older mod's line asks as today.
+
+### F22. Low: a 200 ms tick costs more than a round trip and a band write
+
+Every tick also runs `follow`, which reads the session's id and its record in the registry file
+for the title (`register.tsx:241-247`, called at 274), and writes the band through `update` (281).
+At 200 ms that is five file reads a second for the whole call. The spec should count it, and have a
+fast tick skip `follow` (a title can follow at the 1 s cadence) as well as an unchanged band.
+
+### F23. Low: no answer for a floor run that finds `complete`'s options missing
+
+The calls are checked against 2.1.319 only; the floor run on 2.1.301 "is what will check these
+calls there" (120-121). If `complete` lacks `system`, `effort`, `timeoutMs` or `signal` on 2.1.301,
+the README's floor must rise, which is the owner's call (O6). Name that now, and run the floor
+check in the plan's first step that calls `complete`.
 
 ## Simplification and redundancy
 
@@ -327,15 +383,21 @@ O5. **Если Sonnet 5.5 на low окажется близко к нынешн
 21,4 с от запроса до ответа): ждать ли столько при каждом первом Start сессии, или выбрать другую
 модель по умолчанию до того, как строить ожидание?
 
+O6. **Нижняя версия Claude Code.** Если на 2.1.301 у `$.model.complete` не окажется нужных
+параметров (`effort`, `timeoutMs`, `system`), можно ли поднять минимальную версию в README до той,
+где они есть?
+
 ### Points a builder can settle
 
 - F2: the machine records Mute and Unmute while loading and emits no microphone effect.
 - F4: `.start` knows whether the context is already settled.
+- F20: which posts end a wait, and which count for rule 4.
+- F21: the press asks only a `writesSummaries` mod.
+- F22: a fast tick skips `follow` and an unchanged band.
 - F7: carry `error` on the check's result and on `failure`.
 - F9, F10, F11, F13, F15, F19: as each finding says.
 - F14: build the transcript from `messages({ as: "api" })` or say why not.
 - F16: check model names from the socket.
-- The floor: `$.model.complete` with `system`, `effort` and `timeoutMs` is checked here against
-  2.1.319 only; the floor run on 2.1.301 should run in the step that first calls it, not at the end.
+- F23: the floor run on 2.1.301 runs in the first step that calls `complete`.
 - Wire: `Work.context` gains associated values in `Wire.swift`, so every `switch` on `Work` changes;
   the fixture list at 159-161 already names the new examples.
