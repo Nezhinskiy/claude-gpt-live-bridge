@@ -65,9 +65,14 @@ struct SettingsView: View {
               + "reopening takes a few seconds.")
         }
         seconds("Wait for a first word on a line a result opened", \.firstWordSeconds)
+        if (1...3).contains(model.settings.current.firstWordSeconds) {
+          warning(
+            "The voice often starts about 2 seconds after the line connects, so it can be cut off.")
+        }
         Text(
-          "A line opened by Claude's answer or question waits this long for you or the voice to "
-            + "speak; then it closes, and the result chimes."
+          "A line opened by Claude's answer, question or approval notice waits this long for you or "
+            + "the voice to speak; then it closes, and the result chimes. 0 waits as long as the "
+            + "silence."
         )
         .font(.caption).foregroundStyle(.secondary)
         seconds("Sound without words before the line closes", \.noiseSeconds)
@@ -78,7 +83,8 @@ struct SettingsView: View {
         }
         Text(
           "Seconds, from 0 to 300; 0 never closes the line for that. The line is billed by the "
-            + "minute while it is open, silence included. A change applies from the next words."
+            + "minute while it is open, silence included. A timer turned on starts on a quiet "
+            + "line at once; one already counting keeps its time."
         )
         .font(.caption).foregroundStyle(.secondary)
         Toggle(
@@ -138,16 +144,14 @@ struct SettingsView: View {
         Text("With the chime, a notification names the session; it never shows the result.")
           .font(.caption).foregroundStyle(.secondary)
         if model.settings.current.notifyResults, model.notificationsDenied {
-          Label(Notifier.deniedSentence, systemImage: "exclamationmark.triangle.fill")
-            .font(.caption).symbolRenderingMode(.multicolor)
+          warning(Notifier.deniedSentence)
           Button("Open Notifications Settings") { NSWorkspace.shared.open(Notifier.settingsURL) }
         }
       }
       Section("Login") {
         Toggle("Open at login", isOn: $model.openAtLogin)
         if let problem = model.loginProblem {
-          Label(problem, systemImage: "exclamationmark.triangle.fill")
-            .font(.caption).symbolRenderingMode(.multicolor)
+          warning(problem)
         }
       }
       UpdateSection(model: model)
@@ -168,13 +172,10 @@ struct SettingsView: View {
   private func seconds(
     _ title: String, _ key: WritableKeyPath<BridgeCore.Settings, Int>
   ) -> some View {
-    let range = CallMachine.Timeouts.range
     let value = Binding {
       model.settings.current[keyPath: key]
-    } set: { typed in
-      model.settings.update {
-        $0[keyPath: key] = min(max(typed, range.lowerBound), range.upperBound)
-      }
+    } set: {
+      model.setTimeout(key, $0)
     }
     return LabeledContent(title) {
       HStack(spacing: 4) {
@@ -182,7 +183,10 @@ struct SettingsView: View {
           .labelsHidden()
           .multilineTextAlignment(.trailing)
           .frame(width: 48)
-        Stepper(title, value: value, in: range).labelsHidden()
+          .accessibilityValue("\(value.wrappedValue) seconds")
+        Stepper(title, value: value, in: CallMachine.Timeouts.range)
+          .labelsHidden()
+          .accessibilityLabel("Change \(title.lowercased())")
         Text("s").foregroundStyle(.secondary).accessibilityHidden(true)
       }
     }

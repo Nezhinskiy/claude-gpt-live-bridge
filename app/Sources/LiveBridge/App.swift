@@ -363,6 +363,12 @@ final class AppModel {
     return true
   }
 
+  /// One of Settings' timers for the line, kept in range; one turned on starts on a quiet open line.
+  func setTimeout(_ key: WritableKeyPath<BridgeCore.Settings, Int>, _ seconds: Int) {
+    settings.update { $0[keyPath: key] = CallMachine.Timeouts.clamped(seconds) }
+    Task { await bridge?.timeoutsChanged() }
+  }
+
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
 
   /// The session row's ×, once the owner confirms it; the menu has closed by then.
