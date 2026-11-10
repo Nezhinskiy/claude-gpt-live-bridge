@@ -2,7 +2,8 @@
 # Builds, installs and removes LiveBridge.app (built from the SwiftPM package in app/).
 #
 #   scripts/build-app.sh                          debug build: app/.build/app/LiveBridge.app, ad hoc
-#   scripts/build-app.sh --run [--fake-mic WAV]   debug build, quit its running copy, open it
+#   scripts/build-app.sh --run [--fake-mic WAV] [--call-stats]
+#                                                 debug build, quit its running copy, open it
 #   scripts/build-app.sh --release                release build, signed, installed in
 #                                                 /Applications and opened; run it again to upgrade
 #   scripts/build-app.sh --make-signing-identity  create a self-signed code-signing certificate,
@@ -18,7 +19,10 @@
 # "Developer ID Application", or a SHA-1 hash. The app and the image are then signed with it and
 # a secure timestamp, as notarization (scripts/notarize.sh) needs; LIVEBRIDGE_SIGN_KEYCHAIN, when
 # set, is the one keychain searched for it. LIVEBRIDGE_DIST names another folder than dist/.
-# --fake-mic (debug builds only) plays WAV as the microphone. If CFFIXED_USER_HOME is set, the
+# --fake-mic (debug builds only) plays WAV as the microphone. --call-stats (debug builds only)
+# writes the incoming voice's numbers once a second to one CSV per call, under the app's data
+# folder in debug/call-stats, and prints its path when started from a terminal. CONTRIBUTING.md
+# says how to read the numbers, and what they cannot tell. If CFFIXED_USER_HOME is set, the
 # app keeps its files under that directory instead of your home folder. The disk image is
 # dragged to /Applications too, so --uninstall removes either install; LIVEBRIDGE_APPLICATIONS
 # names another folder for it (the uninstall test's scratch one).
@@ -31,7 +35,7 @@ IDENTITY="LiveBridge Local Signing"
 INSTALLED="${LIVEBRIDGE_APPLICATIONS:-/Applications}/LiveBridge.app"
 
 usage() {
-  sed -n '4,15s/^# \{0,1\}//p' "$0" >&2
+  sed -n '4,16s/^# \{0,1\}//p' "$0" >&2
   exit 2
 }
 
@@ -111,12 +115,20 @@ debug() {
   shift
   quit "$app"
   if [ "${1:-}" = --fake-mic ] && [ -n "${2:-}" ]; then
-    set -- --fake-mic "$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+    wav="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+    shift 2
+    set -- --fake-mic "$wav" "$@"
   fi
+  # What --call-stats prints reaches this terminal only through open's --stdout.
+  terminal=
+  case " $* " in
+    *" --call-stats "*) terminal=$(tty 2>/dev/null) || terminal= ;;
+  esac
   if [ -n "${CFFIXED_USER_HOME:-}" ]; then
-    open -n --env "CFFIXED_USER_HOME=$CFFIXED_USER_HOME" "$app" --args "$@"
+    open -n --env "CFFIXED_USER_HOME=$CFFIXED_USER_HOME" ${terminal:+--stdout "$terminal"} \
+      "$app" --args "$@"
   else
-    open -n "$app" --args "$@"
+    open -n ${terminal:+--stdout "$terminal"} "$app" --args "$@"
   fi
 }
 

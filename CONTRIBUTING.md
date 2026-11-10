@@ -116,6 +116,9 @@ pinned by hash. To change the floor, change that line, set the same version in t
 `package.json` and run `npm install --package-lock-only` there; `check.sh` fails until every copy
 says the same.
 
+A pull request that changes only documents (`scripts/ci-documents-only.sh` lists them) skips both
+runs and counts as passed; a change to a comment in code does not. Every push to `main` runs them.
+
 The end-to-end smoke test drives the real codex and spends your ChatGPT plan's realtime voice;
 the header of `scripts/smoke.sh` says how much and what a pass is:
 
@@ -194,6 +197,7 @@ The Apple Developer Program's account holder does this; nothing of it is in the 
 ```sh
 scripts/build-app.sh --run                      # debug build, then open it
 scripts/build-app.sh --run --fake-mic say.wav   # the WAV plays as the microphone
+scripts/build-app.sh --run --call-stats         # the voice's numbers, one CSV per call
 CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of your home
 /usr/bin/log stream --info --predicate 'subsystem == "com.getlivebridge.livebridge"'
 ```
@@ -201,6 +205,32 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 `claude --plugin-dir plugin` loads the mod from the working tree. The mod follows
 `CFFIXED_USER_HOME` to the socket as the app does, so `CFFIXED_USER_HOME=/tmp/lb claude
 --plugin-dir plugin` talks to the app started with the same variable.
+
+### Reading `--call-stats`
+
+For when the voice breaks up: was it the network? While a line is open, a debug build started
+with `--call-stats` adds a row once a second to a CSV in
+`~/Library/Application Support/LiveBridge/debug/call-stats/`, one file per call. Started from a
+terminal, it prints the file's path there. It holds the time and numbers from WebKit's
+`getStats()` only: no audio, no transcript, no session names, and nothing leaves the Mac. A release
+build compiles all of this out; `scripts/tests/release-guards.test.sh` looks for its names.
+
+Only one copy of the app can hold the bridge's socket, and the mod of a joined session reopens
+`/Applications/LiveBridge.app` when it cannot reach it. So with an installed copy running, start
+the debug build first and then quit the installed copy: the debug build waits up to 10 s for the
+socket. The other way round, the installed copy comes back and takes the socket, the call goes
+through it, and no file is written.
+
+Note the time of the glitch and find its row. `line` changes when the line reopens, and the
+counters restart with it. All columns but `jitter` are running totals, so compare a row with the
+one before, and ignore a line's first row, where concealment is only start-up.
+
+- `packetsLost` jumping at that moment points to the network.
+- `packetsDiscarded`, `jitter`, or `concealedSamples` minus `silentConcealedSamples` rising without
+  loss means audio arrived late or not at all: the network or the server, which these numbers
+  cannot separate.
+- Clean numbers rule out delivery of the incoming audio. That leaves what the server generated and
+  the local audio output (Bluetooth, echo cancellation), which these numbers cannot separate either.
 
 ## Conventions
 

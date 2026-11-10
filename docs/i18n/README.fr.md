@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/16502"><img src="https://www.bestpractices.dev/projects/16502/badge" alt="OpenSSF Best Practices"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence : MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plateforme : macOS 14+ sur Apple Silicon">
 </p>
@@ -615,7 +616,7 @@ session.
   demande de permission attend. Le garde intégré de Claude Code se charge sur une machine dotée de
   réglages gérés et dans une session connectée à une offre Team ou Enterprise, et là, les hooks de
   permission du mod ne s'exécutent pas. La demande apparaît toujours dans Claude Code et vous
-  attend toujours, mais la voix n'en dit rien et la barre de menus montre Claude au travail :
+  attend toujours, mais la voix n'en dit rien et le menu montre Claude au travail :
   regardez donc Claude Code si une réponse semble tarder. `/plugin` nomme les hooks, et les
   versions récentes de Claude Code affichent aussi une ligne indiquant qu'un hook a été ignoré.
   Les questions de Claude parviennent toujours à la voix. Les hooks ont été

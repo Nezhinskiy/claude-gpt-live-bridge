@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/16502"><img src="https://www.bestpractices.dev/projects/16502/badge" alt="OpenSSF Best Practices"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licencia: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Plataforma: macOS 14+ en Apple Silicon">
 </p>
@@ -587,7 +588,7 @@ sesión.
   solicitud de permiso esperando. El guardián integrado de Claude Code se carga en un equipo con
   ajustes administrados y en una sesión iniciada con un plan Team o Enterprise, y ahí los hooks de
   permisos del mod no se ejecutan. La solicitud sigue apareciendo en Claude Code y sigue
-  esperándote, pero la voz no dice nada de ella y la barra de menús muestra a Claude trabajando,
+  esperándote, pero la voz no dice nada de ella y el menú muestra a Claude trabajando,
   así que mira Claude Code si una respuesta parece tardar. `/plugin` nombra los hooks, y las
   versiones recientes de Claude Code también imprimen una línea que dice que un hook se omitió.
   Las preguntas de Claude siguen llegando a la voz. Los hooks se

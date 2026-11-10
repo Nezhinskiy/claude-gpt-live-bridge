@@ -126,7 +126,7 @@ final class StatusGlyph {
     self.level = 0.6 * self.level + 0.4 * level  // a little smoothing between level messages
     let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     let moves =
-      !reduce && badge != .problem && (phase != .off || [.working, .approval].contains(badge))
+      !reduce && badge != .problem && (phase != .off || badge == .approval)
     if moves, timer == nil {
       let timer = Timer(timeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
         MainActor.assumeIsolated { self?.draw(still: false) }

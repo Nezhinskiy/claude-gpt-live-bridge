@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/16502"><img src="https://www.bestpractices.dev/projects/16502/badge" alt="OpenSSF Best Practices"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Лицензия: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Платформа: macOS 14+ на Apple Silicon">
 </p>
@@ -572,7 +573,7 @@ Sigstore за корнем доверия, под вашими собствен�
   разрешения. Встроенная защита Claude Code загружается на компьютере с управляемыми настройками и
   в сессии, где выполнен вход с планом Team или Enterprise, и там хуки разрешений мода не
   выполняются. Запрос по-прежнему появляется в Claude Code и ждёт вас, но голос о нём ничего не
-  говорит, а строка меню показывает, что Claude работает, поэтому загляните в Claude Code, если
+  говорит, а меню показывает, что Claude работает, поэтому загляните в Claude Code, если
   ответ задерживается. `/plugin` называет эти хуки, а свежие версии Claude Code ещё и выводят
   строку о том, что хук пропущен. Вопросы Claude по-прежнему доходят до голоса. Хуки
   [измерены](../../docs/adr/0001-platform-findings.md) в контейнере Linux; то, что делают голос и строка

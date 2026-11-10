@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/16502"><img src="https://www.bestpractices.dev/projects/16502/badge" alt="OpenSSF Best Practices"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="लाइसेंस: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="प्लेटफ़ॉर्म: Apple Silicon पर macOS 14+">
 </p>
@@ -558,7 +559,7 @@ Uninstall करने से वे सब हट जाती हैं। mod
   कि कोई permission prompt इंतज़ार कर रहा है। Claude Code का built-in guard managed settings वाली
   machine पर और Team या Enterprise plan से sign in की गई session में load होता है, और वहाँ mod के
   permission hooks नहीं चलते। Prompt फिर भी Claude Code में दिखता है और आपका इंतज़ार करता है,
-  लेकिन voice उसके बारे में कुछ नहीं कहता और menu bar दिखाता है कि Claude काम कर रहा है, इसलिए अगर
+  लेकिन voice उसके बारे में कुछ नहीं कहता और menu दिखाता है कि Claude काम कर रहा है, इसलिए अगर
   जवाब में देर लगे तो Claude Code देखें। `/plugin` उन hooks के नाम बताता है, और Claude Code के हाल
   के versions एक line भी दिखाते हैं कि hook छोड़ दिया गया। Claude के सवाल फिर भी voice तक पहुँचते
   हैं। Hooks को एक Linux container में [मापा गया](../../docs/adr/0001-platform-findings.md); voice और

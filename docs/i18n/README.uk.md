@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml"><img src="https://github.com/getLiveBridge/LiveBridge/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/getLiveBridge/LiveBridge"><img src="https://api.scorecard.dev/projects/github.com/getLiveBridge/LiveBridge/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/16502"><img src="https://www.bestpractices.dev/projects/16502/badge" alt="OpenSSF Best Practices"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Ліцензія: MIT"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%C2%B7%20Apple%20Silicon-lightgrey.svg" alt="Платформа: macOS 14+ на Apple Silicon">
 </p>
@@ -572,7 +573,7 @@ GitHub, а `gh` ще й до Sigstore по корінь довіри, під в�
   дозволу. Вбудований захист Claude Code завантажується на комп'ютері з керованими налаштуваннями
   та в сесії, де виконано вхід із планом Team або Enterprise, і там хуки дозволів мода не
   виконуються. Запит і далі з'являється в Claude Code і чекає на вас, але голос про нього нічого
-  не каже, а рядок меню показує, що Claude працює, тож зазирніть у Claude Code, якщо відповідь
+  не каже, а меню показує, що Claude працює, тож зазирніть у Claude Code, якщо відповідь
   затримується. `/plugin` називає ці хуки, а свіжі версії Claude Code ще й виводять рядок про те,
   що хук пропущено. Запитання Claude і далі доходять до голосу. Хуки
   [виміряно](../../docs/adr/0001-platform-findings.md) у контейнері Linux; те, що роблять голос і рядок
