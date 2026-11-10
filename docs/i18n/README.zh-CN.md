@@ -310,7 +310,7 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
   语音只是提到了结果，也可能被算作已听取。
 - 在由组织管理 Claude Code 的环境中，LiveBridge 不会告诉你有权限提示正在等待。Claude Code 的内置防护会在有托管设置的机器上，
   以及用 Team 或 Enterprise 套餐登录的会话中加载，此时模组的权限 hooks 不会运行。提示仍会出现在 Claude Code 中并等待你回应，
-  但语音不会提到它，菜单栏也只显示 Claude 正在工作，所以如果答复迟迟不来，请查看 Claude Code。`/plugin` 会列出这些 hooks，
+  但语音不会提到它，菜单也只显示 Claude 正在工作，所以如果答复迟迟不来，请查看 Claude Code。`/plugin` 会列出这些 hooks，
   较新版本的 Claude Code 还会打印一行文字说明某个 hook 被跳过。Claude 提出的问题仍会传到语音。这些 hooks 是在 Linux 容器中[实测](../../docs/adr/0001-platform-findings.md)的；
   语音和菜单栏的表现是从代码推断的，没有运行真实线路。Team 和 Enterprise 的情况来自 Claude Code 的文档。
 - 如果托管设置中有 `allowManagedHooksOnly`、`allowManagedModsOnly` 或 `disableAllHooks`，模组不会加载，`/live` 也无法使用。

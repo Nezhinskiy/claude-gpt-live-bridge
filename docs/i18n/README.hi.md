@@ -559,7 +559,7 @@ Uninstall करने से वे सब हट जाती हैं। mod
   कि कोई permission prompt इंतज़ार कर रहा है। Claude Code का built-in guard managed settings वाली
   machine पर और Team या Enterprise plan से sign in की गई session में load होता है, और वहाँ mod के
   permission hooks नहीं चलते। Prompt फिर भी Claude Code में दिखता है और आपका इंतज़ार करता है,
-  लेकिन voice उसके बारे में कुछ नहीं कहता और menu bar दिखाता है कि Claude काम कर रहा है, इसलिए अगर
+  लेकिन voice उसके बारे में कुछ नहीं कहता और menu दिखाता है कि Claude काम कर रहा है, इसलिए अगर
   जवाब में देर लगे तो Claude Code देखें। `/plugin` उन hooks के नाम बताता है, और Claude Code के हाल
   के versions एक line भी दिखाते हैं कि hook छोड़ दिया गया। Claude के सवाल फिर भी voice तक पहुँचते
   हैं। Hooks को एक Linux container में [मापा गया](../../docs/adr/0001-platform-findings.md); voice और

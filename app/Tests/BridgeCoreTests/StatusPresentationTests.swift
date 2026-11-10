@@ -35,7 +35,9 @@ struct StatusPresentationTests {
       #expect(shown.headline == headline)
       #expect(shown.action == action)
       #expect(shown.muteAction == muteAction)
-      let badge: Badge = [.idle: .none, .working: .working, .approval: .approval][activity]!
+      let badge: Badge =
+        phase == .off && activity == .working
+        ? .none : [.idle: .none, .working: .working, .approval: .approval][activity]!
       #expect(shown.badge == badge, "\(phase) \(activity)")
       #expect(shown.tint == (activity == .approval ? .attention : tint), "\(phase) \(activity)")
       #expect(shown.badge != .problem)
@@ -78,6 +80,13 @@ struct StatusPresentationTests {
     #expect(shown.badge == .problem)
     #expect(shown.tint == .problem)
     #expect(shown.accessibilityLabel.contains(sentence))
+  }
+
+  @Test func aStoppedCallShowsNoTurningRing() {
+    let shown = StatusPresentation(Self.status(.off, other: .working))
+    #expect(shown.badge == .none)
+    #expect(shown.rows[1].detail == "Claude working")
+    #expect(StatusPresentation(Self.status(.off, other: .approval)).badge == .approval)
   }
 
   @Test func unheardOutranksWorkingNotApproval() {
