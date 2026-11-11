@@ -27,8 +27,11 @@ All notable changes to this project are listed here. The format follows
 - The Settings window has two tabs: **Voice** (the voice, the prompt, the line's timers and the
   sounds) and **General** (sync, notifications, Open at login and updates).
 
-- While the call is stopped, the menu bar icon no longer turns its ring for a session where Claude
-  is working; the session's row in the menu still says so. A waiting approval still shows.
+- While Claude works, the menu bar icon shows three dots that light up one after another, for
+  thinking, in place of a turning ring, which read as loading; the session's row in the menu shows
+  an ellipsis in place of turning arrows.
+- While the call is stopped, the menu bar icon no longer shows that a session's Claude is working;
+  the session's row in the menu still says so. A waiting approval still shows.
 
 ## [0.5.0]
 

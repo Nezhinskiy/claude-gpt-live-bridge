@@ -44,8 +44,9 @@ enum SpanGlyph {
     }
   }
 
-  /// One frame; `t` turns the working ring and pulses the approval diamond.
-  static func image(heights: [CGFloat], badge: Badge, faded: Bool, t: Double) -> NSImage {
+  /// One frame; `t` runs the working dots and pulses the approval diamond, and nil is the still
+  /// frame used when motion is reduced.
+  static func image(heights: [CGFloat], badge: Badge, faded: Bool, t: Double?) -> NSImage {
     let image = NSImage(size: size, flipped: true) { _ in
       NSColor.black.withAlphaComponent(faded ? 0.5 : 1).setFill()
       let broken = badge == .problem
@@ -71,18 +72,17 @@ enum SpanGlyph {
     return image
   }
 
-  private static func drawBadge(_ badge: Badge, t: Double) {
+  private static func drawBadge(_ badge: Badge, t: Double?) {
+    let still = t == nil
+    let t = t ?? 0
     switch badge {
     case .none: break
-    case .working:  // a three-quarter ring that turns once a second
-      let ring = NSBezierPath()
-      let turn = t.truncatingRemainder(dividingBy: 1) * 360
-      ring.appendArc(
-        withCenter: NSPoint(x: 12, y: 4.4), radius: 2.8, startAngle: turn - 90,
-        endAngle: turn + 180)
-      ring.lineWidth = 1.6
-      ring.lineCapStyle = .round
-      ring.stroke()
+    case .working:  // three dots that brighten one after another, an ellipsis: Claude thinking
+      for i in 0..<3 {
+        NSColor.black.withAlphaComponent(still ? 1 : dotAlpha(i, t: t)).setFill()
+        NSBezierPath(ovalIn: NSRect(x: 7.6 + 3.2 * Double(i), y: 3.2, width: 2.4, height: 2.4))
+          .fill()
+      }
     case .approval:  // a diamond with an exclamation mark cut out, pulsing
       NSColor.black.withAlphaComponent(0.65 + 0.35 * cos(t * 2 * .pi)).setFill()
       let diamond = NSBezierPath()
@@ -105,6 +105,11 @@ enum SpanGlyph {
       NSBezierPath(ovalIn: NSRect(x: 10.8, y: 13.7, width: 2.4, height: 2.4)).fill()
     }
   }
+
+  /// Dot `i`'s opacity at `t`: a wave that crosses the three dots left to right every 1.2 s.
+  private static func dotAlpha(_ i: Int, t: Double) -> CGFloat {
+    0.3 + 0.7 * (0.5 + 0.5 * cos(2 * .pi * (t / 1.2 - Double(i) / 3)))
+  }
 }
 
 /// Keeps the menu bar image current: still frames for still states, 12 frames a second while
@@ -113,7 +118,7 @@ enum SpanGlyph {
 @MainActor @Observable
 final class StatusGlyph {
   private(set) var image = SpanGlyph.image(
-    heights: SpanGlyph.off, badge: .none, faded: true, t: 0)
+    heights: SpanGlyph.off, badge: .none, faded: true, t: nil)
   @ObservationIgnored private var phase = CallPhase.off
   @ObservationIgnored private var badge = Badge.none
   @ObservationIgnored private var level = 0.0
@@ -143,6 +148,7 @@ final class StatusGlyph {
   private func draw(still: Bool) {
     let t = Date().timeIntervalSince(started)
     let heights = SpanGlyph.heights(phase, t: still ? nil : t, level: level)
-    image = SpanGlyph.image(heights: heights, badge: badge, faded: phase == .off, t: still ? 0 : t)
+    image = SpanGlyph.image(
+      heights: heights, badge: badge, faded: phase == .off, t: still ? nil : t)
   }
 }
