@@ -1,7 +1,7 @@
 # Settings in a toolbar, Quick Settings, Feedback & Support, and a debug mode
 
-Status: proposed, 2026-11-11. Nothing here is built; product code waits for the owner's approval of
-this document and of its plan.
+Status: approved, 2026-11-11; the plan is
+[`plans/2026-11-11-settings-toolbar-and-menus.md`](../plans/2026-11-11-settings-toolbar-and-menus.md).
 
 ## Why
 
@@ -105,7 +105,7 @@ Debug Files** button, and Feedback & Support's **Debug Mode** item.
   a second of the numbers WebKit's `getStats()` gives for the incoming voice (packets lost and
   discarded, jitter, concealed samples, whether the line runs over TCP), one CSV per call, in
   `~/Library/Application Support/LiveBridge/debug/call-stats/`. Nothing else: no audio, no
-  transcript, no session names. Turned on during a call, it records from the next line that opens.
+  transcript, no session names. Turned on during a call, it records the open line from that moment.
 - **Off**, nothing is recorded, and a line recording stops at once. Files already written stay
   until the owner deletes them.
 - **Show Debug Files** opens that folder in the Finder, creating it if it is missing.
@@ -127,9 +127,9 @@ Debug Files** button, and Feedback & Support's **Debug Mode** item.
   (`setConnectsOverTCP`, `setNotifyResults`, `settings.update`), so the confirmation, the permission
   request and the reconnect stay in one place.
 - **The recorder.** `CallStatsRecorder`, `CallStats` and the page's statistics script leave
-  `#if DEBUG`. The page script is installed in every build and starts its once-a-second reading only
-  when the app tells it a line opened with debug mode on; turning the setting off stops it and
-  closes the file.
+  `#if DEBUG`. The page script is installed in every build, and its once-a-second reading does
+  nothing until the app switches it on; the app switches it to the setting when the page loads and
+  whenever the setting changes, and turning it off also closes the file.
 - **The release guard.** `scripts/tests/release-guards.test.sh` looks for `getStats`, `packetsLost`
   and `callStats` in the release binary and its audio page, because "`--call-stats` exists in debug
   builds only, because the README promises no telemetry". The promise is about data leaving the Mac,
