@@ -147,7 +147,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
       case .toggle(let toggle, let isOn):
         let item = native("toggle|\(toggle)", used: &used) {
-          NSMenuItem(title: toggle.title, action: nil, keyEquivalent: "")
+          let item = NSMenuItem(
+            title: toggle.title, action: #selector(StatusMenu.toggle(_:)), keyEquivalent: "")
+          item.target = self
+          item.representedObject = toggle
+          return item
         }
         item.state = isOn ? .on : .off
         return item
@@ -267,6 +271,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   @objc private func showSettings() { later { [model] in model.showSettings() } }
 
   @objc private func starOnGitHub() { NSWorkspace.shared.open(Release.repositoryPage) }
+
+  /// Flips a Quick Settings switch through the setter its Settings control calls, once the menu
+  /// has closed: Connect over TCP may ask first, and an alert inside menu tracking hangs.
+  @objc private func toggle(_ sender: NSMenuItem) {
+    guard let toggle = sender.representedObject as? MenuContent.Switch else { return }
+    let wasOn = sender.state == .on
+    later { [model] in model.set(toggle, on: !wasOn) }
+  }
 
   @objc private func reportBug() { NSWorkspace.shared.open(Release.bugReportForm) }
 

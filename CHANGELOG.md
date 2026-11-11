@@ -21,11 +21,19 @@ All notable changes to this project are listed here. The format follows
   it while a line is open asks first, then opens the line again over the new transport, still
   waiting for what it was waiting for.
 - A debug build's `--call-stats` records which transport the line took (`onTcp`).
+- The menu's **Quick Settings** submenu holds five of Settings' switches as checkmark items:
+  **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is
+  waiting**, **Pause sync while the call is stopped** and **Load a session's context on its first
+  call**. Each is the setting itself, so a change in the menu or in Settings shows at once in the
+  other, and Connect over TCP asks before reconnecting an open line, as in Settings.
+- The menu's **Feedback & Support** submenu holds **Report a Bug…** (the repository's bug report
+  form), **LiveBridge Website** and **Star LiveBridge on GitHub**.
 
 ### Changed
 
 - The Settings window has two tabs: **Voice** (the voice, the prompt, the line's timers and the
   sounds) and **General** (sync, notifications, Open at login and updates).
+- **Star LiveBridge on GitHub** moved from the menu's foot into **Feedback & Support**.
 
 - While the call is stopped, the menu bar icon no longer turns its ring for a session where Claude
   is working; the session's row in the menu still says so. A waiting approval still shows.

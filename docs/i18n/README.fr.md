@@ -283,9 +283,12 @@ parlez.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
   pour en faire la cible), **Load context**, la **Conversation** de la cible telle que LiveBridge
   la conserve (avec une ligne **Task** pour chaque demande que la voix a transmise à Claude et une ligne **Loaded context** là où un résumé a été chargé), les
-  limites d'utilisation, les minutes, **Star LiveBridge on GitHub** (ouvre la page du dépôt),
-  **Settings…** et
-  **Quit LiveBridge**. Pendant un appel, **Conversation** affiche vos mots et ceux de la voix à mesure
+  limites d'utilisation, les minutes, **Quick Settings** (des éléments à coche pour
+  **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause sync while the call is stopped** et **Load a session's context on its first call**),
+  **Settings…**, **Feedback & Support** (**Report a Bug…** ouvre le formulaire de rapport de bogue
+  du dépôt, **LiveBridge Website** ouvre getlivebridge.com, **Star LiveBridge on GitHub** ouvre la
+  page du dépôt) et **Quit LiveBridge**. Quick Settings est là même quand le menu ne montre que
+  l'appel. Pendant un appel, **Conversation** affiche vos mots et ceux de la voix à mesure
   que codex les transcrit : les vôtres peuvent donc apparaître un instant après que vous les avez dits,
   et ceux de la voix un instant avant que vous les entendiez. Quand chaque phrase est terminée, son
   texte final les remplace. Seul le texte final est conservé : les mots qui l'attendent encore quand la
@@ -321,8 +324,12 @@ parlez.
 
 ### Réglages
 
-**Settings…** ouvre la fenêtre Settings de LiveBridge, en deux onglets. **Voice** regroupe ce que
-vous entendez pendant un appel :
+**Settings…** ouvre la fenêtre Settings de LiveBridge, en deux onglets.
+**Quick Settings**, dans le menu, reprend cinq de ses interrupteurs ([le menu](#la-bande-et-le-menu)) :
+chaque élément est le réglage lui-même, donc un changement à un endroit se voit aussitôt à l'autre,
+et il demande ce que demande l'interrupteur d'ici (Connect over TCP, avant de reconnecter une ligne
+ouverte).
+**Voice** regroupe ce que vous entendez pendant un appel :
 
 - **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
   de la fenêtre, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.

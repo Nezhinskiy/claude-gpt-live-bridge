@@ -363,6 +363,18 @@ final class AppModel {
     return true
   }
 
+  /// A Quick Settings switch, through the setter its Settings control calls, so the confirmation,
+  /// the permission request and the reconnect stay in one place.
+  func set(_ toggle: MenuContent.Switch, on: Bool) {
+    switch toggle {
+    case .connectsOverTCP: _ = setConnectsOverTCP(on)
+    case .notifyResults: setNotifyResults(on)
+    case .confirmHandoffs: settings.update { $0.confirmHandoffs = on }
+    case .pauseSyncWhileStopped: settings.update { $0.pauseSyncWhileStopped = on }
+    case .loadContextOnFirstCall: settings.update { $0.loadContextOnFirstCall = on }
+    }
+  }
+
   /// One of Settings' timers for the line, kept in range; one turned on starts on a quiet open line.
   func setTimeout(_ key: WritableKeyPath<BridgeCore.Settings, Int>, _ seconds: Int) {
     settings.update { $0[keyPath: key] = CallMachine.Timeouts.clamped(seconds) }
