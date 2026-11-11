@@ -336,7 +336,7 @@ jour :
 **Voice** regroupe ce que vous entendez pendant un appel :
 
 - **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
-  de la fenêtre, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.
+  de cet onglet, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.
 - **Prompt** (vide par défaut) : vos propres instructions pour la voix, par exemple « Parle-moi
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine

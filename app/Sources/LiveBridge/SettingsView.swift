@@ -276,7 +276,6 @@ final class SettingsWindow {
     window.styleMask = [.titled, .closable]
     window.toolbarStyle = .preference
     window.isReleasedWhenClosed = false
-    tabs.select(model.settingsTab)
     window.center()
   }
 
@@ -288,7 +287,7 @@ final class SettingsWindow {
 }
 
 /// The window's tabs in its toolbar, one SwiftUI form each. The tab shown follows
-/// `AppModel.settingsTab` both ways, and the window takes the height of the tab shown.
+/// `AppModel.settingsTab` both ways, and AppKit sizes the window to the tab shown.
 @MainActor
 private final class SettingsTabs: NSTabViewController {
   static let title = "LiveBridge Settings"
@@ -300,7 +299,6 @@ private final class SettingsTabs: NSTabViewController {
     tabStyle = .toolbar
     // The window keeps its own title instead of taking the tab's label.
     canPropagateSelectedChildViewControllerTitle = false
-    title = Self.title
     for tab in SettingsTab.allCases {
       let form = NSHostingController(rootView: SettingsView(model: model, tab: tab))
       form.sizingOptions = .preferredContentSize
@@ -315,32 +313,13 @@ private final class SettingsTabs: NSTabViewController {
   required init?(coder: NSCoder) { fatalError("SettingsTabs is built in code") }
 
   func select(_ tab: SettingsTab) {
-    selectedTabViewItemIndex = SettingsTab.allCases.firstIndex(of: tab) ?? 0
+    selectedTabViewItemIndex = SettingsTab.allCases.firstIndex(of: tab)!
   }
 
   override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
     super.tabView(tabView, didSelect: tabViewItem)
-    guard let tabViewItem else { return }
-    let index = tabView.indexOfTabViewItem(tabViewItem)
-    if SettingsTab.allCases.indices.contains(index) {
-      model.settingsTab = SettingsTab.allCases[index]
+    if let tabViewItem {
+      model.settingsTab = SettingsTab.allCases[tabView.indexOfTabViewItem(tabViewItem)]
     }
-    if let form = tabViewItem.viewController { fit(form) }
-  }
-
-  override func preferredContentSizeDidChange(for viewController: NSViewController) {
-    super.preferredContentSizeDidChange(for: viewController)
-    if viewController === tabViewItems[selectedTabViewItemIndex].viewController {
-      fit(viewController)
-    }
-  }
-
-  /// Sizes the window to `form`, keeping its top edge where it is.
-  private func fit(_ form: NSViewController) {
-    let size = form.preferredContentSize
-    guard let window = view.window, size.width > 0, size.height > 0 else { return }
-    var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
-    frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
-    if frame != window.frame { window.setFrame(frame, display: true, animate: window.isVisible) }
   }
 }

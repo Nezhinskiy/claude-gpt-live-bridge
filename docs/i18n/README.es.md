@@ -319,8 +319,8 @@ herramientas. **General** reúne las notificaciones, el inicio de sesión y las 
 
 **Voice** reúne lo que oyes durante una llamada:
 
-- **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir la
-  ventana, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
+- **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir esta
+  pestaña, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
 - **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
   hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.

@@ -303,7 +303,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 **Voice** में वह है जो आप call के दौरान सुनते हैं:
 
-- **Voice**: आपका codex जो realtime voices देता है उनमें से एक, जिनकी सूची codex window खुलने पर
+- **Voice**: आपका codex जो realtime voices देता है उनमें से एक, जिनकी सूची codex यह tab खुलने पर
   देता है, या **Codex default**। यह अगली बार line खुलने से सुनाई देती है।
 - **Prompt** (डिफ़ॉल्ट रूप से खाली): voice के लिए आपके अपने निर्देश, जैसे "मुझसे Spanish में बात
   करो", अधिकतम 2,000 अक्षर। ये LiveBridge के अपने voice नियमों के बाद जोड़े जाते हैं, और दोनों में

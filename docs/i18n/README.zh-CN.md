@@ -216,7 +216,7 @@ claude plugin uninstall livebridge@livebridge
 
 **Voice** 包含通话中你听到的内容：
 
-- **Voice**：你的 codex 提供的实时语音之一（窗口打开时由 codex 列出），或 **Codex default**。从线路下次打开起生效。
+- **Voice**：你的 codex 提供的实时语音之一（此标签页打开时由 codex 列出），或 **Codex default**。从线路下次打开起生效。
 - **Prompt**（默认为空）：你给语音的自定义指令，例如“用西班牙语和我说话”，最多 2,000 个字符。它们会追加在 LiveBridge
   为语音设定的规则之后；两者冲突时以 LiveBridge 的规则为准。从线路下次打开起生效。
 - **Play sounds for requests and answers**（默认开启）：语音每转交一个请求给 Claude，就播放一声短音（[原因](#已知限制)）；无人说话时，Claude 的每个回答、失败或提问到达已打开或正在打开的线路，也会播放一声。等待中结果的提示音始终播放。

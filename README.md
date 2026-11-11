@@ -332,7 +332,7 @@ holds notifications, Open at login and updates:
 
 **Voice** holds what you hear during a call:
 
-- **Voice**: one of the realtime voices your codex offers, which codex lists when the window
+- **Voice**: one of the realtime voices your codex offers, which codex lists when this tab
   opens, or **Codex default**. It is heard from the next time the line opens.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
