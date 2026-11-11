@@ -321,22 +321,34 @@ parlez.
 
 ### Réglages
 
-**Settings…** ouvre la fenêtre Settings de LiveBridge, en deux onglets. **Voice** regroupe ce que
-vous entendez pendant un appel :
+**Settings…** ouvre la fenêtre Settings de LiveBridge, en quatre onglets dans sa barre
+d'outils. **General** regroupe les notifications, l'ouverture à la connexion et les mises à
+jour :
+
+- **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
+  attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
+  new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
+  la barre des menus.
+- **Open at login** (désactivé par défaut).
+- **Updates** : la version en cours, **Check for update**, **Check for updates automatically** et
+  ce qu'a fait la dernière mise à jour ([Mises à jour](#mises-à-jour)).
+
+**Voice** regroupe ce que vous entendez pendant un appel :
 
 - **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
   de la fenêtre, ou **Codex default**. Elle s'entend dès la prochaine ouverture de la ligne.
-- **Connect over TCP** (désactivé par défaut) : si la voix se hache sur une mauvaise connexion,
-  activez-le. La ligne préfère alors la route TCP que propose le serveur média (le port 443 dans
-  les réponses observées) à UDP, et peut encore revenir à UDP. Sur une connexion qui perd des
-  paquets, cela peut changer les coupures en courtes pauses entre les phrases ([jusqu'où c'est
-  testé](#limitations-connues)). Une ligne ouverte au moment du changement se ferme et se rouvre
-  aussitôt, après votre confirmation ; ce que la voix disait est coupé, et un résultat que la ligne
-  attendait arrive quand même sur la nouvelle.
 - **Prompt** (vide par défaut) : vos propres instructions pour la voix, par exemple « Parle-moi
   en espagnol », jusqu'à 2 000 caractères. Elles sont ajoutées après les règles propres de
   LiveBridge pour la voix, qui l'emportent en cas de désaccord, et s'appliquent dès la prochaine
   ouverture de la ligne.
+- **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
+  voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
+  question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
+  parle. Le signal d'un résultat en attente retentit dans tous les cas.
+
+**Line** regroupe combien de temps la ligne reste ouverte dans le silence et comment elle
+se connecte :
+
 - **Silence before the line closes** (20 secondes par défaut), **Wait for a first word on a line
   a result opened** (5 secondes) et **Sound without words before the line closes** (90 secondes) :
   combien de temps chaque sorte de silence garde une ligne ouverte, de 0 à 300 secondes. 0 désactive
@@ -350,12 +362,15 @@ vous entendez pendant un appel :
   voix commence souvent environ 2 secondes après la connexion de la ligne. Un minuteur que vous
   activez démarre aussitôt sur une ligne ouverte et silencieuse ; celui qui compte déjà garde son
   temps.
-- **Play sounds for requests and answers** (activé par défaut) : un son bref pour chaque demande que la
-  voix transmet à Claude ([pourquoi](#limitations-connues)) et pour chaque réponse, échec ou
-  question de Claude qui arrive sur une ligne ouverte ou en cours d'ouverture quand personne ne
-  parle. Le signal d'un résultat en attente retentit dans tous les cas.
+- **Connect over TCP** (désactivé par défaut) : si la voix se hache sur une mauvaise connexion,
+  activez-le. La ligne préfère alors la route TCP que propose le serveur média (le port 443 dans
+  les réponses observées) à UDP, et peut encore revenir à UDP. Sur une connexion qui perd des
+  paquets, cela peut changer les coupures en courtes pauses entre les phrases ([jusqu'où c'est
+  testé](#limitations-connues)). Une ligne ouverte au moment du changement se ferme et se rouvre
+  aussitôt, après votre confirmation ; ce que la voix disait est coupé, et un résultat que la ligne
+  attendait arrive quand même sur la nouvelle.
 
-**General** regroupe le reste :
+**Context** regroupe comment vos sessions parviennent à la voix :
 
 - **Pause sync while the call is stopped** (désactivé par défaut) : par défaut, ce que vous tapez
   dans une session rejointe et la réponse finale de Claude sont gardés dans la conversation de cette
@@ -375,13 +390,6 @@ vous entendez pendant un appel :
   ou après **New conversation**. Ce résumé est écrit à partir de toute la transcription, donc il
   porte ce que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
   la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
-- **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
-  attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
-  new result — speak to hear it »), jamais le résultat lui-même. Cliquer dessus ouvre le menu de
-  la barre des menus.
-- **Open at login** (désactivé par défaut).
-- **Updates** : la version en cours, **Check for update**, **Check for updates automatically** et
-  ce qu'a fait la dernière mise à jour ([Mises à jour](#mises-à-jour)).
 
 ### Ce que fait la voix
 
