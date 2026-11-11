@@ -83,10 +83,10 @@ struct MenuContentTests {
 
   static func menu(
     _ update: BridgeUpdate?, problem: Problem? = nil, load: ContextLoadState = .ready,
-    available: AppVersion? = nil
+    available: AppVersion? = nil, settings: Settings = Settings()
   ) -> MenuContent {
     MenuContent(
-      update: update, problem: problem ?? update?.problem, contextLoad: load,
+      settings: settings, update: update, problem: problem ?? update?.problem, contextLoad: load,
       available: available)
   }
 
@@ -138,8 +138,19 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
-        "Star LiveBridge on GitHub",
+        "Quick Settings ▸",
+        "  [ ] Connect over TCP",
+        "  [x] Play sounds for requests and answers",
+        "  [x] Notify when a result is waiting",
+        "  [ ] Pause sync while the call is stopped",
+        "  [x] Load a session's context on its first call",
         "Settings… ⌘,",
+        "---",
+        "Feedback & Support ▸",
+        "  Report a Bug…",
+        "  LiveBridge Website",
+        "  Star LiveBridge on GitHub",
+        "---",
         "Quit LiveBridge ⌘Q",
       ])
   }
@@ -195,8 +206,19 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
-        "Star LiveBridge on GitHub",
+        "Quick Settings ▸",
+        "  [ ] Connect over TCP",
+        "  [x] Play sounds for requests and answers",
+        "  [x] Notify when a result is waiting",
+        "  [ ] Pause sync while the call is stopped",
+        "  [x] Load a session's context on its first call",
         "Settings… ⌘,",
+        "---",
+        "Feedback & Support ▸",
+        "  Report a Bug…",
+        "  LiveBridge Website",
+        "  Star LiveBridge on GitHub",
+        "---",
         "Quit LiveBridge ⌘Q",
       ])
   }
@@ -272,8 +294,9 @@ struct MenuContentTests {
   @Test func withoutABridgeOnlyTheProblemAndTheFooterAreLeft() throws {
     let menu = Self.menu(nil, problem: .other("LiveBridge could not start its bridge: boom"))
     #expect(
-      menu.outline == [
-        "[call] Off", "---", "Star LiveBridge on GitHub", "Settings… ⌘,", "Quit LiveBridge ⌘Q",
+      menu.outline.filter { !$0.hasPrefix(" ") } == [
+        "[call] Off", "---", "Quick Settings ▸", "Settings… ⌘,", "---", "Feedback & Support ▸",
+        "---", "Quit LiveBridge ⌘Q",
       ])
     let card = try #require(Self.card(menu))
     #expect(card.problem == "LiveBridge could not start its bridge: boom")
@@ -281,6 +304,79 @@ struct MenuContentTests {
     #expect(Self.menu(nil).outline.first == "[call] Starting…")
   }
 
+  /// The menu's own lines, a submenu's items left out.
+  static func topLevel(_ menu: MenuContent) -> [String] {
+    menu.outline.filter { !$0.hasPrefix(" ") }
+  }
+
+  /// The items of the submenu titled `title`, nil if the menu has none.
+  static func submenu(_ title: String, in menu: MenuContent) -> [MenuContent.Item]? {
+    menu.items.lazy.compactMap { item -> [MenuContent.Item]? in
+      if case .submenu(title, _, let items) = item { items } else { nil }
+    }.first
+  }
+
+  static func switches(_ settings: Settings) -> [Bool]? {
+    submenu("Quick Settings", in: menu(status(sessions: 1), settings: settings))?.compactMap {
+      if case .toggle(_, let isOn) = $0 { isOn } else { nil }
+    }
+  }
+
+  @Test func theFootIsQuickSettingsSettingsFeedbackAndQuit() throws {
+    let foot = [
+      "Quick Settings ▸", "Settings… ⌘,", "---", "Feedback & Support ▸", "---",
+      "Quit LiveBridge ⌘Q",
+    ]
+    let lines = Self.topLevel(Self.menu(Self.status(sessions: 1)))
+    #expect(Array(lines.suffix(foot.count)) == foot)
+    let minutes = try #require(lines.firstIndex(of: "4 min this call · 31 min today (disabled)"))
+    #expect(lines[minutes + 1] == "---" && lines[minutes + 2] == "Quick Settings ▸")
+    #expect(!lines.contains("Star LiveBridge on GitHub"))
+    let offered = Self.topLevel(
+      Self.menu(Self.status(sessions: 1), available: AppVersion("0.1.3")))
+    #expect(Array(offered.suffix(foot.count + 1)) == ["Install LiveBridge 0.1.3…"] + foot)
+  }
+
+  @Test func quickSettingsShowEachSwitchAsSet() throws {
+    let items = try #require(
+      Self.submenu(
+        "Quick Settings",
+        in: Self.menu(
+          Self.status(sessions: 1),
+          settings: Settings(pauseSyncWhileStopped: true, connectsOverTCP: true))))
+    #expect(items == MenuContent.Switch.allCases.map { .toggle($0, isOn: true) })
+    #expect(Self.switches(Settings()) == [false, true, true, false, true])
+    // Each switch follows its own setting: flipping one flips only its item.
+    let flips: [MenuContent.Switch: Settings] = [
+      .connectsOverTCP: Settings(connectsOverTCP: true),
+      .confirmHandoffs: Settings(confirmHandoffs: false),
+      .notifyResults: Settings(notifyResults: false),
+      .pauseSyncWhileStopped: Settings(pauseSyncWhileStopped: true),
+      .loadContextOnFirstCall: Settings(loadContextOnFirstCall: false),
+    ]
+    let defaults = [false, true, true, false, true]
+    for (index, flipped) in MenuContent.Switch.allCases.enumerated() {
+      var expected = defaults
+      expected[index].toggle()
+      #expect(Self.switches(try #require(flips[flipped])) == expected, "\(flipped)")
+    }
+  }
+
+  @Test func feedbackAndSupportHoldsTheLinks() {
+    #expect(
+      Self.submenu("Feedback & Support", in: Self.menu(Self.status(sessions: 1))) == [
+        .command(.reportBug, title: "Report a Bug…", isEnabled: true),
+        .command(.website, title: "LiveBridge Website", isEnabled: true),
+        .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
+      ])
+  }
+
+  @Test func withoutABridgeQuickSettingsAreStillThere() throws {
+    let settings = Settings(connectsOverTCP: true)
+    let bridged = try #require(
+      Self.submenu("Quick Settings", in: Self.menu(Self.status(sessions: 1), settings: settings)))
+    #expect(Self.submenu("Quick Settings", in: Self.menu(nil, settings: settings)) == bridged)
+  }
 }
 
 struct LimitRowTests {
@@ -454,8 +550,8 @@ struct LimitRowTests {
 
   @Test func theMenuHoldsTheRowsAboveTheMinutes() {
     let menu = MenuContent(
-      update: MenuContentTests.status(sessions: 0), problem: nil, contextLoad: .ready,
-      available: nil, codexLimits: Self.limits(),
+      settings: Settings(), update: MenuContentTests.status(sessions: 0), problem: nil,
+      contextLoad: .ready, available: nil, codexLimits: Self.limits(),
       claudeLimits: Self.limits(five: nil, week: nil, blocked: true),
       now: Self.now, calendar: Self.utc, locale: Self.gb)
     let lines = menu.outline

@@ -76,4 +76,10 @@ struct ReleaseTests {
   @Test func theRepositoryPageIsTheRepositorysGitHubURL() {
     #expect(Release.repositoryPage.absoluteString == "https://github.com/getLiveBridge/LiveBridge")
   }
+
+  @Test func theBugFormIsTheBugTemplate() {
+    #expect(
+      Release.bugReportForm.absoluteString
+        == "https://github.com/getLiveBridge/LiveBridge/issues/new?template=bug_report.yml")
+  }
 }
