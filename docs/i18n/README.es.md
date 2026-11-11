@@ -313,7 +313,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 **Settings…** abre la ventana Settings de LiveBridge, en dos pestañas.
 **Quick Settings**, en el menú, reúne cinco de sus interruptores ([el menú](#la-banda-y-el-menú)):
 cada elemento es el propio ajuste, así que un cambio en un sitio se ve al instante en el otro, y
-pregunta lo mismo que el interruptor de aquí (Connect over TCP, antes de reconectar una línea abierta).
+pregunta lo mismo que el interruptor de aquí.
 **Voice** reúne lo que oyes durante una llamada:
 
 - **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir la

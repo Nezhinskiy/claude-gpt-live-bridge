@@ -297,8 +297,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 **Settings…** LiveBridge की Settings window खोलता है, जिसमें दो tabs हैं।
 menu का **Quick Settings** इसके पाँच switches रखता है ([menu](#बैंड-और-मेन्यू)): हर item वही setting
-है, इसलिए एक जगह का बदलाव दूसरी जगह तुरंत दिखता है, और वह वही पूछता है जो यहाँ का switch पूछता है
-(Connect over TCP, खुली line को फिर से जोड़ने से पहले)।
+है, इसलिए एक जगह का बदलाव दूसरी जगह तुरंत दिखता है, और वह वही पूछता है जो यहाँ का switch पूछता है।
 **Voice** में वह है जो आप call के दौरान सुनते हैं:
 
 - **Voice**: आपका codex जो realtime voices देता है उनमें से एक, जिनकी सूची codex window खुलने पर

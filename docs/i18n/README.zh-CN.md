@@ -208,7 +208,7 @@ claude plugin uninstall livebridge@livebridge
 ### 设置
 
 **Settings…** 会打开 LiveBridge 的设置窗口，分为两个标签页。
-菜单中的 **Quick Settings** 收有其中五个开关（[菜单](#状态条与菜单)）：每一项就是设置本身，因此在一处更改会立即显示在另一处，并且它会询问此处开关所询问的内容（Connect over TCP 在重新连接已打开的线路之前）。
+菜单中的 **Quick Settings** 收有其中五个开关（[菜单](#状态条与菜单)）：每一项就是设置本身，因此在一处更改会立即显示在另一处，并且它会询问此处开关所询问的内容。
 **Voice** 包含通话中你听到的内容：
 
 - **Voice**：你的 codex 提供的实时语音之一（窗口打开时由 codex 列出），或 **Codex default**。从线路下次打开起生效。

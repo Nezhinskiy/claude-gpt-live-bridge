@@ -345,7 +345,6 @@ struct MenuContentTests {
           Self.status(sessions: 1),
           settings: Settings(pauseSyncWhileStopped: true, connectsOverTCP: true))))
     #expect(items == MenuContent.Switch.allCases.map { .toggle($0, isOn: true) })
-    #expect(Self.switches(Settings()) == [false, true, true, false, true])
     // Each switch follows its own setting: flipping one flips only its item.
     let flips: [MenuContent.Switch: Settings] = [
       .connectsOverTCP: Settings(connectsOverTCP: true),

@@ -343,7 +343,8 @@ final class AppModel {
     window.show()
   }
 
-  /// Settings' notifications; macOS asks for permission when they are turned on, not at launch.
+  /// Notify when a result is waiting, from Settings or Quick Settings; macOS asks for permission
+  /// when they are turned on, not at launch.
   func setNotifyResults(_ on: Bool) {
     settings.update { $0.notifyResults = on }
     Task {
@@ -352,9 +353,9 @@ final class AppModel {
     }
   }
 
-  /// Settings' Connect over TCP. A line connecting or open is reconnected over the new transport
-  /// once the owner confirms it, and the bridge reconnects only a line still open by then; with
-  /// none, the next line takes it. False when the owner cancelled, and nothing changed.
+  /// Connect over TCP, from Settings or Quick Settings. A line connecting or open is reconnected
+  /// over the new transport once the owner confirms it, and the bridge reconnects only a line
+  /// still open by then; with none, the next line takes it. False when the owner cancelled, and nothing changed.
   func setConnectsOverTCP(_ on: Bool) -> Bool {
     let lineIsOpen = status.map { [.connecting, .live].contains($0.call) } ?? false
     if lineIsOpen, !Confirm.ask(.reconnect(overTCP: on)) { return false }

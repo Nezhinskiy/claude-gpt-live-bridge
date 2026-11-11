@@ -327,7 +327,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 **Settings…** opens LiveBridge's Settings window, in two tabs.
 The menu's **Quick Settings** holds five of its switches ([the menu](#the-band-and-the-menu)): each
 item is the setting itself, so a change in one place shows at once in the other, and it asks what
-the switch here asks (Connect over TCP, before reconnecting an open line).
+the switch here asks.
 **Voice** holds what you hear during a call:
 
 - **Voice**: one of the realtime voices your codex offers, which codex lists when the window

@@ -327,8 +327,7 @@ parlez.
 **Settings…** ouvre la fenêtre Settings de LiveBridge, en deux onglets.
 **Quick Settings**, dans le menu, reprend cinq de ses interrupteurs ([le menu](#la-bande-et-le-menu)) :
 chaque élément est le réglage lui-même, donc un changement à un endroit se voit aussitôt à l'autre,
-et il demande ce que demande l'interrupteur d'ici (Connect over TCP, avant de reconnecter une ligne
-ouverte).
+et il demande ce que demande l'interrupteur d'ici.
 **Voice** regroupe ce que vous entendez pendant un appel :
 
 - **Voice** : l'une des voix temps réel proposées par votre codex, que codex liste à l'ouverture
