@@ -2,8 +2,8 @@
 /// the bars' shape, this badge and the broken deck carry it.
 public enum Badge: Sendable, Equatable {
   case none
-  /// A session is working on a request while the call is on: a turning ring. A stopped call shows
-  /// none, so the menu bar stays still; the session's row still says Claude is working.
+  /// A session is working on a request while the call is on: dots turning in depth. A stopped call
+  /// shows none, so the menu bar stays still; the session's row still says Claude is working.
   case working
   /// A session waits for the owner's approval: a pulsing diamond.
   case approval
