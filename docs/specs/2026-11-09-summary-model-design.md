@@ -1,9 +1,10 @@
 # A summary model of its own, and a voice that waits for its context
 
-Status: proposed, 2026-11-09; revised 2026-11-10 after the review
+Status: approved 2026-11-12, when the owner chose it over a small fix for
+[BR-003](../bugs/BR-003.md); proposed 2026-11-09, revised 2026-11-10 after the review
 (`docs/reviews/2026-11-10-summary-model-spec-review.md` on branch
-`review/pr74-summary-model-spec`) and the owner's answers to it. Nothing here is built; product
-code waits for the owner's approval.
+`review/pr74-summary-model-spec`) and the owner's answers to it. Only the `working` glyph is built;
+the plan is [`docs/plans/2026-11-12-summary-model.md`](../plans/2026-11-12-summary-model.md).
 
 ## Why
 
