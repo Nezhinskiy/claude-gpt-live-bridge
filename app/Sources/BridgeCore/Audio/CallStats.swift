@@ -1,148 +1,157 @@
-// The `--call-stats` debug tool: numbers about the incoming voice, in a local file, to help tell
-// a network glitch from any other. Debug builds only, and not by a setting: the README promises
-// no telemetry, so `#if DEBUG` compiles it out of a release, and
-// scripts/tests/release-guards.test.sh looks there for its names.
-#if DEBUG
-  import Foundation
+// Debug mode's numbers about the incoming voice, in a local file, to help tell a network glitch
+// from any other. In every build, and read only while the setting is on (`Settings.debugMode`).
+import Foundation
 
-  public enum CallStats {
-    /// The message handler the page script posts to.
-    public static let handlerName = "callStats"
+public enum CallStats {
+  /// The message handler the page script posts to.
+  public static let handlerName = "callStats"
 
-    /// What is read from the incoming audio's `inbound-rtp` report, and written. All are running
-    /// totals of the line, but `jitter`, which is the current value in seconds.
-    static let fields = [
-      "packetsReceived", "packetsLost", "packetsDiscarded", "jitter", "concealedSamples",
-      "silentConcealedSamples", "concealmentEvents", "totalSamplesReceived",
-      "insertedSamplesForDeceleration",
-      "removedSamplesForAcceleration", "jitterBufferDelay", "jitterBufferEmittedCount",
-    ]
+  /// The page's function that turns the reading on and off.
+  static let switchName = "readCallStats"
 
-    /// What is read from the selected candidate pair: `onTcp`, 1 when the line's local candidate
-    /// is TCP and 0 for UDP, which shows what Settings' Connect over TCP did.
-    static let pathFields = ["onTcp"]
+  /// What is read from the incoming audio's `inbound-rtp` report, and written. All are running
+  /// totals of the line, but `jitter`, which is the current value in seconds.
+  static let fields = [
+    "packetsReceived", "packetsLost", "packetsDiscarded", "jitter", "concealedSamples",
+    "silentConcealedSamples", "concealmentEvents", "totalSamplesReceived",
+    "insertedSamplesForDeceleration",
+    "removedSamplesForAcceleration", "jitterBufferDelay", "jitterBufferEmittedCount",
+  ]
 
-    static let header = (["time", "line"] + fields + pathFields).joined(separator: ",")
+  /// What is read from the selected candidate pair: `onTcp`, 1 when the line's local candidate
+  /// is TCP and 0 for UDP, which shows what Settings' Connect over TCP did.
+  static let pathFields = ["onTcp"]
 
-    /// Runs before the page's own script, so the page needs no code for this: every peer it makes
-    /// is sampled once a second until it closes. Only the numbers in `fields` leave the report.
-    public static let pageScript = """
-      (() => {
-        const fields = [\(fields.map { "'\($0)'" }.joined(separator: ","))];
-        const handler = window.webkit.messageHandlers.\(handlerName);
-        let lines = 0;
+  static let header = (["time", "line"] + fields + pathFields).joined(separator: ",")
 
-        function onTcp(report) {
-          let value;
-          report.forEach((entry) => {
-            if (entry.type !== 'transport' || !entry.selectedCandidatePairId) return;
-            const pair = report.get(entry.selectedCandidatePairId);
-            const local = pair && report.get(pair.localCandidateId);
-            if (local) value = local.protocol === 'tcp' ? 1 : 0;
-          });
-          return value;
-        }
+  /// Runs before the page's own script, so the page needs no code for this: every peer it makes
+  /// is sampled once a second until it closes, while `switchScript(on: true)` has switched the
+  /// reading on. Only the numbers in `fields` leave the report.
+  public static let pageScript = """
+    (() => {
+      const fields = [\(fields.map { "'\($0)'" }.joined(separator: ","))];
+      const handler = window.webkit.messageHandlers.\(handlerName);
+      let lines = 0;
+      let reading = false;
+      window.\(switchName) = (on) => { reading = on; };
 
-        function sample(report, line) {
-          const tcp = onTcp(report);
-          report.forEach((entry) => {
-            if (entry.type !== 'inbound-rtp' || entry.kind !== 'audio') return;
-            const numbers = { line };
-            if (tcp !== undefined) numbers.onTcp = tcp;
-            for (const name of fields) {
-              if (typeof entry[name] === 'number') numbers[name] = entry[name];
-            }
-            handler.postMessage(numbers);
-          });
-        }
+      function onTcp(report) {
+        let value;
+        report.forEach((entry) => {
+          if (entry.type !== 'transport' || !entry.selectedCandidatePairId) return;
+          const pair = report.get(entry.selectedCandidatePairId);
+          const local = pair && report.get(pair.localCandidateId);
+          if (local) value = local.protocol === 'tcp' ? 1 : 0;
+        });
+        return value;
+      }
 
-        function watch(peer) {
-          const line = ++lines;
-          const timer = setInterval(async () => {
-            if (peer.signalingState === 'closed') return clearInterval(timer);
-            const report = await peer.getStats();
-            if (peer.signalingState !== 'closed') sample(report, line);
-          }, 1000);
-        }
-
-        window.RTCPeerConnection = class extends window.RTCPeerConnection {
-          constructor(...settings) {
-            super(...settings);
-            watch(this);
+      function sample(report, line) {
+        const tcp = onTcp(report);
+        report.forEach((entry) => {
+          if (entry.type !== 'inbound-rtp' || entry.kind !== 'audio') return;
+          const numbers = { line };
+          if (tcp !== undefined) numbers.onTcp = tcp;
+          for (const name of fields) {
+            if (typeof entry[name] === 'number') numbers[name] = entry[name];
           }
-        };
-      })();
-      """
-
-    /// One line of the file: the time, the line it was on, and the listed numbers; a number the
-    /// page did not send stays empty. Nil for anything that is not a sample.
-    static func row(_ body: Any, at date: Date, timeZone: TimeZone = .current) -> String? {
-      guard let sample = body as? [String: Any], let line = number(sample["line"]) else {
-        return nil
+          handler.postMessage(numbers);
+        });
       }
-      let time = ISO8601DateFormatter()
-      time.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-      time.timeZone = timeZone
-      let cells =
-        [time.string(from: date), line] + (fields + pathFields).map { number(sample[$0]) ?? "" }
-      return cells.joined(separator: ",")
-    }
 
-    private static func number(_ value: Any?) -> String? {
-      guard let number = value as? NSNumber, number.doubleValue.isFinite else { return nil }
-      return number.stringValue
-    }
+      function watch(peer) {
+        const line = ++lines;
+        const timer = setInterval(async () => {
+          if (peer.signalingState === 'closed') return clearInterval(timer);
+          if (!reading) return;
+          const report = await peer.getStats();
+          if (reading && peer.signalingState !== 'closed') sample(report, line);
+        }, 1000);
+      }
 
-    static func fileName(at date: Date, timeZone: TimeZone = .current) -> String {
-      let name = DateFormatter()
-      name.locale = Locale(identifier: "en_US_POSIX")
-      name.timeZone = timeZone
-      name.dateFormat = "'call-'yyyy-MM-dd'T'HH-mm-ss'.csv'"
-      return name.string(from: date)
-    }
+      window.RTCPeerConnection = class extends window.RTCPeerConnection {
+        constructor(...settings) {
+          super(...settings);
+          watch(this);
+        }
+      };
+    })();
+    """
 
-    /// `<data dir>/debug/call-stats`.
-    public static func directory() throws -> URL {
-      try directory(in: .applicationSupportDirectory)
-    }
-
-    static func directory(in base: URL) throws -> URL {
-      try Paths.ownerOnlyDirectory(Paths.dataDir(in: base).appending(path: "debug/call-stats"))
-    }
+  /// What the app evaluates in the page to turn the reading on or off; off, a reading already
+  /// asked for posts nothing.
+  public static func switchScript(on: Bool) -> String {
+    "window.\(switchName)?.(\(on));"
   }
 
-  /// One file per call, made by the call's first sample: a call whose line never opened leaves
-  /// none.
-  public final class CallStatsLog {
-    private let directory: URL
-    private let timeZone: TimeZone
-    private var file: FileHandle?
-
-    public init(directory: URL, timeZone: TimeZone = .current) {
-      self.directory = directory
-      self.timeZone = timeZone
+  /// One line of the file: the time, the line it was on, and the listed numbers; a number the
+  /// page did not send stays empty. Nil for anything that is not a sample.
+  static func row(_ body: Any, at date: Date, timeZone: TimeZone = .current) -> String? {
+    guard let sample = body as? [String: Any], let line = number(sample["line"]) else {
+      return nil
     }
-
-    /// Adds the sample; returns the file when this sample opened it.
-    public func record(_ body: Any, at date: Date) throws -> URL? {
-      guard let row = CallStats.row(body, at: date, timeZone: timeZone) else { return nil }
-      var opened: URL?
-      if file == nil {
-        let url = directory.appending(path: CallStats.fileName(at: date, timeZone: timeZone))
-        try Data((CallStats.header + "\n").utf8).write(to: url)
-        let handle = try FileHandle(forWritingTo: url)
-        try handle.seekToEnd()
-        file = handle
-        opened = url
-      }
-      try file?.write(contentsOf: Data((row + "\n").utf8))
-      return opened
-    }
-
-    /// The next sample starts a new file.
-    public func endCall() {
-      try? file?.close()
-      file = nil
-    }
+    let time = ISO8601DateFormatter()
+    time.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    time.timeZone = timeZone
+    let cells =
+      [time.string(from: date), line] + (fields + pathFields).map { number(sample[$0]) ?? "" }
+    return cells.joined(separator: ",")
   }
-#endif
+
+  private static func number(_ value: Any?) -> String? {
+    guard let number = value as? NSNumber, number.doubleValue.isFinite else { return nil }
+    return number.stringValue
+  }
+
+  static func fileName(at date: Date, timeZone: TimeZone = .current) -> String {
+    let name = DateFormatter()
+    name.locale = Locale(identifier: "en_US_POSIX")
+    name.timeZone = timeZone
+    name.dateFormat = "'call-'yyyy-MM-dd'T'HH-mm-ss'.csv'"
+    return name.string(from: date)
+  }
+
+  /// `<data dir>/debug/call-stats`.
+  public static func directory() throws -> URL {
+    try directory(in: .applicationSupportDirectory)
+  }
+
+  static func directory(in base: URL) throws -> URL {
+    try Paths.ownerOnlyDirectory(Paths.dataDir(in: base).appending(path: "debug/call-stats"))
+  }
+}
+
+/// One file per call, made by the call's first sample: a call whose line never opened leaves
+/// none.
+public final class CallStatsLog {
+  private let directory: URL
+  private let timeZone: TimeZone
+  private var file: FileHandle?
+
+  public init(directory: URL, timeZone: TimeZone = .current) {
+    self.directory = directory
+    self.timeZone = timeZone
+  }
+
+  /// Adds the sample; returns the file when this sample opened it.
+  public func record(_ body: Any, at date: Date) throws -> URL? {
+    guard let row = CallStats.row(body, at: date, timeZone: timeZone) else { return nil }
+    var opened: URL?
+    if file == nil {
+      let url = directory.appending(path: CallStats.fileName(at: date, timeZone: timeZone))
+      try Data((CallStats.header + "\n").utf8).write(to: url)
+      let handle = try FileHandle(forWritingTo: url)
+      try handle.seekToEnd()
+      file = handle
+      opened = url
+    }
+    try file?.write(contentsOf: Data((row + "\n").utf8))
+    return opened
+  }
+
+  /// The next sample starts a new file.
+  public func endCall() {
+    try? file?.close()
+    file = nil
+  }
+}

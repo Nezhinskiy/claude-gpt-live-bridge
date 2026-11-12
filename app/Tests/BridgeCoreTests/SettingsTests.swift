@@ -176,6 +176,30 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.checkUpdatesAutomatically == false)
   }
 
+  /// A file 0.5.0 wrote, which has every other setting and no `debugMode`: debug mode stays off
+  /// and the rest reads as written.
+  @Test func debugModeIsOffInAFileFromBeforeIt() throws {
+    let settings = try decoded(
+      #"{"voice":"marin","pauseSyncWhileStopped":true,"loadContextOnFirstCall":false,"#
+        + #""notifyResults":false,"confirmHandoffs":false,"prompt":"Hi.","connectsOverTCP":true,"#
+        + #""checkUpdatesAutomatically":false,"silenceSeconds":7,"firstWordSeconds":8,"#
+        + #""noiseSeconds":9}"#)
+    var expected = Settings(
+      voice: "marin", pauseSyncWhileStopped: true, loadContextOnFirstCall: false,
+      notifyResults: false, confirmHandoffs: false, prompt: "Hi.", connectsOverTCP: true,
+      checkUpdatesAutomatically: false)
+    expected.silenceSeconds = 7
+    expected.firstWordSeconds = 8
+    expected.noiseSeconds = 9
+    #expect(settings == expected)
+    #expect(!settings.debugMode)
+  }
+
+  @Test func debugModeRoundTrips() throws {
+    let on = Settings(debugMode: true)
+    #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(on)) == on)
+  }
+
   /// The Settings window follows the store: a change is observed where it was read.
   @Test func aChangeIsObserved() throws {
     let store = SettingsStore(file: nil)

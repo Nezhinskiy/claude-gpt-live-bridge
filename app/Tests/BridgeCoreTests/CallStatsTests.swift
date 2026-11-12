@@ -134,8 +134,14 @@ struct CallStatsLogTests {
 struct CallStatsPageScriptTests {
   let page: JSContext
 
+  /// Switched on, as debug mode does; `fresh()` is the page as it loads.
   init() {
-    page = JSContext()!
+    page = Self.fresh()
+    page.evaluateScript(CallStats.switchScript(on: true))
+  }
+
+  static func fresh() -> JSContext {
+    let page = JSContext()!
     page.evaluateScript(
       """
       var window = this;
@@ -164,6 +170,7 @@ struct CallStatsPageScriptTests {
                     mid: 'secret' };
       """)
     page.evaluateScript(CallStats.pageScript)
+    return page
   }
 
   func run(_ script: String) { page.evaluateScript(script) }
@@ -246,6 +253,30 @@ struct CallStatsPageScriptTests {
       peer.signalingState = 'closed';
       """)
     #expect(number("posted.length") == 0)
+  }
+
+  @Test func nothingIsReadUntilSwitchedOn() {
+    let page = Self.fresh()
+    page.evaluateScript("var peer = new RTCPeerConnection(); peer.reports = [audio]; tick();")
+    #expect(page.evaluateScript("timers.length").toInt32() == 1)
+    #expect(page.evaluateScript("posted.length").toInt32() == 0)
+  }
+
+  @Test func switchedOnItReadsOnceASecond() {
+    let page = Self.fresh()
+    page.evaluateScript("var peer = new RTCPeerConnection(); peer.reports = [audio];")
+    page.evaluateScript(CallStats.switchScript(on: true))
+    page.evaluateScript("tick();")
+    #expect(page.evaluateScript("posted.length").toInt32() == 1)
+  }
+
+  /// Turned off mid-call, it posts nothing more, a reading already asked for included.
+  @Test func switchedOffItStopsAtOnce() {
+    run("var peer = new RTCPeerConnection(); peer.reports = [audio]; tick();")
+    #expect(number("posted.length") == 1)
+    run("tick();" + CallStats.switchScript(on: false))
+    run("tick();")
+    #expect(number("posted.length") == 1)
   }
 
   @Test func eachPeerIsItsOwnLine() {

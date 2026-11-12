@@ -21,7 +21,8 @@
         config.userContentController.add(recorder, name: CallStats.handlerName)
         config.userContentController.addUserScript(
           WKUserScript(
-            source: CallStats.pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            source: CallStats.pageScript + CallStats.switchScript(on: true),
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
         say("call stats: on, one file per call in \(directory.path)")
         return recorder
       } catch {
