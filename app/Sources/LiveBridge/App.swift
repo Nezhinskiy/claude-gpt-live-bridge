@@ -395,17 +395,22 @@ final class AppModel {
     NSWorkspace.shared.open(folder)
   }
 
-  /// The menu's Uninstall LiveBridge, in the copy in `/Applications`: once confirmed, the app moves
-  /// itself to the Trash first, and on failure says so and changes nothing else. Then it ends a
-  /// call and removes every joined session, as the menu's × does, so its mod turns off instead of
-  /// opening LiveBridge again; removes the login item and the microphone permission, copies the
-  /// mod's uninstall command, and quits, leaving `UninstallScript` to move the files it keeps to
-  /// the Trash once the process is gone.
+  /// The menu's Uninstall LiveBridge, in the copy in `/Applications`: once confirmed, the app
+  /// removes its login item and moves itself to the Trash first; if it cannot move, the login
+  /// item comes back and it says so, changing nothing else. Then it ends a call and removes every
+  /// joined session, as the menu's × does, so its mod turns off instead of opening LiveBridge
+  /// again; removes the microphone permission, copies the mod's uninstall command, and quits,
+  /// leaving `UninstallScript` to move the files it keeps to the Trash once the process is gone.
   func uninstall() {
     guard isInstalledCopy, Confirm.ask(.uninstall) else { return }
+    // The login item goes while the bundle it names is still in place, and comes back if the
+    // bundle cannot move.
+    let wasAtLogin = LoginItem.isEnabled
+    try? LoginItem.set(false)
     do {
       try FileManager.default.trashItem(at: Bundle.main.bundleURL, resultingItemURL: nil)
     } catch {
+      if wasAtLogin { try? LoginItem.set(true) }
       let alert = NSAlert()
       alert.messageText = "LiveBridge could not move itself to the Trash"
       alert.informativeText =
@@ -422,7 +427,6 @@ final class AppModel {
       for id in sessions { await bridge?.remove(id) }
       // A joined mod polls once a second; its next poll is told the session was removed.
       try? await Task.sleep(for: .seconds(2))
-      try? LoginItem.set(false)
       let reset = Process()
       reset.executableURL = URL(filePath: "/usr/bin/tccutil")
       reset.arguments = ["reset", "Microphone", Paths.bundleID]
