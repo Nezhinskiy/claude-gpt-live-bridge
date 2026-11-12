@@ -286,9 +286,13 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),
   **Load context**, the target's **Conversation** as LiveBridge keeps it (with a **Task** line
   for each request the voice handed to Claude and a **Loaded context** line where a summary was
-  loaded), the usage limits, the minutes, **Star LiveBridge on GitHub**
-  (opens the repository's page), **Settings…** and **Quit LiveBridge**. During a call
-  **Conversation** shows your words and the voice's as codex transcribes them, so yours can appear a
+  loaded), the usage limits, the minutes, **Quick Settings** (checkmark items for **Connect over
+  TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause
+  sync while the call is stopped** and **Load a session's context on its first call**),
+  **Settings…**, **Feedback & Support** (**Report a Bug…** opens the repository's bug report form,
+  **LiveBridge Website** opens getlivebridge.com, **Star LiveBridge on GitHub** opens the
+  repository's page) and **Quit LiveBridge**. Quick Settings is there even when the menu shows
+  only the call. During a call **Conversation** shows your words and the voice's as codex transcribes them, so yours can appear a
   moment after you say them and the voice's a moment before you hear them. When each is finished,
   its final text replaces them. Only final text is kept: words still waiting for it when the line
   closes are gone.
@@ -320,8 +324,11 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 ### Settings
 
-**Settings…** opens LiveBridge's Settings window, in four tabs in its toolbar. **General**
-holds notifications, Open at login and updates:
+**Settings…** opens LiveBridge's Settings window, in four tabs in its toolbar.
+The menu's **Quick Settings** holds five of its switches ([the menu](#the-band-and-the-menu)): each
+item is the setting itself, so a change in one place shows at once in the other, and it asks what
+the switch here asks.
+**General** holds notifications, Open at login and updates:
 
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —

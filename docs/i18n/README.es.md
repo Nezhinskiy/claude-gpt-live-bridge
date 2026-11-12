@@ -270,8 +270,12 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
   conserva LiveBridge (con una línea **Task** por cada petición que la voz pasó a Claude y una línea **Loaded context** donde se cargó un resumen), los
-  límites de uso, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
-  **Settings…** y **Quit LiveBridge**. Durante una llamada, **Conversation** muestra tus palabras y
+  límites de uso, los minutos, **Quick Settings** (elementos con marca de verificación para
+  **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause sync while the call is stopped** y **Load a session's context on its first call**),
+  **Settings…**, **Feedback & Support** (**Report a Bug…** abre el formulario de informe de errores
+  del repositorio, **LiveBridge Website** abre getlivebridge.com, **Star LiveBridge on GitHub** abre
+  la página del repositorio) y **Quit LiveBridge**. Quick Settings está ahí incluso cuando el menú
+  muestra solo la llamada. Durante una llamada, **Conversation** muestra tus palabras y
   las de la voz a medida que codex las transcribe, así que las tuyas pueden aparecer un momento después
   de decirlas y las de la voz un momento antes de oírlas. Cuando cada frase termina, su texto final
   las sustituye. Solo se conserva el texto final: las palabras que aún lo esperan cuando se cierra la
@@ -307,7 +311,11 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 ### Ajustes
 
 **Settings…** abre la ventana Settings de LiveBridge, en cuatro pestañas en su barra de
-herramientas. **General** reúne las notificaciones, el inicio de sesión y las actualizaciones:
+herramientas.
+**Quick Settings**, en el menú, reúne cinco de sus interruptores ([el menú](#la-banda-y-el-menú)):
+cada elemento es el propio ajuste, así que un cambio en un sitio se ve al instante en el otro, y
+pregunta lo mismo que el interruptor de aquí.
+**General** reúne las notificaciones, el inicio de sesión y las actualizaciones:
 
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has

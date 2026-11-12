@@ -36,6 +36,11 @@ public struct Release: Equatable, Sendable {
   public static let repository = "getLiveBridge/LiveBridge"
   /// The repository's page on GitHub.
   public static let repositoryPage = URL(string: "https://github.com/\(repository)")!
+  /// The repository's bug report form.
+  public static let bugReportForm = URL(
+    string: "\(repositoryPage.absoluteString)/issues/new?template=bug_report.yml")!
+  /// The project's website.
+  public static let website = URL(string: "https://getlivebridge.com")!
   /// GitHub's latest release of LiveBridge.
   public static let latestURL = URL(
     string: "https://api.github.com/repos/\(repository)/releases/latest")!
