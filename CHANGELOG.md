@@ -15,7 +15,7 @@ All notable changes to this project are listed here. The format follows
   so with all three at 0 quiet never closes the line, which stays open and billed. A timer turned
   on starts at once on a quiet open line. The defaults are the old fixed values, so nothing changes
   until you change them.
-- **Connect over TCP**, in Settings under Voice, off by default: if the voice breaks up on a poor
+- **Connect over TCP**, in Settings under Line, off by default: if the voice breaks up on a poor
   connection, turn it on and the line prefers the media server's TCP route (port 443 in the answers
   seen) to UDP, which can turn breakups into short pauses; it can still fall back to UDP. Changing
   it while a line is open asks first, then opens the line again over the new transport, still
@@ -31,8 +31,9 @@ All notable changes to this project are listed here. The format follows
 
 ### Changed
 
-- The Settings window has two tabs: **Voice** (the voice, the prompt, the line's timers and the
-  sounds) and **General** (sync, notifications, Open at login and updates).
+- The Settings window has four tabs in its toolbar: **General** (notifications, Open at login and
+  updates), **Voice** (the voice, the prompt and the sounds), **Line** (the line's timers and
+  Connect over TCP) and **Context** (sync).
 - **Star LiveBridge on GitHub** moved from the menu's foot into **Feedback & Support**.
 
 - While the call is stopped, the menu bar icon no longer turns its ring for a session where Claude

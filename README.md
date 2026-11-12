@@ -324,23 +324,33 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 
 ### Settings
 
-**Settings…** opens LiveBridge's Settings window, in two tabs.
+**Settings…** opens LiveBridge's Settings window, in four tabs in its toolbar.
 The menu's **Quick Settings** holds five of its switches ([the menu](#the-band-and-the-menu)): each
 item is the setting itself, so a change in one place shows at once in the other, and it asks what
 the switch here asks.
+**General** holds notifications, Open at login and updates:
+
+- **Notify when a result is waiting** (on by default): with the chime for a result that waits
+  while the line is closed, a macOS notification names the session ("Alpha has a new result —
+  speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
+- **Open at login** (off by default).
+- **Updates**: the running version, **Check for update**, **Check for updates automatically**
+  and what the last update did ([Updating](#updating)).
+
 **Voice** holds what you hear during a call:
 
-- **Voice**: one of the realtime voices your codex offers, which codex lists when the window
+- **Voice**: one of the realtime voices your codex offers, which codex lists when this tab
   opens, or **Codex default**. It is heard from the next time the line opens.
-- **Connect over TCP** (off by default): if the voice breaks up on a poor connection, turn this on.
-  The line then prefers the TCP route the media server offers (port 443 in the answers seen) to
-  UDP, and can still fall back to UDP. On a lossy connection that can turn breakups into short
-  pauses between phrases ([how far it is tested](#known-limitations)). A line that is open when you
-  change it closes and opens again at once, after you confirm; what the voice was saying is cut
-  off, and a result the line was waiting for still comes to the new one.
 - **Prompt** (empty by default): your own instructions for the voice, such as "Speak with me in
   Spanish", up to 2,000 characters. They are added after LiveBridge's own rules for the voice,
   which win where the two disagree, and apply from the next time the line opens.
+- **Play sounds for requests and answers** (on by default): a short sound for each request the voice
+  hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
+  that reaches an open or opening line while nobody is speaking. The chime for a result that waits
+  plays either way.
+
+**Line** holds how long the line stays open in quiet and how it connects:
+
 - **Silence before the line closes** (20 seconds by default), **Wait for a first word on a line
   a result opened** (5 seconds) and **Sound without words before the line closes** (90 seconds):
   how long each kind of quiet keeps an open line, from 0 to 300 seconds. 0 switches the silence or
@@ -352,12 +362,14 @@ the switch here asks.
   without words, which your speech counts as until it is recognised, and at 1 to 3 seconds for the
   first word, as the voice often starts about 2 seconds after the line connects. A timer you turn
   on starts at once on a quiet open line; one already counting keeps its time.
-- **Play sounds for requests and answers** (on by default): a short sound for each request the voice
-  hands off ([why](#known-limitations)), and one for each answer, failure or question from Claude
-  that reaches an open or opening line while nobody is speaking. The chime for a result that waits
-  plays either way.
+- **Connect over TCP** (off by default): if the voice breaks up on a poor connection, turn this on.
+  The line then prefers the TCP route the media server offers (port 443 in the answers seen) to
+  UDP, and can still fall back to UDP. On a lossy connection that can turn breakups into short
+  pauses between phrases ([how far it is tested](#known-limitations)). A line that is open when you
+  change it closes and opens again at once, after you confirm; what the voice was saying is cut
+  off, and a result the line was waiting for still comes to the new one.
 
-**General** holds the rest:
+**Context** holds how your sessions reach the voice:
 
 - **Pause sync while the call is stopped** (off by default): by default, what you type in a joined
   session and Claude's final answer to it are kept in that session's conversation with the voice
@@ -376,12 +388,6 @@ the switch here asks.
   is written from the whole transcript, so it carries what you paused, and it goes to OpenAI. Once
   a session has a summary, the pause governs what follows. With this off, only **Load context**
   loads a summary under the pause.
-- **Notify when a result is waiting** (on by default): with the chime for a result that waits
-  while the line is closed, a macOS notification names the session ("Alpha has a new result —
-  speak to hear it"), never the result itself. Clicking it opens the menu bar menu.
-- **Open at login** (off by default).
-- **Updates**: the running version, **Check for update**, **Check for updates automatically**
-  and what the last update did ([Updating](#updating)).
 
 ### What the voice does
 

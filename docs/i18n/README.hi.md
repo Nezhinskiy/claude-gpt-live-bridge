@@ -295,22 +295,32 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 
 ### सेटिंग्स
 
-**Settings…** LiveBridge की Settings window खोलता है, जिसमें दो tabs हैं।
+**Settings…** LiveBridge की Settings window खोलता है, जिसके toolbar में चार tabs हैं।
 menu का **Quick Settings** इसके पाँच switches रखता है ([menu](#बैंड-और-मेन्यू)): हर item वही setting
 है, इसलिए एक जगह का बदलाव दूसरी जगह तुरंत दिखता है, और वह वही पूछता है जो यहाँ का switch पूछता है।
+**General** में notifications, login और updates हैं:
+
+- **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
+  chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
+  hear it"), नतीजा खुद कभी नहीं। उस पर click करने से menu bar menu खुलता है।
+- **Open at login** (डिफ़ॉल्ट रूप से बंद)।
+- **Updates**: चल रहा version, **Check for update**, **Check for updates automatically** और पिछले
+  update ने क्या किया ([अपडेट करना](#अपडेट-करना))।
+
 **Voice** में वह है जो आप call के दौरान सुनते हैं:
 
-- **Voice**: आपका codex जो realtime voices देता है उनमें से एक, जिनकी सूची codex window खुलने पर
+- **Voice**: आपका codex जो realtime voices देता है उनमें से एक, जिनकी सूची codex यह tab खुलने पर
   देता है, या **Codex default**। यह अगली बार line खुलने से सुनाई देती है।
-- **Connect over TCP** (डिफ़ॉल्ट रूप से बंद): अगर खराब connection पर voice टूटती है, तो इसे चालू
-  करें। तब line UDP के बजाय media server के दिए TCP रास्ते (देखे गए answers में port 443) को
-  प्राथमिकता देती है, और फिर भी UDP पर लौट सकती है। packets खोने वाले connection पर इससे टूटन
-  phrases के बीच छोटे ठहराव बन सकती है ([यह कितना परखा गया](#ज्ञात-सीमाएँ))। बदलते समय खुली line
-  आपकी पुष्टि के बाद तुरंत बंद होकर फिर खुलती है; voice जो कह रही थी वह कट जाता है, और line जिस
-  नतीजे का इंतज़ार कर रही थी वह फिर भी नई line में आता है।
 - **Prompt** (डिफ़ॉल्ट रूप से खाली): voice के लिए आपके अपने निर्देश, जैसे "मुझसे Spanish में बात
   करो", अधिकतम 2,000 अक्षर। ये LiveBridge के अपने voice नियमों के बाद जोड़े जाते हैं, और दोनों में
   टकराव होने पर उन्हीं नियमों की चलती है, और अगली बार line खुलने से लागू होते हैं।
+- **Play sounds for requests and answers** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध Claude को सौंपता है,
+  हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ)), और जब कोई बोल नहीं रहा हो तब खुली या खुलती
+  line पर पहुँचने वाले Claude के हर जवाब, विफलता या सवाल के लिए भी एक। प्रतीक्षा कर रहे नतीजे की
+  ध्वनि हर हाल में बजती है।
+
+**Line** में यह है कि ख़ामोशी में line कितनी देर खुली रहती है और वह कैसे जुड़ती है:
+
 - **Silence before the line closes** (डिफ़ॉल्ट रूप से 20 सेकंड), **Wait for a first word on a line
   a result opened** (5 सेकंड) और **Sound without words before the line closes** (90 सेकंड): हर तरह
   की चुप्पी खुली line को कितनी देर खुला रखती है, 0 से 300 सेकंड तक। 0 चुप्पी या शब्दों के बिना आवाज़
@@ -323,12 +333,14 @@ menu का **Quick Settings** इसके पाँच switches रखता �
   जाती है, और पहले शब्द के लिए 1 से 3 सेकंड पर, क्योंकि voice अक्सर line connect होने के लगभग 2 सेकंड
   बाद बोलना शुरू करता है। जो timer आप चालू करते हैं, वह शांत खुली line पर तुरंत शुरू हो जाता है; जो
   पहले से गिन रहा है, वह अपना समय बनाए रखता है।
-- **Play sounds for requests and answers** (डिफ़ॉल्ट रूप से चालू): voice जो भी अनुरोध Claude को सौंपता है,
-  हर एक के लिए एक छोटी आवाज़ ([क्यों](#ज्ञात-सीमाएँ)), और जब कोई बोल नहीं रहा हो तब खुली या खुलती
-  line पर पहुँचने वाले Claude के हर जवाब, विफलता या सवाल के लिए भी एक। प्रतीक्षा कर रहे नतीजे की
-  ध्वनि हर हाल में बजती है।
+- **Connect over TCP** (डिफ़ॉल्ट रूप से बंद): अगर खराब connection पर voice टूटती है, तो इसे चालू
+  करें। तब line UDP के बजाय media server के दिए TCP रास्ते (देखे गए answers में port 443) को
+  प्राथमिकता देती है, और फिर भी UDP पर लौट सकती है। packets खोने वाले connection पर इससे टूटन
+  phrases के बीच छोटे ठहराव बन सकती है ([यह कितना परखा गया](#ज्ञात-सीमाएँ))। बदलते समय खुली line
+  आपकी पुष्टि के बाद तुरंत बंद होकर फिर खुलती है; voice जो कह रही थी वह कट जाता है, और line जिस
+  नतीजे का इंतज़ार कर रही थी वह फिर भी नई line में आता है।
 
-**General** में बाकी सब है:
+**Context** में यह है कि आपके sessions voice तक कैसे पहुँचते हैं:
 
 - **Pause sync while the call is stopped** (डिफ़ॉल्ट रूप से बंद): डिफ़ॉल्ट रूप से, जुड़े हुए session
   में आप जो टाइप करते हैं और उस पर Claude का अंतिम जवाब, call रुकी होने पर भी voice के साथ उस
@@ -348,12 +360,6 @@ menu का **Quick Settings** इसके पाँच switches रखता �
   लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
   बन जाने के बाद जो आगे होता है उस पर pause लागू होता है। यह बंद हो तो pause में सिर्फ़ **Load context** सारांश
   load करता है।
-- **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
-  chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
-  hear it"), नतीजा खुद कभी नहीं। उस पर click करने से menu bar menu खुलता है।
-- **Open at login** (डिफ़ॉल्ट रूप से बंद)।
-- **Updates**: चल रहा version, **Check for update**, **Check for updates automatically** और पिछले
-  update ने क्या किया ([अपडेट करना](#अपडेट-करना))।
 
 ### वॉइस क्या करता है
 

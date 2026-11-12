@@ -310,24 +310,35 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 
 ### Ajustes
 
-**Settings…** abre la ventana Settings de LiveBridge, en dos pestañas.
+**Settings…** abre la ventana Settings de LiveBridge, en cuatro pestañas en su barra de
+herramientas.
 **Quick Settings**, en el menú, reúne cinco de sus interruptores ([el menú](#la-banda-y-el-menú)):
 cada elemento es el propio ajuste, así que un cambio en un sitio se ve al instante en el otro, y
 pregunta lo mismo que el interruptor de aquí.
+**General** reúne las notificaciones, el inicio de sesión y las actualizaciones:
+
+- **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
+  que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
+  a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
+  menú de la barra de menús.
+- **Open at login** (desactivado por defecto).
+- **Updates**: la versión en uso, **Check for update**, **Check for updates automatically** y lo
+  que hizo la última actualización ([Actualización](#actualización)).
+
 **Voice** reúne lo que oyes durante una llamada:
 
-- **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir la
-  ventana, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
-- **Connect over TCP** (desactivado por defecto): si la voz se corta con una conexión mala,
-  actívalo. La línea prefiere entonces la ruta TCP que ofrece el servidor de medios (el puerto 443
-  en las respuestas vistas) a UDP, y aún puede volver a UDP. En una conexión con pérdidas eso puede
-  convertir los cortes en pausas breves entre frases ([hasta dónde está probado](#limitaciones-conocidas)).
-  Una línea abierta cuando lo cambias se cierra y se vuelve a abrir en el acto, tras confirmarlo; lo
-  que la voz estaba diciendo se corta, y un resultado que la línea esperaba llega igualmente a la
-  nueva.
+- **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir esta
+  pestaña, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
 - **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
   hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
   prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
+- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
+  la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
+  de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
+  resultado en espera suena de todos modos.
+
+**Line** reúne cuánto sigue abierta la línea en silencio y cómo se conecta:
+
 - **Silence before the line closes** (20 segundos por defecto), **Wait for a first word on a line
   a result opened** (5 segundos) y **Sound without words before the line closes** (90 segundos):
   cuánto tiempo mantiene abierta la línea cada tipo de silencio, de 0 a 300 segundos. 0 desactiva
@@ -340,12 +351,15 @@ pregunta lo mismo que el interruptor de aquí.
   reconoce, y de 1 a 3 segundos para la primera palabra, ya que la voz suele empezar unos 2 segundos
   después de que la línea se conecta. Un temporizador que activas empieza enseguida en una línea
   abierta en silencio; uno que ya cuenta conserva su tiempo.
-- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
-  la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
-  de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
-  resultado en espera suena de todos modos.
+- **Connect over TCP** (desactivado por defecto): si la voz se corta con una conexión mala,
+  actívalo. La línea prefiere entonces la ruta TCP que ofrece el servidor de medios (el puerto 443
+  en las respuestas vistas) a UDP, y aún puede volver a UDP. En una conexión con pérdidas eso puede
+  convertir los cortes en pausas breves entre frases ([hasta dónde está probado](#limitaciones-conocidas)).
+  Una línea abierta cuando lo cambias se cierra y se vuelve a abrir en el acto, tras confirmarlo; lo
+  que la voz estaba diciendo se corta, y un resultado que la línea esperaba llega igualmente a la
+  nueva.
 
-**General** reúne el resto:
+**Context** reúne cómo llegan tus sesiones a la voz:
 
 - **Pause sync while the call is stopped** (desactivado por defecto): por defecto, lo que escribes
   en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
@@ -365,13 +379,6 @@ pregunta lo mismo que el interruptor de aquí.
   conversation**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
   pausaste, y va a OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
   Desactivado, bajo la pausa solo **Load context** carga un resumen.
-- **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
-  que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
-  a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
-  menú de la barra de menús.
-- **Open at login** (desactivado por defecto).
-- **Updates**: la versión en uso, **Check for update**, **Check for updates automatically** y lo
-  que hizo la última actualización ([Actualización](#actualización)).
 
 ### Qué hace la voz
 

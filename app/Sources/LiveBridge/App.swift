@@ -96,7 +96,7 @@ final class AppModel {
   @ObservationIgnored let settings: SettingsStore
   @ObservationIgnored private var settingsWindow: SettingsWindow?
   /// The Settings tab shown; the window opens on the one last shown.
-  var settingsTab = SettingsTab.voice
+  var settingsTab = SettingsTab.general
   @ObservationIgnored private var codexCwd: URL?
   /// When codex's usage is read, and the last reading.
   private(set) var limitsPoll = LimitsPoll()
