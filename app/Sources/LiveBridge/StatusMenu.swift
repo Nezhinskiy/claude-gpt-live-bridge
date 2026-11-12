@@ -81,7 +81,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     MenuContent(
       settings: model.settings.current, update: model.update, problem: model.problem,
       contextLoad: model.contextLoad, available: model.available?.version,
-      codexLimits: model.codexLimits(at: Date()), claudeLimits: model.update?.claudeLimits)
+      codexLimits: model.codexLimits(at: Date()), claudeLimits: model.update?.claudeLimits,
+      isInstalledCopy: model.isInstalledCopy)
   }
 
   /// Renders the model's current content, and again whenever it changes. Only the content is
@@ -274,8 +275,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   @objc private func starOnGitHub() { NSWorkspace.shared.open(Release.repositoryPage) }
 
-  /// Flips a switch (Quick Settings' or Debug Mode) through the setter its Settings control calls, once the menu
-  /// has closed: Connect over TCP may ask first, and an alert inside menu tracking hangs.
+  /// Flips a switch (Quick Settings' or Debug Mode) through the setter its Settings control
+  /// calls, once the menu has closed: Connect over TCP may ask first, and an alert inside menu
+  /// tracking hangs.
   @objc private func toggle(_ sender: NSMenuItem) {
     guard let toggle = sender.representedObject as? MenuContent.Switch else { return }
     let wasOn = sender.state == .on

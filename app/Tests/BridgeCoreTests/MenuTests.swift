@@ -392,6 +392,17 @@ struct MenuContentTests {
     #expect(MenuContent.Switch.debugMode.title == "Debug Mode")
   }
 
+  @Test func onlyTheInstalledCopyCanUninstall() throws {
+    for installed in [false, true] {
+      let menu = MenuContent(
+        settings: Settings(), update: Self.status(sessions: 1), problem: nil, contextLoad: .ready,
+        available: nil, isInstalledCopy: installed)
+      let support = try #require(Self.submenu("Feedback & Support", in: menu))
+      #expect(
+        support.last == .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: installed))
+    }
+  }
+
   @Test func withoutABridgeQuickSettingsAreStillThere() throws {
     let settings = Settings(connectsOverTCP: true)
     let bridged = try #require(

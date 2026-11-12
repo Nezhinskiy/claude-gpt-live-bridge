@@ -76,6 +76,16 @@ A second submenu, **Feedback & Support**, holds:
   page; the website is the project's other link.
 - a separator, then **Debug Mode** (a checkmark item, the setting below) and **Show Debug
   Files…**.
+- a separator, then **Uninstall LiveBridge…** (added 2026-11-12 at the owner's request, as
+  Amphetamine has one). Enabled only in the copy in `/Applications`: a debug build would move
+  itself and reset the installed copy's login item and microphone permission, which share its
+  bundle id. After a confirmation it ends a call and removes every joined session, as the menu's ×
+  does, so each mod turns `/live` off instead of opening the app again; removes the login item and
+  the microphone permission; copies `claude plugin uninstall livebridge@livebridge`; and quits.
+  Once the process has exited, a `/bin/sh` it left moves the app and the files
+  `build-app.sh --uninstall` removes into one folder in the Trash, so nothing the app writes on its
+  way out comes back. The Trash, not deletion, so it can be undone; the mod is left, because it is
+  Claude Code's configuration and the app does not run `claude` on the owner's behalf.
 
 ### The menu's foot
 

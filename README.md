@@ -233,10 +233,14 @@ call stops with a sentence that says where to allow it.
 
 ### Uninstall
 
-The menu's **Feedback & Support ▸ Uninstall LiveBridge…** asks first, then removes LiveBridge's
-login item and microphone permission, ends a call, moves the app and every file it keeps (the
-files listed below) to the Trash, and quits. It leaves the Claude Code mod, and copies the command
-that removes it, `claude plugin uninstall livebridge@livebridge`, for you to run in Terminal.
+In the copy in `/Applications`, the menu's **Feedback & Support ▸ Uninstall LiveBridge…** asks
+first. Then a call open ends and every session leaves LiveBridge, as the menu's × does, so `/live`
+turns off in each instead of opening LiveBridge again; LiveBridge removes its login item and
+microphone permission and quits, and once it has quit the app and every file it keeps (the files
+listed below) go to one folder in the Trash, until you empty it. It leaves the Claude Code mod, and
+copies the command that removes it, `claude plugin uninstall livebridge@livebridge`, for you to run
+in Terminal. A session that was not open then may still look for LiveBridge when it opens again;
+removing the mod ends that.
 
 From a clone, `scripts/build-app.sh --uninstall` removes `/Applications/LiveBridge.app`,
 however it was installed, its login item and every file it keeps, and prints the two commands
@@ -255,7 +259,7 @@ tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
 
-Neither removes a copy named `/Applications/.LiveBridge-update-….app`, which an update stopped
+None of these removes a copy named `/Applications/.LiveBridge-update-….app`, which an update stopped
 mid-install can leave behind. The app removes such copies at its next launch; after an
 uninstall, delete one by hand if it is there.
 
@@ -560,7 +564,8 @@ call running unless you turned on **Pause sync**) and the context line last load
 ([how it is kept](SECURITY.md#residual-risk-by-design)). A session's lines go when you press **New
 conversation** with it as the target or remove it with ×. A session that has left keeps them
 until 20 sessions used since push them out; to erase them sooner, run `/live` in it again and
-press **New conversation**. Uninstalling removes them all. The mod keeps a snapshot of its own in Claude Code's plugin store ([what it holds](SECURITY.md#residual-risk-by-design)).
+press **New conversation**. Uninstalling removes them all; the menu's Uninstall LiveBridge moves
+them to the Trash, so they are gone once you empty it. The mod keeps a snapshot of its own in Claude Code's plugin store ([what it holds](SECURITY.md#residual-risk-by-design)).
 **Debug mode**, off by default, writes the voice's network numbers during a call to a file in that
 folder, and nothing more ([Settings](#settings)).
 

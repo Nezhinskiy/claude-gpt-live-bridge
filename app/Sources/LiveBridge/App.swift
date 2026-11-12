@@ -395,39 +395,44 @@ final class AppModel {
     NSWorkspace.shared.open(folder)
   }
 
-  /// The menu's Uninstall LiveBridge: once confirmed, copies the mod's uninstall command, removes
-  /// the login item and the microphone permission, ends a call, moves the app and every file it
-  /// keeps to the Trash (`Paths.uninstalled`), and quits.
+  /// The menu's Uninstall LiveBridge, in the copy in `/Applications`: once confirmed, ends a call
+  /// and removes every joined session, as the menu's × does, so its mod turns off instead of
+  /// opening LiveBridge again; then removes the login item and the microphone permission, copies
+  /// the mod's uninstall command, and quits, leaving `UninstallScript` to move the app and every
+  /// file it keeps to the Trash once the process is gone.
   func uninstall() {
-    guard Confirm.ask(.uninstall) else { return }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(Confirmation.modUninstallCommand, forType: .string)
-    try? LoginItem.set(false)
-    let reset = Process()
-    reset.executableURL = URL(filePath: "/usr/bin/tccutil")
-    reset.arguments = ["reset", "Microphone", Paths.bundleID]
-    try? reset.run()
-    reset.waitUntilExit()
-    let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-    let files = Paths.uninstalled(app: Bundle.main.bundleURL, library: library)
-      .filter { FileManager.default.fileExists(atPath: $0.path) }
+    guard isInstalledCopy, Confirm.ask(.uninstall) else { return }
     let bridge = bridge
+    let sessions = status?.sessions.map(\.sessionId) ?? []
     Task {
       await bridge?.perform(.stop)
-      NSWorkspace.shared.recycle(files) { _, error in
-        Task { @MainActor in
-          if let error {
-            let alert = NSAlert()
-            alert.messageText = "LiveBridge could not move everything to the Trash"
-            alert.informativeText =
-              "\(error.localizedDescription) What is left can be removed by hand, as the README's "
-              + "Uninstall section shows."
-            NSApp.activate()
-            alert.runModal()
-          }
-          NSApp.terminate(nil)
-        }
-      }
+      for id in sessions { await bridge?.remove(id) }
+      // A joined mod polls once a second; its next poll is told the session was removed.
+      try? await Task.sleep(for: .seconds(2))
+      try? LoginItem.set(false)
+      let reset = Process()
+      reset.executableURL = URL(filePath: "/usr/bin/tccutil")
+      reset.arguments = ["reset", "Microphone", Paths.bundleID]
+      try? reset.run()
+      reset.waitUntilExit()
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(Confirmation.modUninstallCommand, forType: .string)
+      let manager = FileManager.default
+      let library = manager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+      let trash = manager.urls(for: .trashDirectory, in: .userDomainMask)[0]
+      let stamp = DateFormatter()
+      stamp.dateFormat = "yyyy-MM-dd HH.mm.ss"  // no colon: the Finder shows one as a slash
+      let move = Process()
+      move.executableURL = URL(filePath: "/bin/sh")
+      move.arguments = UninstallScript.arguments(
+        pid: ProcessInfo.processInfo.processIdentifier,
+        trash: trash.appending(path: "LiveBridge \(stamp.string(from: Date()))").path,
+        paths: Paths.uninstalled(app: Bundle.main.bundleURL, library: library).map(\.path))
+      move.standardInput = FileHandle.nullDevice
+      move.standardOutput = FileHandle.nullDevice
+      move.standardError = FileHandle.nullDevice
+      try? move.run()
+      NSApp.terminate(nil)
     }
   }
 

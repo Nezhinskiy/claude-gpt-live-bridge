@@ -48,7 +48,7 @@ public struct MenuContent: Sendable, Equatable {
       .loadContextOnFirstCall,
     ]
 
-    /// Settings' own words for it.
+    /// The menu's words for it, Settings' own but for Debug Mode's title case.
     public var title: String {
       switch self {
       case .connectsOverTCP: "Connect over TCP"
@@ -120,13 +120,16 @@ public struct MenuContent: Sendable, Equatable {
 
   /// `settings` are the app's, shown in Quick Settings with or without a bridge. `problem` is the
   /// app's own or the bridge's; `update` is nil while there is no bridge. `available` is a newer
-  /// release found and not yet installed: the menu offers to install it.
+  /// release found and not yet installed: the menu offers to install it. Only the copy in
+  /// `/Applications` (`isInstalledCopy`) can uninstall itself.
   public init(
     settings: Settings, update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
     available: AppVersion?, codexLimits: UsageLimits? = nil, claudeLimits: UsageLimits? = nil,
+    isInstalledCopy: Bool = true,
     now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
   ) {
-    let footer = Self.foot(settings: settings, available: available)
+    let footer = Self.foot(
+      settings: settings, available: available, isInstalledCopy: isInstalledCopy)
     let shown = update.map { StatusPresentation($0.status) }
     let hear =
       update?.status.call == .off
@@ -187,7 +190,9 @@ public struct MenuContent: Sendable, Equatable {
 
   /// The menu's foot, the same with or without a bridge: an update to install, Quick Settings,
   /// Settings, Feedback & Support and Quit.
-  private static func foot(settings: Settings, available: AppVersion?) -> [Item] {
+  private static func foot(
+    settings: Settings, available: AppVersion?, isInstalledCopy: Bool
+  ) -> [Item] {
     let install: [Item] =
       available.map {
         [.command(.installUpdate($0), title: "Install LiveBridge \($0)…", isEnabled: true)]
@@ -201,7 +206,7 @@ public struct MenuContent: Sendable, Equatable {
       .toggle(.debugMode, isOn: settings.debugMode),
       .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
       .separator,
-      .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: true),
+      .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: isInstalledCopy),
     ]
     return install + [
       .submenu("Quick Settings", isEnabled: true, items: quick),

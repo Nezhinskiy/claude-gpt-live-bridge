@@ -217,11 +217,14 @@ permitirlo.
 
 ### Desinstalación
 
-**Feedback & Support ▸ Uninstall LiveBridge…**, en el menú, pregunta primero; luego quita el
-inicio de sesión y el permiso del micrófono, termina la llamada, mueve la app y todos los
-archivos que guarda (los de abajo) a la Papelera y se cierra. Deja el mod de Claude Code y
-copia el comando que lo quita, `claude plugin uninstall livebridge@livebridge`, para que lo
-ejecutes en Terminal.
+En la copia de `/Applications`, **Feedback & Support ▸ Uninstall LiveBridge…**, en el menú,
+pregunta primero. Luego termina la llamada abierta y cada sesión deja LiveBridge, como con la ×
+del menú, así que `/live` se apaga en ella en vez de volver a abrir LiveBridge; LiveBridge quita
+el inicio de sesión y el permiso del micrófono y se cierra, y una vez cerrado, la app y todos los
+archivos que guarda (los de abajo) van a una carpeta de la Papelera, hasta que la vacíes. Deja
+el mod de Claude Code y copia el comando que lo quita, `claude plugin uninstall livebridge@livebridge`,
+para que lo ejecutes en Terminal. Una sesión que no estaba abierta entonces puede volver a
+buscar LiveBridge cuando se abra; quitar el mod lo termina.
 
 Desde un clon, `scripts/build-app.sh --uninstall` elimina `/Applications/LiveBridge.app`, sea cual
 sea la forma en que se instaló, su elemento de inicio de sesión y todos los archivos que conserva, e
@@ -240,7 +243,7 @@ tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
 
-Ninguna de las dos formas elimina una copia llamada `/Applications/.LiveBridge-update-….app`, que
+Ninguna de estas formas elimina una copia llamada `/Applications/.LiveBridge-update-….app`, que
 puede dejar una actualización interrumpida a mitad de la instalación. La aplicación elimina esas
 copias en su siguiente arranque; tras desinstalar, bórrala a mano si existe.
 
@@ -564,7 +567,8 @@ salvo que actives **Pause sync**) y la última línea de contexto cargada desde 
 ([cómo se guarda](../../SECURITY.md#residual-risk-by-design)). Las líneas de una sesión desaparecen cuando
 pulsas **New conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido
 las conserva hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta
-`/live` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](../../SECURITY.md#residual-risk-by-design)).
+`/live` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas; Uninstall LiveBridge, en el menú, las mueve a la
+Papelera, y desaparecen cuando la vacías. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](../../SECURITY.md#residual-risk-by-design)).
 **Debug mode**, desactivado por defecto, escribe los números de red de la voz durante una llamada
 en un archivo de esa carpeta, y nada más ([Ajustes](#ajustes)).
 

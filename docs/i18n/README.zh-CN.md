@@ -157,7 +157,7 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
 
 ### 卸载
 
-菜单中的 **Feedback & Support ▸ Uninstall LiveBridge…** 会先询问，然后移除登录项和麦克风权限，结束通话，把应用及其保存的所有文件（见下文）移到废纸篓，然后退出。它不会移除 Claude Code 模组，而是复制移除模组的命令 `claude plugin uninstall livebridge@livebridge`，供你在终端中运行。
+在 `/Applications` 中的副本里，菜单中的 **Feedback & Support ▸ Uninstall LiveBridge…** 会先询问。然后结束正在进行的通话，每个会话都会离开 LiveBridge（与菜单中的 × 相同），因此其中的 `/live` 会关闭，而不会再次打开 LiveBridge；LiveBridge 移除登录项和麦克风权限后退出，退出之后，应用及其保存的所有文件（见下文）会移到废纸篓中的一个文件夹，直到你清倒废纸篓。它不会移除 Claude Code 模组，而是复制移除模组的命令 `claude plugin uninstall livebridge@livebridge`，供你在终端中运行。当时未打开的会话在再次打开时可能仍会寻找 LiveBridge；移除模组即可停止。
 
 在克隆的仓库中运行 `scripts/build-app.sh --uninstall`，无论应用是如何安装的，它都会移除
 `/Applications/LiveBridge.app`、其登录项以及它保存的所有文件，并打印出留给你自己执行的两条命令：
@@ -175,7 +175,7 @@ tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
 
-两种方式都不会删除名为 `/Applications/.LiveBridge-update-….app` 的副本，这种副本可能由安装中途中断的更新留下。应用会在下次启动时删除这类副本；
+这些方式都不会删除名为 `/Applications/.LiveBridge-update-….app` 的副本，这种副本可能由安装中途中断的更新留下。应用会在下次启动时删除这类副本；
 卸载之后，如果它存在，请手动删除。
 
 `claude plugin uninstall` 可能会留下模组的快照 `~/.claude/plugins/store/livebridge_*.json`：Claude Code 文档中列出的删除内容不包括这个文件，这一点也没有实际运行验证。如果它还在，请手动删除。
@@ -300,7 +300,7 @@ LiveBridge 没有遥测，也不监听任何网络端口；模组通过一个只
 在你的 Mac 上，应用把设置、用量计量、上次检查更新的时间和已通知过的版本、上一次更新做了什么，以及最近使用的 20 个会话各自的近期对话（最多 64 行，包括你在其中输入的内容；除非你开启 **Pause sync**，否则无需通话也会记录）和上次从中加载的上下文行，保存在
 `~/Library/Application Support/LiveBridge`，该文件夹只有你的用户才能打开（[保存方式](../../SECURITY.md#residual-risk-by-design)）。当你以某个会话为目标按下 **New
 conversation**，或用 × 移除它时，该会话的这些行就会被删除。已离开的会话会保留这些内容，
-直到之后使用的 20 个会话将其挤出；若想更早地清除，请在其中再次运行 `/live` 并点击 **New conversation**。卸载会将它们全部移除。模组在 Claude Code 的插件存储中保留自己的快照（[其中有什么](../../SECURITY.md#residual-risk-by-design)）。**Debug mode** 默认关闭，开启后会在通话期间把语音的网络数据写入该文件夹中的一个文件，仅此而已（[设置](#设置)）。
+直到之后使用的 20 个会话将其挤出；若想更早地清除，请在其中再次运行 `/live` 并点击 **New conversation**。卸载会将它们全部移除；菜单中的 Uninstall LiveBridge 会把它们移到废纸篓，清倒废纸篓后才会消失。模组在 Claude Code 的插件存储中保留自己的快照（[其中有什么](../../SECURITY.md#residual-risk-by-design)）。**Debug mode** 默认关闭，开启后会在通话期间把语音的网络数据写入该文件夹中的一个文件，仅此而已（[设置](#设置)）。
 
 [SECURITY.md](../../SECURITY.md) 给出了威胁模型：简而言之，凡是你的麦克风能听到的内容，都可能变成一条请求，由 Claude 在该会话自己的权限模式下执行。
 

@@ -206,10 +206,14 @@ network पर devices खोज सकता है। voice line को यह
 
 ### अनइंस्टॉल करना
 
-menu का **Feedback & Support ▸ Uninstall LiveBridge…** पहले पूछता है, फिर login item और
-microphone permission हटाता है, call खत्म करता है, app और उसकी सारी files (नीचे दी गई) Trash में
-ले जाता है और बंद हो जाता है। Claude Code का mod बना रहता है: उसे हटाने वाला command,
-`claude plugin uninstall livebridge@livebridge`, copy हो जाता है ताकि आप उसे Terminal में चलाएँ।
+`/Applications` वाली copy में menu का **Feedback & Support ▸ Uninstall LiveBridge…** पहले
+पूछता है। फिर खुली call खत्म होती है और हर session LiveBridge छोड़ देता है, जैसे menu के × से,
+इसलिए उसमें `/live` LiveBridge को फिर से खोलने के बजाय बंद हो जाता है; LiveBridge login item और
+microphone permission हटाकर बंद हो जाता है, और उसके बंद होने के बाद app और उसकी सारी files (नीचे
+दी गई) Trash के एक folder में चली जाती हैं, जब तक आप उसे खाली न करें। Claude Code का mod बना
+रहता है: उसे हटाने वाला command, `claude plugin uninstall livebridge@livebridge`, copy हो
+जाता है ताकि आप उसे Terminal में चलाएँ। जो session तब खुला नहीं था, वह खुलने पर फिर से
+LiveBridge ढूँढ सकता है; mod हटाने से यह रुक जाता है।
 
 किसी clone से, `scripts/build-app.sh --uninstall` `/Applications/LiveBridge.app` को हटा देता है,
 चाहे वह जैसे भी install हुआ हो, साथ ही उसका login item और उसकी रखी हर फ़ाइल, और वे दो commands
@@ -534,7 +538,8 @@ release मिलने पर app `gh auth status` चलाता है, य�
 उसे target रखकर **New conversation** दबाते हैं या उसे × से हटाते हैं। जो session चला गया है, उसकी
 पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए 20 sessions उन्हें बाहर न धकेल दें; उन्हें
 जल्दी मिटाने के लिए, उसी session में फिर से `/live` चलाएँ और **New conversation** दबाएँ।
-Uninstall करने से वे सब हट जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](../../SECURITY.md#residual-risk-by-design))।
+Uninstall करने से वे सब हट जाती हैं; menu का Uninstall LiveBridge उन्हें Trash में ले जाता
+है, और Trash खाली करने पर वे चली जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](../../SECURITY.md#residual-risk-by-design))।
 **Debug mode**, जो डिफ़ॉल्ट रूप से बंद है, call के दौरान voice के network आँकड़े इसी folder की एक file
 में लिखता है, और कुछ नहीं ([सेटिंग्स](#सेटिंग्स))।
 

@@ -54,8 +54,9 @@ public struct Confirmation: Sendable, Equatable {
   public static let uninstall = Confirmation(
     title: "Uninstall LiveBridge?",
     message:
-      "LiveBridge moves itself and every file it keeps to the Trash, removes its login item and "
-      + "its microphone permission, and quits; a call open now ends. The Claude Code mod stays: "
-      + "the command that removes it, \(modUninstallCommand), is copied for you to run in Terminal.",
+      "A call open now ends, and every session leaves LiveBridge, so /live turns off in each. "
+      + "LiveBridge removes its login item and its microphone permission and quits, and the app "
+      + "and every file it keeps go to the Trash. The Claude Code mod stays: the command that "
+      + "removes it, \(modUninstallCommand), is copied for you to run in Terminal.",
     confirm: "Uninstall")
 }
