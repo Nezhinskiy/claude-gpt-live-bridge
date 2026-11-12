@@ -48,7 +48,7 @@ public struct Confirmation: Sendable, Equatable {
   }
 
   /// The command that removes the Claude Code mod, which Uninstall LiveBridge leaves to the owner.
-  public static let modUninstallCommand = "claude plugin uninstall livebridge@livebridge"
+  public static let modUninstallCommand = "claude plugin uninstall \(Updater.modID)"
 
   /// The menu's Uninstall LiveBridge.
   public static let uninstall = Confirmation(
