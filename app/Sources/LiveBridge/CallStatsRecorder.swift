@@ -3,14 +3,13 @@ import Foundation
 import WebKit
 import os
 
-/// Debug mode's recorder: puts `CallStats.pageScript` in the page, switches its reading to the
-/// setting, and writes what it posts to one file per call. The folder is made by the first
-/// sample, so a run with debug mode off leaves nothing on disk.
+/// Debug mode's recorder: puts `CallStats.pageScript` in the page, switches its reading and the
+/// log to the setting, and hands what the page posts to `CallStatsLog`, which drops it while
+/// debug mode is off.
 @MainActor
 final class CallStatsRecorder: NSObject, WKScriptMessageHandler {
   private weak var page: WKWebView?
-  private var log: CallStatsLog?
-  private var isOn = false
+  private let log = CallStatsLog(directory: CallStats.directory)
   private static let logger = Logger(subsystem: Paths.bundleID, category: "call-stats")
 
   /// Installs the script for the page's next load; it reads nothing until `set(on: true)`.
@@ -24,25 +23,22 @@ final class CallStatsRecorder: NSObject, WKScriptMessageHandler {
         source: CallStats.pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
   }
 
-  /// Switches the page's reading; off, the call's file closes at once, and a sample the page
-  /// posted before the switch reached it is dropped.
+  /// Switches the page's reading and the log; off, the call's file closes at once.
   func set(on: Bool) {
-    isOn = on
+    log.set(on: on)
     page?.evaluateJavaScript(CallStats.switchScript(on: on))
-    if !on { endCall() }
   }
 
-  func endCall() { log?.endCall() }
+  func endCall() { log.endCall() }
 
   func userContentController(
     _ controller: WKUserContentController, didReceive message: WKScriptMessage
   ) {
-    guard isOn, message.frameInfo.isMainFrame else { return }
+    guard message.frameInfo.isMainFrame else { return }
     do {
-      if log == nil { log = CallStatsLog(directory: try CallStats.directory()) }
-      _ = try log?.record(message.body, at: Date())
+      _ = try log.record(message.body, at: Date())
     } catch {
-      Self.logger.error("call stats not written: \(error.localizedDescription)")
+      Self.logger.error("call stats not written: \(error.localizedDescription, privacy: .public)")
     }
   }
 }

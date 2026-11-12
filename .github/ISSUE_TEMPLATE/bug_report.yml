@@ -83,7 +83,7 @@ body:
       description: |
         If the voice broke up: turn on Debug mode (Settings > General, or Feedback & Support in
         the menu), make a call until it breaks up again, then open Show Debug Files and attach that
-        call's CSV here. It holds only network numbers.
+        call's CSV here. It holds the time and the network numbers, nothing else.
   - type: checkboxes
     id: checks
     attributes:

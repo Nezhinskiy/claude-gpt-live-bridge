@@ -121,24 +121,33 @@ public enum CallStats {
   }
 }
 
-/// One file per call, made by the call's first sample: a call whose line never opened leaves
-/// none.
+/// Debug mode's files: one per call, made by the call's first sample while debug mode is on, so
+/// a call whose line never opened, or one with debug mode off, leaves none. `directory` makes the
+/// folder; it is asked for each new file, so a folder deleted between calls is made again.
 public final class CallStatsLog {
-  private let directory: URL
+  private let directory: () throws -> URL
   private let timeZone: TimeZone
   private var file: FileHandle?
+  private var isOn = false
 
-  public init(directory: URL, timeZone: TimeZone = .current) {
+  public init(directory: @escaping () throws -> URL, timeZone: TimeZone = .current) {
     self.directory = directory
     self.timeZone = timeZone
   }
 
+  /// Debug mode. Off, the call's file closes at once and every sample is dropped, one the page
+  /// posted before it heard of the switch included.
+  public func set(on: Bool) {
+    isOn = on
+    if !on { endCall() }
+  }
+
   /// Adds the sample; returns the file when this sample opened it.
   public func record(_ body: Any, at date: Date) throws -> URL? {
-    guard let row = CallStats.row(body, at: date, timeZone: timeZone) else { return nil }
+    guard isOn, let row = CallStats.row(body, at: date, timeZone: timeZone) else { return nil }
     var opened: URL?
     if file == nil {
-      let url = directory.appending(path: CallStats.fileName(at: date, timeZone: timeZone))
+      let url = try directory().appending(path: CallStats.fileName(at: date, timeZone: timeZone))
       try Data((CallStats.header + "\n").utf8).write(to: url)
       let handle = try FileHandle(forWritingTo: url)
       try handle.seekToEnd()
