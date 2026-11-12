@@ -185,6 +185,8 @@ struct BridgeTests {
   let timeouts = OSAllocatedUnfairLock(initialState: CallMachine.Timeouts())
   /// Settings' Connect over TCP, which a test may flip.
   let tcp = OSAllocatedUnfairLock(initialState: false)
+  /// What the bridge reported about each summary ask it saw answered.
+  let timings = OSAllocatedUnfairLock(initialState: [SummaryTiming]())
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
@@ -199,6 +201,7 @@ struct BridgeTests {
     self.time = time
     let pause = OSAllocatedUnfairLock(initialState: pausesSync)
     self.pause = pause
+    let timings = timings
     self.dir = try dir ?? temporaryDirectory()
     registry = SessionRegistry(time: time)
     audio = FakeAudio(time: time)
@@ -209,7 +212,8 @@ struct BridgeTests {
       notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
       pausesSync: { pause.withLock { $0 } }, timeouts: { [timeouts] in timeouts.withLock { $0 } },
       loadsContextOnFirstCall: { loadsContextOnFirstCall },
-      connectsOverTCP: { [tcp] in tcp.withLock { $0 } }, appVersion: appVersion)
+      connectsOverTCP: { [tcp] in tcp.withLock { $0 } },
+      reportsSummary: { timing in timings.withLock { $0.append(timing) } }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -1400,6 +1404,28 @@ struct BridgeTests {
     #expect(try test.saved()[a].outOfSync == .paused)
     #expect(await test.bridge.current.needsContext)
     #expect(await test.bridge.current.context == "[CONTEXT] Alpha: Old.")
+  }
+
+  @Test func aSummaryReportsHowLongItsAskTook() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    time.advance(by: .seconds(7))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    let timing = try #require(timings.withLock { $0.first })
+    #expect(timing.askedFor == 7)
+    #expect(!timing.stale)
+    #expect(timing.hadSummary)
+  }
+
+  @Test func aStaleAnswerIsReportedAsStale() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    await bridge.newConversation()
+    time.advance(by: .seconds(3))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    let timing = try #require(timings.withLock { $0.first })
+    #expect(timing.stale)
+    #expect(timing.askedFor == 3)
   }
 
   /// A summary on its way when the owner presses New conversation does not bring back what was

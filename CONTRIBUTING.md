@@ -234,6 +234,14 @@ one before, and ignore a line's first row, where concealment is only start-up.
 - Clean numbers rule out delivery of the incoming audio. That leaves what the server generated and
   the local audio output (Bluetooth, echo cancellation), which these numbers cannot separate either.
 
+To see how long each summary ask takes to be answered, which model wrote it and whether the answer
+was ignored as stale, stream the app's debug log. A line holds numbers and a listed model's name
+only (`custom` for any other id), no summary text:
+
+```sh
+log stream --level debug --predicate 'subsystem == "com.getlivebridge.livebridge" AND category == "summary"'
+```
+
 ## Conventions
 
 - One behaviour, one test, and a failing test before the change that makes it pass.
