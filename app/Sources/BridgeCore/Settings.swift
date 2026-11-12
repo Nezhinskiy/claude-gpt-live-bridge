@@ -37,6 +37,9 @@ public struct Settings: Codable, Sendable, Equatable {
   public var silenceSeconds: Int
   public var firstWordSeconds: Int
   public var noiseSeconds: Int
+  /// The model that writes a session's summary (`SummaryModel`), at low effort; a value that is
+  /// not a model id reads as the default.
+  public var summaryModel = SummaryModel.default
 
   public init(
     voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
@@ -94,6 +97,9 @@ public struct Settings: Codable, Sendable, Equatable {
     silenceSeconds = try timeout(.silenceSeconds, defaults.silence)
     firstWordSeconds = try timeout(.firstWordSeconds, defaults.firstWord)
     noiseSeconds = try timeout(.noiseSeconds, defaults.noise)
+    summaryModel =
+      try container.decodeIfPresent(String.self, forKey: .summaryModel).flatMap(
+        SummaryModel.accepted) ?? SummaryModel.default
   }
 }
 

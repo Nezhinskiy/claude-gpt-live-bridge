@@ -187,6 +187,8 @@ struct BridgeTests {
   let tcp = OSAllocatedUnfairLock(initialState: false)
   /// What the bridge reported about each summary ask it saw answered.
   let timings = OSAllocatedUnfairLock(initialState: [SummaryTiming]())
+  /// Settings' summary model, which a test may change.
+  let summaryModel = OSAllocatedUnfairLock(initialState: SummaryModel.default)
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
@@ -213,6 +215,7 @@ struct BridgeTests {
       pausesSync: { pause.withLock { $0 } }, timeouts: { [timeouts] in timeouts.withLock { $0 } },
       loadsContextOnFirstCall: { loadsContextOnFirstCall },
       connectsOverTCP: { [tcp] in tcp.withLock { $0 } },
+      summaryModel: { [summaryModel] in summaryModel.withLock { $0 } },
       reportsSummary: { timing in timings.withLock { $0.append(timing) } }, appVersion: appVersion)
   }
 
@@ -225,13 +228,13 @@ struct BridgeTests {
 
   func join(
     _ id: SessionID, _ title: String, modVersion: String? = nil, owner: Bool? = nil,
-    syncs: Bool? = true, missed: Bool? = nil
+    syncs: Bool? = true, missed: Bool? = nil, writesSummaries: Bool? = nil
   ) async throws {
     try await post(
       "/v1/join",
       JoinBody(
         sessionId: id, title: title, owner: owner, modVersion: modVersion, syncs: syncs,
-        missed: missed))
+        missed: missed, writesSummaries: writesSummaries))
   }
 
   func setPause(_ on: Bool) { pause.withLock { $0 = on } }
@@ -1442,6 +1445,70 @@ struct BridgeTests {
     let timing = try #require(timings.withLock { $0.first })
     #expect(timing.stale)
     #expect(timing.askedFor == 3)
+  }
+
+  // MARK: The summary model
+
+  @Test func anAskNamesTheModelAndTheDefault() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    #expect(
+      try await registry.poll(a)
+        == .context(model: "claude-opus-5-5", fallbackModel: "claude-haiku-5-5"))
+    let recorded = try saved()[a].openSummaryAsk(at: time.now)
+    #expect(recorded?.model == "claude-opus-5-5")
+    #expect(recorded?.fallbackModel == "claude-haiku-5-5")
+  }
+
+  @Test func theDefaultHasNoFallback() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: "claude-haiku-5-5", fallbackModel: nil))
+  }
+
+  /// A mod that forks ignores a model, so it is asked as before.
+  @Test func anOlderModGetsAPlainAsk() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context())
+  }
+
+  /// Only an answer to an ask that named a model says which model wrote it.
+  @Test func anOlderModsAnswerLeavesTheReportAlone() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let refused = [SummaryFailure(reason: .modelRefused, error: nil)]
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", failures: refused))
+    let report = SummaryReport(
+      asked: "claude-opus-5-5", fallback: "claude-haiku-5-5", failures: refused, wrote: true)
+    #expect(await bridge.lastSummary == report)
+    try await join(b, "Beta")
+    await bridge.setTarget(b)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    #expect(await bridge.lastSummary == report)
+  }
+
+  /// The log names the model asked for, or the fallback when that one failed, with the post's numbers.
+  @Test func theLogNamesTheAskedModel() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    let stats = SummaryStats(
+      durationMs: 4_000, transcriptChars: 90_000, inputTokens: 25_000, outputTokens: 400)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "One.", stats: stats))
+    await bridge.loadContext()
+    try await post(
+      "/v1/context",
+      ContextBody(
+        sessionId: a, summary: "Two.", failures: [SummaryFailure(reason: .apiError, error: nil)]))
+    let reported = timings.withLock { $0 }
+    #expect(reported.map(\.model) == ["claude-opus-5-5", "claude-haiku-5-5"])
+    #expect(reported.first?.stats == stats)
   }
 
   /// A summary on its way when the owner presses New conversation does not bring back what was

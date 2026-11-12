@@ -297,15 +297,17 @@ extension ContinuityTests {
     #expect(!taken)
   }
 
-  /// The mod joins a second ask to the summary on its way, which is the first ask's.
-  @Test func aSecondAskDoesNotFreshenTheFirst() {
+  /// An ask after a gap is a fresh one, with its own model, not blocked behind the stale ask.
+  @Test func aFreshAskReplacesAStaleOne() {
     var continuity = Continuity()
     let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.noteSummaryAsk(of: a, at: now, model: "claude-opus-5-5")
     continuity.markMissed(a, asPaused: false)
-    continuity.noteSummaryAsk(of: a, at: now + 1)
-    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
-    #expect(!taken)
+    continuity.noteSummaryAsk(of: a, at: now + 1, model: "claude-sonnet-5-5")
+    let open = continuity.openSummaryAsk(of: a, at: now + 2)
+    #expect(open?.isStale == false)
+    #expect(open?.model == "claude-sonnet-5-5")
+    #expect(open?.at == now + 1)
   }
 
   /// A summary refused closes its ask: the owner's next press stands on its own.

@@ -27,6 +27,10 @@ public actor Bridge: Router {
   private let connectsOverTCP: @Sendable () -> Bool
   /// Told how long each summary ask took to be answered (`SummaryLog`).
   private let reportsSummary: @Sendable (SummaryTiming) -> Void
+  /// Settings' summary model, read at each ask.
+  private let summaryModel: @Sendable () -> String
+  /// What came of the last summary asked for with a model.
+  public private(set) var lastSummary: SummaryReport?
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -82,9 +86,11 @@ public actor Bridge: Router {
     timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
     connectsOverTCP: @escaping @Sendable () -> Bool = { false },
+    summaryModel: @escaping @Sendable () -> String = { SummaryModel.default },
     reportsSummary: @escaping @Sendable (SummaryTiming) -> Void = { _ in }, appVersion: AppVersion?
   ) {
     self.reportsSummary = reportsSummary
+    self.summaryModel = summaryModel
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
@@ -194,10 +200,18 @@ public actor Bridge: Router {
     await askForContext(of: target)
   }
 
+  /// A mod that writes summaries is told the model and, unless it is the default, the default to
+  /// fall back on; one that forks is asked as before.
   private func askForContext(of id: SessionID) async {
-    continuity.noteSummaryAsk(of: id, at: time.now)
+    var model: String?
+    var fallback: String?
+    if await registry.writesSummaries(id) {
+      model = summaryModel()
+      fallback = model == SummaryModel.default ? nil : SummaryModel.default
+    }
+    continuity.noteSummaryAsk(of: id, at: time.now, model: model, fallbackModel: fallback)
     save()
-    await registry.requestContext(for: id)
+    await registry.requestContext(for: id, model: model, fallbackModel: fallback)
   }
 
   /// The menu's choice of target; a session that left is ignored.
@@ -740,8 +754,9 @@ public actor Bridge: Router {
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
   /// it is and kept in the session's conversation. One asked for before the latest gap or forget
   /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
-  /// the menu's press stays pending. An empty one keeps the stored line: the mod never sends one,
-  /// so this guards only against another socket peer, and it is not a control.
+  /// the menu's press stays pending. An empty one keeps the stored line and closes the ask: a mod
+  /// that writes summaries sends one when it has none. The answer to an ask that named a model is
+  /// `lastSummary`.
   /// A live line about that session gets the summary at once, and one still connecting gets it
   /// when connected; it does not hold the line open. A summary equal to the stored one is not
   /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
@@ -749,18 +764,26 @@ public actor Bridge: Router {
     let id = body.sessionId
     let row = try await label(of: id)
     let now = time.now
-    if let ask = continuity.openSummaryAsk(of: id, at: now) {
+    let wrote = !body.summary.allSatisfy(\.isWhitespace)
+    let failures = body.failures ?? []
+    let ask = continuity.openSummaryAsk(of: id, at: now)
+    if let ask {
+      let model = failures.count == 1 && wrote ? ask.fallbackModel : ask.model
       reportsSummary(
         SummaryTiming(
-          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale,
-          hadSummary: !body.summary.allSatisfy(\.isWhitespace), model: nil, stats: nil))
+          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale, hadSummary: wrote,
+          model: model, stats: body.stats))
     }
     guard continuity.takeSummaryAsk(of: id, at: now) else { return }
+    if let asked = ask?.model {
+      lastSummary = SummaryReport(
+        asked: asked, fallback: ask?.fallbackModel, failures: failures, wrote: wrote)
+    }
     let line =
-      body.summary.allSatisfy(\.isWhitespace)
-      ? nil
-      : AnswerShaper.line(
+      wrote
+      ? AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
+      : nil
     guard let line else {
       announceContext.yield(id)
       return

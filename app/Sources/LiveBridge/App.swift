@@ -172,6 +172,7 @@ final class AppModel {
         timeouts: { settings.current.timeouts },
         loadsContextOnFirstCall: { settings.current.loadContextOnFirstCall },
         connectsOverTCP: { settings.current.connectsOverTCP },
+        summaryModel: { settings.current.summaryModel },
         reportsSummary: { timing in
           Self.summaryLog.debug("\(SummaryLog.line(timing), privacy: .public)")
         }, appVersion: appVersion)

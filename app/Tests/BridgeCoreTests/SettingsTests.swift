@@ -94,6 +94,16 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.loadContextOnFirstCall)
   }
 
+  /// A 0.5.x file has no summary model: it gets the default, on an update too.
+  @Test func aFileFromBeforeItGetsHaiku() throws {
+    #expect(try decoded(#"{"voice":"marin"}"#).summaryModel == "claude-haiku-5-5")
+  }
+
+  @Test func aBadStoredValueGetsHaiku() throws {
+    #expect(try decoded(#"{"summaryModel":"x;rm -rf"}"#).summaryModel == "claude-haiku-5-5")
+    #expect(try decoded(#"{"summaryModel":"claude-opus-5-5"}"#).summaryModel == "claude-opus-5-5")
+  }
+
   @Test func theLineKeepsTodaysTimersByDefault() {
     #expect(Settings().timeouts == CallMachine.Timeouts(silence: 20, firstWord: 5, noise: 90))
   }
