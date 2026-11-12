@@ -129,7 +129,10 @@ Mute and Unmute work as today: the call is `.listening` or `.connecting`, never 
   the call is on, after `problem` and `approval` and before `unheard`. `working` gets a new
   animation instead: three dots between the towers that brighten one after another, like an
   ellipsis, for thinking rather than loading. Both have a still frame when motion is reduced. The
-  shapes are my call; frames are shown to the owner before the code is committed.
+  shapes are my call; frames are shown to the owner before the code is committed. **Built ahead
+  of the rest** (2026-11-11, at the owner's request): `working` draws the three dots, and the
+  session row's symbol for it is `ellipsis`, not turning arrows. The ring's drawing was removed
+  with it; `loadingContext` brings it back.
 
 ## Facts from the engine's types
 
