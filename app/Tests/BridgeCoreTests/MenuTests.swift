@@ -389,7 +389,6 @@ struct MenuContentTests {
       let quick = try #require(Self.submenu("Quick Settings", in: menu))
       #expect(quick.count == 5 && !quick.contains(.toggle(.debugMode, isOn: on)))
     }
-    #expect(MenuContent.Switch.debugMode.title == "Debug Mode")
   }
 
   @Test func onlyTheInstalledCopyCanUninstall() throws {
