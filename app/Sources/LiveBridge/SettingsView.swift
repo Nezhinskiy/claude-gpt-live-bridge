@@ -287,7 +287,7 @@ final class SettingsWindow {
 }
 
 /// The window's tabs in its toolbar, one SwiftUI form each. The tab shown follows
-/// `AppModel.settingsTab` both ways, and AppKit sizes the window to the tab shown.
+/// `AppModel.settingsTab` both ways.
 @MainActor
 private final class SettingsTabs: NSTabViewController {
   static let title = "LiveBridge Settings"
@@ -300,9 +300,7 @@ private final class SettingsTabs: NSTabViewController {
     // The window keeps its own title instead of taking the tab's label.
     canPropagateSelectedChildViewControllerTitle = false
     for tab in SettingsTab.allCases {
-      let form = NSHostingController(rootView: SettingsView(model: model, tab: tab))
-      form.sizingOptions = .preferredContentSize
-      let item = NSTabViewItem(viewController: form)
+      let item = NSTabViewItem(viewController: SettingsPage(model: model, tab: tab))
       item.label = tab.label
       item.image = NSImage(systemSymbolName: tab.symbol, accessibilityDescription: tab.label)
       addTabViewItem(item)
@@ -320,6 +318,59 @@ private final class SettingsTabs: NSTabViewController {
     super.tabView(tabView, didSelect: tabViewItem)
     if let tabViewItem {
       model.settingsTab = SettingsTab.allCases[tabView.indexOfTabViewItem(tabViewItem)]
+      (tabViewItem.viewController as? SettingsPage)?.fitWindow()
+    }
+  }
+}
+
+/// One tab: its form hangs from the top, and the window slides to the form's height, top edge
+/// still, the way a Mac settings window moves between tabs. AppKit's own fitting snaps, since
+/// it sizes the window through layout constraints, so the form gives the window no constraint
+/// and reports its height instead.
+@MainActor
+private final class SettingsPage: NSViewController {
+  private let form: NSHostingController<SettingsView>
+  private var height: NSKeyValueObservation?
+
+  init(model: AppModel, tab: SettingsTab) {
+    form = NSHostingController(rootView: SettingsView(model: model, tab: tab))
+    form.sizingOptions = .preferredContentSize
+    super.init(nibName: nil, bundle: nil)
+    addChild(form)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError("SettingsPage is built in code") }
+
+  override func loadView() {
+    view = NSView()
+    form.view.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(form.view)
+    NSLayoutConstraint.activate([
+      form.view.topAnchor.constraint(equalTo: view.topAnchor),
+      form.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      form.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+    ])
+    // A hint that comes or goes inside the tab moves the window too.
+    height = form.observe(\.preferredContentSize) { [weak self] _, _ in
+      MainActor.assumeIsolated { self?.fitWindow() }
+    }
+  }
+
+  func fitWindow() {
+    let size = form.preferredContentSize
+    guard let window = view.window, let content = window.contentView, size.height > 0 else {
+      return
+    }
+    var frame = window.frame
+    frame.size.width += size.width - content.frame.width
+    frame.size.height += size.height - content.frame.height
+    frame.origin.y = window.frame.maxY - frame.height
+    guard frame != window.frame else { return }
+    if window.isVisible {
+      NSAnimationContext.runAnimationGroup { _ in window.animator().setFrame(frame, display: true) }
+    } else {
+      window.setFrame(frame, display: false)
     }
   }
 }
