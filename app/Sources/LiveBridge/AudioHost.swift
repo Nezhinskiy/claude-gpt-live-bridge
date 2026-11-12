@@ -25,9 +25,12 @@ final class AudioHost: NSObject, AudioSide {
   private var waiting: [CheckedContinuation<Void, Never>] = []
   private let chimeSound = bundledSound("chime")
   private let handoffSound = bundledSound("handoff")
-  #if DEBUG
-    private var callStats: CallStatsRecorder?
-  #endif
+  private let callStats: CallStatsRecorder
+  /// Debug mode: the page reads the call's statistics while it is on, applied again each time
+  /// the page loads.
+  var recordsCallStats = false {
+    didSet { callStats.set(on: recordsCallStats) }
+  }
 
   /// `fakeMic` (debug builds only) replaces the microphone with a WAV file.
   init(fakeMic: URL?) {
@@ -37,11 +40,9 @@ final class AudioHost: NSObject, AudioSide {
     config.mediaTypesRequiringUserActionForPlayback = []
     config.setURLSchemeHandler(PageFiles(fakeMic: fakeMic), forURLScheme: AudioPage.scheme)
     webView = WKWebView(frame: .zero, configuration: config)
+    callStats = CallStatsRecorder(page: webView)
     super.init()
     config.userContentController.add(self, name: "bridge")
-    #if DEBUG
-      callStats = CallStatsRecorder.install(in: config)
-    #endif
     webView.navigationDelegate = self
     webView.uiDelegate = self
     window.contentView = webView
@@ -86,9 +87,7 @@ final class AudioHost: NSObject, AudioSide {
 
   func stopListening() async {
     _ = try? await call("LB.stop()")
-    #if DEBUG
-      callStats?.endCall()
-    #endif
+    callStats.endCall()
   }
 
   /// Fails closed: a page that cannot confirm the release ends the call, whose `LB.stop`
@@ -182,8 +181,11 @@ extension AudioHost: WKNavigationDelegate, WKUIDelegate {
       ? .allow : .cancel
   }
 
+  /// A load, a reload after WebKit ended the page's process included, starts with the reading
+  /// off: it follows debug mode again.
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     settle(navigation, loaded: true)
+    callStats.set(on: recordsCallStats)
   }
 
   func webView(

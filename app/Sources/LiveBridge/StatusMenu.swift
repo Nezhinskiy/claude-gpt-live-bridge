@@ -238,6 +238,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
       case .starOnGitHub: #selector(starOnGitHub)
       case .reportBug: #selector(reportBug)
       case .website: #selector(openWebsite)
+      case .showDebugFiles: #selector(showDebugFiles)
       case .settings: #selector(showSettings)
       case .quit: #selector(quit)
       case .installUpdate: #selector(installUpdate(_:))
@@ -272,7 +273,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   @objc private func starOnGitHub() { NSWorkspace.shared.open(Release.repositoryPage) }
 
-  /// Flips a Quick Settings switch through the setter its Settings control calls, once the menu
+  /// Flips a switch (Quick Settings' or Debug Mode) through the setter its Settings control calls, once the menu
   /// has closed: Connect over TCP may ask first, and an alert inside menu tracking hangs.
   @objc private func toggle(_ sender: NSMenuItem) {
     guard let toggle = sender.representedObject as? MenuContent.Switch else { return }
@@ -283,6 +284,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   @objc private func reportBug() { NSWorkspace.shared.open(Release.bugReportForm) }
 
   @objc private func openWebsite() { NSWorkspace.shared.open(Release.website) }
+
+  @objc private func showDebugFiles() { model.showDebugFiles() }
 
   @objc private func quit() { NSApp.terminate(nil) }
 

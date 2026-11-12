@@ -287,7 +287,8 @@ parlez.
   **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause sync while the call is stopped** et **Load a session's context on its first call**),
   **Settings…**, **Feedback & Support** (**Report a Bug…** ouvre le formulaire de rapport de bogue
   du dépôt, **LiveBridge Website** ouvre getlivebridge.com, **Star LiveBridge on GitHub** ouvre la
-  page du dépôt) et **Quit LiveBridge**. Quick Settings est là même quand le menu ne montre que
+  page du dépôt, puis **Debug Mode** et **Show Debug Files…**, l'interrupteur et le dossier du
+  [mode débogage](#réglages)) et **Quit LiveBridge**. Quick Settings est là même quand le menu ne montre que
   l'appel. Pendant un appel, **Conversation** affiche vos mots et ceux de la voix à mesure
   que codex les transcrit : les vôtres peuvent donc apparaître un instant après que vous les avez dits,
   et ceux de la voix un instant avant que vous les entendiez. Quand chaque phrase est terminée, son
@@ -328,7 +329,8 @@ parlez.
 **Quick Settings**, dans le menu, reprend cinq de ses interrupteurs ([le menu](#la-bande-et-le-menu)) :
 chaque élément est le réglage lui-même, donc un changement à un endroit se voit aussitôt à l'autre,
 et il demande ce que demande l'interrupteur d'ici.
-**General** regroupe les notifications, l'ouverture à la connexion et les mises à jour :
+**General** regroupe les notifications, l'ouverture à la connexion, les mises à jour et le mode
+débogage :
 
 - **Notify when a result is waiting** (activé par défaut) : avec le carillon pour un résultat qui
   attend pendant que la ligne est fermée, une notification macOS nomme la session (« Alpha has a
@@ -337,6 +339,14 @@ et il demande ce que demande l'interrupteur d'ici.
 - **Open at login** (désactivé par défaut).
 - **Updates** : la version en cours, **Check for update**, **Check for updates automatically** et
   ce qu'a fait la dernière mise à jour ([Mises à jour](#mises-à-jour)).
+- **Debug mode** (désactivé par défaut) : pendant un appel, une ligne par seconde des chiffres
+  réseau de la voix (paquets perdus et écartés, gigue, échantillons masqués, si la ligne passe par
+  TCP), un CSV par appel, dans `~/Library/Application Support/LiveBridge/debug/call-stats/` ; ni
+  audio, ni transcription, ni noms de session. Activé pendant un appel, il enregistre la ligne
+  ouverte à partir de ce moment ; désactivé, il s'arrête aussitôt, et les fichiers restent jusqu'à
+  ce que vous les supprimiez. **Show Debug Files** ouvre le dossier. Dans le menu, c'est **Debug
+  Mode**, dans **Feedback & Support**
+  ([lire les chiffres](../../CONTRIBUTING.md#reading-debug-modes-numbers)).
 
 **Voice** regroupe ce que vous entendez pendant un appel :
 
@@ -575,6 +585,8 @@ appuyez sur **New conversation** avec elle comme cible ou que vous la retirez av
 qui est partie les conserve jusqu'à ce que 20 sessions utilisées ensuite les évincent ; pour les
 effacer plus tôt, exécutez de nouveau `/live` dans cette session et appuyez sur **New
 conversation**. La désinstallation les supprime toutes. Le mod garde un instantané à lui dans le magasin de plugins de Claude Code ([ce qu'il contient](../../SECURITY.md#residual-risk-by-design)).
+**Debug mode**, désactivé par défaut, écrit les chiffres réseau de la voix pendant un appel dans un
+fichier de ce dossier, et rien de plus ([Réglages](#réglages)).
 
 [SECURITY.md](../../SECURITY.md) contient le modèle de menace : en bref, tout ce que votre microphone
 peut entendre peut devenir une demande que Claude exécute avec le mode de permissions propre à la
@@ -585,8 +597,8 @@ session.
 - **Connect over TCP** préfère TCP sans l'imposer, et rien dans l'app ne montre quel transport une
   ligne a pris : une ligne revenue à UDP peut encore se hacher. La route a été mesurée une fois,
   dans une version de débogage qui retirait les candidats UDP (aucun son perdu en 10 minutes) ; la
-  méthode livrée, baisser leur priorité, a choisi TCP une fois. `--call-stats` d'une version de
-  débogage enregistre le transport (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading---call-stats)).
+  méthode livrée, baisser leur priorité, a choisi TCP une fois. Le mode débogage enregistre le
+  transport (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading-debug-modes-numbers)).
 - La voix dit parfois qu'elle regarde (« On it », « Looking now ») sans transmettre la demande, si
   bien que rien n'arrive à Claude : environ une demande sur cinq avec la règle telle qu'écrite au
   départ, et 0 sur 20 avec la règle actuelle, trop peu pour distinguer cela du hasard

@@ -197,7 +197,6 @@ The Apple Developer Program's account holder does this; nothing of it is in the 
 ```sh
 scripts/build-app.sh --run                      # debug build, then open it
 scripts/build-app.sh --run --fake-mic say.wav   # the WAV plays as the microphone
-scripts/build-app.sh --run --call-stats         # the voice's numbers, one CSV per call
 CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of your home
 /usr/bin/log stream --info --predicate 'subsystem == "com.getlivebridge.livebridge"'
 ```
@@ -212,20 +211,13 @@ was stale (asked before a gap or a forget, so it is ignored) and had text, and t
 (`custom` for an id you typed, `fork` for a summary the session's own fork wrote). It holds no
 summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
 
-### Reading `--call-stats`
+### Reading debug mode's numbers
 
-For when the voice breaks up: was it the network? While a line is open, a debug build started
-with `--call-stats` adds a row once a second to a CSV in
-`~/Library/Application Support/LiveBridge/debug/call-stats/`, one file per call. Started from a
-terminal, it prints the file's path there. It holds the time and numbers from WebKit's
-`getStats()` only: no audio, no transcript, no session names, and nothing leaves the Mac. A release
-build compiles all of this out; `scripts/tests/release-guards.test.sh` looks for its names.
-
-Only one copy of the app can hold the bridge's socket, and the mod of a joined session reopens
-`/Applications/LiveBridge.app` when it cannot reach it. So with an installed copy running, start
-the debug build first and then quit the installed copy: the debug build waits up to 10 s for the
-socket. The other way round, the installed copy comes back and takes the socket, the call goes
-through it, and no file is written.
+For when the voice breaks up: was it the network? Turn on **Debug mode** in Settings' General tab,
+or **Debug Mode** in the menu's **Feedback & Support**, in any build. While a line is open, it adds
+a row once a second to a CSV in `~/Library/Application Support/LiveBridge/debug/call-stats/`, one
+file per call; **Show Debug Files** opens the folder. It holds the time and numbers from WebKit's
+`getStats()` only: no audio, no transcript, no session names, and nothing leaves the Mac.
 
 Note the time of the glitch and find its row. `line` changes when the line reopens, and the
 counters restart with it. All columns but `jitter` are running totals, so compare a row with the

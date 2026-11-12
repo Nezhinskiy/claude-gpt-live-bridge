@@ -17,6 +17,8 @@ public struct MenuContent: Sendable, Equatable {
     case reportBug
     /// Opens the project's website (`Release.website`).
     case website
+    /// Opens debug mode's folder in the Finder.
+    case showDebugFiles
     /// Installs the release announced, this version.
     case installUpdate(AppVersion)
 
@@ -26,17 +28,23 @@ public struct MenuContent: Sendable, Equatable {
       case .settings: ","
       case .quit: "q"
       case .copyJoinCommand, .loadContext, .newConversation, .starOnGitHub, .reportBug, .website,
-        .installUpdate:
+        .showDebugFiles, .installUpdate:
         ""
       }
     }
   }
 
-  /// A setting Quick Settings shows as a checkmark item, in menu order: the setting of the same
-  /// name in Settings, not a copy.
+  /// A setting the menu shows as a checkmark item: the setting of the same name in Settings, not
+  /// a copy.
   public enum Switch: Sendable, Equatable, CaseIterable {
     case connectsOverTCP, confirmHandoffs, notifyResults, pauseSyncWhileStopped,
-      loadContextOnFirstCall
+      loadContextOnFirstCall, debugMode
+
+    /// Quick Settings' switches, in menu order; debug mode is in Feedback & Support.
+    public static let quickSettings: [Switch] = [
+      .connectsOverTCP, .confirmHandoffs, .notifyResults, .pauseSyncWhileStopped,
+      .loadContextOnFirstCall,
+    ]
 
     /// Settings' own words for it.
     public var title: String {
@@ -46,6 +54,7 @@ public struct MenuContent: Sendable, Equatable {
       case .notifyResults: "Notify when a result is waiting"
       case .pauseSyncWhileStopped: "Pause sync while the call is stopped"
       case .loadContextOnFirstCall: "Load a session's context on its first call"
+      case .debugMode: "Debug Mode"
       }
     }
 
@@ -56,6 +65,7 @@ public struct MenuContent: Sendable, Equatable {
       case .notifyResults: settings.notifyResults
       case .pauseSyncWhileStopped: settings.pauseSyncWhileStopped
       case .loadContextOnFirstCall: settings.loadContextOnFirstCall
+      case .debugMode: settings.debugMode
       }
     }
   }
@@ -180,11 +190,14 @@ public struct MenuContent: Sendable, Equatable {
       available.map {
         [.command(.installUpdate($0), title: "Install LiveBridge \($0)…", isEnabled: true)]
       } ?? []
-    let quick = Switch.allCases.map { Item.toggle($0, isOn: $0.isOn(in: settings)) }
+    let quick = Switch.quickSettings.map { Item.toggle($0, isOn: $0.isOn(in: settings)) }
     let support: [Item] = [
       .command(.reportBug, title: "Report a Bug…", isEnabled: true),
       .command(.website, title: "LiveBridge Website", isEnabled: true),
       .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
+      .separator,
+      .toggle(.debugMode, isOn: settings.debugMode),
+      .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
     ]
     return install + [
       .submenu("Quick Settings", isEnabled: true, items: quick),

@@ -291,7 +291,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   sync while the call is stopped** and **Load a session's context on its first call**),
   **Settings…**, **Feedback & Support** (**Report a Bug…** opens the repository's bug report form,
   **LiveBridge Website** opens getlivebridge.com, **Star LiveBridge on GitHub** opens the
-  repository's page) and **Quit LiveBridge**. Quick Settings is there even when the menu shows
+  repository's page, then **Debug Mode** and **Show Debug Files…**, [debug mode](#settings)'s
+  switch and folder) and **Quit LiveBridge**. Quick Settings is there even when the menu shows
   only the call. During a call **Conversation** shows your words and the voice's as codex transcribes them, so yours can appear a
   moment after you say them and the voice's a moment before you hear them. When each is finished,
   its final text replaces them. Only final text is kept: words still waiting for it when the line
@@ -328,7 +329,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 The menu's **Quick Settings** holds five of its switches ([the menu](#the-band-and-the-menu)): each
 item is the setting itself, so a change in one place shows at once in the other, and it asks what
 the switch here asks.
-**General** holds notifications, Open at login and updates:
+**General** holds notifications, Open at login, updates and debug mode:
 
 - **Notify when a result is waiting** (on by default): with the chime for a result that waits
   while the line is closed, a macOS notification names the session ("Alpha has a new result —
@@ -336,6 +337,13 @@ the switch here asks.
 - **Open at login** (off by default).
 - **Updates**: the running version, **Check for update**, **Check for updates automatically**
   and what the last update did ([Updating](#updating)).
+- **Debug mode** (off by default): during a call, a row a second of the voice's network numbers
+  (packets lost and discarded, jitter, concealed samples, whether the line runs over TCP), one CSV
+  per call, in `~/Library/Application Support/LiveBridge/debug/call-stats/`; no audio, no
+  transcript, no session names. Turned on during a call, it records the open line from then; turned
+  off, it stops at once, and the files stay until you delete them. **Show Debug Files** opens the
+  folder. It is also **Debug Mode** in the menu's **Feedback & Support**
+  ([reading the numbers](CONTRIBUTING.md#reading-debug-modes-numbers)).
 
 **Voice** holds what you hear during a call:
 
@@ -548,6 +556,8 @@ call running unless you turned on **Pause sync**) and the context line last load
 conversation** with it as the target or remove it with ×. A session that has left keeps them
 until 20 sessions used since push them out; to erase them sooner, run `/live` in it again and
 press **New conversation**. Uninstalling removes them all. The mod keeps a snapshot of its own in Claude Code's plugin store ([what it holds](SECURITY.md#residual-risk-by-design)).
+**Debug mode**, off by default, writes the voice's network numbers during a call to a file in that
+folder, and nothing more ([Settings](#settings)).
 
 [SECURITY.md](SECURITY.md) has the threat model: in short, anything your microphone can hear
 can become a request that Claude runs under the session's own permission mode.
@@ -557,8 +567,8 @@ can become a request that Claude runs under the session's own permission mode.
 - **Connect over TCP** prefers TCP; it does not force it, and nothing in the app shows which
   transport a line took, so a line that fell back to UDP can still break up. The route was measured
   once, in a debug build that removed the UDP candidates (no audio lost in 10 minutes); the shipped
-  way, lowering their priority, was seen once to choose TCP. A debug build's `--call-stats` records
-  the transport (`onTcp`) ([CONTRIBUTING.md](CONTRIBUTING.md#reading---call-stats)).
+  way, lowering their priority, was seen once to choose TCP. Debug mode records
+  the transport (`onTcp`) ([CONTRIBUTING.md](CONTRIBUTING.md#reading-debug-modes-numbers)).
 - The voice sometimes says it is looking ("On it", "Looking now") without handing the request off,
   so nothing reaches Claude: about one request in five with the rule as first written, and 0 of 20
   with the rule now, too few to tell from luck ([BR-001](docs/bugs/BR-001.md)). It can also claim

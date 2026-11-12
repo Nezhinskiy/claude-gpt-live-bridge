@@ -153,6 +153,7 @@ final class AppModel {
     let data = Result { try Paths.dataDir() }
     let settings = SettingsStore(file: try? data.get().appending(path: "settings.json"))
     self.settings = settings
+    audio.recordsCallStats = settings.current.debugMode
     do {
       let data = try data.get()
       let cwd = data.appending(path: "codex-cwd")
@@ -368,8 +369,8 @@ final class AppModel {
     return true
   }
 
-  /// A Quick Settings switch, through the setter its Settings control calls, so the confirmation,
-  /// the permission request and the reconnect stay in one place.
+  /// A menu switch, through the setter its Settings control calls, so the confirmation, the
+  /// permission request, the reconnect and the recorder stay in one place.
   func set(_ toggle: MenuContent.Switch, on: Bool) {
     switch toggle {
     case .connectsOverTCP: _ = setConnectsOverTCP(on)
@@ -377,7 +378,21 @@ final class AppModel {
     case .confirmHandoffs: settings.update { $0.confirmHandoffs = on }
     case .pauseSyncWhileStopped: settings.update { $0.pauseSyncWhileStopped = on }
     case .loadContextOnFirstCall: settings.update { $0.loadContextOnFirstCall = on }
+    case .debugMode: setDebugMode(on)
     }
+  }
+
+  /// Debug mode, from Settings or the menu: turned on, a line open now records from this moment;
+  /// turned off, its file closes at once.
+  func setDebugMode(_ on: Bool) {
+    settings.update { $0.debugMode = on }
+    audio.recordsCallStats = on
+  }
+
+  /// Settings' Show Debug Files and the menu's: debug mode's folder in the Finder, made if missing.
+  func showDebugFiles() {
+    guard let folder = try? CallStats.directory() else { return }
+    NSWorkspace.shared.open(folder)
   }
 
   /// One of Settings' timers for the line, kept in range; one turned on starts on a quiet open line.

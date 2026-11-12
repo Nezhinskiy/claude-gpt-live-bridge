@@ -150,6 +150,9 @@ struct MenuContentTests {
         "  Report a Bug…",
         "  LiveBridge Website",
         "  Star LiveBridge on GitHub",
+        "  ---",
+        "  [ ] Debug Mode",
+        "  Show Debug Files…",
         "---",
         "Quit LiveBridge ⌘Q",
       ])
@@ -218,6 +221,9 @@ struct MenuContentTests {
         "  Report a Bug…",
         "  LiveBridge Website",
         "  Star LiveBridge on GitHub",
+        "  ---",
+        "  [ ] Debug Mode",
+        "  Show Debug Files…",
         "---",
         "Quit LiveBridge ⌘Q",
       ])
@@ -344,7 +350,7 @@ struct MenuContentTests {
         in: Self.menu(
           Self.status(sessions: 1),
           settings: Settings(pauseSyncWhileStopped: true, connectsOverTCP: true))))
-    #expect(items == MenuContent.Switch.allCases.map { .toggle($0, isOn: true) })
+    #expect(items == MenuContent.Switch.quickSettings.map { .toggle($0, isOn: true) })
     // Each switch follows its own setting: flipping one flips only its item.
     let flips: [MenuContent.Switch: Settings] = [
       .connectsOverTCP: Settings(connectsOverTCP: true),
@@ -354,20 +360,30 @@ struct MenuContentTests {
       .loadContextOnFirstCall: Settings(loadContextOnFirstCall: false),
     ]
     let defaults = [false, true, true, false, true]
-    for (index, flipped) in MenuContent.Switch.allCases.enumerated() {
+    for (index, flipped) in MenuContent.Switch.quickSettings.enumerated() {
       var expected = defaults
       expected[index].toggle()
       #expect(Self.switches(try #require(flips[flipped])) == expected, "\(flipped)")
     }
   }
 
-  @Test func feedbackAndSupportHoldsTheLinks() {
-    #expect(
-      Self.submenu("Feedback & Support", in: Self.menu(Self.status(sessions: 1))) == [
-        .command(.reportBug, title: "Report a Bug…", isEnabled: true),
-        .command(.website, title: "LiveBridge Website", isEnabled: true),
-        .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
-      ])
+  /// The links, then debug mode as set and its files; Quick Settings does not repeat it.
+  @Test func feedbackAndSupportEndsWithDebugMode() throws {
+    for on in [false, true] {
+      let menu = Self.menu(Self.status(sessions: 1), settings: Settings(debugMode: on))
+      #expect(
+        Self.submenu("Feedback & Support", in: menu) == [
+          .command(.reportBug, title: "Report a Bug…", isEnabled: true),
+          .command(.website, title: "LiveBridge Website", isEnabled: true),
+          .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
+          .separator,
+          .toggle(.debugMode, isOn: on),
+          .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+        ])
+      let quick = try #require(Self.submenu("Quick Settings", in: menu))
+      #expect(quick.count == 5 && !quick.contains(.toggle(.debugMode, isOn: on)))
+    }
+    #expect(MenuContent.Switch.debugMode.title == "Debug Mode")
   }
 
   @Test func withoutABridgeQuickSettingsAreStillThere() throws {
