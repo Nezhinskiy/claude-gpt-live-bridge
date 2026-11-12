@@ -77,11 +77,14 @@ enum SpanGlyph {
     let t = t ?? 0
     switch badge {
     case .none: break
-    case .working:  // three dots that brighten one after another, an ellipsis: Claude thinking
-      for i in 0..<3 {
-        NSColor.black.withAlphaComponent(still ? 1 : dotAlpha(i, t: t)).setFill()
-        NSBezierPath(ovalIn: NSRect(x: 7.6 + 3.2 * Double(i), y: 3.2, width: 2.4, height: 2.4))
-          .fill()
+    case .working:  // dots turning in depth, gathering and opening again: Claude thinking
+      for dot in orbit(t: still ? nil : t) {
+        NSColor.black.withAlphaComponent(dot.alpha).setFill()
+        NSBezierPath(
+          ovalIn: NSRect(
+            x: dot.x - dot.radius, y: dot.y - dot.radius, width: 2 * dot.radius,
+            height: 2 * dot.radius)
+        ).fill()
       }
     case .approval:  // a diamond with an exclamation mark cut out, pulsing
       NSColor.black.withAlphaComponent(0.65 + 0.35 * cos(t * 2 * .pi)).setFill()
@@ -106,10 +109,40 @@ enum SpanGlyph {
     }
   }
 
-  /// Dot `i`'s opacity at `t`: a wave that crosses the three dots left to right every 1.2 s.
-  private static func dotAlpha(_ i: Int, t: Double) -> CGFloat {
-    0.3 + 0.7 * (0.5 + 0.5 * cos(2 * .pi * (t / 1.2 - Double(i) / 3)))
+  /// The working badge's dots at `t`, farthest first, on a 4.8 s cycle: three turn on a ring
+  /// lying almost flat, gather into one, open as four turning the other way on a ring stood
+  /// almost upright, gather, and open as three again. Seen in perspective, a nearer dot is larger
+  /// and darker. nil is the still frame, three dots.
+  private static func orbit(t: Double?) -> [(x: Double, y: Double, radius: Double, alpha: Double)] {
+    let cycle = (t ?? 0.8).truncatingRemainder(dividingBy: 4.8)
+    let (count, spread): (Int, Double) =
+      switch cycle {
+      case ..<1.6: (3, 1)
+      case ..<2.0: (3, ease(1 - (cycle - 1.6) / 0.4))
+      case ..<2.4: (4, ease((cycle - 2.0) / 0.4))
+      case ..<4.0: (4, 1)
+      case ..<4.4: (4, ease(1 - (cycle - 4.0) / 0.4))
+      default: (3, ease((cycle - 4.4) / 0.4))
+      }
+    let turn = 2 * .pi * (t ?? 0.3) / 1.6
+    let tilt = 0.55  // the ring leans back, so it is seen in depth
+    let (roll, direction) = count == 3 ? (0.15, 1.0) : (1.25, -1.0)
+    let ring = 3.4 * spread
+    let eye = 8.0  // the viewer's distance from the ring's centre
+    return (0..<count).map { i in
+      let angle = direction * turn + Double(i) * 2 * .pi / Double(count)
+      let (flat, depth) = (ring * cos(angle), ring * sin(angle))  // depth > 0 is nearer
+      let (up, z) = (depth * sin(tilt), depth * cos(tilt))
+      let (x, y) = (flat * cos(roll) - up * sin(roll), flat * sin(roll) + up * cos(roll))
+      let scale = eye / (eye - z)
+      let near = ring > 0 ? (z + ring) / (2 * ring) : 1
+      let size = 1.15 + 0.6 * (1 - spread)  // gathered, the dots become one larger dot
+      return (12 + x * scale, 4.6 + 0.75 * y * scale, size * scale, 0.45 + 0.55 * near)
+    }.sorted { $0.radius < $1.radius }
   }
+
+  /// 0 to 1, slow at both ends.
+  private static func ease(_ x: Double) -> Double { 0.5 - 0.5 * cos(.pi * x) }
 }
 
 /// Keeps the menu bar image current: still frames for still states, 12 frames a second while
