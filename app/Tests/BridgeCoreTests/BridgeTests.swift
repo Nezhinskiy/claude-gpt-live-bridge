@@ -1517,6 +1517,23 @@ struct BridgeTests {
     #expect(await bridge.lastSummary?.line == line)
   }
 
+  /// A reason from a later mod, or a number that is not whole, does not lose the summary; the
+  /// reason is a failure in the app's own words.
+  @Test func aPostWithAFieldTheAppCannotReadIsTaken() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let body = """
+      {"sessionId":"\(a.rawValue)","summary":"Alpha's work.","ask":1,
+      "failures":[{"reason":"a-later-reason"}],
+      "stats":{"durationMs":4000.5,"transcriptChars":1,"inputTokens":1,"outputTokens":1}}
+      """
+    _ = await bridge.handle(
+      HTTPRequest(method: "POST", path: "/v1/context", query: [:], body: Data(body.utf8)))
+    #expect(await bridge.current.context == summary)
+    #expect(await bridge.lastSummary?.line == "The last summary used Haiku 5.5: Opus 5.5 failed.")
+  }
+
   /// The log names the model asked for, or the fallback when that one failed, with the post's numbers.
   @Test func theLogNamesTheAskedModel() async throws {
     summaryModel.withLock { $0 = "claude-opus-5-5" }

@@ -180,6 +180,13 @@ public struct SummaryFailure: Codable, Sendable, Equatable {
     case apiError = "api-error"
     case emptyReply = "empty-reply"
     case timedOut = "timed-out"
+    /// One this app does not know, as from a later mod.
+    case unknown
+
+    public init(from decoder: any Decoder) throws {
+      let text = try? decoder.singleValueContainer().decode(String.self)
+      self = text.flatMap(Self.init(rawValue:)) ?? .unknown
+    }
   }
   public var reason: Reason
   public var error: String?
@@ -203,6 +210,18 @@ public struct ContextBody: Codable, Sendable, Equatable {
   public var failures: [SummaryFailure]?
   public var stats: SummaryStats?
   public var ask: Int?
+}
+
+extension ContextBody {
+  /// `stats` serve the log alone, so ones the app cannot read are dropped, not the summary.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    sessionId = try container.decode(SessionID.self, forKey: .sessionId)
+    summary = try container.decode(String.self, forKey: .summary)
+    failures = try container.decodeIfPresent([SummaryFailure].self, forKey: .failures)
+    stats = try? container.decodeIfPresent(SummaryStats.self, forKey: .stats)
+    ask = try container.decodeIfPresent(Int.self, forKey: .ask)
+  }
 }
 
 /// One usage window as the mod reads it from Claude Code. The app takes `five_hour` as a window of

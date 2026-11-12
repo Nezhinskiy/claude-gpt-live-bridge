@@ -60,6 +60,7 @@ public struct SummaryReport: Sendable, Equatable {
       }
     case .emptyReply: "wrote nothing"
     case .timedOut: "ran out of time"
+    case .unknown: "failed"
     }
   }
 }
