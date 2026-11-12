@@ -99,6 +99,22 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     forks: 0,
     /** How long the session's model takes over a summary, on the mocked clock. */
     forkMs: 0,
+    /** The session's messages, as `$.session.messages({ as: 'api' })` gives them. */
+    messages: [
+      { role: 'user', content: [{ type: 'text', text: 'Tidy the example project.' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'Tidied: the helper is renamed.' }] },
+    ] as { role: 'user' | 'assistant'; content: { type: string; text?: string; name?: string }[] }[],
+    /** Reading the session's messages fails. */
+    isTranscriptBroken: false,
+    /** What `$.model.complete` was asked, in order. */
+    completes: [] as { model: string; system?: string; prompt: string; effort?: string; maxTokens?: number; timeoutMs?: number }[],
+    /**
+     * How a model fails, by id: the engine refuses it (`complete` rejects), an API error, a reply
+     * with no text, or held until its `timeoutMs` runs out. Any other model writes `summary`.
+     */
+    completeFails: {} as Record<string, 'refused' | 'api-error' | 'empty-reply' | 'held'>,
+    /** How long a model takes over a summary, on the mocked clock. */
+    completeMs: 0,
     joined: new Set<string>(),
     /** Sessions the owner removed in the menu; only the owner's join (`/live`) clears the mark. */
     removed: new Set<string>(),
@@ -256,6 +272,27 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     }
     if (world.forkFails === 'nothing-to-fork') return { value: { isAnswered: false, reason: 'nothing-to-fork' } } as const
     return { value: { isAnswered: true, text: world.summary, usage } } as const
+  })
+  on('session.messages', () => {
+    if (world.isTranscriptBroken) throw new Error('the transcript could not be read')
+    return { value: world.messages }
+  })
+  on('model.complete', async (_, e) => {
+    const { model, system, prompt, effort, maxTokens, timeoutMs } = e
+    world.completes.push({ model, system, prompt, effort, maxTokens, timeoutMs })
+    const fails = world.completeFails[model]
+    const none = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
+    if (fails === 'refused') return { deny: `the model "${model}" is not available` }
+    if (fails === 'held') {
+      await world.clock.sleep(timeoutMs ?? 0)
+      return { value: { isAnswered: false, reason: 'aborted', usage: none } } as const
+    }
+    if (world.completeMs > 0) await world.clock.sleep(world.completeMs)
+    if (fails === 'api-error') {
+      return { value: { isAnswered: false, reason: 'api-error', status: 529, error: 'overloaded', usage: none } } as const
+    }
+    if (fails === 'empty-reply') return { value: { isAnswered: false, reason: 'empty-reply', usage: { ...none, input_tokens: 13105 } } } as const
+    return { value: { isAnswered: true, text: world.summary, usage: { ...none, input_tokens: 13105, output_tokens: 412 } } } as const
   })
   // AskUserQuestion's dialog is its own permission prompt; any other tool asks first.
   on('tool.check', (_, e) => ({ decision: e.tool === 'AskUserQuestion' ? 'allow' : 'ask' }))

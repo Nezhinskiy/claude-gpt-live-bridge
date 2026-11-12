@@ -4,6 +4,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, TestBody } from 'claude-code/testing'
 
 import { voicePrompt } from '../hooks/prompt.ts'
+import { transcriptText } from '../hooks/transcript.ts'
 import type { VoiceRequest } from '../hooks/wire.ts'
 import { BAND, fakeWorld, framed, ID, liveOn } from './fake-bridge.ts'
 
@@ -23,9 +24,12 @@ async function joined(...[$, on]: Parameters<TestBody>) {
   return world
 }
 
-/** The app asks for the session's context; the poll that brings the ask is the one that runs it. */
-async function appAsks(world: ReturnType<typeof fakeWorld>) {
-  world.work.push({ kind: 'context' })
+/**
+ * The app asks for the session's context, naming a model or, as an older app, none; the poll that
+ * brings the ask is the one that runs it.
+ */
+async function appAsks(world: ReturnType<typeof fakeWorld>, ask: { model?: string; fallbackModel?: string } = {}) {
+  world.work.push({ kind: 'context', ...ask })
   await world.clock.advance(1000)
 }
 
@@ -263,4 +267,76 @@ test('nothingToForkIsNoFailure', async ($, on) => {
   await appAsks(world)
   expect(world.take('context')).toEqual([])
   expect(world.logs.some(line => line.includes('could not summarise'))).toBe(false)
+})
+
+const OPUS = 'claude-opus-5-5'
+const HAIKU = 'claude-haiku-5-5'
+const MINUTE = 60_000
+/** An ask from an app that names a model other than its default. */
+const NAMED = { model: OPUS, fallbackModel: HAIKU }
+
+test('aNamedModelWritesWithComplete', async ($, on) => {
+  const world = await joined($, on)
+  world.completeMs = 6400
+  await appAsks(world, NAMED)
+  await world.clock.advance(6400)
+  const transcript = transcriptText(world.messages)
+  expect(world.take('context')).toEqual([{
+    ...SUMMARY,
+    stats: { durationMs: 6400, transcriptChars: transcript.length, inputTokens: 13105, outputTokens: 412 },
+  }])
+  expect(world.completes).toEqual([expect.objectContaining({ model: OPUS, effort: 'low', maxTokens: 4096 })])
+  expect(world.completes[0]!.prompt).toContain(transcript)
+  expect(world.forks).toBe(0)
+})
+
+test('aFailedModelFallsBackOnce', async ($, on) => {
+  const world = await joined($, on)
+  const cases = [
+    ['refused', { reason: 'model-refused' }],
+    ['api-error', { reason: 'api-error', error: 'overloaded' }],
+    ['empty-reply', { reason: 'empty-reply' }],
+  ] as const
+  for (const [fails, failure] of cases) {
+    await typedTurn($, `t-${fails}`, 'Done.')
+    world.completes = []
+    world.completeFails = { [OPUS]: fails }
+    await appAsks(world, NAMED)
+    expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, failures: [failure] })])
+    expect(world.completes.map(one => one.model)).toEqual([OPUS, HAIKU])
+  }
+})
+
+test('aTimeOutDoesNotFallBack', async ($, on) => {
+  const world = await joined($, on)
+  world.completeFails = { [OPUS]: 'held' }
+  await appAsks(world, NAMED)
+  // The app holds its reply to the poll, so the clock crosses the minute with one held poll.
+  let release = () => {}
+  world.holdNext = new Promise<void>(resolve => { release = resolve })
+  await world.clock.advance(MINUTE)
+  release()
+  world.holdNext = null
+  expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '', failures: [{ reason: 'timed-out' }] }])
+  expect(world.completes.map(one => [one.model, one.timeoutMs])).toEqual([[OPUS, MINUTE]])
+})
+
+test('noFallbackWhenTheModelIsTheDefault', async ($, on) => {
+  const world = await joined($, on)
+  world.completeFails = { [HAIKU]: 'api-error' }
+  await appAsks(world, { model: HAIKU })
+  expect(world.take('context')).toEqual([
+    { ...SUMMARY, summary: '', failures: [{ reason: 'api-error', error: 'overloaded' }] },
+  ])
+  expect(world.completes.map(one => one.model)).toEqual([HAIKU])
+})
+
+test('bothFailingGivesNoTextAndTwoFailures', async ($, on) => {
+  const world = await joined($, on)
+  world.completeFails = { [OPUS]: 'refused', [HAIKU]: 'empty-reply' }
+  await appAsks(world, NAMED)
+  expect(world.take('context')).toEqual([
+    { ...SUMMARY, summary: '', failures: [{ reason: 'model-refused' }, { reason: 'empty-reply' }] },
+  ])
+  expect(world.completes.map(one => one.model)).toEqual([OPUS, HAIKU])
 })

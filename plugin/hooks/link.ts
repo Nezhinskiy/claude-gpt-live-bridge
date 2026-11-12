@@ -5,7 +5,8 @@ import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-cod
 
 import type { SyncLine } from './turns.ts'
 import type {
-  ActivityBody, AnswerBody, CallAction, JoinBody, LimitWindowBody, PollReply, SessionActivity,
+  ActivityBody, AnswerBody, CallAction, ContextBody, JoinBody, LimitWindowBody, PollReply,
+  SessionActivity,
 } from './wire.ts'
 
 /** LiveBridge.app's bundle identifier. */
@@ -139,9 +140,9 @@ export class BridgeLink {
     return (await this.#forSession('sync', line))?.ok === true
   }
 
-  /** Posts the session's summary; false when the app did not take it. */
-  async context(summary: string): Promise<boolean> {
-    return (await this.#forSession('context', { summary }))?.ok === true
+  /** Posts the session's summary, and what went wrong on the way; false when the app did not take it. */
+  async context(body: Omit<ContextBody, 'sessionId'>): Promise<boolean> {
+    return (await this.#forSession('context', body))?.ok === true
   }
 
   /** Posts Claude's usage windows; nothing for an empty list, and the app's reply changes nothing. */

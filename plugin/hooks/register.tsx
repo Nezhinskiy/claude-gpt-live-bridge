@@ -18,7 +18,7 @@ const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
 const RESCAN_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
-/** How long a summary may take before the band stops saying it is loading. */
+/** How long a summary may take: the models an ask names share it, and a fork is given up after it. */
 const CONTEXT_TIMEOUT_MS = 60_000
 /** How long the band says "Context sent". */
 const SENT_NOTE_MS = 3_000
@@ -78,6 +78,8 @@ let posts: Promise<unknown> = Promise.resolve()
 let sendCount = 0
 
 type ContextOutcome = 'sent' | 'empty' | 'failed'
+/** What a context ask names: the model to write with, and the one to try if it fails; none from an older app. */
+type ContextAsk = Omit<Extract<Work, { kind: 'context' }>, 'kind'>
 
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
@@ -302,7 +304,8 @@ async function tick($: EngineInterface): Promise<void> {
       await link?.answer({ id: work.id, status: 'failed', text: '', reason: ANSWERED_HERE })
     }
   } else if (work?.kind === 'context') {
-    void contextAsked($)
+    const { kind: _, ...ask } = work
+    void contextAsked($, ask)
   }
 }
 
@@ -381,14 +384,21 @@ async function hasTurns($: EngineInterface): Promise<boolean> {
   return ((await turnCount($)) ?? 1) > 0  // not known: the model says when there is nothing
 }
 
-async function deliverContext($: EngineInterface): Promise<ContextOutcome> {
+async function deliverContext($: EngineInterface, ask: ContextAsk): Promise<ContextOutcome> {
+  const deadline = (await $.clock.now()) + CONTEXT_TIMEOUT_MS
   if (!(await hasTurns($))) return 'empty'
   const send = ++sendCount
   await showContext($, 'loading')
-  let timer: { cancel(): void } | undefined
-  const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
-  const outcome = await Promise.race([writeAndPost($, send), late])
-  timer?.cancel()
+  let outcome: ContextOutcome
+  if (ask.model === undefined) {
+    let timer: { cancel(): void } | undefined
+    const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
+    outcome = await Promise.race([writeAndPost($, ask, send, deadline), late])
+    timer?.cancel()
+  } else {
+    // The models share the minute: each call's own time limit is what is left of it.
+    outcome = await writeAndPost($, ask, send, deadline)
+  }
   if (outcome !== 'sent') sendCount += 1  // a summary this send writes after its time is dropped
   await showContext($, outcome === 'sent' ? 'sent' : undefined)
   if (outcome === 'sent') {
@@ -397,14 +407,20 @@ async function deliverContext($: EngineInterface): Promise<ContextOutcome> {
   return outcome
 }
 
-async function writeAndPost($: EngineInterface, send: number): Promise<ContextOutcome> {
+async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, deadline: number): Promise<ContextOutcome> {
   try {
+    if (ask.model !== undefined) {
+      const { text, failures, stats } = await summarize($, ask, deadline)
+      if (send !== sendCount) return 'failed'
+      const body = { summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }) }
+      return (await link?.context(body)) === true && text !== '' ? 'sent' : 'failed'
+    }
     const turns = turnsDone
-    const text = summary ?? (await summarize($))
+    const text = summary ?? (await summarize($, ask, deadline)).text
     if (send !== sendCount) return 'failed'
     if (text === '') return 'empty'
     if (turns === turnsDone) summary = text
-    return (await link?.context(text)) === true ? 'sent' : 'failed'
+    return (await link?.context({ summary: text })) === true ? 'sent' : 'failed'
   } catch {
     return 'failed'
   }
@@ -414,8 +430,8 @@ async function writeAndPost($: EngineInterface, send: number): Promise<ContextOu
  * Sends the summary the app asked for, which has no reply line of its own, and never rejects. While
  * one is on its way a second ask joins it.
  */
-async function contextAsked($: EngineInterface): Promise<void> {
-  sending ??= deliverContext($).finally(() => { sending = null })
+async function contextAsked($: EngineInterface, ask: ContextAsk): Promise<void> {
+  sending ??= deliverContext($, ask).finally(() => { sending = null })
   // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
   if ((await sending) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
 }
