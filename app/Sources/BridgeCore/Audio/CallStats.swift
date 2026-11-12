@@ -65,7 +65,7 @@ public enum CallStats {
           if (peer.signalingState === 'closed') return clearInterval(timer);
           if (!reading) return;
           const report = await peer.getStats();
-          if (reading && peer.signalingState !== 'closed') sample(report, line);
+          if (peer.signalingState !== 'closed') sample(report, line);
         }, 1000);
       }
 
@@ -78,8 +78,8 @@ public enum CallStats {
     })();
     """
 
-  /// What the app evaluates in the page to turn the reading on or off; off, a reading already
-  /// asked for posts nothing.
+  /// What the app evaluates in the page to turn the reading on or off; off, it reads no more, and
+  /// `CallStatsLog` drops a reading already asked for.
   public static func switchScript(on: Bool) -> String {
     "window.\(switchName)?.(\(on));"
   }

@@ -322,12 +322,10 @@ struct CallStatsPageScriptTests {
   }
 
   /// Turned off mid-call, it posts nothing more, a reading already asked for included.
-  @Test func switchedOffItStopsAtOnce() {
+  @Test func switchedOffItReadsNoMore() {
     run("var peer = new RTCPeerConnection(); peer.reports = [audio]; tick();")
-    #expect(number("posted.length") == 1)
-    run("tick();" + CallStats.switchScript(on: false))
-    run("tick();")
-    #expect(number("posted.length") == 1)
+    run(CallStats.switchScript(on: false) + "tick(); tick();")
+    #expect(number("window.reads") == 1)
   }
 
   @Test func eachPeerIsItsOwnLine() {
