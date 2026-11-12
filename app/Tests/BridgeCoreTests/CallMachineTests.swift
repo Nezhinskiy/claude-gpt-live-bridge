@@ -500,6 +500,20 @@ struct CallMachineTests {
     #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 30)])
   }
 
+  /// A timer a change started follows the next changes, as a Stepper passes 1, 2, 3 on its way:
+  /// it never closes the line at a value the owner went past, and back at 0 it stops.
+  @Test func aTimerStillBeingSetFollowsTheSetting() {
+    var machine = CallMachine()
+    machine.timeouts = .init(silence: 0)
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 1)
+    #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 1)])
+    machine.timeouts = .init(silence: 20)
+    #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 20)])
+    machine.timeouts = .init(silence: 0)
+    #expect(machine.handle(.timeoutsChanged) == [.cancelSilenceTimer])
+  }
+
   /// A change never moves a timer already counting.
   @Test func aChangeLeavesATimerThatCounts() {
     var machine = CallMachine()
