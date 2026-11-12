@@ -159,6 +159,8 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
 
 在 `/Applications` 中的副本里，菜单中的 **Feedback & Support ▸ Uninstall LiveBridge…** 会先询问，然后把应用移到废纸篓；如果无法移动，它会说明并且不做任何其他更改。然后结束正在进行的通话，每个会话都会离开 LiveBridge（与菜单中的 × 相同），因此其中的 `/live` 会关闭，而不会再次打开 LiveBridge；LiveBridge 移除登录项和麦克风权限后退出，退出之后，它保存的文件（见下文）会移到废纸篓中的一个文件夹，直到你清倒废纸篓。它不会移除 Claude Code 模组，而是复制移除模组的命令 `claude plugin uninstall livebridge@livebridge`，供你在终端中运行。当时未打开的会话在再次打开时可能仍会寻找 LiveBridge；移除模组即可停止。
 
+用 Homebrew 安装的？`brew uninstall --cask getlivebridge/tap/livebridge` 会移除应用及 Homebrew 中的记录；下面的步骤仍适用于应用保存的文件。
+
 在克隆的仓库中运行 `scripts/build-app.sh --uninstall`，无论应用是如何安装的，它都会移除
 `/Applications/LiveBridge.app`、其登录项以及它保存的所有文件，并打印出留给你自己执行的两条命令：
 `tccutil reset Microphone com.getlivebridge.livebridge` 和
@@ -306,7 +308,7 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
 
 ## 已知限制
 
-- **Connect over TCP** 只是优先 TCP，并不强制，应用里也不显示线路实际用了哪种传输方式，所以退回 UDP 的线路仍可能断续。这条路线只测量过一次，是在一个移除了 UDP 候选项的调试版本中（10 分钟内没有丢失音频）；正式采用的方式，即降低其优先级，只观察到一次选择了 TCP。调试模式会记录传输方式（`onTcp`）（[CONTRIBUTING.md](../../CONTRIBUTING.md#reading-debug-modes-numbers)）。
+- **Connect over TCP** 只是优先 TCP，并不强制，通话期间也不显示线路实际用了哪种传输方式，所以退回 UDP 的线路仍可能断续。这条路线只测量过一次，是在一个移除了 UDP 候选项的调试版本中（10 分钟内没有丢失音频）；正式采用的方式，即降低其优先级，只观察到一次选择了 TCP。调试模式会记录传输方式（`onTcp`）（[CONTRIBUTING.md](../../CONTRIBUTING.md#reading-debug-modes-numbers)）。
 - 语音有时会说它在查看（“On it”“Looking now”），却没有转交请求，于是什么也没有送到 Claude：按最初写下的规则，约五分之一的请求如此；按现在的规则为 20 次中 0 次，次数太少，无法与运气区分（[BR-001](../../docs/bugs/BR-001.md)）。它还可能声称做了它没有做的工作，例如 “I'll take a look.”，包括根据只作为上下文拥有的行（[ADR 0001 (n), (o)](../../docs/adr/0001-platform-findings.md)）。应用把请求放入 Claude 的队列时会播放一声短音，它不同于回答的声音；如果语音说它在查看却没有这声短音，请再说一遍。应用无法凭措辞区分这种承诺和回答，因为语音说的是你的语言。
 - Claude 的提问或它正在等待的权限提示只是交给语音，语音可能不说；没有什么能强制它说。所以离开 Mac 时不要依赖语音来播报提示：Claude 可能在没有任何通知的情况下等待。提示仍在 Claude Code 中等待，它才是唯一的控制手段；语音不是控制手段，LiveBridge 也绝不回答提示。在检查中，打开的线路上来自输入轮次的权限通知，在键盘回答之前被说出的次数为 3 次运行中 0 次，这是计数，不是比率（[ADR 0001 (n)](../../docs/adr/0001-platform-findings.md)）。已关闭的线路只有在目标会话的对话中有你的一轮时才会为它们打开；否则应用发出提示音，通话关闭时则只做记录。
 - Claude 桌面应用把输入的提示的来源报告成什么，尚未观察到（[ADR 0001 (m)](../../docs/adr/0001-platform-findings.md)）。模组只有在提示的来源是 `composer` 时才把它记录为你的。如果在那里输入的提示以其他来源到达，在那里输入的内容都不会被记录，也不会标记缺口，菜单显示 **Context up to date**，暂停的作用范围也会变小（[详情](../../SECURITY.md#what-session-text-can-do)）。

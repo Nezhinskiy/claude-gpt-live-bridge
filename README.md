@@ -243,6 +243,9 @@ copies the command that removes it, `claude plugin uninstall livebridge@livebrid
 in Terminal. A session that was not open then may still look for LiveBridge when it opens again;
 removing the mod ends that.
 
+Installed with Homebrew? `brew uninstall --cask getlivebridge/tap/livebridge` removes the app
+and Homebrew's record of it; the steps below still cover the files the app keeps.
+
 From a clone, `scripts/build-app.sh --uninstall` removes `/Applications/LiveBridge.app`,
 however it was installed, its login item and every file it keeps, and prints the two commands
 it leaves to you: `tccutil reset Microphone com.getlivebridge.livebridge` and
@@ -575,7 +578,7 @@ can become a request that Claude runs under the session's own permission mode.
 
 ## Known limitations
 
-- **Connect over TCP** prefers TCP; it does not force it, and nothing in the app shows which
+- **Connect over TCP** prefers TCP; it does not force it, and nothing shows during a call which
   transport a line took, so a line that fell back to UDP can still break up. The route was measured
   once, in a debug build that removed the UDP candidates (no audio lost in 10 minutes); the shipped
   way, lowering their priority, was seen once to choose TCP. Debug mode records

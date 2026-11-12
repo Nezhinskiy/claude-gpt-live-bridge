@@ -79,7 +79,9 @@ The README and SECURITY.md promise no telemetry. This change adds no `getStats` 
 log to a release build, so the app cannot show which transport a line took; the README's known
 limitations say so. The debug-only `--call-stats` gains an `onTcp` column, read from the selected
 candidate pair's local candidate (1 for TCP, 0 for UDP), compiled out of a release like the rest
-of it.
+of it. (Superseded 2026-11-12: `--call-stats` became debug mode, off by default and in every
+build, which keeps the `onTcp` column; see
+[the Settings and menus design](2026-11-11-settings-toolbar-and-menus-design.md).)
 
 ## Privacy wording
 
@@ -91,8 +93,8 @@ not LiveBridge's. The offer is unchanged: it lists the same local candidates eit
 ## Not verified without a real call
 
 - That a line with the setting on connects over TCP in the shipped code path, not only in the
-  debug experiment, and what it then loses. Check: one call with the setting on in a debug build
-  with `--call-stats`, reading `onTcp` and the loss columns. Watch also for a line that moves back
+  debug experiment, and what it then loses. Check: one call with the setting on with debug mode on
+  (formerly a debug build with `--call-stats`), reading `onTcp` and the loss columns. Watch also for a line that moves back
   to UDP mid-call (`onTcp` going to 0), which an ICE agent may do when a TCP pair stalls.
 - The UDP fallback when the answer has a TCP candidate but no TCP pair connects. Check: one call
   with outbound TCP to port 443 blocked by a temporary `pf` rule for the media server's address;

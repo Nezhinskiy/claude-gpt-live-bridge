@@ -226,6 +226,9 @@ el mod de Claude Code y copia el comando que lo quita, `claude plugin uninstall 
 para que lo ejecutes en Terminal. Una sesión que no estaba abierta entonces puede volver a
 buscar LiveBridge cuando se abra; quitar el mod lo termina.
 
+¿Lo instalaste con Homebrew? `brew uninstall --cask getlivebridge/tap/livebridge` quita la app y el registro de Homebrew;
+los pasos de abajo siguen siendo para los archivos que guarda la app.
+
 Desde un clon, `scripts/build-app.sh --uninstall` elimina `/Applications/LiveBridge.app`, sea cual
 sea la forma en que se instaló, su elemento de inicio de sesión y todos los archivos que conserva, e
 imprime los dos comandos que deja de tu mano: `tccutil reset Microphone com.getlivebridge.livebridge`
@@ -578,7 +581,7 @@ sesión.
 
 ## Limitaciones conocidas
 
-- **Connect over TCP** prefiere TCP pero no lo impone, y nada en la app muestra qué transporte tomó
+- **Connect over TCP** prefiere TCP pero no lo impone, y nada muestra durante la llamada qué transporte tomó
   una línea, así que una línea que volvió a UDP aún puede cortarse. La ruta se midió una vez, en
   una compilación de depuración que quitaba los candidatos UDP (ningún audio perdido en 10
   minutos); la forma que se distribuye, bajar su prioridad, eligió TCP una vez. El modo de

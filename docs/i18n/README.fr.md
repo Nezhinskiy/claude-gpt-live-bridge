@@ -236,6 +236,9 @@ le retire, `claude plugin uninstall livebridge@livebridge`, pour que vous la lan
 Terminal. Une session qui n'était pas ouverte alors peut chercher LiveBridge à sa réouverture ;
 retirer le mod y met fin.
 
+Installé avec Homebrew ? `brew uninstall --cask getlivebridge/tap/livebridge` retire l'app et la trace qu'en garde
+Homebrew ; les étapes ci-dessous restent valables pour les fichiers de l'app.
+
 Depuis un clone, `scripts/build-app.sh --uninstall` supprime `/Applications/LiveBridge.app`,
 quelle que soit la manière dont il a été installé, son élément d'ouverture de session et tous les
 fichiers qu'il conserve, puis affiche les deux commandes qu'il vous laisse exécuter :
@@ -605,7 +608,7 @@ session.
 
 ## Limitations connues
 
-- **Connect over TCP** préfère TCP sans l'imposer, et rien dans l'app ne montre quel transport une
+- **Connect over TCP** préfère TCP sans l'imposer, et rien ne montre pendant l'appel quel transport une
   ligne a pris : une ligne revenue à UDP peut encore se hacher. La route a été mesurée une fois,
   dans une version de débogage qui retirait les candidats UDP (aucun son perdu en 10 minutes) ; la
   méthode livrée, baisser leur priorité, a choisi TCP une fois. Le mode débogage enregistre le

@@ -215,6 +215,9 @@ Trash के एक folder में चली जाती हैं, जब �
 जाता है ताकि आप उसे Terminal में चलाएँ। जो session तब खुला नहीं था, वह खुलने पर फिर से
 LiveBridge ढूँढ सकता है; mod हटाने से यह रुक जाता है।
 
+Homebrew से install किया था? `brew uninstall --cask getlivebridge/tap/livebridge` app और Homebrew का उसका record हटा देता
+है; app की files के लिए नीचे के steps फिर भी लागू हैं।
+
 किसी clone से, `scripts/build-app.sh --uninstall` `/Applications/LiveBridge.app` को हटा देता है,
 चाहे वह जैसे भी install हुआ हो, साथ ही उसका login item और उसकी रखी हर फ़ाइल, और वे दो commands
 प्रिंट करता है जो वह आपके लिए छोड़ देता है: `tccutil reset Microphone com.getlivebridge.livebridge` और
@@ -548,7 +551,7 @@ Uninstall करने से वे सब हट जाती हैं; menu 
 
 ## ज्ञात सीमाएँ
 
-- **Connect over TCP** TCP को प्राथमिकता देता है, उसे मजबूर नहीं करता, और app कहीं नहीं दिखाता कि line
+- **Connect over TCP** TCP को प्राथमिकता देता है, उसे मजबूर नहीं करता, और call के दौरान कुछ नहीं दिखाता कि line
   ने कौन-सा transport लिया, इसलिए UDP पर लौटी line अब भी टूट सकती है। यह रास्ता एक बार मापा गया, एक
   debug build में जिसने UDP candidates हटा दिए थे (10 मिनट में कोई audio नहीं खोया); भेजा गया तरीका,
   उनकी priority घटाना, एक बार TCP चुनते देखा गया। debug mode transport दर्ज करता
