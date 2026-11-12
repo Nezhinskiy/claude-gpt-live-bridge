@@ -2,8 +2,7 @@
 # Builds, installs and removes LiveBridge.app (built from the SwiftPM package in app/).
 #
 #   scripts/build-app.sh                          debug build: app/.build/app/LiveBridge.app, ad hoc
-#   scripts/build-app.sh --run [--fake-mic WAV]
-#                                                 debug build, quit its running copy, open it
+#   scripts/build-app.sh --run [--fake-mic WAV]   debug build, quit its running copy, open it
 #   scripts/build-app.sh --release                release build, signed, installed in
 #                                                 /Applications and opened; run it again to upgrade
 #   scripts/build-app.sh --make-signing-identity  create a self-signed code-signing certificate,
@@ -32,7 +31,7 @@ IDENTITY="LiveBridge Local Signing"
 INSTALLED="${LIVEBRIDGE_APPLICATIONS:-/Applications}/LiveBridge.app"
 
 usage() {
-  sed -n '4,16s/^# \{0,1\}//p' "$0" >&2
+  sed -n '4,15s/^# \{0,1\}//p' "$0" >&2
   exit 2
 }
 
@@ -112,9 +111,7 @@ debug() {
   shift
   quit "$app"
   if [ "${1:-}" = --fake-mic ] && [ -n "${2:-}" ]; then
-    wav="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
-    shift 2
-    set -- --fake-mic "$wav" "$@"
+    set -- --fake-mic "$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
   fi
   if [ -n "${CFFIXED_USER_HOME:-}" ]; then
     open -n --env "CFFIXED_USER_HOME=$CFFIXED_USER_HOME" "$app" --args "$@"

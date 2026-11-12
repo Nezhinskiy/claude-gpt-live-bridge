@@ -1,6 +1,6 @@
 #!/bin/sh
 # Two guards for a release: the marketplace pins the mod to the tag of the app's version, so an
-# update installs the mod that belongs to the app; and a release binary has no way to point the
+# update installs the mod that belongs to the app, and a release binary has no way to point the
 # update check elsewhere (LIVEBRIDGE_RELEASES_URL exists in debug builds only).
 set -eu
 cd "$(dirname "$0")/../.."
