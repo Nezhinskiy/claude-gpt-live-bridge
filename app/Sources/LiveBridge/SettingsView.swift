@@ -2,30 +2,50 @@ import AppKit
 import BridgeCore
 import SwiftUI
 
-/// The Settings window's tabs: what the owner hears during a call, and the rest.
-enum SettingsTab: Hashable {
-  case voice, general
+/// The Settings window's tabs, in the toolbar's order.
+enum SettingsTab: CaseIterable {
+  case general, voice, line, context
+
+  var label: String {
+    switch self {
+    case .general: "General"
+    case .voice: "Voice"
+    case .line: "Line"
+    case .context: "Context"
+    }
+  }
+
+  /// The SF Symbol above the label.
+  var symbol: String {
+    switch self {
+    case .general: "gearshape"
+    case .voice: "waveform"
+    case .line: "antenna.radiowaves.left.and.right"
+    case .context: "text.bubble"
+    }
+  }
 }
 
-/// LiveBridge's Settings, in two tabs. **Voice**: the voice and its prompt, the line (its timers and
-/// how it connects) and the sounds. **General**: sync, notifications, Open at login and updates. The settings are read
-/// from and written to `AppModel.settings`, their one copy.
+/// One tab of LiveBridge's Settings. **General**: notifications, Open at login and updates.
+/// **Voice**: the voice, its prompt and the sounds. **Line**: the line's timers and how it connects.
+/// **Context**: sync. The settings are read from and written to `AppModel.settings`, their one copy.
 struct SettingsView: View {
   @Bindable var model: AppModel
+  let tab: SettingsTab
   /// Counts the reconnects the owner cancelled, so the switch is drawn again as it was.
   @State private var cancelledReconnects = 0
 
   var body: some View {
-    TabView(selection: $model.settingsTab) {
-      voiceTab.tabItem { Label("Voice", systemImage: "waveform") }.tag(SettingsTab.voice)
-      generalTab.tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
+    Group {
+      switch tab {
+      case .general: generalTab
+      case .voice: voiceTab
+      case .line: lineTab
+      case .context: contextTab
+      }
     }
     .frame(width: 480)
     .fixedSize(horizontal: false, vertical: true)
-    .onAppear { model.listVoices() }
-    .task { await model.refreshNotificationStatus() }
-    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
-    { _ in Task { await model.refreshNotificationStatus() } }
   }
 
   private var voiceTab: some View {
@@ -57,6 +77,21 @@ struct SettingsView: View {
         )
         .font(.caption).foregroundStyle(.secondary)
       }
+      Section("Sounds") {
+        Toggle("Play sounds for requests and answers", isOn: setting(\.confirmHandoffs))
+        Text(
+          "The voice sometimes says it is looking without sending the request. An answer has "
+            + "its own sound; with no request sound, nothing was queued, so say it again."
+        )
+        .font(.caption).foregroundStyle(.secondary)
+      }
+    }
+    .formStyle(.grouped)
+    .onAppear { model.listVoices() }
+  }
+
+  private var lineTab: some View {
+    Form {
       Section("Line") {
         seconds("Silence before the line closes", \.silenceSeconds)
         if (1...9).contains(model.settings.current.silenceSeconds) {
@@ -103,19 +138,11 @@ struct SettingsView: View {
         )
         .font(.caption).foregroundStyle(.secondary)
       }
-      Section("Sounds") {
-        Toggle("Play sounds for requests and answers", isOn: setting(\.confirmHandoffs))
-        Text(
-          "The voice sometimes says it is looking without sending the request. An answer has "
-            + "its own sound; with no request sound, nothing was queued, so say it again."
-        )
-        .font(.caption).foregroundStyle(.secondary)
-      }
     }
     .formStyle(.grouped)
   }
 
-  private var generalTab: some View {
+  private var contextTab: some View {
     Form {
       Section("Sync") {
         Toggle("Pause sync while the call is stopped", isOn: setting(\.pauseSyncWhileStopped))
@@ -133,6 +160,12 @@ struct SettingsView: View {
         )
         .font(.caption).foregroundStyle(.secondary)
       }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var generalTab: some View {
+    Form {
       Section("Notifications") {
         Toggle(
           "Notify when a result is waiting",
@@ -157,6 +190,9 @@ struct SettingsView: View {
       UpdateSection(model: model)
     }
     .formStyle(.grouped)
+    .task { await model.refreshNotificationStatus() }
+    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
+    { _ in Task { await model.refreshNotificationStatus() } }
   }
 
   /// A setting as the controls change it: read from the store and written back to it.
@@ -231,18 +267,125 @@ struct SettingsView: View {
 @MainActor
 final class SettingsWindow {
   private let window: NSWindow
+  private let tabs: SettingsTabs
+  private var placed = false
 
   init(model: AppModel) {
-    window = NSWindow(
-      contentViewController: NSHostingController(rootView: SettingsView(model: model)))
-    window.title = "LiveBridge Settings"
+    tabs = SettingsTabs(model: model)
+    window = NSWindow(contentViewController: tabs)
+    window.title = SettingsTabs.title
     window.styleMask = [.titled, .closable]
+    window.toolbarStyle = .preference
     window.isReleasedWhenClosed = false
-    window.center()
   }
 
   func show() {
+    tabs.select(tabs.model.settingsTab)
+    if !window.isVisible {
+      // Sized before it shows, so it opens at its height rather than sliding to it, and
+      // centered the first time at that height; after that it opens where it was left.
+      tabs.selectedPage?.fitWindow()
+      if !placed { window.center() }
+      placed = true
+    }
     NSApp.activate()
     window.makeKeyAndOrderFront(nil)
+  }
+}
+
+/// The window's tabs in its toolbar, one SwiftUI form each. The tab shown follows
+/// `AppModel.settingsTab` both ways.
+@MainActor
+private final class SettingsTabs: NSTabViewController {
+  static let title = "LiveBridge Settings"
+  let model: AppModel
+
+  init(model: AppModel) {
+    self.model = model
+    super.init(nibName: nil, bundle: nil)
+    tabStyle = .toolbar
+    // The window keeps its own title instead of taking the tab's label.
+    canPropagateSelectedChildViewControllerTitle = false
+    for tab in SettingsTab.allCases {
+      let item = NSTabViewItem(viewController: SettingsPage(model: model, tab: tab))
+      item.label = tab.label
+      item.image = NSImage(systemSymbolName: tab.symbol, accessibilityDescription: tab.label)
+      addTabViewItem(item)
+    }
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError("SettingsTabs is built in code") }
+
+  func select(_ tab: SettingsTab) {
+    selectedTabViewItemIndex = SettingsTab.allCases.firstIndex(of: tab)!
+  }
+
+  var selectedPage: SettingsPage? {
+    tabViewItems[selectedTabViewItemIndex].viewController as? SettingsPage
+  }
+
+  override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
+    super.tabView(tabView, didSelect: tabViewItem)
+    if let tabViewItem {
+      model.settingsTab = SettingsTab.allCases[tabView.indexOfTabViewItem(tabViewItem)]
+      (tabViewItem.viewController as? SettingsPage)?.fitWindow()
+    }
+  }
+}
+
+/// One tab: its form hangs from the top, and the window slides to the form's height, top edge
+/// still, the way a Mac settings window moves between tabs. AppKit's own fitting snaps, since
+/// it sizes the window through layout constraints, so the form gives the window no constraint
+/// and reports its height instead.
+@MainActor
+private final class SettingsPage: NSViewController {
+  private let form: NSHostingController<SettingsView>
+  private var height: NSKeyValueObservation?
+
+  init(model: AppModel, tab: SettingsTab) {
+    form = NSHostingController(rootView: SettingsView(model: model, tab: tab))
+    form.sizingOptions = .preferredContentSize
+    super.init(nibName: nil, bundle: nil)
+    addChild(form)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError("SettingsPage is built in code") }
+
+  override func loadView() {
+    view = NSView()
+    form.view.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(form.view)
+    NSLayoutConstraint.activate([
+      form.view.topAnchor.constraint(equalTo: view.topAnchor),
+      form.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      form.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+    ])
+    // A hint that comes or goes inside the tab moves the window too.
+    height = form.observe(\.preferredContentSize) { [weak self] _, _ in
+      MainActor.assumeIsolated { self?.fitWindow() }
+    }
+  }
+
+  func fitWindow() {
+    guard let window = view.window, let content = window.contentView else { return }
+    if !window.isVisible { view.layoutSubtreeIfNeeded() }  // the form measures itself in layout
+    let size = form.preferredContentSize
+    guard size.height > 0 else { return }
+    var frame = window.frame
+    frame.size.width += size.width - content.frame.width
+    frame.size.height += size.height - content.frame.height
+    frame.origin.y = window.frame.maxY - frame.height
+    // A window low on the screen grows upward instead, so a tall tab's bottom stays reachable.
+    if let screen = window.screen?.visibleFrame {
+      frame.origin.y = max(frame.origin.y, screen.minY)
+    }
+    guard frame != window.frame else { return }
+    if window.isVisible {
+      NSAnimationContext.runAnimationGroup { _ in window.animator().setFrame(frame, display: true) }
+    } else {
+      window.setFrame(frame, display: false)
+    }
   }
 }
