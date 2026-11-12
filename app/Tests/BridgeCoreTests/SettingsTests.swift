@@ -176,8 +176,8 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.checkUpdatesAutomatically == false)
   }
 
-  /// A file 0.5.0 wrote, which has every other setting and no `debugMode`: debug mode stays off
-  /// and the rest reads as written.
+  /// A file written before debug mode, which has every other setting and no `debugMode`: debug
+  /// mode stays off and the rest reads as written.
   @Test func debugModeIsOffInAFileFromBeforeIt() throws {
     let settings = try decoded(
       #"{"voice":"marin","pauseSyncWhileStopped":true,"loadContextOnFirstCall":false,"#
