@@ -102,6 +102,9 @@ struct SettingsStoreTests {
   @Test func aBadStoredValueGetsHaiku() throws {
     #expect(try decoded(#"{"summaryModel":"x;rm -rf"}"#).summaryModel == "claude-haiku-5-5")
     #expect(try decoded(#"{"summaryModel":"claude-opus-5-5"}"#).summaryModel == "claude-opus-5-5")
+    let notText = try decoded(#"{"voice":"marin","summaryModel":5}"#)
+    #expect(notText.summaryModel == "claude-haiku-5-5")
+    #expect(notText.voice == "marin")
   }
 
   @Test func theLineKeepsTodaysTimersByDefault() {

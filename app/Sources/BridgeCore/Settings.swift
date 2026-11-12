@@ -97,8 +97,9 @@ public struct Settings: Codable, Sendable, Equatable {
     silenceSeconds = try timeout(.silenceSeconds, defaults.silence)
     firstWordSeconds = try timeout(.firstWordSeconds, defaults.firstWord)
     noiseSeconds = try timeout(.noiseSeconds, defaults.noise)
+    // A value of any other type reads as the default too, not as a file to start over from.
     summaryModel =
-      try container.decodeIfPresent(String.self, forKey: .summaryModel).flatMap(
+      (try? container.decodeIfPresent(String.self, forKey: .summaryModel)).flatMap(
         SummaryModel.accepted) ?? SummaryModel.default
   }
 }
