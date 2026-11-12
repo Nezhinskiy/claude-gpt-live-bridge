@@ -25,6 +25,8 @@ public actor Bridge: Router {
   private let timeouts: @Sendable () -> CallMachine.Timeouts
   /// Settings' Connect over TCP, read as each line applies its answer.
   private let connectsOverTCP: @Sendable () -> Bool
+  /// Told how long each summary ask took to be answered (`SummaryLog`).
+  private let reportsSummary: @Sendable (SummaryTiming) -> Void
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -79,8 +81,10 @@ public actor Bridge: Router {
     pausesSync: @escaping @Sendable () -> Bool = { false },
     timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
-    connectsOverTCP: @escaping @Sendable () -> Bool = { false }, appVersion: AppVersion?
+    connectsOverTCP: @escaping @Sendable () -> Bool = { false },
+    reportsSummary: @escaping @Sendable (SummaryTiming) -> Void = { _ in }, appVersion: AppVersion?
   ) {
+    self.reportsSummary = reportsSummary
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
@@ -744,7 +748,14 @@ public actor Bridge: Router {
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
-    guard continuity.takeSummaryAsk(of: id, at: time.now) else { return }
+    let now = time.now
+    if let ask = continuity.openSummaryAsk(of: id, at: now) {
+      reportsSummary(
+        SummaryTiming(
+          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale,
+          hadSummary: !body.summary.allSatisfy(\.isWhitespace), model: nil, stats: nil))
+    }
+    guard continuity.takeSummaryAsk(of: id, at: now) else { return }
     let line =
       body.summary.allSatisfy(\.isWhitespace)
       ? nil

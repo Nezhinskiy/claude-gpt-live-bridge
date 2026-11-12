@@ -136,6 +136,11 @@ public struct Conversation: Codable, Sendable, Equatable {
     return openAsk(at: now)?.isStale != true
   }
 
+  /// The open ask's time and whether a gap or a forget came after it; nil when none is open.
+  func openSummaryAsk(at now: Date) -> (at: Date, isStale: Bool)? {
+    openAsk(at: now).map { ($0.at, $0.isStale) }
+  }
+
   private func openAsk(at now: Date) -> SummaryAsk? {
     summaryAsk.flatMap { now < $0.at + Self.askLife ? $0 : nil }
   }
@@ -202,6 +207,11 @@ public struct Continuity: Codable, Sendable, Equatable {
   /// The app asked `id` for a summary.
   public mutating func noteSummaryAsk(of id: SessionID, at now: Date) {
     use(id) { $0.noteSummaryAsk(at: now) }
+  }
+
+  /// The ask of `id` still open at `now`, without taking it.
+  public func openSummaryAsk(of id: SessionID, at now: Date) -> (at: Date, isStale: Bool)? {
+    self[id].openSummaryAsk(at: now)
   }
 
   /// A summary from `id` arrived. False: it was asked for before the latest gap or forget, so it

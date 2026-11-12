@@ -206,6 +206,12 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 `CFFIXED_USER_HOME` to the socket as the app does, so `CFFIXED_USER_HOME=/tmp/lb claude
 --plugin-dir plugin` talks to the app started with the same variable.
 
+Every build, not only a debug one, logs a line at debug level in the category `summary` for each
+summary answered within two minutes of its ask: the milliseconds the ask took, whether the answer
+was stale (asked before a gap or a forget, so it is ignored) and had text, and the model's name
+(`custom` for an id you typed, `fork` for a summary the session's own fork wrote). It holds no
+summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
+
 ### Reading `--call-stats`
 
 For when the voice breaks up: was it the network? While a line is open, a debug build started

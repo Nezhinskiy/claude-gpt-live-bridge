@@ -129,6 +129,7 @@ final class AppModel {
   @ObservationIgnored private var updateState: UpdateStateStore?
   @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
   private static let log = Logger(subsystem: Paths.bundleID, category: "call")
+  private nonisolated static let summaryLog = Logger(subsystem: Paths.bundleID, category: "summary")
 
   var problem: Problem? { appProblem ?? update?.problem }
 
@@ -169,7 +170,10 @@ final class AppModel {
         pausesSync: { settings.current.pauseSyncWhileStopped },
         timeouts: { settings.current.timeouts },
         loadsContextOnFirstCall: { settings.current.loadContextOnFirstCall },
-        connectsOverTCP: { settings.current.connectsOverTCP }, appVersion: appVersion)
+        connectsOverTCP: { settings.current.connectsOverTCP },
+        reportsSummary: { timing in
+          Self.summaryLog.debug("\(SummaryLog.line(timing), privacy: .public)")
+        }, appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge
       self.server = server
