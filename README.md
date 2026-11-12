@@ -334,8 +334,9 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   opens. Results it has not said yet stay and are added again; only **Stop** clears them. Claude's
   waiting questions follow other rules ([details](SECURITY.md#residual-risk-by-design)). With
   **Load a session's context on its first call** on, or **Pause sync** off and the session not paused, the next line loads a summary of the same session's
-  transcript by itself, which holds the conversation's text and the names of the tools it used, not
-  their output; `/clear` the session first to avoid
+  transcript by itself, which holds the conversation's text (an app and a mod of this release leave
+  out tool output, thinking and reminders, but not text that quotes them, and an older one sends the
+  whole request); `/clear` the session first to avoid
   that, then press **New conversation**. `/live` in a removed session joins it again.
 
 ### Settings
@@ -401,16 +402,14 @@ the switch here asks.
   setting if the session may have no summary yet, press Stop, then type: nothing you type while the call is stopped is recorded, and the session is marked as
   paused. While it is on, no line loads a summary by itself, and neither does one after a pause,
   except for a session with no summary (the next setting); otherwise only **Load context** does. That
-  summary is written from the transcript without tool output, thinking or reminders, so it still
-  carries what you paused. Typing into a turn that runs a voice request fails its
+  summary is written from the transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
   it does and does not do.
 - **Load a session's context on its first call** (on by default; off if **Pause sync** was on when you updated to it): a line that
   opens for a session the voice has no summary for asks for one even while **Pause sync** is on or
   the session is paused, an old chat or a chat after **New conversation** included. That summary
-  is written from the transcript without tool output, thinking or reminders, so it still carries
-  what you paused, and it goes to OpenAI. Once
+  is written from the transcript, so it carries what you paused, and it goes to OpenAI. Once
   a session has a summary, the pause governs what follows. With this off, only **Load context**
   loads a summary under the pause.
 - **Summary model** (Haiku 5.5 by default, on an update too; or Sonnet 5.5 or Opus 5.5): the model

@@ -302,8 +302,9 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े
   जाते हैं; उन्हें सिर्फ़ **Stop** मिटाता है। Claude के इंतज़ार कर रहे सवालों के नियम अलग हैं
   ([विवरण](../../SECURITY.md#residual-risk-by-design))। **Load a session's context on its first call** चालू हो, या **Pause sync** बंद हो और session paused न हो, तो
-  अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें बातचीत का text और
-  उसके इस्तेमाल किए tools के नाम हैं, उनका output नहीं; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
+  अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें बातचीत का text है (इस
+  release का app और mod tool output, thinking और reminders हटा देते हैं, पर उन्हें quote करने वाला
+  text नहीं, और पुराना app या mod पूरी request भेजता है); इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
   session में `/live` उसे फिर से जोड़ देता है।
 
 ### सेटिंग्स
@@ -369,15 +370,15 @@ menu का **Quick Settings** इसके पाँच switches रखता �
   करें, अगर session का सारांश शायद अभी न हो तो अगली setting बंद करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
   session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
   के बाद भी नहीं, सिवाय ऐसे session के जिसका सारांश नहीं है (अगली setting); बाकी समय यह सिर्फ़ **Load context**
-  करता है। वह सारांश tool output,
-  thinking और reminders के बिना transcript से लिखा जाता है, फिर भी उसमें वह आता है जिसे आपने pause किया था। जिस turn में voice
+  करता है। वह सारांश
+  transcript से लिखा जाता है, इसलिए उसमें वह आता है जिसे आपने pause किया था। जिस turn में voice
   अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
   हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](../../SECURITY.md#residual-risk-by-design) में है।
 - **Load a session's context on its first call** (डिफ़ॉल्ट रूप से चालू; update के समय **Pause sync** चालू था तो बंद): जिस session का
   सारांश voice के पास नहीं है, उसके लिए खुलने वाली line सारांश माँगती है, चाहे **Pause sync** चालू हो या
-  session paused हो, पुरानी chat और **New conversation** के बाद की chat समेत। वह सारांश tool output, thinking
-  और reminders के बिना transcript से लिखा जाता है, फिर भी उसमें वह आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
+  session paused हो, पुरानी chat और **New conversation** के बाद की chat समेत। वह सारांश transcript से
+  लिखा जाता है, इसलिए उसमें वह आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
   बन जाने के बाद जो आगे होता है उस पर pause लागू होता है। यह बंद हो तो pause में सिर्फ़ **Load context** सारांश
   load करता है।
 - **Summary model** (डिफ़ॉल्ट Haiku 5.5, update के बाद भी; या Sonnet 5.5 या Opus 5.5): वह model जो

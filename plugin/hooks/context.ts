@@ -1,6 +1,7 @@
 // The session summary the voice model is given as context, written by the model the app names over
-// the session's own transcript, trimmed (`transcript.ts`). The model gets no tools and the
-// transcript only as data. The summary is sent whole: the app redacts it on arrival and then caps
+// the session's own transcript, trimmed (`transcript.ts`). The model gets no tools. The transcript
+// goes between tags it is told to read as data, which transcript text quoting the closing tag can
+// end early, so the marking is an instruction and not a control. The summary is sent whole: the app redacts it on arrival and then caps
 // it, so a cut here could shorten a secret past what the redaction matches.
 import type { EngineInterface } from 'claude-code'
 

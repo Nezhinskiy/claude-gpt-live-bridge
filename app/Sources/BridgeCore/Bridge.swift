@@ -457,8 +457,8 @@ public actor Bridge: Router {
   }
 
   /// Whether the pause, the setting or a session's mark, stops the next line asking for a summary,
-  /// which is written from the transcript without tool output, thinking or reminders, paused text
-  /// included. A session with no summary
+  /// which is written from the transcript, paused text included (a current mod leaves out tool
+  /// output, thinking and reminders, but not text that quotes them). A session with no summary
   /// has its first one asked for all the same, if the owner left `loadsContextOnFirstCall` on.
   private func pauseHoldsBackSummary(of id: SessionID) -> Bool {
     if loadsContextOnFirstCall(), continuity[id].context == nil { return false }

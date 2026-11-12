@@ -332,8 +332,9 @@ parlez.
   restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude en attente
   suivent d'autres règles ([détails](../../SECURITY.md#residual-risk-by-design)). Avec **Load a session's context on its first call** activé, ou avec **Pause sync**
   désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
-  transcription de la session, qui contient le texte de la conversation et le nom des outils
-  qu'elle a utilisés, sans leur sortie ; pour l'éviter, faites d'abord
+  transcription de la session, qui contient le texte de la conversation (une app et un mod de cette
+  version en retirent la sortie des outils, le raisonnement et les rappels, mais pas le texte qui
+  les cite, et une version antérieure envoie toute la requête) ; pour l'éviter, faites d'abord
   `/clear` dans la session, puis appuyez sur **New conversation**. `/live` dans une session
   retirée la rejoint de nouveau.
 
@@ -408,17 +409,16 @@ se connecte :
   voir arriver chez OpenAI, activez le réglage, désactivez le suivant si la session n'a peut-être pas encore de résumé, appuyez sur Stop, puis tapez : rien de ce que vous
   tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
   aucune ligne ne charge de résumé d'elle-même, ni après une pause, sauf pour une session sans résumé (le réglage suivant) ; sinon seul
-  **Load context** le fait. Ce résumé est écrit à partir de la transcription sans la sortie des
-  outils, le raisonnement ni les rappels, donc il porte quand même ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
+  **Load context** le fait. Ce résumé est écrit à partir de la transcription, donc il porte ce
+  que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
 - **Load a session's context on its first call** (activé par défaut ; désactivé si **Pause sync** était activé lors de la mise à jour) :
   une ligne qui s'ouvre pour une session dont la voix n'a pas de résumé en demande un même si
   **Pause sync** est activé ou si la session est en pause, y compris pour une ancienne discussion
-  ou après **New conversation**. Ce résumé est écrit à partir de la transcription sans la sortie
-  des outils, le raisonnement ni les rappels, donc il porte quand même ce que vous avez mis en
-  pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
+  ou après **New conversation**. Ce résumé est écrit à partir de la transcription, donc il porte ce
+  que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
   la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
 - **Summary model** (Haiku 5.5 par défaut, après une mise à jour aussi ; ou Sonnet 5.5 ou
   Opus 5.5) : le modèle qui écrit le résumé que la voix reçoit comme contexte, toujours avec un

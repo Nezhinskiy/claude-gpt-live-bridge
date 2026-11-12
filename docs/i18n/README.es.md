@@ -318,7 +318,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   **Stop** los borra. Las preguntas de Claude en espera siguen otras reglas
   ([detalles](../../SECURITY.md#residual-risk-by-design)). Con **Load a session's context on its first call** activado, o con **Pause sync** desactivado y la sesión sin
   pausa, la siguiente línea carga por sí sola un resumen de la misma transcripción de la sesión, que
-  incluye el texto de la conversación y los nombres de las herramientas que usó, no su salida; para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
+  incluye el texto de la conversación (una app y un mod de esta versión dejan fuera la salida de las herramientas, el razonamiento y los recordatorios, pero no el texto que los cita, y uno anterior envía la petición entera); para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
   conversation**. `/live` en una sesión eliminada la une de nuevo.
 
 ### Ajustes
@@ -389,16 +389,14 @@ depuración:
   el ajuste, desactiva el siguiente si la sesión puede no tener resumen aún, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
   registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
   resumen por sí sola, ni tampoco después de una pausa, salvo para una sesión sin resumen (el ajuste
-  siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de la transcripción sin la salida de las
-  herramientas, el razonamiento ni los recordatorios, así que aun así lleva lo que pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
+  siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
   nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
   de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
   [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
 - **Load a session's context on its first call** (activado por defecto; desactivado si **Pause sync** estaba activado al actualizar):
   una línea que se abre para una sesión de la que la voz no tiene resumen lo pide aunque **Pause
   sync** esté activado o la sesión esté en pausa, también en un chat antiguo o tras **New
-  conversation**. Ese resumen se escribe a partir de la transcripción sin la salida de las
-  herramientas, el razonamiento ni los recordatorios, así que aun así lleva lo que pausaste, y va a
+  conversation**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste, y va a
   OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
   Desactivado, bajo la pausa solo **Load context** carga un resumen.
 - **Summary model** (Haiku 5.5 por defecto, también al actualizar; o Sonnet 5.5 u Opus 5.5): el

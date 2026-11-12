@@ -156,8 +156,9 @@ struct SettingsView: View {
           "Load a session's context on its first call", isOn: setting(\.loadContextOnFirstCall))
         Text(
           "A line for a session with no summary yet asks for one, even while sync is paused. It "
-            + "is written from the transcript without tool output, thinking or reminders, paused "
-            + "text included, and goes to OpenAI."
+            + "is written from the transcript, paused text included, and goes to OpenAI. A mod of "
+            + "this version leaves out tool output, thinking and reminders, but not text that "
+            + "quotes them."
         )
         .font(.caption).foregroundStyle(.secondary)
         Picker("Summary model", selection: setting(\.summaryModel)) {
