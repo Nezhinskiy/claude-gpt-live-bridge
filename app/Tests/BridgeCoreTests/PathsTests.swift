@@ -53,6 +53,24 @@ struct PathsTests {
     #expect(try permissions(elsewhere) == 0o700)
   }
 
+  /// `build-app.sh --uninstall` removes the same files the menu's Uninstall moves to the Trash, so
+  /// a file the app starts to keep cannot be added to one route and missed by the other.
+  @Test func theScriptRemovesTheFilesTheMenuMoves() throws {
+    let script = try String(
+      contentsOf: URL(filePath: #filePath).deletingLastPathComponent()
+        .appending(path: "../../../scripts/build-app.sh").standardized, encoding: .utf8)
+    let body =
+      try #require(script.components(separatedBy: "uninstall() {").last)
+      .components(separatedBy: "\n}").first ?? ""
+    let removed = Set(body.matches(of: /"\$lib\/([^"]+)"/).map { String($0.1) })
+    let moved = Set(
+      Paths.uninstalled(library: URL(filePath: "/L")).map {
+        String($0.path.dropFirst("/L/".count))
+          .replacingOccurrences(of: Paths.bundleID, with: "$BUNDLE_ID")
+      })
+    #expect(removed == moved)
+  }
+
   /// The notices, the log and System Settings' link use the bundle id the app ships with.
   @Test func theBundleIDIsTheAppsOwn() throws {
     let plist = URL(filePath: #filePath).deletingLastPathComponent()
