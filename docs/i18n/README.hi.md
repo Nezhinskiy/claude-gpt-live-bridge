@@ -206,6 +206,11 @@ network पर devices खोज सकता है। voice line को यह
 
 ### अनइंस्टॉल करना
 
+menu का **Feedback & Support ▸ Uninstall LiveBridge…** पहले पूछता है, फिर login item और
+microphone permission हटाता है, call खत्म करता है, app और उसकी सारी files (नीचे दी गई) Trash में
+ले जाता है और बंद हो जाता है। Claude Code का mod बना रहता है: उसे हटाने वाला command,
+`claude plugin uninstall livebridge@livebridge`, copy हो जाता है ताकि आप उसे Terminal में चलाएँ।
+
 किसी clone से, `scripts/build-app.sh --uninstall` `/Applications/LiveBridge.app` को हटा देता है,
 चाहे वह जैसे भी install हुआ हो, साथ ही उसका login item और उसकी रखी हर फ़ाइल, और वे दो commands
 प्रिंट करता है जो वह आपके लिए छोड़ देता है: `tccutil reset Microphone com.getlivebridge.livebridge` और
@@ -263,7 +268,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   **Settings…**, **Feedback & Support** (**Report a Bug…** repository का bug report form खोलता है,
   **LiveBridge Website** getlivebridge.com खोलता है, **Star LiveBridge on GitHub** repository का page
   खोलता है, फिर **Debug Mode** और **Show Debug Files…**, [debug mode](#सेटिंग्स) का switch और
-  folder) और **Quit LiveBridge** होते हैं। जब menu में सिर्फ़ call दिखती है, तब भी Quick Settings
+  folder, और **Uninstall LiveBridge…** ([अनइंस्टॉल करना](#अनइंस्टॉल-करना))) और **Quit LiveBridge** होते हैं। जब menu में सिर्फ़ call दिखती है, तब भी Quick Settings
   वहाँ होता है। call के दौरान **Conversation** आपके और voice के शब्द
   वैसे-वैसे दिखाता है जैसे-जैसे codex उन्हें transcribe करता है, इसलिए आपके शब्द बोलने के थोड़ी देर बाद, और
   voice के शब्द सुनाई देने से थोड़ा पहले दिख सकते हैं। हर बात पूरी होने पर उसका अंतिम पाठ इन शब्दों की जगह

@@ -226,6 +226,12 @@ s'arrête avec une phrase qui indique où l'accorder.
 
 ### Désinstallation
 
+**Feedback & Support ▸ Uninstall LiveBridge…**, dans le menu, demande d'abord ; puis il retire
+l'ouverture à la connexion et l'autorisation du micro, met fin à l'appel, déplace l'app et
+tous les fichiers qu'elle garde (ceux ci-dessous) dans la Corbeille et quitte. Il laisse le
+mod Claude Code et copie la commande qui le retire, `claude plugin uninstall
+livebridge@livebridge`, pour que vous la lanciez dans Terminal.
+
 Depuis un clone, `scripts/build-app.sh --uninstall` supprime `/Applications/LiveBridge.app`,
 quelle que soit la manière dont il a été installé, son élément d'ouverture de session et tous les
 fichiers qu'il conserve, puis affiche les deux commandes qu'il vous laisse exécuter :
@@ -288,7 +294,7 @@ parlez.
   **Settings…**, **Feedback & Support** (**Report a Bug…** ouvre le formulaire de rapport de bogue
   du dépôt, **LiveBridge Website** ouvre getlivebridge.com, **Star LiveBridge on GitHub** ouvre la
   page du dépôt, puis **Debug Mode** et **Show Debug Files…**, l'interrupteur et le dossier du
-  [mode débogage](#réglages)) et **Quit LiveBridge**. Quick Settings est là même quand le menu ne montre que
+  [mode débogage](#réglages), et **Uninstall LiveBridge…** ([Désinstallation](#désinstallation))) et **Quit LiveBridge**. Quick Settings est là même quand le menu ne montre que
   l'appel. Pendant un appel, **Conversation** affiche vos mots et ceux de la voix à mesure
   que codex les transcrit : les vôtres peuvent donc apparaître un instant après que vous les avez dits,
   et ceux de la voix un instant avant que vous les entendiez. Quand chaque phrase est terminée, son

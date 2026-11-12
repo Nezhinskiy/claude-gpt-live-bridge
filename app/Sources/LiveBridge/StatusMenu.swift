@@ -239,6 +239,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
       case .reportBug: #selector(reportBug)
       case .website: #selector(openWebsite)
       case .showDebugFiles: #selector(showDebugFiles)
+      case .uninstall: #selector(uninstall)
       case .settings: #selector(showSettings)
       case .quit: #selector(quit)
       case .installUpdate: #selector(installUpdate(_:))
@@ -286,6 +287,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   @objc private func openWebsite() { NSWorkspace.shared.open(Release.website) }
 
   @objc private func showDebugFiles() { model.showDebugFiles() }
+
+  @objc private func uninstall() { later { [model] in model.uninstall() } }
 
   @objc private func quit() { NSApp.terminate(nil) }
 

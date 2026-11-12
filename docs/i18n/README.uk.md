@@ -217,6 +217,12 @@ Privacy & Security > Microphone, де потрібно дозволити LiveBr
 
 ### Видалення
 
+**Feedback & Support ▸ Uninstall LiveBridge…** у меню спершу питає, потім прибирає вхід у
+систему й дозвіл на мікрофон, завершує дзвінок, переносить застосунок і всі його файли
+(перелічені нижче) у Кошик і закривається. Мод Claude Code лишається: команда, що його
+видаляє, `claude plugin uninstall livebridge@livebridge`, копіюється, щоб ви запустили її в
+Терміналі.
+
 З клона репозиторію `scripts/build-app.sh --uninstall` видаляє `/Applications/LiveBridge.app`,
 хоч як його було встановлено, його елемент входу та всі файли, що він зберігає, і виводить дві
 команди, які залишає вам: `tccutil reset Microphone com.getlivebridge.livebridge` та
@@ -274,7 +280,7 @@ claude plugin uninstall livebridge@livebridge
   **Settings…**, **Feedback & Support** (**Report a Bug…** відкриває форму звіту про помилку в
   репозиторії, **LiveBridge Website** відкриває getlivebridge.com, **Star LiveBridge on GitHub**
   відкриває сторінку репозиторію, далі **Debug Mode** і **Show Debug Files…**, перемикач і тека
-  [режиму налагодження](#налаштування)) та **Quit LiveBridge**. Quick Settings є й тоді, коли меню
+  [режиму налагодження](#налаштування), і **Uninstall LiveBridge…** ([Видалення](#видалення))) та **Quit LiveBridge**. Quick Settings є й тоді, коли меню
   показує лише дзвінок. Під час дзвінка **Conversation** показує ваші слова й слова голосу в міру того,
   як їх розшифровує codex, тож ваші можуть з'явитися трохи пізніше, ніж ви їх сказали, а слова голосу
   трохи раніше, ніж ви їх почуєте. Коли репліку закінчено, її замінює остаточний текст. Зберігається

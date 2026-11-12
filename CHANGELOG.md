@@ -32,6 +32,9 @@ All notable changes to this project are listed here. The format follows
   default, in every build: during a call it writes a row a second of the voice's network numbers,
   one CSV per call, under `debug/call-stats` in LiveBridge's data folder; no audio, no transcript,
   no session names, and nothing leaves the Mac. **Show Debug Files** opens the folder.
+- **Uninstall LiveBridge…**, in **Feedback & Support**, asks, then moves the app and every file it
+  keeps to the Trash, removes its login item and microphone permission, and quits; it copies the
+  command that removes the Claude Code mod for you to run.
 
 ### Changed
 

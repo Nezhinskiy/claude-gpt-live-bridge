@@ -19,6 +19,8 @@ public struct MenuContent: Sendable, Equatable {
     case website
     /// Opens debug mode's folder in the Finder.
     case showDebugFiles
+    /// Asks, then moves the app and its files to the Trash and quits (`AppModel.uninstall`).
+    case uninstall
     /// Installs the release announced, this version.
     case installUpdate(AppVersion)
 
@@ -28,7 +30,7 @@ public struct MenuContent: Sendable, Equatable {
       case .settings: ","
       case .quit: "q"
       case .copyJoinCommand, .loadContext, .newConversation, .starOnGitHub, .reportBug, .website,
-        .showDebugFiles, .installUpdate:
+        .showDebugFiles, .uninstall, .installUpdate:
         ""
       }
     }
@@ -198,6 +200,8 @@ public struct MenuContent: Sendable, Equatable {
       .separator,
       .toggle(.debugMode, isOn: settings.debugMode),
       .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+      .separator,
+      .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: true),
     ]
     return install + [
       .submenu("Quick Settings", isEnabled: true, items: quick),

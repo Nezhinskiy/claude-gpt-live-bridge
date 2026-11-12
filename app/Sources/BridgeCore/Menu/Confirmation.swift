@@ -46,4 +46,16 @@ public struct Confirmation: Sendable, Equatable {
         + "so macOS asks for the microphone again.",
       confirm: "Install")
   }
+
+  /// The command that removes the Claude Code mod, which Uninstall LiveBridge leaves to the owner.
+  public static let modUninstallCommand = "claude plugin uninstall livebridge@livebridge"
+
+  /// The menu's Uninstall LiveBridge.
+  public static let uninstall = Confirmation(
+    title: "Uninstall LiveBridge?",
+    message:
+      "LiveBridge moves itself and every file it keeps to the Trash, removes its login item and "
+      + "its microphone permission, and quits; a call open now ends. The Claude Code mod stays: "
+      + "the command that removes it, \(modUninstallCommand), is copied for you to run in Terminal.",
+    confirm: "Uninstall")
 }

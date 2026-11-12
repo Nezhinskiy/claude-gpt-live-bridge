@@ -153,6 +153,8 @@ struct MenuContentTests {
         "  ---",
         "  [ ] Debug Mode",
         "  Show Debug Files…",
+        "  ---",
+        "  Uninstall LiveBridge…",
         "---",
         "Quit LiveBridge ⌘Q",
       ])
@@ -224,6 +226,8 @@ struct MenuContentTests {
         "  ---",
         "  [ ] Debug Mode",
         "  Show Debug Files…",
+        "  ---",
+        "  Uninstall LiveBridge…",
         "---",
         "Quit LiveBridge ⌘Q",
       ])
@@ -368,7 +372,7 @@ struct MenuContentTests {
   }
 
   /// The links, then debug mode as set and its files; Quick Settings does not repeat it.
-  @Test func feedbackAndSupportEndsWithDebugMode() throws {
+  @Test func feedbackAndSupportEndsWithUninstall() throws {
     for on in [false, true] {
       let menu = Self.menu(Self.status(sessions: 1), settings: Settings(debugMode: on))
       #expect(
@@ -379,6 +383,8 @@ struct MenuContentTests {
           .separator,
           .toggle(.debugMode, isOn: on),
           .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+          .separator,
+          .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: true),
         ])
       let quick = try #require(Self.submenu("Quick Settings", in: menu))
       #expect(quick.count == 5 && !quick.contains(.toggle(.debugMode, isOn: on)))

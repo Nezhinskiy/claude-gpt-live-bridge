@@ -395,6 +395,42 @@ final class AppModel {
     NSWorkspace.shared.open(folder)
   }
 
+  /// The menu's Uninstall LiveBridge: once confirmed, copies the mod's uninstall command, removes
+  /// the login item and the microphone permission, ends a call, moves the app and every file it
+  /// keeps to the Trash (`Paths.uninstalled`), and quits.
+  func uninstall() {
+    guard Confirm.ask(.uninstall) else { return }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(Confirmation.modUninstallCommand, forType: .string)
+    try? LoginItem.set(false)
+    let reset = Process()
+    reset.executableURL = URL(filePath: "/usr/bin/tccutil")
+    reset.arguments = ["reset", "Microphone", Paths.bundleID]
+    try? reset.run()
+    reset.waitUntilExit()
+    let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+    let files = Paths.uninstalled(app: Bundle.main.bundleURL, library: library)
+      .filter { FileManager.default.fileExists(atPath: $0.path) }
+    let bridge = bridge
+    Task {
+      await bridge?.perform(.stop)
+      NSWorkspace.shared.recycle(files) { _, error in
+        Task { @MainActor in
+          if let error {
+            let alert = NSAlert()
+            alert.messageText = "LiveBridge could not move everything to the Trash"
+            alert.informativeText =
+              "\(error.localizedDescription) What is left can be removed by hand, as the README's "
+              + "Uninstall section shows."
+            NSApp.activate()
+            alert.runModal()
+          }
+          NSApp.terminate(nil)
+        }
+      }
+    }
+  }
+
   /// One of Settings' timers for the line, kept in range; one turned on starts on a quiet open line.
   func setTimeout(_ key: WritableKeyPath<BridgeCore.Settings, Int>, _ seconds: Int) {
     settings.update { $0[keyPath: key] = CallMachine.Timeouts.clamped(seconds) }

@@ -217,6 +217,12 @@ permitirlo.
 
 ### Desinstalación
 
+**Feedback & Support ▸ Uninstall LiveBridge…**, en el menú, pregunta primero; luego quita el
+inicio de sesión y el permiso del micrófono, termina la llamada, mueve la app y todos los
+archivos que guarda (los de abajo) a la Papelera y se cierra. Deja el mod de Claude Code y
+copia el comando que lo quita, `claude plugin uninstall livebridge@livebridge`, para que lo
+ejecutes en Terminal.
+
 Desde un clon, `scripts/build-app.sh --uninstall` elimina `/Applications/LiveBridge.app`, sea cual
 sea la forma en que se instaló, su elemento de inicio de sesión y todos los archivos que conserva, e
 imprime los dos comandos que deja de tu mano: `tccutil reset Microphone com.getlivebridge.livebridge`
@@ -275,7 +281,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   **Settings…**, **Feedback & Support** (**Report a Bug…** abre el formulario de informe de errores
   del repositorio, **LiveBridge Website** abre getlivebridge.com, **Star LiveBridge on GitHub** abre
   la página del repositorio, y luego **Debug Mode** y **Show Debug Files…**, el interruptor y la
-  carpeta del [modo de depuración](#ajustes)) y **Quit LiveBridge**. Quick Settings está ahí incluso cuando el menú
+  carpeta del [modo de depuración](#ajustes), y **Uninstall LiveBridge…** ([Desinstalación](#desinstalación))) y **Quit LiveBridge**. Quick Settings está ahí incluso cuando el menú
   muestra solo la llamada. Durante una llamada, **Conversation** muestra tus palabras y
   las de la voz a medida que codex las transcribe, así que las tuyas pueden aparecer un momento después
   de decirlas y las de la voz un momento antes de oírlas. Cuando cada frase termina, su texto final

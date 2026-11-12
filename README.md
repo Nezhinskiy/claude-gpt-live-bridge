@@ -233,12 +233,17 @@ call stops with a sentence that says where to allow it.
 
 ### Uninstall
 
+The menu's **Feedback & Support ▸ Uninstall LiveBridge…** asks first, then removes LiveBridge's
+login item and microphone permission, ends a call, moves the app and every file it keeps (the
+files listed below) to the Trash, and quits. It leaves the Claude Code mod, and copies the command
+that removes it, `claude plugin uninstall livebridge@livebridge`, for you to run in Terminal.
+
 From a clone, `scripts/build-app.sh --uninstall` removes `/Applications/LiveBridge.app`,
 however it was installed, its login item and every file it keeps, and prints the two commands
 it leaves to you: `tccutil reset Microphone com.getlivebridge.livebridge` and
 `claude plugin uninstall livebridge@livebridge`.
 
-Without a clone, turn off **Open at login** in LiveBridge's Settings, quit LiveBridge, and run
+By hand, without a clone, turn off **Open at login** in LiveBridge's Settings, quit LiveBridge, and run
 the same steps in Terminal:
 
 ```sh
@@ -292,7 +297,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   **Settings…**, **Feedback & Support** (**Report a Bug…** opens the repository's bug report form,
   **LiveBridge Website** opens getlivebridge.com, **Star LiveBridge on GitHub** opens the
   repository's page, then **Debug Mode** and **Show Debug Files…**, [debug mode](#settings)'s
-  switch and folder) and **Quit LiveBridge**. Quick Settings is there even when the menu shows
+  switch and folder, and **Uninstall LiveBridge…** ([Uninstall](#uninstall))) and **Quit LiveBridge**. Quick Settings is there even when the menu shows
   only the call. During a call **Conversation** shows your words and the voice's as codex transcribes them, so yours can appear a
   moment after you say them and the voice's a moment before you hear them. When each is finished,
   its final text replaces them. Only final text is kept: words still waiting for it when the line
