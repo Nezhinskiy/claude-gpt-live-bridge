@@ -401,9 +401,11 @@ that reads your Codex usage from OpenAI, also while the call is off; what codex 
 is codex's. Codex
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
 session sends its work to Anthropic as it always does. LiveBridge has no telemetry. The menu's
-**Feedback & Support** items, **Report a Bug…**, **LiveBridge Website** and **Star LiveBridge on
+**Feedback & Support** links, **Report a Bug…**, **LiveBridge Website** and **Star LiveBridge on
 GitHub**, only open the repository's bug form, getlivebridge.com and the repository's page in your
-browser; the app sends nothing.
+browser; the app sends nothing. Its other items stay on the Mac: **Debug Mode** writes the voice's
+network numbers to a local file ([Settings](README.md#settings)), and **Uninstall LiveBridge…**
+moves the app and its files to the Trash ([Uninstall](README.md#uninstall)).
 
 For updates, the app itself makes two kinds of request, and no others: the release check and the
 image download below. It also runs `gh` and `claude` for the requests listed below; what `gh`

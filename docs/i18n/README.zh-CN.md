@@ -157,6 +157,10 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
 
 ### 卸载
 
+在 `/Applications` 中的副本里，菜单中的 **Feedback & Support ▸ Uninstall LiveBridge…** 会先询问，然后把应用移到废纸篓；如果无法移动，它会说明并且不做任何其他更改。然后结束正在进行的通话，每个会话都会离开 LiveBridge（与菜单中的 × 相同），因此其中的 `/live` 会关闭，而不会再次打开 LiveBridge；LiveBridge 移除登录项和麦克风权限后退出，退出之后，它保存的文件（见下文）会移到废纸篓中的一个文件夹，直到你清倒废纸篓。它不会移除 Claude Code 模组，而是复制移除模组的命令 `claude plugin uninstall livebridge@livebridge`，供你在终端中运行。当时未打开的会话在再次打开时可能仍会寻找 LiveBridge；移除模组即可停止。
+
+用 Homebrew 安装的？`brew uninstall --cask getlivebridge/tap/livebridge` 会移除应用及 Homebrew 中的记录；下面的步骤仍适用于应用保存的文件。
+
 在克隆的仓库中运行 `scripts/build-app.sh --uninstall`，无论应用是如何安装的，它都会移除
 `/Applications/LiveBridge.app`、其登录项以及它保存的所有文件，并打印出留给你自己执行的两条命令：
 `tccutil reset Microphone com.getlivebridge.livebridge` 和
@@ -173,7 +177,7 @@ tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
 
-两种方式都不会删除名为 `/Applications/.LiveBridge-update-….app` 的副本，这种副本可能由安装中途中断的更新留下。应用会在下次启动时删除这类副本；
+这些方式都不会删除名为 `/Applications/.LiveBridge-update-….app` 的副本，这种副本可能由安装中途中断的更新留下。应用会在下次启动时删除这类副本；
 卸载之后，如果它存在，请手动删除。
 
 `claude plugin uninstall` 可能会留下模组的快照 `~/.claude/plugins/store/livebridge_*.json`：Claude Code 文档中列出的删除内容不包括这个文件，这一点也没有实际运行验证。如果它还在，请手动删除。
@@ -200,7 +204,7 @@ claude plugin uninstall livebridge@livebridge
   状态条，`/live` 会让它重新出现。
 - **菜单栏菜单**包含通话、已加入的会话（点击某个会话使其成为目标）、
   **Load context**、LiveBridge 保存的目标会话 **Conversation**（语音交给 Claude 的每个请求都有一行 **Task**，载入摘要的位置有一行 **Loaded context**）、用量限额、分钟数、
-  **Quick Settings**（**Connect over TCP**、**Play sounds for requests and answers**、**Notify when a result is waiting**、**Pause sync while the call is stopped** 和 **Load a session's context on its first call** 的勾选项）、**Settings…**、**Feedback & Support**（**Report a Bug…** 打开仓库的错误报告表单，**LiveBridge Website** 打开 getlivebridge.com，**Star LiveBridge on GitHub** 打开仓库页面）和 **Quit LiveBridge**。菜单只显示通话时，Quick Settings 也在。通话期间，**Conversation** 会随着 codex 的转写显示你和语音说的话，因此你的话可能在说出后片刻才出现，语音的话可能在你听到前片刻就出现。每句话结束后，由最终文本替换这些文字。只保留最终文本：线路关闭时仍未等到最终文本的文字会消失。
+  **Quick Settings**（**Connect over TCP**、**Play sounds for requests and answers**、**Notify when a result is waiting**、**Pause sync while the call is stopped** 和 **Load a session's context on its first call** 的勾选项）、**Settings…**、**Feedback & Support**（**Report a Bug…** 打开仓库的错误报告表单，**LiveBridge Website** 打开 getlivebridge.com，**Star LiveBridge on GitHub** 打开仓库页面，随后是 **Debug Mode** 和 **Show Debug Files…**，即[调试模式](#设置)的开关和文件夹，以及 **Uninstall LiveBridge…**（[卸载](#卸载)））和 **Quit LiveBridge**。菜单只显示通话时，Quick Settings 也在。通话期间，**Conversation** 会随着 codex 的转写显示你和语音说的话，因此你的话可能在说出后片刻才出现，语音的话可能在你听到前片刻就出现。每句话结束后，由最终文本替换这些文字。只保留最终文本：线路关闭时仍未等到最终文本的文字会消失。
 - **Mute**（在 **Stop** 旁边，位于状态条和菜单的通话卡片中；Mute 后显示 **Unmute**）会在通话继续时释放你的麦克风：Claude 的答复仍会打开线路，并交给语音去说。状态条保留阶段并加上 `· muted`；没有线路打开时，菜单显示 “Muted — line closed”。Mute 不会关闭线路：已打开的线路会在通常的无声时长后关闭：若你当时在说话，则从 Mute 起算；若线路本来就安静，Mute 不会改变它何时关闭，计费与任何无声时段相同，因此 Mute 不会节省实时分钟数。**Unmute** 会重新使用麦克风，若无法使用（被拒绝、被占用、缺失），通话会带着原因结束。**Stop** 会结束通话和 Mute；下一次 **Start** 从未 Mute 开始。Mute 不是锁：任何以你的用户身份运行的进程都可以解除它（[SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)）。
 - **Load context** 只在语音缺少目标的一部分时可用：没有摘要且 **Pause sync** 使下一条线路无法加载、某一轮没有送达、某个问题或权限通知没有送到应用、模组关闭期间有轮次运行、摘要之后的行数已超出语音所能承载（较长的对话会超出）、该会话曾被暂停且已有摘要，或其模组不同步。否则该项显示为 **Context up to date** 且不可用，因为语音已经有了这段对话。如果没有打开的线路、下一条线路将加载摘要且没有缺少其他内容，该项显示为 **Context loads with the line** 且不可用，因为下一条线路会自行请求摘要。摘要不带日期，因此它可能被忽略而该项仍保持可用（[BR-002](../../docs/bugs/BR-002.md)）。
 - **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。语音从线路下次打开时重新开始。它还没说出的结果会保留并再次加入，只有 **Stop** 会清除它们。Claude 等待中的问题遵循其他规则（[详情](../../SECURITY.md#residual-risk-by-design)）。**Load a session's context on its first call** 开启时，或 **Pause sync** 关闭且该会话未被暂停时，下一条线路会自行加载同一会话记录的摘要，其中包括该会话读过的内容；要避免这一点，请先在该会话中执行 `/clear`，再点击 **New conversation**。在被移除的会话中执行 `/live` 可让它重新加入。
@@ -209,12 +213,13 @@ claude plugin uninstall livebridge@livebridge
 
 **Settings…** 会打开 LiveBridge 的设置窗口，工具栏中有四个标签页。
 菜单中的 **Quick Settings** 收有其中五个开关（[菜单](#状态条与菜单)）：每一项就是设置本身，因此在一处更改会立即显示在另一处，并且它会询问此处开关所询问的内容。
-**General** 包含通知、登录和更新：
+**General** 包含通知、登录、更新和调试模式：
 
 - **Notify when a result is waiting**（默认开启）：当线路关闭期间有结果在等待时，除提示音外，还会弹出一条 macOS 通知，其中写明会话名称
   （“Alpha has a new result — speak to hear it”），但绝不包含结果本身。点击通知会打开菜单栏菜单。
 - **Open at login**（默认关闭）。
 - **Updates**：当前运行的版本、**Check for update**、**Check for updates automatically**，以及上一次更新做了什么（[更新应用](#更新应用)）。
+- **Debug mode**（默认关闭）：通话期间每秒记录一行语音的网络数据（丢失和丢弃的数据包、抖动、隐藏的采样、线路是否走 TCP），每次通话一个 CSV，存放在 `~/Library/Application Support/LiveBridge/debug/call-stats/`；不含音频、转写或会话名称。通话中开启时，从那一刻起记录正在打开的线路；关闭时立即停止，已写入的文件会保留，直到你删除。**Show Debug Files** 打开该文件夹。在菜单中，它是 **Feedback & Support** 里的 **Debug Mode**（[如何解读这些数据](../../CONTRIBUTING.md#reading-debug-modes-numbers)）。
 
 **Voice** 包含通话中你听到的内容：
 
@@ -297,13 +302,13 @@ LiveBridge 没有遥测，也不监听任何网络端口；模组通过一个只
 在你的 Mac 上，应用把设置、用量计量、上次检查更新的时间和已通知过的版本、上一次更新做了什么，以及最近使用的 20 个会话各自的近期对话（最多 64 行，包括你在其中输入的内容；除非你开启 **Pause sync**，否则无需通话也会记录）和上次从中加载的上下文行，保存在
 `~/Library/Application Support/LiveBridge`，该文件夹只有你的用户才能打开（[保存方式](../../SECURITY.md#residual-risk-by-design)）。当你以某个会话为目标按下 **New
 conversation**，或用 × 移除它时，该会话的这些行就会被删除。已离开的会话会保留这些内容，
-直到之后使用的 20 个会话将其挤出；若想更早地清除，请在其中再次运行 `/live` 并点击 **New conversation**。卸载会将它们全部移除。模组在 Claude Code 的插件存储中保留自己的快照（[其中有什么](../../SECURITY.md#residual-risk-by-design)）。
+直到之后使用的 20 个会话将其挤出；若想更早地清除，请在其中再次运行 `/live` 并点击 **New conversation**。卸载会将它们全部移除；菜单中的 Uninstall LiveBridge 会把它们移到废纸篓，清倒废纸篓后才会消失。模组在 Claude Code 的插件存储中保留自己的快照（[其中有什么](../../SECURITY.md#residual-risk-by-design)）。**Debug mode** 默认关闭，开启后会在通话期间把语音的网络数据写入该文件夹中的一个文件，仅此而已（[设置](#设置)）。
 
 [SECURITY.md](../../SECURITY.md) 给出了威胁模型：简而言之，凡是你的麦克风能听到的内容，都可能变成一条请求，由 Claude 在该会话自己的权限模式下执行。
 
 ## 已知限制
 
-- **Connect over TCP** 只是优先 TCP，并不强制，应用里也不显示线路实际用了哪种传输方式，所以退回 UDP 的线路仍可能断续。这条路线只测量过一次，是在一个移除了 UDP 候选项的调试版本中（10 分钟内没有丢失音频）；正式采用的方式，即降低其优先级，只观察到一次选择了 TCP。调试版本的 `--call-stats` 会记录传输方式（`onTcp`）（[CONTRIBUTING.md](../../CONTRIBUTING.md#reading---call-stats)）。
+- **Connect over TCP** 只是优先 TCP，并不强制，通话期间也不显示线路实际用了哪种传输方式，所以退回 UDP 的线路仍可能断续。这条路线只测量过一次，是在一个移除了 UDP 候选项的调试版本中（10 分钟内没有丢失音频）；正式采用的方式，即降低其优先级，只观察到一次选择了 TCP。调试模式会记录传输方式（`onTcp`）（[CONTRIBUTING.md](../../CONTRIBUTING.md#reading-debug-modes-numbers)）。
 - 语音有时会说它在查看（“On it”“Looking now”），却没有转交请求，于是什么也没有送到 Claude：按最初写下的规则，约五分之一的请求如此；按现在的规则为 20 次中 0 次，次数太少，无法与运气区分（[BR-001](../../docs/bugs/BR-001.md)）。它还可能声称做了它没有做的工作，例如 “I'll take a look.”，包括根据只作为上下文拥有的行（[ADR 0001 (n), (o)](../../docs/adr/0001-platform-findings.md)）。应用把请求放入 Claude 的队列时会播放一声短音，它不同于回答的声音；如果语音说它在查看却没有这声短音，请再说一遍。应用无法凭措辞区分这种承诺和回答，因为语音说的是你的语言。
 - Claude 的提问或它正在等待的权限提示只是交给语音，语音可能不说；没有什么能强制它说。所以离开 Mac 时不要依赖语音来播报提示：Claude 可能在没有任何通知的情况下等待。提示仍在 Claude Code 中等待，它才是唯一的控制手段；语音不是控制手段，LiveBridge 也绝不回答提示。在检查中，打开的线路上来自输入轮次的权限通知，在键盘回答之前被说出的次数为 3 次运行中 0 次，这是计数，不是比率（[ADR 0001 (n)](../../docs/adr/0001-platform-findings.md)）。已关闭的线路只有在目标会话的对话中有你的一轮时才会为它们打开；否则应用发出提示音，通话关闭时则只做记录。
 - Claude 桌面应用把输入的提示的来源报告成什么，尚未观察到（[ADR 0001 (m)](../../docs/adr/0001-platform-findings.md)）。模组只有在提示的来源是 `composer` 时才把它记录为你的。如果在那里输入的提示以其他来源到达，在那里输入的内容都不会被记录，也不会标记缺口，菜单显示 **Context up to date**，暂停的作用范围也会变小（[详情](../../SECURITY.md#what-session-text-can-do)）。

@@ -17,6 +17,10 @@ public struct MenuContent: Sendable, Equatable {
     case reportBug
     /// Opens the project's website (`Release.website`).
     case website
+    /// Opens debug mode's folder in the Finder.
+    case showDebugFiles
+    /// Asks, then moves the app and its files to the Trash and quits (`AppModel.uninstall`).
+    case uninstall
     /// Installs the release announced, this version.
     case installUpdate(AppVersion)
 
@@ -26,19 +30,25 @@ public struct MenuContent: Sendable, Equatable {
       case .settings: ","
       case .quit: "q"
       case .copyJoinCommand, .loadContext, .newConversation, .starOnGitHub, .reportBug, .website,
-        .installUpdate:
+        .showDebugFiles, .uninstall, .installUpdate:
         ""
       }
     }
   }
 
-  /// A setting Quick Settings shows as a checkmark item, in menu order: the setting of the same
-  /// name in Settings, not a copy.
+  /// A setting the menu shows as a checkmark item: the setting of the same name in Settings, not
+  /// a copy.
   public enum Switch: Sendable, Equatable, CaseIterable {
     case connectsOverTCP, confirmHandoffs, notifyResults, pauseSyncWhileStopped,
-      loadContextOnFirstCall
+      loadContextOnFirstCall, debugMode
 
-    /// Settings' own words for it.
+    /// Quick Settings' switches, in menu order; debug mode is in Feedback & Support.
+    public static let quickSettings: [Switch] = [
+      .connectsOverTCP, .confirmHandoffs, .notifyResults, .pauseSyncWhileStopped,
+      .loadContextOnFirstCall,
+    ]
+
+    /// The menu's words for it, Settings' own but for Debug Mode's title case.
     public var title: String {
       switch self {
       case .connectsOverTCP: "Connect over TCP"
@@ -46,6 +56,7 @@ public struct MenuContent: Sendable, Equatable {
       case .notifyResults: "Notify when a result is waiting"
       case .pauseSyncWhileStopped: "Pause sync while the call is stopped"
       case .loadContextOnFirstCall: "Load a session's context on its first call"
+      case .debugMode: "Debug Mode"
       }
     }
 
@@ -56,6 +67,7 @@ public struct MenuContent: Sendable, Equatable {
       case .notifyResults: settings.notifyResults
       case .pauseSyncWhileStopped: settings.pauseSyncWhileStopped
       case .loadContextOnFirstCall: settings.loadContextOnFirstCall
+      case .debugMode: settings.debugMode
       }
     }
   }
@@ -108,13 +120,16 @@ public struct MenuContent: Sendable, Equatable {
 
   /// `settings` are the app's, shown in Quick Settings with or without a bridge. `problem` is the
   /// app's own or the bridge's; `update` is nil while there is no bridge. `available` is a newer
-  /// release found and not yet installed: the menu offers to install it.
+  /// release found and not yet installed: the menu offers to install it. Only the copy in
+  /// `/Applications` (`isInstalledCopy`) can uninstall itself.
   public init(
     settings: Settings, update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
     available: AppVersion?, codexLimits: UsageLimits? = nil, claudeLimits: UsageLimits? = nil,
+    isInstalledCopy: Bool,
     now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
   ) {
-    let footer = Self.foot(settings: settings, available: available)
+    let footer = Self.foot(
+      settings: settings, available: available, isInstalledCopy: isInstalledCopy)
     let shown = update.map { StatusPresentation($0.status) }
     let hear =
       update?.status.call == .off
@@ -175,16 +190,23 @@ public struct MenuContent: Sendable, Equatable {
 
   /// The menu's foot, the same with or without a bridge: an update to install, Quick Settings,
   /// Settings, Feedback & Support and Quit.
-  private static func foot(settings: Settings, available: AppVersion?) -> [Item] {
+  private static func foot(
+    settings: Settings, available: AppVersion?, isInstalledCopy: Bool
+  ) -> [Item] {
     let install: [Item] =
       available.map {
         [.command(.installUpdate($0), title: "Install LiveBridge \($0)…", isEnabled: true)]
       } ?? []
-    let quick = Switch.allCases.map { Item.toggle($0, isOn: $0.isOn(in: settings)) }
+    let quick = Switch.quickSettings.map { Item.toggle($0, isOn: $0.isOn(in: settings)) }
     let support: [Item] = [
       .command(.reportBug, title: "Report a Bug…", isEnabled: true),
       .command(.website, title: "LiveBridge Website", isEnabled: true),
       .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
+      .separator,
+      .toggle(.debugMode, isOn: settings.debugMode),
+      .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+      .separator,
+      .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: isInstalledCopy),
     ]
     return install + [
       .submenu("Quick Settings", isEnabled: true, items: quick),

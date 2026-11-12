@@ -206,6 +206,18 @@ network पर devices खोज सकता है। voice line को यह
 
 ### अनइंस्टॉल करना
 
+`/Applications` वाली copy में menu का **Feedback & Support ▸ Uninstall LiveBridge…** पहले
+पूछता है और app को Trash में ले जाता है; अगर न ले जा सके, तो यह बताता है और कुछ और नहीं बदलता। फिर खुली call खत्म होती है और हर session LiveBridge छोड़ देता है, जैसे menu के × से,
+इसलिए उसमें `/live` LiveBridge को फिर से खोलने के बजाय बंद हो जाता है; LiveBridge login item और
+microphone permission हटाकर बंद हो जाता है, और उसके बंद होने के बाद उसकी files (नीचे दी गई)
+Trash के एक folder में चली जाती हैं, जब तक आप उसे खाली न करें। Claude Code का mod बना
+रहता है: उसे हटाने वाला command, `claude plugin uninstall livebridge@livebridge`, copy हो
+जाता है ताकि आप उसे Terminal में चलाएँ। जो session तब खुला नहीं था, वह खुलने पर फिर से
+LiveBridge ढूँढ सकता है; mod हटाने से यह रुक जाता है।
+
+Homebrew से install किया था? `brew uninstall --cask getlivebridge/tap/livebridge` app और Homebrew का उसका record हटा देता
+है; app की files के लिए नीचे के steps फिर भी लागू हैं।
+
 किसी clone से, `scripts/build-app.sh --uninstall` `/Applications/LiveBridge.app` को हटा देता है,
 चाहे वह जैसे भी install हुआ हो, साथ ही उसका login item और उसकी रखी हर फ़ाइल, और वे दो commands
 प्रिंट करता है जो वह आपके लिए छोड़ देता है: `tccutil reset Microphone com.getlivebridge.livebridge` और
@@ -262,7 +274,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   **Quick Settings** (**Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause sync while the call is stopped** और **Load a session's context on its first call** के checkmark items),
   **Settings…**, **Feedback & Support** (**Report a Bug…** repository का bug report form खोलता है,
   **LiveBridge Website** getlivebridge.com खोलता है, **Star LiveBridge on GitHub** repository का page
-  खोलता है) और **Quit LiveBridge** होते हैं। जब menu में सिर्फ़ call दिखती है, तब भी Quick Settings
+  खोलता है, फिर **Debug Mode** और **Show Debug Files…**, [debug mode](#सेटिंग्स) का switch और
+  folder, और **Uninstall LiveBridge…** ([अनइंस्टॉल करना](#अनइंस्टॉल-करना))) और **Quit LiveBridge** होते हैं। जब menu में सिर्फ़ call दिखती है, तब भी Quick Settings
   वहाँ होता है। call के दौरान **Conversation** आपके और voice के शब्द
   वैसे-वैसे दिखाता है जैसे-जैसे codex उन्हें transcribe करता है, इसलिए आपके शब्द बोलने के थोड़ी देर बाद, और
   voice के शब्द सुनाई देने से थोड़ा पहले दिख सकते हैं। हर बात पूरी होने पर उसका अंतिम पाठ इन शब्दों की जगह
@@ -298,7 +311,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 **Settings…** LiveBridge की Settings window खोलता है, जिसके toolbar में चार tabs हैं।
 menu का **Quick Settings** इसके पाँच switches रखता है ([menu](#बैंड-और-मेन्यू)): हर item वही setting
 है, इसलिए एक जगह का बदलाव दूसरी जगह तुरंत दिखता है, और वह वही पूछता है जो यहाँ का switch पूछता है।
-**General** में notifications, login और updates हैं:
+**General** में notifications, login, updates और debug mode हैं:
 
 - **Notify when a result is waiting** (डिफ़ॉल्ट रूप से चालू): line बंद रहने पर इंतज़ार कर रहे नतीजे की
   chime के साथ, एक macOS notification session का नाम बताता है ("Alpha has a new result — speak to
@@ -306,6 +319,13 @@ menu का **Quick Settings** इसके पाँच switches रखता �
 - **Open at login** (डिफ़ॉल्ट रूप से बंद)।
 - **Updates**: चल रहा version, **Check for update**, **Check for updates automatically** और पिछले
   update ने क्या किया ([अपडेट करना](#अपडेट-करना))।
+- **Debug mode** (डिफ़ॉल्ट रूप से बंद): call के दौरान हर सेकंड voice के network आँकड़ों की एक row
+  (खोए और फेंके गए packets, jitter, concealed samples, line TCP पर चल रही है या नहीं), हर call की एक
+  CSV, `~/Library/Application Support/LiveBridge/debug/call-stats/` में; न audio, न transcript, न
+  session के नाम। call के दौरान चालू करने पर यह खुली line को उसी पल से दर्ज करता है; बंद करने पर
+  तुरंत रुक जाता है, और files तब तक रहती हैं जब तक आप उन्हें न हटाएँ। **Show Debug Files** folder
+  खोलता है। menu में यह **Feedback & Support** में **Debug Mode** है
+  ([आँकड़े कैसे पढ़ें](../../CONTRIBUTING.md#reading-debug-modes-numbers))।
 
 **Voice** में वह है जो आप call के दौरान सुनते हैं:
 
@@ -521,18 +541,21 @@ release मिलने पर app `gh auth status` चलाता है, य�
 उसे target रखकर **New conversation** दबाते हैं या उसे × से हटाते हैं। जो session चला गया है, उसकी
 पंक्तियाँ तब तक रहती हैं जब तक उसके बाद इस्तेमाल हुए 20 sessions उन्हें बाहर न धकेल दें; उन्हें
 जल्दी मिटाने के लिए, उसी session में फिर से `/live` चलाएँ और **New conversation** दबाएँ।
-Uninstall करने से वे सब हट जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](../../SECURITY.md#residual-risk-by-design))।
+Uninstall करने से वे सब हट जाती हैं; menu का Uninstall LiveBridge उन्हें Trash में ले जाता
+है, और Trash खाली करने पर वे चली जाती हैं। mod Claude Code के plugin store में अपना एक snapshot रखता है ([उसमें क्या है](../../SECURITY.md#residual-risk-by-design))।
+**Debug mode**, जो डिफ़ॉल्ट रूप से बंद है, call के दौरान voice के network आँकड़े इसी folder की एक file
+में लिखता है, और कुछ नहीं ([सेटिंग्स](#सेटिंग्स))।
 
 [SECURITY.md](../../SECURITY.md) में threat model है: संक्षेप में, जो कुछ भी आपका microphone सुन सकता है
 वह एक ऐसा अनुरोध बन सकता है जिसे Claude session के अपने permission mode के तहत चलाता है।
 
 ## ज्ञात सीमाएँ
 
-- **Connect over TCP** TCP को प्राथमिकता देता है, उसे मजबूर नहीं करता, और app कहीं नहीं दिखाता कि line
+- **Connect over TCP** TCP को प्राथमिकता देता है, उसे मजबूर नहीं करता, और call के दौरान कुछ नहीं दिखाता कि line
   ने कौन-सा transport लिया, इसलिए UDP पर लौटी line अब भी टूट सकती है। यह रास्ता एक बार मापा गया, एक
   debug build में जिसने UDP candidates हटा दिए थे (10 मिनट में कोई audio नहीं खोया); भेजा गया तरीका,
-  उनकी priority घटाना, एक बार TCP चुनते देखा गया। debug build का `--call-stats` transport दर्ज करता
-  है (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading---call-stats))।
+  उनकी priority घटाना, एक बार TCP चुनते देखा गया। debug mode transport दर्ज करता
+  है (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading-debug-modes-numbers))।
 - voice कभी-कभी कहता है कि वह देख रहा है ("On it", "Looking now"), पर अनुरोध Claude को नहीं सौंपता,
   इसलिए Claude तक कुछ नहीं पहुँचता: पहले लिखे गए नियम के साथ लगभग पाँच में से एक अनुरोध, और अब के
   नियम के साथ 20 में से 0, जो किस्मत से अलग बताने के लिए बहुत कम है ([BR-001](../../docs/bugs/BR-001.md))।

@@ -188,6 +188,22 @@ struct SettingsView: View {
         }
       }
       UpdateSection(model: model)
+      Section("Debug") {
+        Toggle(
+          "Debug mode",
+          isOn: Binding {
+            model.settings.current.debugMode
+          } set: {
+            model.setDebugMode($0)
+          })
+        Text(
+          "Records the voice's network numbers once a second during a call, one CSV per call, in "
+            + "LiveBridge's data folder under debug/call-stats. No audio, no transcript, no "
+            + "session names; nothing leaves this Mac."
+        )
+        .font(.caption).foregroundStyle(.secondary)
+        Button("Show Debug Files") { model.showDebugFiles() }
+      }
     }
     .formStyle(.grouped)
     .task { await model.refreshNotificationStatus() }

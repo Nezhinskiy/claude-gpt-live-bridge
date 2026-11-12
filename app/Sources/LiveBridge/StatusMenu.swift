@@ -81,7 +81,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     MenuContent(
       settings: model.settings.current, update: model.update, problem: model.problem,
       contextLoad: model.contextLoad, available: model.available?.version,
-      codexLimits: model.codexLimits(at: Date()), claudeLimits: model.update?.claudeLimits)
+      codexLimits: model.codexLimits(at: Date()), claudeLimits: model.update?.claudeLimits,
+      isInstalledCopy: model.isInstalledCopy)
   }
 
   /// Renders the model's current content, and again whenever it changes. Only the content is
@@ -238,6 +239,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
       case .starOnGitHub: #selector(starOnGitHub)
       case .reportBug: #selector(reportBug)
       case .website: #selector(openWebsite)
+      case .showDebugFiles: #selector(showDebugFiles)
+      case .uninstall: #selector(uninstall)
       case .settings: #selector(showSettings)
       case .quit: #selector(quit)
       case .installUpdate: #selector(installUpdate(_:))
@@ -272,8 +275,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
   @objc private func starOnGitHub() { NSWorkspace.shared.open(Release.repositoryPage) }
 
-  /// Flips a Quick Settings switch through the setter its Settings control calls, once the menu
-  /// has closed: Connect over TCP may ask first, and an alert inside menu tracking hangs.
+  /// Flips a switch (Quick Settings' or Debug Mode) through the setter its Settings control
+  /// calls, once the menu has closed: Connect over TCP may ask first, and an alert inside menu
+  /// tracking hangs.
   @objc private func toggle(_ sender: NSMenuItem) {
     guard let toggle = sender.representedObject as? MenuContent.Switch else { return }
     let wasOn = sender.state == .on
@@ -283,6 +287,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   @objc private func reportBug() { NSWorkspace.shared.open(Release.bugReportForm) }
 
   @objc private func openWebsite() { NSWorkspace.shared.open(Release.website) }
+
+  @objc private func showDebugFiles() { model.showDebugFiles() }
+
+  @objc private func uninstall() { later { [model] in model.uninstall() } }
 
   @objc private func quit() { NSApp.terminate(nil) }
 

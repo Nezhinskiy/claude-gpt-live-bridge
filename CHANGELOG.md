@@ -20,7 +20,6 @@ All notable changes to this project are listed here. The format follows
   seen) to UDP, which can turn breakups into short pauses; it can still fall back to UDP. Changing
   it while a line is open asks first, then opens the line again over the new transport, still
   waiting for what it was waiting for.
-- A debug build's `--call-stats` records which transport the line took (`onTcp`).
 - The menu's **Quick Settings** submenu holds five of Settings' switches as checkmark items:
   **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is
   waiting**, **Pause sync while the call is stopped** and **Load a session's context on its first
@@ -28,12 +27,22 @@ All notable changes to this project are listed here. The format follows
   other, and Connect over TCP asks before reconnecting an open line, as in Settings.
 - The menu's **Feedback & Support** submenu holds **Report a Bug…** (the repository's bug report
   form), **LiveBridge Website** and **Star LiveBridge on GitHub**.
+- **Debug mode**, in Settings under General and as **Debug Mode** in **Feedback & Support**, off by
+  default, in every build: during a call it writes a row a second of the voice's network numbers,
+  one CSV per call, under `debug/call-stats` in LiveBridge's data folder; no audio, no transcript,
+  no session names, and nothing leaves the Mac. **Show Debug Files** opens the folder. The
+  numbers include which transport the line took (`onTcp`).
+- **Uninstall LiveBridge…**, in **Feedback & Support** of the copy in `/Applications`, asks, then
+  moves the app to the Trash, or says why it cannot and changes nothing; then every session leaves
+  LiveBridge, so `/live` turns off, LiveBridge removes its login item and microphone permission and
+  quits, and the files it keeps go to the Trash. It copies the command that removes the Claude Code
+  mod for you to run.
 
 ### Changed
 
-- The Settings window has four tabs in its toolbar: **General** (notifications, Open at login and
-  updates), **Voice** (the voice, the prompt and the sounds), **Line** (the line's timers and
-  Connect over TCP) and **Context** (sync).
+- The Settings window has four tabs in its toolbar: **General** (notifications, Open at login,
+  updates and debug mode), **Voice** (the voice, the prompt and the sounds), **Line** (the line's
+  timers and Connect over TCP) and **Context** (sync).
 - **Star LiveBridge on GitHub** moved from the menu's foot into **Feedback & Support**.
 
 - While Claude works, the menu bar icon shows dots turning in depth, three and then four, which

@@ -163,6 +163,9 @@ public struct CallMachine: Sendable {
   private var isSoundOn = false
   /// A silence timer is counting: armed, and neither elapsed nor cancelled since.
   private var isSilenceArmed = false
+  /// The counting timer was started by a change of the timeouts, so the owner may still be
+  /// setting it; the line's own events arm it afresh and clear this.
+  private var isArmedByChange = false
   /// The line's timers, which Settings holds.
   public var timeouts = Timeouts()
   /// How long after the latest handoff the line stays open for its result. Billed.
@@ -201,6 +204,7 @@ public struct CallMachine: Sendable {
   /// without words, the line closes after the noise timeout instead.
   private mutating func armSilence() -> CallEffect {
     isSilenceDue = false
+    isArmedByChange = false
     let firstWord = timeouts.firstWord > 0 ? timeouts.firstWord : timeouts.silence
     let quiet = isAwaitingFirstWord ? firstWord : timeouts.silence
     let seconds = isSoundOn ? timeouts.noise : quiet
@@ -344,10 +348,13 @@ public struct CallMachine: Sendable {
       replyCanSay = nil
       return [.reopenRealtime(preroll: isSoundOn)]
     case (.live, .timeoutsChanged):
-      // a timer turned on starts now; one already counting is not moved
-      guard !isSilenceArmed, !isSilenceDue else { return [] }
+      // A timer turned on starts now. One the line started is not moved; one a change started
+      // follows the next change, as a Stepper passes 1, 2, 3 on its way to the value meant.
+      let wasSetByChange = isSilenceArmed && isArmedByChange
+      guard !isSilenceArmed || wasSetByChange, !isSilenceDue else { return [] }
       let arm = armSilence()
-      return isSilenceArmed ? [arm] : []
+      isArmedByChange = isSilenceArmed
+      return isSilenceArmed || wasSetByChange ? [arm] : []
     case (.live, .silenceElapsed):
       isSilenceArmed = false
       if !awaited.isEmpty, !isSoundOn {

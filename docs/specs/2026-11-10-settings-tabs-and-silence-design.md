@@ -1,6 +1,9 @@
 # Settings in two tabs, and the silence before the line closes
 
-Status: delivered, 2026-11-10. Amended after the PR #80 review (below).
+Status: delivered, 2026-11-10. Amended after the PR #80 review (below). Its window is superseded by
+[the Settings and menus design](2026-11-11-settings-toolbar-and-menus-design.md) (2026-11-11): four
+tabs in a toolbar that open on General, not two `TabView` tabs that open on Voice; the silence
+timers stand as written here.
 
 ## Why
 

@@ -217,6 +217,18 @@ permitirlo.
 
 ### Desinstalación
 
+En la copia de `/Applications`, **Feedback & Support ▸ Uninstall LiveBridge…**, en el menú,
+pregunta primero y mueve la app a la Papelera; si no puede, lo dice y no cambia nada más. Luego termina la llamada abierta y cada sesión deja LiveBridge, como con la ×
+del menú, así que `/live` se apaga en ella en vez de volver a abrir LiveBridge; LiveBridge quita
+el inicio de sesión y el permiso del micrófono y se cierra, y una vez cerrado, los archivos que
+guarda (los de abajo) van a una carpeta de la Papelera, hasta que la vacíes. Deja
+el mod de Claude Code y copia el comando que lo quita, `claude plugin uninstall livebridge@livebridge`,
+para que lo ejecutes en Terminal. Una sesión que no estaba abierta entonces puede volver a
+buscar LiveBridge cuando se abra; quitar el mod lo termina.
+
+¿Lo instalaste con Homebrew? `brew uninstall --cask getlivebridge/tap/livebridge` quita la app y el registro de Homebrew;
+los pasos de abajo siguen siendo para los archivos que guarda la app.
+
 Desde un clon, `scripts/build-app.sh --uninstall` elimina `/Applications/LiveBridge.app`, sea cual
 sea la forma en que se instaló, su elemento de inicio de sesión y todos los archivos que conserva, e
 imprime los dos comandos que deja de tu mano: `tccutil reset Microphone com.getlivebridge.livebridge`
@@ -234,7 +246,7 @@ tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
 
-Ninguna de las dos formas elimina una copia llamada `/Applications/.LiveBridge-update-….app`, que
+Ninguna de estas formas elimina una copia llamada `/Applications/.LiveBridge-update-….app`, que
 puede dejar una actualización interrumpida a mitad de la instalación. La aplicación elimina esas
 copias en su siguiente arranque; tras desinstalar, bórrala a mano si existe.
 
@@ -274,7 +286,8 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause sync while the call is stopped** y **Load a session's context on its first call**),
   **Settings…**, **Feedback & Support** (**Report a Bug…** abre el formulario de informe de errores
   del repositorio, **LiveBridge Website** abre getlivebridge.com, **Star LiveBridge on GitHub** abre
-  la página del repositorio) y **Quit LiveBridge**. Quick Settings está ahí incluso cuando el menú
+  la página del repositorio, y luego **Debug Mode** y **Show Debug Files…**, el interruptor y la
+  carpeta del [modo de depuración](#ajustes), y **Uninstall LiveBridge…** ([Desinstalación](#desinstalación))) y **Quit LiveBridge**. Quick Settings está ahí incluso cuando el menú
   muestra solo la llamada. Durante una llamada, **Conversation** muestra tus palabras y
   las de la voz a medida que codex las transcribe, así que las tuyas pueden aparecer un momento después
   de decirlas y las de la voz un momento antes de oírlas. Cuando cada frase termina, su texto final
@@ -315,7 +328,8 @@ herramientas.
 **Quick Settings**, en el menú, reúne cinco de sus interruptores ([el menú](#la-banda-y-el-menú)):
 cada elemento es el propio ajuste, así que un cambio en un sitio se ve al instante en el otro, y
 pregunta lo mismo que el interruptor de aquí.
-**General** reúne las notificaciones, el inicio de sesión y las actualizaciones:
+**General** reúne las notificaciones, el inicio de sesión, las actualizaciones y el modo de
+depuración:
 
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
@@ -324,6 +338,13 @@ pregunta lo mismo que el interruptor de aquí.
 - **Open at login** (desactivado por defecto).
 - **Updates**: la versión en uso, **Check for update**, **Check for updates automatically** y lo
   que hizo la última actualización ([Actualización](#actualización)).
+- **Debug mode** (desactivado por defecto): durante una llamada, una fila por segundo con los
+  números de red de la voz (paquetes perdidos y descartados, jitter, muestras ocultadas, si la línea
+  va por TCP), un CSV por llamada, en `~/Library/Application Support/LiveBridge/debug/call-stats/`;
+  ni audio, ni transcripción, ni nombres de sesión. Activado durante una llamada, registra la línea
+  abierta desde ese momento; desactivado, se detiene al instante, y los archivos quedan hasta que
+  los borres. **Show Debug Files** abre la carpeta. En el menú es **Debug Mode**, en **Feedback &
+  Support** ([cómo leer los números](../../CONTRIBUTING.md#reading-debug-modes-numbers)).
 
 **Voice** reúne lo que oyes durante una llamada:
 
@@ -549,7 +570,10 @@ salvo que actives **Pause sync**) y la última línea de contexto cargada desde 
 ([cómo se guarda](../../SECURITY.md#residual-risk-by-design)). Las líneas de una sesión desaparecen cuando
 pulsas **New conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido
 las conserva hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta
-`/live` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](../../SECURITY.md#residual-risk-by-design)).
+`/live` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas; Uninstall LiveBridge, en el menú, las mueve a la
+Papelera, y desaparecen cuando la vacías. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](../../SECURITY.md#residual-risk-by-design)).
+**Debug mode**, desactivado por defecto, escribe los números de red de la voz durante una llamada
+en un archivo de esa carpeta, y nada más ([Ajustes](#ajustes)).
 
 [SECURITY.md](../../SECURITY.md) contiene el modelo de amenazas: en resumen, todo lo que tu micrófono
 pueda oír puede convertirse en una petición que Claude ejecuta con el propio modo de permisos de la
@@ -557,11 +581,11 @@ sesión.
 
 ## Limitaciones conocidas
 
-- **Connect over TCP** prefiere TCP pero no lo impone, y nada en la app muestra qué transporte tomó
+- **Connect over TCP** prefiere TCP pero no lo impone, y nada muestra durante la llamada qué transporte tomó
   una línea, así que una línea que volvió a UDP aún puede cortarse. La ruta se midió una vez, en
   una compilación de depuración que quitaba los candidatos UDP (ningún audio perdido en 10
-  minutos); la forma que se distribuye, bajar su prioridad, eligió TCP una vez. `--call-stats` de
-  una compilación de depuración registra el transporte (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading---call-stats)).
+  minutos); la forma que se distribuye, bajar su prioridad, eligió TCP una vez. El modo de
+  depuración registra el transporte (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading-debug-modes-numbers)).
 - A veces la voz dice que está mirando ("On it", "Looking now") sin pasar la petición, así que a
   Claude no le llega nada: más o menos una petición de cada cinco con la regla tal como se escribió
   primero, y 0 de 20 con la regla actual, muy pocas para distinguirlo de la suerte

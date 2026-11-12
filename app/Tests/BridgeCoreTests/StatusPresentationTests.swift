@@ -82,11 +82,10 @@ struct StatusPresentationTests {
     #expect(shown.accessibilityLabel.contains(sentence))
   }
 
-  @Test func aStoppedCallShowsNoTurningRing() {
-    let shown = StatusPresentation(Self.status(.off, other: .working))
-    #expect(shown.badge == .none)
-    #expect(shown.rows[1].detail == "Claude working")
-    #expect(StatusPresentation(Self.status(.off, other: .approval)).badge == .approval)
+  /// The menu bar stays still while the call is stopped (the table above), but the row still says so.
+  @Test func aStoppedCallsRowStillSaysClaudeWorks() {
+    #expect(
+      StatusPresentation(Self.status(.off, other: .working)).rows[1].detail == "Claude working")
   }
 
   @Test func unheardOutranksWorkingNotApproval() {

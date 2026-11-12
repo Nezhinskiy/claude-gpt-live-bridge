@@ -82,8 +82,12 @@ struct CallStatsLogTests {
     try String(contentsOf: url, encoding: .utf8).split(separator: "\n")
   }
 
-  func log() throws -> CallStatsLog {
-    CallStatsLog(directory: try CallStats.directory(in: base), timeZone: utc)
+  /// A log with debug mode on.
+  func log() -> CallStatsLog {
+    let log = CallStatsLog(
+      directory: { [base] in try CallStats.directory(in: base) }, timeZone: utc)
+    log.set(on: true)
+    return log
   }
 
   @Test func theFolderIsOwnerOnlyUnderTheDebugData() throws {
@@ -105,7 +109,7 @@ struct CallStatsLogTests {
 
   @Test func laterSamplesOfTheCallGoInTheSameFile() throws {
     defer { try? FileManager.default.removeItem(at: base) }
-    let log = try log()
+    let log = log()
     let url = try #require(try log.record(["line": 1], at: first))
     #expect(try log.record(["line": 1], at: second) == nil)
     #expect(try lines(url).count == 3)
@@ -113,12 +117,57 @@ struct CallStatsLogTests {
 
   @Test func aNewCallGetsItsOwnFile() throws {
     defer { try? FileManager.default.removeItem(at: base) }
-    let log = try log()
+    let log = log()
     let one = try #require(try log.record(["line": 1], at: first))
     log.endCall()
     let two = try #require(try log.record(["line": 2], at: second))
     #expect(one != two)
     #expect(try lines(one).count == 2)
+    #expect(try lines(two).count == 2)
+  }
+
+  @Test func whileOffNothingIsWrittenAndNoFolderMade() throws {
+    var asked = 0
+    let log = CallStatsLog(
+      directory: { [base] in
+        asked += 1
+        return try CallStats.directory(in: base)
+      }, timeZone: utc)
+    #expect(try log.record(["line": 1], at: first) == nil)
+    #expect(asked == 0)
+    #expect(!FileManager.default.fileExists(atPath: base.path))
+  }
+
+  @Test func turnedOffMidCallItClosesTheFileAndDropsWhatFollows() throws {
+    defer { try? FileManager.default.removeItem(at: base) }
+    let log = log()
+    let url = try #require(try log.record(["line": 1], at: first))
+    log.set(on: false)
+    #expect(try log.record(["line": 1], at: second) == nil)
+    #expect(try lines(url).count == 2)
+    #expect(
+      try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+        .count == 1)
+  }
+
+  @Test func offAndOnAgainInOneCallStartsANewFile() throws {
+    defer { try? FileManager.default.removeItem(at: base) }
+    let log = log()
+    let one = try #require(try log.record(["line": 1], at: first))
+    log.set(on: false)
+    log.set(on: true)
+    let two = try #require(try log.record(["line": 1], at: second))
+    #expect(one != two)
+    #expect(try lines(one).count == 2)
+  }
+
+  @Test func aFolderDeletedBetweenCallsIsMadeAgain() throws {
+    defer { try? FileManager.default.removeItem(at: base) }
+    let log = log()
+    let one = try #require(try log.record(["line": 1], at: first))
+    log.endCall()
+    try FileManager.default.removeItem(at: one.deletingLastPathComponent())
+    let two = try #require(try log.record(["line": 2], at: second))
     #expect(try lines(two).count == 2)
   }
 
@@ -134,8 +183,14 @@ struct CallStatsLogTests {
 struct CallStatsPageScriptTests {
   let page: JSContext
 
+  /// Switched on, as debug mode does; `fresh()` is the page as it loads.
   init() {
-    page = JSContext()!
+    page = Self.fresh()
+    page.evaluateScript(CallStats.switchScript(on: true))
+  }
+
+  static func fresh() -> JSContext {
+    let page = JSContext()!
     page.evaluateScript(
       """
       var window = this;
@@ -155,6 +210,7 @@ struct CallStatsPageScriptTests {
           this.reports = [];
         }
         getStats() {
+          window.reads = (window.reads ?? 0) + 1;
           return Promise.resolve(new Map(this.reports.map((report, i) => [report.id ?? i, report])));
         }
       };
@@ -164,6 +220,7 @@ struct CallStatsPageScriptTests {
                     mid: 'secret' };
       """)
     page.evaluateScript(CallStats.pageScript)
+    return page
   }
 
   func run(_ script: String) { page.evaluateScript(script) }
@@ -246,6 +303,29 @@ struct CallStatsPageScriptTests {
       peer.signalingState = 'closed';
       """)
     #expect(number("posted.length") == 0)
+  }
+
+  @Test func nothingIsReadUntilSwitchedOn() {
+    let page = Self.fresh()
+    page.evaluateScript("var peer = new RTCPeerConnection(); peer.reports = [audio]; tick();")
+    #expect(page.evaluateScript("timers.length").toInt32() == 1)
+    #expect(page.evaluateScript("window.reads ?? 0").toInt32() == 0)  // not even read
+    #expect(page.evaluateScript("posted.length").toInt32() == 0)
+  }
+
+  @Test func switchedOnItReadsOnceASecond() {
+    let page = Self.fresh()
+    page.evaluateScript("var peer = new RTCPeerConnection(); peer.reports = [audio];")
+    page.evaluateScript(CallStats.switchScript(on: true))
+    page.evaluateScript("tick();")
+    #expect(page.evaluateScript("posted.length").toInt32() == 1)
+  }
+
+  /// Turned off mid-call, it posts nothing more, a reading already asked for included.
+  @Test func switchedOffItReadsNoMore() {
+    run("var peer = new RTCPeerConnection(); peer.reports = [audio]; tick();")
+    run(CallStats.switchScript(on: false) + "tick(); tick();")
+    #expect(number("window.reads") == 1)
   }
 
   @Test func eachPeerIsItsOwnLine() {

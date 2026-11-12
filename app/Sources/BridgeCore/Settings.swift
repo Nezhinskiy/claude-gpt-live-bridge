@@ -29,6 +29,9 @@ public struct Settings: Codable, Sendable, Equatable {
   /// Check GitHub for a newer release once a day; nil leaves it to the build, on for a release
   /// build and off for one from source (`UpdatePolicy.checksAutomatically`).
   public var checkUpdatesAutomatically: Bool?
+  /// Debug mode: record the voice's network numbers during each call, to a local file
+  /// (`CallStats`). Off by default, a file from before it included.
+  public var debugMode: Bool
   /// The line's timers in seconds (`CallMachine.Timeouts`), each read and written within
   /// `Timeouts.range`.
   public var silenceSeconds: Int
@@ -38,7 +41,7 @@ public struct Settings: Codable, Sendable, Equatable {
   public init(
     voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
     notifyResults: Bool = true, confirmHandoffs: Bool = true, prompt: String = "",
-    connectsOverTCP: Bool = false, checkUpdatesAutomatically: Bool? = nil
+    connectsOverTCP: Bool = false, checkUpdatesAutomatically: Bool? = nil, debugMode: Bool = false
   ) {
     self.voice = voice
     self.pauseSyncWhileStopped = pauseSyncWhileStopped
@@ -48,6 +51,7 @@ public struct Settings: Codable, Sendable, Equatable {
     self.prompt = prompt
     self.connectsOverTCP = connectsOverTCP
     self.checkUpdatesAutomatically = checkUpdatesAutomatically
+    self.debugMode = debugMode
     let timeouts = CallMachine.Timeouts()
     silenceSeconds = timeouts.silence
     firstWordSeconds = timeouts.firstWord
@@ -82,6 +86,7 @@ public struct Settings: Codable, Sendable, Equatable {
     connectsOverTCP = try container.decodeIfPresent(Bool.self, forKey: .connectsOverTCP) ?? false
     checkUpdatesAutomatically = try container.decodeIfPresent(
       Bool.self, forKey: .checkUpdatesAutomatically)
+    debugMode = try container.decodeIfPresent(Bool.self, forKey: .debugMode) ?? false
     let defaults = CallMachine.Timeouts()
     func timeout(_ key: CodingKeys, _ fallback: Int) throws -> Int {
       CallMachine.Timeouts.clamped(try container.decodeIfPresent(Int.self, forKey: key) ?? fallback)

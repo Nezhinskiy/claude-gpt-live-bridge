@@ -87,7 +87,7 @@ struct MenuContentTests {
   ) -> MenuContent {
     MenuContent(
       settings: settings, update: update, problem: problem ?? update?.problem, contextLoad: load,
-      available: available)
+      available: available, isInstalledCopy: true)
   }
 
   static func line(_ speaker: Conversation.Line.Speaker, _ text: String) -> Conversation.Line {
@@ -150,6 +150,11 @@ struct MenuContentTests {
         "  Report a Bug…",
         "  LiveBridge Website",
         "  Star LiveBridge on GitHub",
+        "  ---",
+        "  [ ] Debug Mode",
+        "  Show Debug Files…",
+        "  ---",
+        "  Uninstall LiveBridge…",
         "---",
         "Quit LiveBridge ⌘Q",
       ])
@@ -218,6 +223,11 @@ struct MenuContentTests {
         "  Report a Bug…",
         "  LiveBridge Website",
         "  Star LiveBridge on GitHub",
+        "  ---",
+        "  [ ] Debug Mode",
+        "  Show Debug Files…",
+        "  ---",
+        "  Uninstall LiveBridge…",
         "---",
         "Quit LiveBridge ⌘Q",
       ])
@@ -344,7 +354,7 @@ struct MenuContentTests {
         in: Self.menu(
           Self.status(sessions: 1),
           settings: Settings(pauseSyncWhileStopped: true, connectsOverTCP: true))))
-    #expect(items == MenuContent.Switch.allCases.map { .toggle($0, isOn: true) })
+    #expect(items == MenuContent.Switch.quickSettings.map { .toggle($0, isOn: true) })
     // Each switch follows its own setting: flipping one flips only its item.
     let flips: [MenuContent.Switch: Settings] = [
       .connectsOverTCP: Settings(connectsOverTCP: true),
@@ -354,20 +364,42 @@ struct MenuContentTests {
       .loadContextOnFirstCall: Settings(loadContextOnFirstCall: false),
     ]
     let defaults = [false, true, true, false, true]
-    for (index, flipped) in MenuContent.Switch.allCases.enumerated() {
+    for (index, flipped) in MenuContent.Switch.quickSettings.enumerated() {
       var expected = defaults
       expected[index].toggle()
       #expect(Self.switches(try #require(flips[flipped])) == expected, "\(flipped)")
     }
   }
 
-  @Test func feedbackAndSupportHoldsTheLinks() {
-    #expect(
-      Self.submenu("Feedback & Support", in: Self.menu(Self.status(sessions: 1))) == [
-        .command(.reportBug, title: "Report a Bug…", isEnabled: true),
-        .command(.website, title: "LiveBridge Website", isEnabled: true),
-        .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
-      ])
+  /// The links, then debug mode as set and its files; Quick Settings does not repeat it.
+  @Test func feedbackAndSupportEndsWithUninstall() throws {
+    for on in [false, true] {
+      let menu = Self.menu(Self.status(sessions: 1), settings: Settings(debugMode: on))
+      #expect(
+        Self.submenu("Feedback & Support", in: menu) == [
+          .command(.reportBug, title: "Report a Bug…", isEnabled: true),
+          .command(.website, title: "LiveBridge Website", isEnabled: true),
+          .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
+          .separator,
+          .toggle(.debugMode, isOn: on),
+          .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+          .separator,
+          .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: true),
+        ])
+      let quick = try #require(Self.submenu("Quick Settings", in: menu))
+      #expect(quick.count == 5 && !quick.contains(.toggle(.debugMode, isOn: on)))
+    }
+  }
+
+  @Test func onlyTheInstalledCopyCanUninstall() throws {
+    for installed in [false, true] {
+      let menu = MenuContent(
+        settings: Settings(), update: Self.status(sessions: 1), problem: nil, contextLoad: .ready,
+        available: nil, isInstalledCopy: installed)
+      let support = try #require(Self.submenu("Feedback & Support", in: menu))
+      #expect(
+        support.last == .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: installed))
+    }
   }
 
   @Test func withoutABridgeQuickSettingsAreStillThere() throws {
@@ -552,7 +584,7 @@ struct LimitRowTests {
       settings: Settings(), update: MenuContentTests.status(sessions: 0), problem: nil,
       contextLoad: .ready, available: nil, codexLimits: Self.limits(),
       claudeLimits: Self.limits(five: nil, week: nil, blocked: true),
-      now: Self.now, calendar: Self.utc, locale: Self.gb)
+      isInstalledCopy: true, now: Self.now, calendar: Self.utc, locale: Self.gb)
     let lines = menu.outline
     let at = lines.firstIndex(of: "[limit] Codex — 7% of 5 h · 19% of week")
     #expect(at != nil)
