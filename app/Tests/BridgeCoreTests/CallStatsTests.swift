@@ -150,6 +150,17 @@ struct CallStatsLogTests {
         .count == 1)
   }
 
+  @Test func offAndOnAgainInOneCallStartsANewFile() throws {
+    defer { try? FileManager.default.removeItem(at: base) }
+    let log = log()
+    let one = try #require(try log.record(["line": 1], at: first))
+    log.set(on: false)
+    log.set(on: true)
+    let two = try #require(try log.record(["line": 1], at: second))
+    #expect(one != two)
+    #expect(try lines(one).count == 2)
+  }
+
   @Test func aFolderDeletedBetweenCallsIsMadeAgain() throws {
     defer { try? FileManager.default.removeItem(at: base) }
     let log = log()
