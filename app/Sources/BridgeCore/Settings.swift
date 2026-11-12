@@ -11,8 +11,8 @@ public struct Settings: Codable, Sendable, Equatable {
   /// session's first summary under `loadContextOnFirstCall`.
   public var pauseSyncWhileStopped: Bool
   /// A line that opens for a session the voice has no summary for asks for one, even under the
-  /// pause or a paused mark. That summary is written from the whole transcript, paused text
-  /// included.
+  /// pause or a paused mark. That summary is written from the transcript without tool output,
+  /// thinking or reminders, paused text included.
   public var loadContextOnFirstCall: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool

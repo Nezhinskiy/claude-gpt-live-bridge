@@ -143,7 +143,7 @@ public actor Bridge: Router {
         status: status, problem: problem, minutesThisCall: minutes,
         conversation: shown.shownLines + growing.lines,
         labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
-        claudeLimits: claudeLimits)
+        claudeLimits: claudeLimits, lastSummary: lastSummary)
     }
   }
 
@@ -457,7 +457,8 @@ public actor Bridge: Router {
   }
 
   /// Whether the pause, the setting or a session's mark, stops the next line asking for a summary,
-  /// which is written from the whole transcript, paused text included. A session with no summary
+  /// which is written from the transcript without tool output, thinking or reminders, paused text
+  /// included. A session with no summary
   /// has its first one asked for all the same, if the owner left `loadsContextOnFirstCall` on.
   private func pauseHoldsBackSummary(of id: SessionID) -> Bool {
     if loadsContextOnFirstCall(), continuity[id].context == nil { return false }
@@ -898,4 +899,6 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let contextNeed: ContextNeed
   /// What Claude Code last said of Claude's usage windows; nil until a session has.
   public var claudeLimits: UsageLimits? = nil
+  /// What came of the last summary asked for with a model, for Settings.
+  public var lastSummary: SummaryReport? = nil
 }

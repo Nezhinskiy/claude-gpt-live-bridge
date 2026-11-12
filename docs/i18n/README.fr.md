@@ -332,7 +332,8 @@ parlez.
   restent et sont ajoutés de nouveau ; seul **Stop** les efface. Les questions de Claude en attente
   suivent d'autres règles ([détails](../../SECURITY.md#residual-risk-by-design)). Avec **Load a session's context on its first call** activé, ou avec **Pause sync**
   désactivé et la session sans pause, la ligne suivante charge d'elle-même un résumé de la même
-  transcription de la session, qui contient ce que la session a lu ; pour l'éviter, faites d'abord
+  transcription de la session, qui contient le texte de la conversation et le nom des outils
+  qu'elle a utilisés, sans leur sortie ; pour l'éviter, faites d'abord
   `/clear` dans la session, puis appuyez sur **New conversation**. `/live` dans une session
   retirée la rejoint de nouveau.
 
@@ -407,17 +408,24 @@ se connecte :
   voir arriver chez OpenAI, activez le réglage, désactivez le suivant si la session n'a peut-être pas encore de résumé, appuyez sur Stop, puis tapez : rien de ce que vous
   tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
   aucune ligne ne charge de résumé d'elle-même, ni après une pause, sauf pour une session sans résumé (le réglage suivant) ; sinon seul
-  **Load context** le fait. Ce résumé est écrit à partir de toute la transcription, donc il porte
-  ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
+  **Load context** le fait. Ce résumé est écrit à partir de la transcription sans la sortie des
+  outils, le raisonnement ni les rappels, donc il porte quand même ce que vous avez mis en pause. Taper dans un tour qui exécute une demande vocale fait échouer sa
   réponse, sans que rien en soit enregistré ni dit. Le réglage ne supprime rien de ce qui est déjà
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
 - **Load a session's context on its first call** (activé par défaut ; désactivé si **Pause sync** était activé lors de la mise à jour) :
   une ligne qui s'ouvre pour une session dont la voix n'a pas de résumé en demande un même si
   **Pause sync** est activé ou si la session est en pause, y compris pour une ancienne discussion
-  ou après **New conversation**. Ce résumé est écrit à partir de toute la transcription, donc il
-  porte ce que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
+  ou après **New conversation**. Ce résumé est écrit à partir de la transcription sans la sortie
+  des outils, le raisonnement ni les rappels, donc il porte quand même ce que vous avez mis en
+  pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
   la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
+- **Summary model** (Haiku 5.5 par défaut, après une mise à jour aussi ; ou Sonnet 5.5 ou
+  Opus 5.5) : le modèle qui écrit le résumé que la voix reçoit comme contexte, toujours avec un
+  effort faible, sur votre usage de Claude. Si un autre modèle échoue, Haiku 5.5 l'écrit à sa place.
+  Une ligne en dessous dit quand le dernier résumé est venu de Haiku 5.5, ou d'aucun modèle, et
+  pourquoi. Une session sur un mod antérieur à ce réglage l'ignore et écrit avec le modèle de la
+  session.
 
 ### Ce que fait la voix
 
@@ -666,6 +674,12 @@ session.
   comme vos mots, mais la réponse de Claude l'est, et il ne refuse pas un tour en cours sous la
   pause ([SECURITY.md](../../SECURITY.md#what-session-text-can-do) dit quels prompts comptent comme les
   vôtres).
+- Là où le fournisseur de Claude Code (Bedrock, Vertex ou Foundry) ne propose pas le modèle choisi
+  dans **Summary model**, ou où l'organisation ne l'autorise pas, ce modèle échoue et Haiku 5.5
+  écrit le résumé ; là où Haiku 5.5 n'est pas proposé non plus, la voix n'a pas de résumé, ce que
+  Settings indique. Avant ce réglage, le modèle de la session l'écrivait, ce qui marche partout où
+  la session marche. Qu'un id fixé soit résolu chez ces fournisseurs vient de la documentation de
+  Claude Code et n'a pas été essayé.
 - Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
   synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, et aucune
   pause ne refuse ses lignes ([ce qui change d'autre](../../CHANGELOG.md)).

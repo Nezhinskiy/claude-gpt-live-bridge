@@ -43,8 +43,9 @@ closes, and it opens again when you speak, with the conversation where you left 
   the voice is told to answer it from the conversation it shares with the session, so the
   question does not start a turn of Claude's. Once you have decided, it hands Claude a brief, with
   what was said since the last request quoted after it; a question that needs the code still goes
-  to Claude. When the voice lacks part of the session, the line asks the session's own model for a
-  short summary on the side (while **Pause sync** is on, only when it has no summary).
+  to Claude. When the voice lacks part of the session, the line asks for a short summary on the
+  side, written by the model set in Settings (Haiku 5.5 by default) (while **Pause sync** is on,
+  only when it has no summary).
 - **Walk away while Claude works.** Claude's answer to your request opens the closed line again
   and the voice says it. If the voice stays silent, the answer chimes and waits, so it is not lost
   ([what can go wrong](#known-limitations)).
@@ -333,7 +334,8 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   opens. Results it has not said yet stay and are added again; only **Stop** clears them. Claude's
   waiting questions follow other rules ([details](SECURITY.md#residual-risk-by-design)). With
   **Load a session's context on its first call** on, or **Pause sync** off and the session not paused, the next line loads a summary of the same session's
-  transcript by itself, which holds the text the session read; `/clear` the session first to avoid
+  transcript by itself, which holds the conversation's text and the names of the tools it used, not
+  their output; `/clear` the session first to avoid
   that, then press **New conversation**. `/live` in a removed session joins it again.
 
 ### Settings
@@ -399,16 +401,23 @@ the switch here asks.
   setting if the session may have no summary yet, press Stop, then type: nothing you type while the call is stopped is recorded, and the session is marked as
   paused. While it is on, no line loads a summary by itself, and neither does one after a pause,
   except for a session with no summary (the next setting); otherwise only **Load context** does. That
-  summary is written from the whole transcript, so it carries what you paused. Typing into a turn that runs a voice request fails its
+  summary is written from the transcript without tool output, thinking or reminders, so it still
+  carries what you paused. Typing into a turn that runs a voice request fails its
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
   it does and does not do.
 - **Load a session's context on its first call** (on by default; off if **Pause sync** was on when you updated to it): a line that
   opens for a session the voice has no summary for asks for one even while **Pause sync** is on or
   the session is paused, an old chat or a chat after **New conversation** included. That summary
-  is written from the whole transcript, so it carries what you paused, and it goes to OpenAI. Once
+  is written from the transcript without tool output, thinking or reminders, so it still carries
+  what you paused, and it goes to OpenAI. Once
   a session has a summary, the pause governs what follows. With this off, only **Load context**
   loads a summary under the pause.
+- **Summary model** (Haiku 5.5 by default, on an update too; or Sonnet 5.5 or Opus 5.5): the model
+  that writes the summary the voice gets as context, always at low effort, on your Claude usage. If
+  another model fails, Haiku 5.5 writes it instead. A line under it says when the last summary came
+  from Haiku 5.5 instead, or from no model, and why. A session on a mod from before this setting
+  ignores it and writes with the session's own model.
 
 ### What the voice does
 
@@ -629,6 +638,12 @@ can become a request that Claude runs under the session's own permission mode.
   Remote Control) is not recorded in the voice's conversation as your words, though Claude's answer
   to it is, and it does not refuse a running turn under the pause
   ([SECURITY.md](SECURITY.md#what-session-text-can-do) says which prompts count as yours).
+- Where Claude Code's provider (Bedrock, Vertex or Foundry) does not offer the model set as
+  **Summary model**, or the organisation does not allow it, that model fails and Haiku 5.5 writes
+  the summary; where Haiku 5.5 is not offered either, the voice gets no summary, which Settings
+  says. Before this setting the session's own model wrote it, which works wherever the session
+  does. That a pinned id resolves on those providers comes from Claude Code's documentation and
+  was not run.
 - A session still on a mod from before this release, until it restarts, is not synced: it loads a
   summary as a session with missing turns does, and no pause refuses its lines ([what else
   differs](CHANGELOG.md)).

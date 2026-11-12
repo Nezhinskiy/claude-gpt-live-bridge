@@ -207,7 +207,7 @@ claude plugin uninstall livebridge@livebridge
   **Quick Settings**（**Connect over TCP**、**Play sounds for requests and answers**、**Notify when a result is waiting**、**Pause sync while the call is stopped** 和 **Load a session's context on its first call** 的勾选项）、**Settings…**、**Feedback & Support**（**Report a Bug…** 打开仓库的错误报告表单，**LiveBridge Website** 打开 getlivebridge.com，**Star LiveBridge on GitHub** 打开仓库页面，随后是 **Debug Mode** 和 **Show Debug Files…**，即[调试模式](#设置)的开关和文件夹，以及 **Uninstall LiveBridge…**（[卸载](#卸载)））和 **Quit LiveBridge**。菜单只显示通话时，Quick Settings 也在。通话期间，**Conversation** 会随着 codex 的转写显示你和语音说的话，因此你的话可能在说出后片刻才出现，语音的话可能在你听到前片刻就出现。每句话结束后，由最终文本替换这些文字。只保留最终文本：线路关闭时仍未等到最终文本的文字会消失。
 - **Mute**（在 **Stop** 旁边，位于状态条和菜单的通话卡片中；Mute 后显示 **Unmute**）会在通话继续时释放你的麦克风：Claude 的答复仍会打开线路，并交给语音去说。状态条保留阶段并加上 `· muted`；没有线路打开时，菜单显示 “Muted — line closed”。Mute 不会关闭线路：已打开的线路会在通常的无声时长后关闭：若你当时在说话，则从 Mute 起算；若线路本来就安静，Mute 不会改变它何时关闭，计费与任何无声时段相同，因此 Mute 不会节省实时分钟数。**Unmute** 会重新使用麦克风，若无法使用（被拒绝、被占用、缺失），通话会带着原因结束。**Stop** 会结束通话和 Mute；下一次 **Start** 从未 Mute 开始。Mute 不是锁：任何以你的用户身份运行的进程都可以解除它（[SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)）。
 - **Load context** 只在语音缺少目标的一部分时可用：没有摘要且 **Pause sync** 使下一条线路无法加载、某一轮没有送达、某个问题或权限通知没有送到应用、模组关闭期间有轮次运行、摘要之后的行数已超出语音所能承载（较长的对话会超出）、该会话曾被暂停且已有摘要，或其模组不同步。否则该项显示为 **Context up to date** 且不可用，因为语音已经有了这段对话。如果没有打开的线路、下一条线路将加载摘要且没有缺少其他内容，该项显示为 **Context loads with the line** 且不可用，因为下一条线路会自行请求摘要。摘要不带日期，因此它可能被忽略而该项仍保持可用（[BR-002](../../docs/bugs/BR-002.md)）。
-- **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。语音从线路下次打开时重新开始。它还没说出的结果会保留并再次加入，只有 **Stop** 会清除它们。Claude 等待中的问题遵循其他规则（[详情](../../SECURITY.md#residual-risk-by-design)）。**Load a session's context on its first call** 开启时，或 **Pause sync** 关闭且该会话未被暂停时，下一条线路会自行加载同一会话记录的摘要，其中包括该会话读过的内容；要避免这一点，请先在该会话中执行 `/clear`，再点击 **New conversation**。在被移除的会话中执行 `/live` 可让它重新加入。
+- **New conversation…** 会清除目标会话的对话及其已加载的上下文；会话上的 × 会移除该会话并清除它自己的对话；两者都会先询问确认。语音从线路下次打开时重新开始。它还没说出的结果会保留并再次加入，只有 **Stop** 会清除它们。Claude 等待中的问题遵循其他规则（[详情](../../SECURITY.md#residual-risk-by-design)）。**Load a session's context on its first call** 开启时，或 **Pause sync** 关闭且该会话未被暂停时，下一条线路会自行加载同一会话记录的摘要，其中包括对话的文字和它用过的工具名称，但不含工具输出；要避免这一点，请先在该会话中执行 `/clear`，再点击 **New conversation**。在被移除的会话中执行 `/live` 可让它重新加入。
 
 ### 设置
 
@@ -235,8 +235,9 @@ claude plugin uninstall livebridge@livebridge
 
 **Context** 包含你的会话如何到达语音：
 
-- **Pause sync while the call is stopped**（默认关闭）：默认情况下，你在已加入的会话中输入的内容以及 Claude 对此的最终答复，即使通话已停止，也会保存到该会话与语音的对话中，下一条线路打开时语音就拥有它们。在线路打开之前，没有任何内容离开这台 Mac。若不想让某些文字到达 OpenAI，请开启此项，若该会话可能还没有摘要，请关闭下一项设置，按下 Stop，然后再输入：通话停止期间你输入的内容都不会被记录，该会话会被标记为已暂停。开启期间，没有任何线路会自行加载摘要，暂停之后也是如此，但没有摘要的会话除外（见下一项设置）；其他情况下只有 **Load context** 才会加载。该摘要由整份会话记录写成，因此会带上你暂停的内容。向正在运行语音请求的那一轮输入，会使它的答复失败，其中的任何内容都不会被记录或说出。此项不会删除已记录的任何内容，Claude 之后的答复也可能重复被暂停的文字；它做什么、不做什么，见 [SECURITY.md](../../SECURITY.md#residual-risk-by-design)。
-- **Load a session's context on its first call**（默认开启；如果更新时 **Pause sync** 已开启，则为关闭）：为语音没有摘要的会话打开的线路会请求摘要，即使 **Pause sync** 已开启或该会话已被暂停，旧对话和 **New conversation** 之后的对话也一样。该摘要由整份会话记录写成，因此会带上你暂停的内容，并发送给 OpenAI。会话有了摘要之后，后续内容由暂停决定。关闭此项时，暂停期间只有 **Load context** 才会加载摘要。
+- **Pause sync while the call is stopped**（默认关闭）：默认情况下，你在已加入的会话中输入的内容以及 Claude 对此的最终答复，即使通话已停止，也会保存到该会话与语音的对话中，下一条线路打开时语音就拥有它们。在线路打开之前，没有任何内容离开这台 Mac。若不想让某些文字到达 OpenAI，请开启此项，若该会话可能还没有摘要，请关闭下一项设置，按下 Stop，然后再输入：通话停止期间你输入的内容都不会被记录，该会话会被标记为已暂停。开启期间，没有任何线路会自行加载摘要，暂停之后也是如此，但没有摘要的会话除外（见下一项设置）；其他情况下只有 **Load context** 才会加载。该摘要由不含工具输出、思考和提醒的会话记录写成，因此仍会带上你暂停的内容。向正在运行语音请求的那一轮输入，会使它的答复失败，其中的任何内容都不会被记录或说出。此项不会删除已记录的任何内容，Claude 之后的答复也可能重复被暂停的文字；它做什么、不做什么，见 [SECURITY.md](../../SECURITY.md#residual-risk-by-design)。
+- **Load a session's context on its first call**（默认开启；如果更新时 **Pause sync** 已开启，则为关闭）：为语音没有摘要的会话打开的线路会请求摘要，即使 **Pause sync** 已开启或该会话已被暂停，旧对话和 **New conversation** 之后的对话也一样。该摘要由不含工具输出、思考和提醒的会话记录写成，因此仍会带上你暂停的内容，并发送给 OpenAI。会话有了摘要之后，后续内容由暂停决定。关闭此项时，暂停期间只有 **Load context** 才会加载摘要。
+- **Summary model**（默认 Haiku 5.5，更新后也是；也可选 Sonnet 5.5 或 Opus 5.5）：撰写语音作为上下文所得摘要的模型，始终使用低推理强度，消耗你的 Claude 用量。若其他模型失败，则由 Haiku 5.5 撰写。设置下方有一行说明上一份摘要何时改由 Haiku 5.5 撰写，或没有任何模型写成，以及原因。使用此设置之前的模组的会话会忽略它，用会话自己的模型撰写。
 
 ### 语音做什么
 
@@ -320,6 +321,7 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
   会在线路关闭时发出提示音并推送通知，并在线路下次打开时再次交给语音。
 - 达到你的 ChatGPT 套餐的用量限额时，语音会停止，直到限额重置。菜单和状态条会说明这一点，使用 codex 的原句，并在 codex 给出时附上重置时间；通话随之结束，这样说话就不会再打开注定失败的线路。Claude Code 继续工作，答复继续等待，Start 会再试一次。应用只能靠 codex 的措辞或服务的错误代码识别限额，因为没有别的信号（[详情](../../docs/research/2026-11-05-gpt-live-limits.md)）。它无法识别的拒绝，例如没有说明原因就断开的线路（“The voice session closed (transport_closed).”），通话会保持开启，你接下来说的话会再次尝试；在限额重置之前请按 **Stop**。
 - 不是在输入框中键入的提示（host 的消息、定时任务、其他代理，大概还有 Remote Control），不会作为你的话记录到语音的对话中，但 Claude 对它的答复会被记录，而且在暂停下它不会拒绝正在运行的一轮（哪些提示算作你的，见 [SECURITY.md](../../SECURITY.md#what-session-text-can-do)）。
+- 若 Claude Code 的提供方（Bedrock、Vertex 或 Foundry）不提供 **Summary model** 中选择的模型，或组织不允许使用它，该模型会失败并由 Haiku 5.5 撰写摘要；若连 Haiku 5.5 也不提供，语音就得不到摘要，Settings 会说明。在此设置之前，摘要由会话自己的模型撰写，只要会话能用就能用。固定 id 能在这些提供方上解析，这一点来自 Claude Code 的文档，未经实际运行。
 - 仍在使用此版本之前模组的会话，在重启之前不会同步：它会像缺少轮次的会话那样加载摘要，暂停也不会拒绝它的行（[其他差异](../../CHANGELOG.md)）。
 - 在模组加载之前就已打开的 Claude Code 会话，可能需要重新打开，`/live` 才能在其中使用。
 - 在 Claude 桌面应用中，如果在其 Claude Code 进程尚未启动的会话（新建的会话，或刚重新打开的会话）里输入 `/live`，

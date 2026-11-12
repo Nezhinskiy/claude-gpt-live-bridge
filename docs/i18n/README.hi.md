@@ -302,8 +302,8 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   line खुलने से नए सिरे से शुरू होता है। जो नतीजे उसने अभी नहीं बोले वे रहते हैं और फिर से जोड़े
   जाते हैं; उन्हें सिर्फ़ **Stop** मिटाता है। Claude के इंतज़ार कर रहे सवालों के नियम अलग हैं
   ([विवरण](../../SECURITY.md#residual-risk-by-design))। **Load a session's context on its first call** चालू हो, या **Pause sync** बंद हो और session paused न हो, तो
-  अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें वह भी है जो session ने
-  पढ़ा; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
+  अगली line उसी session के transcript का सारांश अपने-आप load करती है, जिसमें बातचीत का text और
+  उसके इस्तेमाल किए tools के नाम हैं, उनका output नहीं; इससे बचने के लिए पहले session में `/clear` करें, फिर **New conversation** दबाएँ। हटाए गए
   session में `/live` उसे फिर से जोड़ देता है।
 
 ### सेटिंग्स
@@ -369,17 +369,22 @@ menu का **Quick Settings** इसके पाँच switches रखता �
   करें, अगर session का सारांश शायद अभी न हो तो अगली setting बंद करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
   session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
   के बाद भी नहीं, सिवाय ऐसे session के जिसका सारांश नहीं है (अगली setting); बाकी समय यह सिर्फ़ **Load context**
-  करता है। वह सारांश पूरे
-  transcript से लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था। जिस turn में voice
+  करता है। वह सारांश tool output,
+  thinking और reminders के बिना transcript से लिखा जाता है, फिर भी उसमें वह आता है जिसे आपने pause किया था। जिस turn में voice
   अनुरोध चल रहा हो, उसमें टाइप करने से उसका जवाब विफल हो जाता है, उसका कुछ भी दर्ज या बोला नहीं
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
   हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](../../SECURITY.md#residual-risk-by-design) में है।
 - **Load a session's context on its first call** (डिफ़ॉल्ट रूप से चालू; update के समय **Pause sync** चालू था तो बंद): जिस session का
   सारांश voice के पास नहीं है, उसके लिए खुलने वाली line सारांश माँगती है, चाहे **Pause sync** चालू हो या
-  session paused हो, पुरानी chat और **New conversation** के बाद की chat समेत। वह सारांश पूरे transcript से
-  लिखा जाता है, इसलिए उसमें वह भी आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
+  session paused हो, पुरानी chat और **New conversation** के बाद की chat समेत। वह सारांश tool output, thinking
+  और reminders के बिना transcript से लिखा जाता है, फिर भी उसमें वह आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
   बन जाने के बाद जो आगे होता है उस पर pause लागू होता है। यह बंद हो तो pause में सिर्फ़ **Load context** सारांश
   load करता है।
+- **Summary model** (डिफ़ॉल्ट Haiku 5.5, update के बाद भी; या Sonnet 5.5 या Opus 5.5): वह model जो
+  voice को context के रूप में मिलने वाला सारांश लिखता है, हमेशा low effort पर, आपके Claude usage से।
+  कोई दूसरा model विफल हो तो Haiku 5.5 उसे लिखता है। इसके नीचे एक पंक्ति बताती है कि पिछला सारांश कब
+  Haiku 5.5 से आया, या किसी model से नहीं आया, और क्यों। इस setting से पहले के mod पर चल रहा session इसे
+  अनदेखा करता है और session के अपने model से लिखता है।
 
 ### वॉइस क्या करता है
 
@@ -604,6 +609,11 @@ Uninstall करने से वे सब हट जाती हैं; menu 
   का जवाब दर्ज होता है, और pause में वह चल रहे turn को अस्वीकार नहीं करता
   ([SECURITY.md](../../SECURITY.md#what-session-text-can-do) बताता है कि कौन-से prompt आपके माने जाते
   हैं)।
+- जहाँ Claude Code का provider (Bedrock, Vertex या Foundry) **Summary model** में चुना model नहीं देता,
+  या organisation उसकी अनुमति नहीं देता, वह model विफल होता है और Haiku 5.5 सारांश लिखता है; जहाँ Haiku 5.5
+  भी नहीं मिलता, voice को सारांश नहीं मिलता, जो Settings बताती है। इस setting से पहले session का अपना model
+  उसे लिखता था, जो हर उस जगह काम करता है जहाँ session करता है। pinned id का इन providers पर resolve होना
+  Claude Code के documentation से लिया गया है और चलाकर नहीं देखा गया।
 - जो session अब भी इस release से पहले के mod पर है, वह restart होने तक sync नहीं होता: वह turns छूटे
   session की तरह सारांश load करता है, और कोई pause उसकी पंक्तियों को अस्वीकार नहीं करता ([और क्या
   अलग है](../../CHANGELOG.md))।
