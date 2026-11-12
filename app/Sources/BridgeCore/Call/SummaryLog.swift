@@ -1,10 +1,5 @@
 import Foundation
 
-/// The numbers the mod reports about the summary it wrote.
-public struct SummaryStats: Sendable, Equatable {
-  public init() {}
-}
-
 /// How one summary ask went, as the app saw it.
 public struct SummaryTiming: Sendable, Equatable {
   /// Seconds from the ask to the post that answers it.

@@ -30,12 +30,14 @@ export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance
 /**
  * `reply`: the owner's reply to the question Claude is waiting on. `forRequest` is the request
  * the turn's answer belongs to: the one in flight once this reply goes out. Absent from an
- * older app's reply.
+ * older app's reply. `context`: summarise the session; `model` is the model to write it with,
+ * absent from an older app, and `fallbackModel` the one tried once if `model` fails, absent when
+ * `model` is the app's default.
  */
 export type Work =
   | ({ kind: 'request' } & VoiceRequest)
   | ({ kind: 'reply'; forRequest?: RequestId } & VoiceRequest)
-  | { kind: 'context' };
+  | { kind: 'context'; model?: string; fallbackModel?: string };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
@@ -46,11 +48,13 @@ export type Work =
  * read it, and Settings then lists the session as on the old mod. `syncs: true` says this mod
  * posts its turns as sync lines (POST /v1/sync), so the app may rely on what it has recorded of
  * the session; absent, the app asks for a summary as before. `missed: true` says a turn of the
- * session did not arrive, so the voice's picture of it has a gap.
+ * session did not arrive, so the voice's picture of it has a gap. `writesSummaries: true` says this
+ * mod writes with the model an ask names and answers every context ask, with an empty summary
+ * when it has none.
  */
 export type JoinBody = {
   sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string;
-  syncs?: boolean; missed?: boolean;
+  syncs?: boolean; missed?: boolean; writesSummaries?: boolean;
 };
 /**
  * The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
@@ -82,7 +86,20 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  */
 export type ActivityBody =
   { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; turn?: TurnRef };
-export type ContextBody = { sessionId: SessionId; summary: string };
+/** Why one attempt at a summary wrote nothing; `error`, with `api-error`, the engine's kind of error. */
+export type SummaryFailure = {
+  reason: 'model-refused' | 'api-error' | 'empty-reply' | 'timed-out'; error?: string;
+};
+/** The numbers of the attempt that wrote a summary with a named model; a fork sends none. */
+export type SummaryStats =
+  { durationMs: number; transcriptChars: number; inputTokens: number; outputTokens: number };
+/**
+ * `failures`: one per attempt that wrote nothing, in order; with a summary the fallback wrote it,
+ * with `""` none did. `stats`: of the attempt that wrote it.
+ */
+export type ContextBody = {
+  sessionId: SessionId; summary: string; failures?: SummaryFailure[]; stats?: SummaryStats;
+};
 
 /**
  * One usage window as the engine reports it. The app takes `five_hour` as a window of five hours

@@ -1,0 +1,15 @@
+{
+  "failures": [
+    {
+      "reason": "model-refused"
+    }
+  ],
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "stats": {
+    "durationMs": 5100,
+    "inputTokens": 13105,
+    "outputTokens": 398,
+    "transcriptChars": 48210
+  },
+  "summary": "Goal: tidy the example project. State: tests pass. Open question: none."
+}

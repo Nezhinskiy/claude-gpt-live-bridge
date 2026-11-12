@@ -182,7 +182,7 @@ public actor SessionRegistry {
       }
       guard session.wantsContext else { return nil }
       session.wantsContext = false
-      return .context
+      return .context()
     }
   }
 

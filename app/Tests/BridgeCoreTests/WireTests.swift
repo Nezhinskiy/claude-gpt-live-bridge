@@ -12,6 +12,7 @@ struct WireTests {
   static let roundTrips: [String: @Sendable (Data) throws -> Data] = [
     "join": roundTrip(JoinBody.self), "join-replaces": roundTrip(JoinBody.self),
     "join-version": roundTrip(JoinBody.self), "join-syncs": roundTrip(JoinBody.self),
+    "join-writes-summaries": roundTrip(JoinBody.self),
     "sync-start": roundTrip(SyncBody.self), "sync-start-voice": roundTrip(SyncBody.self),
     "sync-typed": roundTrip(SyncBody.self), "sync-answer": roundTrip(SyncBody.self),
     "sync-report": roundTrip(SyncBody.self),
@@ -22,9 +23,12 @@ struct WireTests {
     "activity-approval": roundTrip(ActivityBody.self),
     "activity-typed-question": roundTrip(ActivityBody.self),
     "activity-voice-question": roundTrip(ActivityBody.self),
-    "context": roundTrip(ContextBody.self), "limits": roundTrip(LimitsBody.self),
+    "context": roundTrip(ContextBody.self), "context-stats": roundTrip(ContextBody.self),
+    "context-fallback": roundTrip(ContextBody.self), "context-failed": roundTrip(ContextBody.self),
+    "limits": roundTrip(LimitsBody.self),
     "answer-ok": roundTrip(AnswerBody.self), "answer-failed": roundTrip(AnswerBody.self),
     "next-request": roundTrip(PollReply.self), "next-context": roundTrip(PollReply.self),
+    "next-context-model": roundTrip(PollReply.self),
     "next-idle": roundTrip(PollReply.self), "next-reply": roundTrip(PollReply.self),
     "error": roundTrip(ErrorReply.self), "error-removed": roundTrip(ErrorReply.self),
   ]
@@ -67,6 +71,15 @@ struct WireTests {
     #expect(request.transcript == [Utterance(role: .user, text: request.brief)])
     #expect(
       reply.status.sessions.map(\.label) == ["Example session · 0000", "Example session · 1111"])
+  }
+
+  /// An older mod reads `{"kind":"context"}` alone, so an ask that names no model must stay that.
+  @Test func anAskWithNoModelEncodesAsBefore() throws {
+    let json = try Data(contentsOf: Self.fixtures.appending(path: "next-context.json"))
+    let reply = try JSONDecoder().decode(PollReply.self, from: json)
+    #expect(reply.work == .context())
+    let sent = try JSONEncoder().encode(PollReply(status: reply.status, work: .context()))
+    #expect(try Self.canonical(sent) == Self.canonical(json))
   }
 
 }
