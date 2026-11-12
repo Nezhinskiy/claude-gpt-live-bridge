@@ -1,9 +1,10 @@
 # A summary model of its own, and a voice that waits for its context
 
-Status: proposed, 2026-11-09; revised 2026-11-10 after the review
+Status: approved 2026-11-12, when the owner chose it over a small fix for
+[BR-003](../bugs/BR-003.md); proposed 2026-11-09, revised 2026-11-10 after the review
 (`docs/reviews/2026-11-10-summary-model-spec-review.md` on branch
-`review/pr74-summary-model-spec`) and the owner's answers to it. Nothing here is built; product
-code waits for the owner's approval.
+`review/pr74-summary-model-spec`) and the owner's answers to it. Only the `working` glyph is built;
+the plan is [`docs/plans/2026-11-12-summary-model.md`](../plans/2026-11-12-summary-model.md).
 
 ## Why
 
@@ -157,7 +158,7 @@ in the README, the CHANGELOG and every copy `claude-code-floor.test.sh` checks.
   (`OpEventOf`). `model.complete` carries the whole prompt, so the transcript; `model.fork` carries
   only its request, the prompt and effort.
 
-Not verified, and the comparison will show: what a Haiku refusal comes back as (expected
+Not verified, and the measurement will show: what a Haiku refusal comes back as (expected
 `empty-reply`), and whether an unknown id is rejected by the engine or answered as `api-error`.
 
 ## The summary
@@ -173,10 +174,10 @@ The effort is not on the wire: `low` is a constant in the mod.
 | `Work.context.model?: string` | app | the model to write this summary with; absent from an older app |
 | `Work.context.fallbackModel?: string` | app | the default, used if `model` fails; absent when `model` is the default |
 | `JoinBody.writesSummaries?: true` | mod | writes with the model asked, answers every context ask with `POST /v1/context` (an empty summary when it has none), runs model checks |
-| `ContextBody.failures?: [{ reason, status?, error? }]` | mod | one per attempt that wrote nothing, in order: with a summary, the fallback wrote it; with `summary: ""`, nothing did |
+| `ContextBody.failures?: [{ reason, error? }]` | mod | one per attempt that wrote nothing, in order: with a summary, the fallback wrote it; with `summary: ""`, nothing did |
 | `ContextBody.stats?` | mod | the [timing log](#the-timing-log) |
 | `Work.checkModel: { id, model }` | app | check this model; only to a mod that said `writesSummaries` |
-| `POST /v1/model-check: { sessionId, id, ok, reason?, status?, error? }` | mod | the check's result; taken only from the session it was handed to, with its `id` |
+| `POST /v1/model-check: { sessionId, id, ok, reason?, error? }` | mod | the check's result; taken only from the session it was handed to, with its `id` |
 
 `reason` is one of `model-refused`, `api-error`, `empty-reply`, `timed-out`; the app writes its own
 sentences from it and from `error`, and shows nothing the mod wrote. No model name comes back over
@@ -218,7 +219,7 @@ A new pure module, `plugin/hooks/transcript.ts`, builds the text from `$.session
 token rarely covers less than a character, so 120,000 characters stay under the smallest window in
 play (200,000 tokens for `haiku` on Bedrock, Vertex or Foundry, per the research note). A custom
 model with a smaller window, or an emoji-only transcript, ends in `api-error` and the fallback. The
-number is a first guess for the comparison to check.
+number is a first guess for the measurement to check.
 
 **What leaving the fork costs.** A fork reads the session's prompt cache; `complete` shares nothing
 with it and pays for its whole input every time. No cache mark is set: trimming from the tail shifts
@@ -302,8 +303,8 @@ and codex first sees the offer at `voice.open`.
 ### The time limit
 
 One limit, counted from the ask, so a line opened late in a summary's run waits only for the rest of
-it. It comes from the [comparison](#the-comparison-one-off-asks-first) and is not a number yet: twice
-the slowest run of the default model on the session measured, at least 10 s, at most 30 s.
+it. It comes from the [measurement](#the-measurement-one-off-asks-first) and is not a number yet: twice
+the slowest of the three runs of the default model on the session measured, at least 10 s, at most 30 s.
 
 The research note's own estimate for Sonnet low at 100k input is 6 to 8 s, but the same source
 measures the average end-to-end time of a single request at low effort as **21.4 s for Sonnet 5.5
@@ -325,20 +326,28 @@ comes back by `POST` at once.
 
 ## The timing log
 
-`POST /v1/context` carries `stats: { durationMs, transcriptChars, inputTokens, outputTokens,
-cacheReadTokens, cacheWriteTokens }` for the attempt that wrote it. The app adds the model it asked
-for (the fallback when `failures` has one entry), how long the ask took to answer and how long the
-line waited, and writes one line to the unified log (`Logger`, category `summary`): numbers and the
-model's id, no text and no session id. It is local: no file is kept and nothing is sent, so "no
-telemetry" holds.
+`POST /v1/context` carries `stats: { durationMs, transcriptChars, inputTokens, outputTokens }` for
+the attempt that wrote it with `complete`; no cache counts, as no cache mark is set, and a fork
+sends none. The app adds the model it asked for (the fallback when `failures` has one entry), how
+long the ask took to answer and how long the line waited, and writes one `.debug` line to the
+unified log (`Logger`, category `summary`): numbers and the model as its listed name or `custom`,
+never a custom id (a Bedrock ARN holds an account number), no text and no session id. A debug
+line is not kept unless someone streams it; CONTRIBUTING says how. Nothing is sent, so "no
+telemetry" holds. The app times each ask from its first version, before any wire change.
 
-## The comparison (one-off, asks first)
+An `error` kind is shown only when it is one the engine documents (`rate_limit`, `overloaded`,
+`server_error`, `model_not_found`, `invalid_request`, `authentication_failed`,
+`billing_error`), so no text a local process wrote reaches Settings.
 
-One real long session, with one throwaway mod outside the repository running today's fork, the fork
-at `low`, Haiku 5.5 low and Sonnet 5.5 low, on a `--fork-session` copy so the original is untouched.
-It records duration, the four token counts and the text, and tries the 120,000 budget against the
-fork's summary by reading them. It costs about 3 to 4 ordinary Opus turns in a long session, more if
-the copy's first turn finds the cache cold.
+## The measurement (one-off, asks first)
+
+Revised 2026-11-12 after the plan review: it runs on the shipped mod and app once the setting and
+the fallback are merged, not on a throwaway copy, and it gates only the wait. On a
+`--fork-session` copy of one real long session, with Haiku 5.5 chosen, three Load context presses
+give the times and the token counts from the app's log and the post's `stats`, and show whether
+120,000 characters fit. A resumed session pressed before its first turn ends shows that
+`$.session.messages` gives the history then, which is what closes BR-003. A custom id that does
+not exist shows what a refusal comes back as. It costs about three Haiku summaries.
 
 It runs only after the owner agrees at that moment, as do `scripts/smoke.sh` and any real-voice
 probe. It checks the default and sets the limit; it does not choose the default.
@@ -413,7 +422,7 @@ retry on the same model, re-checking a stored value.
 
 ## Implementation order
 
-Step one, which spends nothing: `summarize` reports duration and token use, `POST /v1/context`
-carries `stats`, and the app logs them, with nothing else changing. Then the comparison (when the
-owner agrees), the setting, transcript and fallback with the floor run, the model check, the wait and
-its early asks, the glyph, and the 200 ms poll. The plan follows the spec's approval.
+The plan, [`docs/plans/2026-11-12-summary-model.md`](../plans/2026-11-12-summary-model.md), holds the
+order: the app times its asks; the setting, transcript and fallback with the floor run; the
+measurement (when the owner agrees); the wait and its early asks, the glyph and the 200 ms poll; the
+model check last.
