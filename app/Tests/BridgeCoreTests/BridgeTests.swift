@@ -1500,6 +1500,23 @@ struct BridgeTests {
     #expect(await bridge.lastSummary == report)
   }
 
+  /// Settings' line stays until a model is tried again: an answer no model was asked for leaves it.
+  @Test func theFailureLineStaysThroughAnAnswerNoModelWrote() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let failed = [
+      SummaryFailure(reason: .modelRefused, error: nil),
+      SummaryFailure(reason: .timedOut, error: nil),
+    ]
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", failures: failed, ask: 1))
+    let line = "The voice got no new summary: Opus 5.5 was refused, then Haiku 5.5 ran out of time."
+    #expect(await bridge.lastSummary?.line == line)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 2))
+    #expect(await bridge.lastSummary?.line == line)
+  }
+
   /// The log names the model asked for, or the fallback when that one failed, with the post's numbers.
   @Test func theLogNamesTheAskedModel() async throws {
     summaryModel.withLock { $0 = "claude-opus-5-5" }

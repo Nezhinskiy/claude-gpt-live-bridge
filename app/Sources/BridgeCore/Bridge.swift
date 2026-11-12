@@ -758,8 +758,8 @@ public actor Bridge: Router {
   /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
   /// the menu's press stays pending. A post with the number of an ask other than the open one is
   /// such a summary, and leaves the open ask open; one with no number is matched by its time. An empty one keeps the stored line and closes the ask: a mod
-  /// that writes summaries sends one when it has none. The answer to an ask that named a model is
-  /// `lastSummary`.
+  /// that writes summaries sends one when it has none. The answer to an ask that named a model, if a
+  /// model was tried, is `lastSummary`.
   /// A live line about that session gets the summary at once, and one still connecting gets it
   /// when connected; it does not hold the line open. A summary equal to the stored one is not
   /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
@@ -780,7 +780,8 @@ public actor Bridge: Router {
           hadSummary: wrote, model: model, stats: body.stats))
     }
     guard continuity.takeSummaryAsk(of: id, at: now, number: body.ask) else { return }
-    if let asked = ask?.model {
+    // An answer on which no model was tried leaves Settings' line as it was.
+    if let asked = ask?.model, wrote || !failures.isEmpty {
       lastSummary = SummaryReport(
         asked: asked, fallback: ask?.fallbackModel, failures: failures, wrote: wrote)
     }
