@@ -268,6 +268,7 @@ struct SettingsView: View {
 final class SettingsWindow {
   private let window: NSWindow
   private let tabs: SettingsTabs
+  private var placed = false
 
   init(model: AppModel) {
     tabs = SettingsTabs(model: model)
@@ -276,11 +277,17 @@ final class SettingsWindow {
     window.styleMask = [.titled, .closable]
     window.toolbarStyle = .preference
     window.isReleasedWhenClosed = false
-    window.center()
   }
 
   func show() {
     tabs.select(tabs.model.settingsTab)
+    if !window.isVisible {
+      // Sized before it shows, so it opens at its height rather than sliding to it, and
+      // centered the first time at that height; after that it opens where it was left.
+      tabs.selectedPage?.fitWindow()
+      if !placed { window.center() }
+      placed = true
+    }
     NSApp.activate()
     window.makeKeyAndOrderFront(nil)
   }
@@ -312,6 +319,10 @@ private final class SettingsTabs: NSTabViewController {
 
   func select(_ tab: SettingsTab) {
     selectedTabViewItemIndex = SettingsTab.allCases.firstIndex(of: tab)!
+  }
+
+  var selectedPage: SettingsPage? {
+    tabViewItems[selectedTabViewItemIndex].viewController as? SettingsPage
   }
 
   override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
@@ -358,14 +369,18 @@ private final class SettingsPage: NSViewController {
   }
 
   func fitWindow() {
+    guard let window = view.window, let content = window.contentView else { return }
+    if !window.isVisible { view.layoutSubtreeIfNeeded() }  // the form measures itself in layout
     let size = form.preferredContentSize
-    guard let window = view.window, let content = window.contentView, size.height > 0 else {
-      return
-    }
+    guard size.height > 0 else { return }
     var frame = window.frame
     frame.size.width += size.width - content.frame.width
     frame.size.height += size.height - content.frame.height
     frame.origin.y = window.frame.maxY - frame.height
+    // A window low on the screen grows upward instead, so a tall tab's bottom stays reachable.
+    if let screen = window.screen?.visibleFrame {
+      frame.origin.y = max(frame.origin.y, screen.minY)
+    }
     guard frame != window.frame else { return }
     if window.isVisible {
       NSAnimationContext.runAnimationGroup { _ in window.animator().setFrame(frame, display: true) }
