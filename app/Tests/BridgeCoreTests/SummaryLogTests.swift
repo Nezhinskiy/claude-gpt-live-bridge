@@ -15,6 +15,17 @@ struct SummaryLogTests {
     #expect(SummaryLog.line(timing(model: "claude-haiku-5-5")).contains("model=\"Haiku 5.5\""))
   }
 
+  @Test func theLineCarriesThePostsNumbers() {
+    var withStats = timing(model: "claude-haiku-5-5")
+    withStats.stats = SummaryStats(
+      durationMs: 4_000, transcriptChars: 90_000, inputTokens: 25_000, outputTokens: 400)
+    let line = SummaryLog.line(withStats)
+    #expect(line.contains("duration=4000ms"))
+    #expect(line.contains("transcriptChars=90000"))
+    #expect(line.contains("inputTokens=25000"))
+    #expect(line.contains("outputTokens=400"))
+  }
+
   @Test func aLineWithoutAModelSaysFork() {
     #expect(SummaryLog.line(timing(model: nil)).contains("model=fork"))
   }
