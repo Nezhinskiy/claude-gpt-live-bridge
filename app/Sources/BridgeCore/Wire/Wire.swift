@@ -35,20 +35,21 @@ public struct VoiceRequest: Codable, Sendable, Equatable {
 /// Work for a session, tagged by `kind`: `{"kind":"request", <VoiceRequest>}`,
 /// `{"kind":"reply", <VoiceRequest>, "forRequest"}` (the owner's reply to the question Claude is
 /// waiting on; `forRequest` is the request its answer belongs to) or
-/// `{"kind":"context","model"?,"fallbackModel"?}` (summarise the session for the voice).
+/// `{"kind":"context","model"?,"fallbackModel"?,"ask"?}` (summarise the session for the voice).
 public enum Work: Sendable, Equatable {
   case request(VoiceRequest)
   /// `forRequest`: the request the turn's answer belongs to, the one in flight once this reply
   /// goes out. With none in flight, for a mod that does not sync and does not read it, the reply.
   case reply(VoiceRequest, forRequest: RequestID)
   /// `model`: the model to write the summary with; nil to an older mod, which forks. `fallbackModel`:
-  /// the default, tried once if `model` fails; nil when `model` is the default.
-  case context(model: String? = nil, fallbackModel: String? = nil)
+  /// the default, tried once if `model` fails; nil when `model` is the default. `ask`: the ask's
+  /// number in its session, which the answer echoes; nil from an older app.
+  case context(model: String? = nil, fallbackModel: String? = nil, ask: Int? = nil)
 }
 
 extension Work: Codable {
   private enum Kind: String, Codable { case request, reply, context }
-  private enum CodingKeys: String, CodingKey { case kind, forRequest, model, fallbackModel }
+  private enum CodingKeys: String, CodingKey { case kind, forRequest, model, fallbackModel, ask }
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -60,7 +61,8 @@ extension Work: Codable {
     case .context:
       self = .context(
         model: try container.decodeIfPresent(String.self, forKey: .model),
-        fallbackModel: try container.decodeIfPresent(String.self, forKey: .fallbackModel))
+        fallbackModel: try container.decodeIfPresent(String.self, forKey: .fallbackModel),
+        ask: try container.decodeIfPresent(Int.self, forKey: .ask))
     }
   }
 
@@ -74,10 +76,11 @@ extension Work: Codable {
       try container.encode(Kind.reply, forKey: .kind)
       try container.encode(forRequest, forKey: .forRequest)
       try request.encode(to: encoder)
-    case .context(let model, let fallbackModel):
+    case .context(let model, let fallbackModel, let ask):
       try container.encode(Kind.context, forKey: .kind)
       try container.encodeIfPresent(model, forKey: .model)
       try container.encodeIfPresent(fallbackModel, forKey: .fallbackModel)
+      try container.encodeIfPresent(ask, forKey: .ask)
     }
   }
 }
@@ -192,12 +195,14 @@ public struct SummaryStats: Codable, Sendable, Equatable {
 
 /// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`. `failures`: one
 /// per attempt that wrote nothing, in order; with a summary the fallback wrote it, with `""` none
-/// did. `stats`: of the attempt that wrote it.
+/// did. `stats`: of the attempt that wrote it. `ask`: the number of the ask it answers; absent from
+/// an older mod.
 public struct ContextBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var summary: String
   public var failures: [SummaryFailure]?
   public var stats: SummaryStats?
+  public var ask: Int?
 }
 
 /// One usage window as the mod reads it from Claude Code. The app takes `five_hour` as a window of

@@ -28,7 +28,7 @@ async function joined(...[$, on]: Parameters<TestBody>) {
  * The app asks for the session's context, naming a model or, as an older app, none; the poll that
  * brings the ask is the one that runs it.
  */
-async function appAsks(world: ReturnType<typeof fakeWorld>, ask: { model?: string; fallbackModel?: string } = {}) {
+async function appAsks(world: ReturnType<typeof fakeWorld>, ask: { model?: string; fallbackModel?: string; ask?: number } = {}) {
   world.work.push({ kind: 'context', ...ask })
   await world.clock.advance(1000)
 }
@@ -445,6 +445,16 @@ test('aCachedFallbackSummaryKeepsItsFailures', async ($, on) => {
   await appAsks(world, NAMED)
   expect(world.take('context')).toEqual([{ ...SUMMARY, failures: [{ reason: 'model-refused' }] }])
   expect(world.completes.map(one => one.model)).toEqual([OPUS, HAIKU])
+})
+
+test('theSummaryEchoesItsAsk', async ($, on) => {
+  const world = await joined($, on)
+  await appAsks(world, { ...NAMED, ask: 7 })
+  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 7 })])
+  // A replay of the kept summary answers the ask that asked for it.
+  await appAsks(world, { ...NAMED, ask: 8 })
+  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 8 })])
+  expect(world.completes.map(one => one.model)).toEqual([OPUS])
 })
 
 test('aJoinSaysItWritesSummaries', async ($, on) => {

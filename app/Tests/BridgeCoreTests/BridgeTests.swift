@@ -170,6 +170,13 @@ actor FakeNotifier: ResultNotifying {
   func post(_ notice: ResultNotice) { posted.append(notice) }
 }
 
+extension Work {
+  /// A context ask, whatever it names; each ask carries its own number.
+  var asksForContext: Bool {
+    if case .context = self { true } else { false }
+  }
+}
+
 @Suite(.timeLimit(.minutes(1)))
 struct BridgeTests {
   let time: TestTime
@@ -681,7 +688,7 @@ struct BridgeTests {
     try await post("/v1/target", TargetBody(sessionId: b))
     _ = try await registry.poll(b)  // a fresh target may already owe a summary
     await bridge.loadContext()
-    #expect(try await registry.poll(b) == .context())
+    #expect(try await registry.poll(b)?.asksForContext == true)
     #expect(try await registry.poll(a) == nil)
   }
 
@@ -1400,7 +1407,7 @@ struct BridgeTests {
     try await test.post("/v1/context", ContextBody(sessionId: a, summary: "Old."))
     await test.live()
     await test.bridge.loadContext()
-    #expect(try await test.registry.poll(a) == .context())
+    #expect(try await test.registry.poll(a)?.asksForContext == true)
     await test.bridge.perform(.stop)
     try await test.sync(a, turn: "turn-2", "Private thing.")
     try await test.post("/v1/context", ContextBody(sessionId: a, summary: "From before."))
@@ -1455,7 +1462,7 @@ struct BridgeTests {
     await bridge.loadContext()
     #expect(
       try await registry.poll(a)
-        == .context(model: "claude-opus-5-5", fallbackModel: "claude-haiku-5-5"))
+        == .context(model: "claude-opus-5-5", fallbackModel: "claude-haiku-5-5", ask: 1))
     let recorded = try saved()[a].openSummaryAsk(at: time.now)
     #expect(recorded?.model == "claude-opus-5-5")
     #expect(recorded?.fallbackModel == "claude-haiku-5-5")
@@ -1464,7 +1471,7 @@ struct BridgeTests {
   @Test func theDefaultHasNoFallback() async throws {
     try await join(a, "Alpha", writesSummaries: true)
     await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context(model: "claude-haiku-5-5", fallbackModel: nil))
+    #expect(try await registry.poll(a) == .context(model: "claude-haiku-5-5", ask: 1))
   }
 
   /// A mod that forks ignores a model, so it is asked as before.
@@ -1472,7 +1479,7 @@ struct BridgeTests {
     summaryModel.withLock { $0 = "claude-opus-5-5" }
     try await join(a, "Alpha")
     await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context())
+    #expect(try await registry.poll(a) == .context(ask: 1))
   }
 
   /// Only an answer to an ask that named a model says which model wrote it.
@@ -1511,12 +1518,50 @@ struct BridgeTests {
     #expect(reported.first?.stats == stats)
   }
 
+  // MARK: The ask's number
+
+  /// A post that a gap made stale carries the old number, so it cannot take the fresh ask.
+  @Test func aStalePostDoesNotAnswerTheFreshAsk() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+    try await join(a, "Alpha", missed: true, writesSummaries: true)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "From before.", ask: 1))
+    #expect(await bridge.current.context == nil)
+    #expect(try saved()[a].openSummaryAsk(at: time.now)?.number == 2)
+    #expect(timings.withLock { $0.last?.stale } == true)
+    #expect(await bridge.lastSummary == nil)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
+    #expect(await bridge.current.context == summary)
+  }
+
+  /// A second ask while one is open is the same ask, as the mod joins the send on its way.
+  @Test func aJoinedAskKeepsItsNumber() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+  }
+
+  /// An older mod echoes no number, so its post is matched as before.
+  @Test func aPostWithoutANumberIsGuessedAsBefore() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    try await join(a, "Alpha", missed: true)
+    await bridge.loadContext()
+    try await post("/v1/context", context())
+    #expect(await bridge.current.context == summary)
+  }
+
   /// A summary on its way when the owner presses New conversation does not bring back what was
   /// just forgotten.
   @Test func aSummaryAskedForBeforeNewConversationIsIgnored() async throws {
     try await join(a, "Alpha")
     await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context())
+    #expect(try await registry.poll(a)?.asksForContext == true)
     await bridge.newConversation()
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
     #expect(await bridge.current.context == nil)
@@ -1577,7 +1622,7 @@ struct BridgeTests {
   @Test func aLineWithNoContextAsksForASummary() async throws {
     let test = try BridgeTests()
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
     #expect(try await test.registry.poll(test.a) == nil)
   }
 
@@ -1589,7 +1634,7 @@ struct BridgeTests {
     test.voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await test.bridge.status.call == .listening })
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
   }
 
   /// The line after a target switch asks the new target, and the old target is not asked.
@@ -1602,7 +1647,7 @@ struct BridgeTests {
     await test.bridge.setTarget(test.b)
     #expect(try await test.registry.poll(test.b) == nil)  // switching asks for nothing
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.b) == .context())
+    #expect(try await test.registry.poll(test.b)?.asksForContext == true)
     #expect(try await test.registry.poll(test.a) == nil)
   }
 
@@ -1620,7 +1665,7 @@ struct BridgeTests {
     try await post("/v1/context", context())
     try await join(a, "Alpha", missed: true)
     await live()
-    #expect(try await registry.poll(a) == .context())
+    #expect(try await registry.poll(a)?.asksForContext == true)
   }
 
   /// A paused mark outlasts the setting: the owner decides with Load context. Also with no
@@ -1647,7 +1692,7 @@ struct BridgeTests {
     await test.live()
     #expect(try await test.registry.poll(test.a) == nil)
     await test.bridge.loadContext()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
   }
 
   /// The menu's Load context follows `needsContext`, for each cause and for a current voice.
@@ -1781,12 +1826,12 @@ struct BridgeTests {
     try await join(a, "Alpha", syncs: nil)
     try await post("/v1/context", context())
     await live()
-    #expect(try await registry.poll(a) == .context())
+    #expect(try await registry.poll(a)?.asksForContext == true)
     try await post("/v1/context", context())
     voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     await bridge.audioEvent(.speechStarted)
-    #expect(try await registry.poll(a) == .context())
+    #expect(try await registry.poll(a)?.asksForContext == true)
   }
 
   /// A summary the same as the stored one still means the voice is current again.
@@ -3015,7 +3060,7 @@ struct BridgeTests {
   @Test func theFirstLineUnderThePauseAsksForContext() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
   }
 
   @Test func aPausedSessionWithNoSummaryAsksForContext() async throws {
@@ -3024,7 +3069,7 @@ struct BridgeTests {
     try await test.sync(test.a, "Private thing.")
     #expect(try test.saved()[test.a].outOfSync == .paused)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
   }
 
   /// A mark outlasts the pause setting: the first summary goes over the mark on its own.
@@ -3034,7 +3079,7 @@ struct BridgeTests {
     try await test.sync(test.a, "Private thing.")
     test.setPause(false)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
   }
 
   @Test func withTheSettingOffTheFirstLineUnderThePauseAsksForNothing() async throws {
@@ -3078,7 +3123,7 @@ struct BridgeTests {
   @Test func afterTheFirstSummaryThePauseWorksAsBefore() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
     try await test.post("/v1/context", test.context())
     #expect(try test.saved()[test.a].outOfSync == nil)
     await test.bridge.perform(.stop)
@@ -3093,7 +3138,7 @@ struct BridgeTests {
   @Test func aFirstSummaryOvertakenByPausedTypingIsIgnored() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
     await test.bridge.perform(.stop)
     try await test.sync(test.a, "Private thing.")
     try await test.post("/v1/context", test.context())
@@ -3110,7 +3155,7 @@ struct BridgeTests {
     await test.bridge.newConversation()
     #expect(try test.saved()[test.a].outOfSync == .paused)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
   }
 
   @Test func aLineForANewTargetUnderThePauseAsksThatTarget() async throws {
@@ -3123,24 +3168,24 @@ struct BridgeTests {
     await test.bridge.setTarget(test.b)
     #expect(await eventually { await test.bridge.status.call == .listening })
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.b) == .context())
+    #expect(try await test.registry.poll(test.b)?.asksForContext == true)
   }
 
   /// A first ask that brought nothing is asked again by the next line.
   @Test func aReopenedLineWithStillNoSummaryAsksAgain() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
     test.voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await test.bridge.status.call == .listening })
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
   }
 
   @Test func aReopenedLineAfterTheFirstSummaryAsksForNothing() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context())
+    #expect(try await test.registry.poll(test.a)?.asksForContext == true)
     try await test.post("/v1/context", test.context())
     test.voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await test.bridge.status.call == .listening })

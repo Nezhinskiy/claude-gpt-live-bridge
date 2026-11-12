@@ -41,7 +41,7 @@ const WORK: Shape = {
       kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE }, forRequest: optional(S),
     }),
     fields<Extract<Wire.Work, { kind: 'context' }>>({
-      kind: { oneOf: ['context'] }, model: optional(S), fallbackModel: optional(S),
+      kind: { oneOf: ['context'] }, model: optional(S), fallbackModel: optional(S), ask: optional('number'),
     }),
   ],
 }
@@ -68,6 +68,7 @@ const SHAPES: Record<string, Shape> = {
     stats: optional(fields<Wire.SummaryStats>({
       durationMs: 'number', transcriptChars: 'number', inputTokens: 'number', outputTokens: 'number',
     })),
+    ask: optional('number'),
   }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
   'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S), syncs: optional('boolean'), missed: optional('boolean'), writesSummaries: optional('boolean') }),

@@ -76,9 +76,10 @@ let summary: { model: string | undefined; text: string; failures: SummaryFailure
 let turnsDone = 0
 /**
  * The summary on its way, which a second ask joins instead of asking a model again, and gets what
- * the first ask's model writes; not once a gap crossed it (`send` behind `sendCount`).
+ * the first ask's model writes; not once a gap crossed it (`send` behind `sendCount`), nor when the
+ * app numbered the second ask as another (`ask`).
  */
-let sending: { send: number; outcome: Promise<ContextOutcome> } | null = null
+let sending: { send: number; ask: number | undefined; outcome: Promise<ContextOutcome> } | null = null
 /** The hooks' posts to the app, in the order the hooks ran. */
 let posts: Promise<unknown> = Promise.resolve()
 /** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
@@ -88,6 +89,8 @@ let sendCount = 0
 type ContextOutcome = 'sent' | 'empty' | 'failed'
 /** What a context ask names: the model to write with, and the one to try if it fails; none from an older app. */
 type ContextAsk = Omit<Extract<Work, { kind: 'context' }>, 'kind'>
+/** The ask's number, which every answer to an ask that names a model echoes. */
+const answering = (ask: ContextAsk) => (ask.ask === undefined ? {} : { ask: ask.ask })
 
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
@@ -402,7 +405,7 @@ async function deliverContext($: EngineInterface, ask: ContextAsk, send: number)
   const deadline = (await $.clock.now()) + CONTEXT_TIMEOUT_MS
   const isNamed = ask.model !== undefined
   if (!(await hasTurns($))) {
-    if (isNamed) await link?.context({ summary: '' })
+    if (isNamed) await link?.context({ summary: '', ...answering(ask) })
     return 'empty'
   }
   await showContext($, 'loading')
@@ -438,13 +441,13 @@ async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, d
     written = kept ?? (await summarize($, ask, deadline))
   } catch {
     // The transcript could not be read, so no model was asked.
-    await link?.context({ summary: '' })
+    await link?.context({ summary: '', ...answering(ask) })
     return 'failed'
   }
   const { text, failures, stats } = written
   if (text !== '' && turns === turnsDone) summary = { model: ask.model, text, failures }
   const isTaken = (await link?.context({
-    summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }),
+    summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }), ...answering(ask),
   })) === true
   if (!isTaken || send !== sendCount) return 'failed'
   return text !== '' ? 'sent' : failures.length > 0 ? 'failed' : 'empty'
@@ -466,13 +469,14 @@ async function forkAndPost($: EngineInterface, send: number): Promise<ContextOut
 
 /**
  * Sends the summary the app asked for, which has no reply line of its own, and never rejects. While
- * one is on its way a second ask joins it, unless a gap crossed it: that one is over.
+ * one is on its way a second ask joins it, unless a gap crossed it or the app numbered the second
+ * ask as another: that one is over.
  */
 async function contextAsked($: EngineInterface, ask: ContextAsk): Promise<void> {
-  if (sending === null || sending.send !== sendCount) {
+  if (sending === null || sending.send !== sendCount || sending.ask !== ask.ask) {
     const send = ++sendCount
     const mine: NonNullable<typeof sending> = {
-      send, outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
+      send, ask: ask.ask, outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
     }
     sending = mine
   }

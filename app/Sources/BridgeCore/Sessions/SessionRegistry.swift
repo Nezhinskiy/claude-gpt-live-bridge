@@ -203,11 +203,11 @@ public actor SessionRegistry {
   public func writesSummaries(_ id: SessionID) -> Bool { sessions[id]?.writesSummaries ?? false }
 
   /// Asks the session for its context summary at its next poll, with `model` and `fallbackModel`
-  /// if they are named.
+  /// if they are named, and the ask's number.
   public func requestContext(
-    for id: SessionID, model: String? = nil, fallbackModel: String? = nil
+    for id: SessionID, model: String? = nil, fallbackModel: String? = nil, ask: Int? = nil
   ) {
-    sessions[id]?.wantsContext = .context(model: model, fallbackModel: fallbackModel)
+    sessions[id]?.wantsContext = .context(model: model, fallbackModel: fallbackModel, ask: ask)
   }
 
   /// The turn of `request` refused what the owner typed into it, so its answer may repeat that

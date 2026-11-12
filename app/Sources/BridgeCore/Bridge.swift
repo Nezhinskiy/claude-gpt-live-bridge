@@ -209,9 +209,10 @@ public actor Bridge: Router {
       model = summaryModel()
       fallback = model == SummaryModel.default ? nil : SummaryModel.default
     }
-    continuity.noteSummaryAsk(of: id, at: time.now, model: model, fallbackModel: fallback)
+    let ask = continuity.noteSummaryAsk(of: id, at: time.now, model: model, fallbackModel: fallback)
     save()
-    await registry.requestContext(for: id, model: model, fallbackModel: fallback)
+    await registry.requestContext(
+      for: id, model: ask.model, fallbackModel: ask.fallbackModel, ask: ask.number)
   }
 
   /// The menu's choice of target; a session that left is ignored.
@@ -754,7 +755,8 @@ public actor Bridge: Router {
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
   /// it is and kept in the session's conversation. One asked for before the latest gap or forget
   /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
-  /// the menu's press stays pending. An empty one keeps the stored line and closes the ask: a mod
+  /// the menu's press stays pending. A post with the number of an ask other than the open one is
+  /// such a summary, and leaves the open ask open; one with no number is matched by its time. An empty one keeps the stored line and closes the ask: a mod
   /// that writes summaries sends one when it has none. The answer to an ask that named a model is
   /// `lastSummary`.
   /// A live line about that session gets the summary at once, and one still connecting gets it
@@ -769,12 +771,14 @@ public actor Bridge: Router {
     let ask = continuity.openSummaryAsk(of: id, at: now)
     if let ask {
       let model = failures.count == 1 && wrote ? ask.fallbackModel : ask.model
+      // A post with another ask's number was written for an ask a gap made stale.
+      let isOtherAsk = body.ask != nil && body.ask != ask.number
       reportsSummary(
         SummaryTiming(
-          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale, hadSummary: wrote,
-          model: model, stats: body.stats))
+          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale || isOtherAsk,
+          hadSummary: wrote, model: model, stats: body.stats))
     }
-    guard continuity.takeSummaryAsk(of: id, at: now) else { return }
+    guard continuity.takeSummaryAsk(of: id, at: now, number: body.ask) else { return }
     if let asked = ask?.model {
       lastSummary = SummaryReport(
         asked: asked, fallback: ask?.fallbackModel, failures: failures, wrote: wrote)

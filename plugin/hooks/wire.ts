@@ -32,12 +32,13 @@ export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance
  * the turn's answer belongs to: the one in flight once this reply goes out. Absent from an
  * older app's reply. `context`: summarise the session; `model` is the model to write it with,
  * absent from an older app, and `fallbackModel` the one tried once if `model` fails, absent when
- * `model` is the app's default.
+ * `model` is the app's default. `ask` is the ask's number, which the answer echoes; absent from an
+ * older app.
  */
 export type Work =
   | ({ kind: 'request' } & VoiceRequest)
   | ({ kind: 'reply'; forRequest?: RequestId } & VoiceRequest)
-  | { kind: 'context'; model?: string; fallbackModel?: string };
+  | { kind: 'context'; model?: string; fallbackModel?: string; ask?: number };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
@@ -95,10 +96,10 @@ export type SummaryStats =
   { durationMs: number; transcriptChars: number; inputTokens: number; outputTokens: number };
 /**
  * `failures`: one per attempt that wrote nothing, in order; with a summary the fallback wrote it,
- * with `""` none did. `stats`: of the attempt that wrote it.
+ * with `""` none did. `stats`: of the attempt that wrote it. `ask`: the number of the ask it answers.
  */
 export type ContextBody = {
-  sessionId: SessionId; summary: string; failures?: SummaryFailure[]; stats?: SummaryStats;
+  sessionId: SessionId; summary: string; failures?: SummaryFailure[]; stats?: SummaryStats; ask?: number;
 };
 
 /**
