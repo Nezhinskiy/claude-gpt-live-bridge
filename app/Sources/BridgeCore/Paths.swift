@@ -26,11 +26,12 @@ public enum Paths {
   /// `~/Library/Application Support/LiveBridge`.
   public static func dataDir() throws -> URL { try dataDir(in: .applicationSupportDirectory) }
 
-  /// What the menu's Uninstall LiveBridge moves to the Trash: the app and every file it keeps
-  /// in `library`, the same list `build-app.sh --uninstall` removes.
-  public static func uninstalled(app: URL, library: URL) -> [URL] {
+  /// The files the app keeps in `library`, which the menu's Uninstall LiveBridge moves to the
+  /// Trash once the app has moved itself there: the list `build-app.sh --uninstall` removes, but
+  /// for the app.
+  public static func uninstalled(library: URL) -> [URL] {
     [
-      app, library.appending(path: "Application Support/LiveBridge"),
+      library.appending(path: "Application Support/LiveBridge"),
       library.appending(path: "Caches/\(bundleID)"), library.appending(path: "WebKit/\(bundleID)"),
       library.appending(path: "HTTPStorages/\(bundleID)"),
       library.appending(path: "HTTPStorages/\(bundleID).binarycookies"),

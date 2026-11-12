@@ -32,10 +32,11 @@ All notable changes to this project are listed here. The format follows
   one CSV per call, under `debug/call-stats` in LiveBridge's data folder; no audio, no transcript,
   no session names, and nothing leaves the Mac. **Show Debug Files** opens the folder. The
   numbers include which transport the line took (`onTcp`).
-- **Uninstall LiveBridge…**, in **Feedback & Support** of the copy in `/Applications`, asks; then
-  every session leaves LiveBridge, so `/live` turns off, LiveBridge removes its login item and
-  microphone permission and quits, and the app and every file it keeps go to the Trash. It copies
-  the command that removes the Claude Code mod for you to run.
+- **Uninstall LiveBridge…**, in **Feedback & Support** of the copy in `/Applications`, asks, then
+  moves the app to the Trash, or says why it cannot and changes nothing; then every session leaves
+  LiveBridge, so `/live` turns off, LiveBridge removes its login item and microphone permission and
+  quits, and the files it keeps go to the Trash. It copies the command that removes the Claude Code
+  mod for you to run.
 
 ### Changed
 

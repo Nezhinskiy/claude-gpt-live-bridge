@@ -10,13 +10,11 @@ struct PathsTests {
     try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as! Int
   }
 
-  @Test func uninstallTakesTheAppAndEveryFileItKeeps() {
+  @Test func uninstallTakesEveryFileTheAppKeeps() {
     let library = URL(filePath: "/Users/example/Library")
-    let app = URL(filePath: "/Applications/LiveBridge.app")
     let id = "com.getlivebridge.livebridge"
     #expect(
-      Paths.uninstalled(app: app, library: library).map(\.path) == [
-        "/Applications/LiveBridge.app",
+      Paths.uninstalled(library: library).map(\.path) == [
         "/Users/example/Library/Application Support/LiveBridge",
         "/Users/example/Library/Caches/\(id)",
         "/Users/example/Library/WebKit/\(id)",

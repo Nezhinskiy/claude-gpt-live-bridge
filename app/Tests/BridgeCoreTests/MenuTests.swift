@@ -87,7 +87,7 @@ struct MenuContentTests {
   ) -> MenuContent {
     MenuContent(
       settings: settings, update: update, problem: problem ?? update?.problem, contextLoad: load,
-      available: available)
+      available: available, isInstalledCopy: true)
   }
 
   static func line(_ speaker: Conversation.Line.Speaker, _ text: String) -> Conversation.Line {
@@ -585,7 +585,7 @@ struct LimitRowTests {
       settings: Settings(), update: MenuContentTests.status(sessions: 0), problem: nil,
       contextLoad: .ready, available: nil, codexLimits: Self.limits(),
       claudeLimits: Self.limits(five: nil, week: nil, blocked: true),
-      now: Self.now, calendar: Self.utc, locale: Self.gb)
+      isInstalledCopy: true, now: Self.now, calendar: Self.utc, locale: Self.gb)
     let lines = menu.outline
     let at = lines.firstIndex(of: "[limit] Codex — 7% of 5 h · 19% of week")
     #expect(at != nil)

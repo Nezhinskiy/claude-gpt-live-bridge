@@ -234,10 +234,11 @@ call stops with a sentence that says where to allow it.
 ### Uninstall
 
 In the copy in `/Applications`, the menu's **Feedback & Support ▸ Uninstall LiveBridge…** asks
-first. Then a call open ends and every session leaves LiveBridge, as the menu's × does, so `/live`
+first, then moves the app to the Trash; if it cannot, it says so and changes nothing else. Then
+a call open ends and every session leaves LiveBridge, as the menu's × does, so `/live`
 turns off in each instead of opening LiveBridge again; LiveBridge removes its login item and
-microphone permission and quits, and once it has quit the app and every file it keeps (the files
-listed below) go to one folder in the Trash, until you empty it. It leaves the Claude Code mod, and
+microphone permission and quits, and once it has quit, the files it keeps (listed below) go to a
+folder in the Trash, until you empty it. It leaves the Claude Code mod, and
 copies the command that removes it, `claude plugin uninstall livebridge@livebridge`, for you to run
 in Terminal. A session that was not open then may still look for LiveBridge when it opens again;
 removing the mod ends that.

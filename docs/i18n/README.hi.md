@@ -207,10 +207,10 @@ network पर devices खोज सकता है। voice line को यह
 ### अनइंस्टॉल करना
 
 `/Applications` वाली copy में menu का **Feedback & Support ▸ Uninstall LiveBridge…** पहले
-पूछता है। फिर खुली call खत्म होती है और हर session LiveBridge छोड़ देता है, जैसे menu के × से,
+पूछता है और app को Trash में ले जाता है; अगर न ले जा सके, तो यह बताता है और कुछ और नहीं बदलता। फिर खुली call खत्म होती है और हर session LiveBridge छोड़ देता है, जैसे menu के × से,
 इसलिए उसमें `/live` LiveBridge को फिर से खोलने के बजाय बंद हो जाता है; LiveBridge login item और
-microphone permission हटाकर बंद हो जाता है, और उसके बंद होने के बाद app और उसकी सारी files (नीचे
-दी गई) Trash के एक folder में चली जाती हैं, जब तक आप उसे खाली न करें। Claude Code का mod बना
+microphone permission हटाकर बंद हो जाता है, और उसके बंद होने के बाद उसकी files (नीचे दी गई)
+Trash के एक folder में चली जाती हैं, जब तक आप उसे खाली न करें। Claude Code का mod बना
 रहता है: उसे हटाने वाला command, `claude plugin uninstall livebridge@livebridge`, copy हो
 जाता है ताकि आप उसे Terminal में चलाएँ। जो session तब खुला नहीं था, वह खुलने पर फिर से
 LiveBridge ढूँढ सकता है; mod हटाने से यह रुक जाता है।

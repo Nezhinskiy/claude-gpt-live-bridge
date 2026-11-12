@@ -8,7 +8,6 @@ import Testing
 struct UninstallScriptTests {
   let home: URL
   var library: URL { home.appending(path: "Library") }
-  var app: URL { home.appending(path: "Applications/LiveBridge.app") }
   var trash: URL { home.appending(path: ".Trash/LiveBridge 2026-11-12 15.30.00") }
 
   init() throws { home = try temporaryDirectory() }
@@ -34,7 +33,7 @@ struct UninstallScriptTests {
       "/bin/sh",
       UninstallScript.arguments(
         pid: pid, trash: trash.path,
-        paths: Paths.uninstalled(app: app, library: library).map(\.path)))
+        paths: Paths.uninstalled(library: library).map(\.path)))
     process.waitUntilExit()
     #expect(process.terminationStatus == 0)
   }
@@ -42,7 +41,7 @@ struct UninstallScriptTests {
   func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
 
   @Test func onceTheAppIsGoneEveryFileGoesToOneTrashFolder() throws {
-    let ours = Paths.uninstalled(app: app, library: library)
+    let ours = Paths.uninstalled(library: library)
     let neighbour = library.appending(path: "Caches/com.example.other")
     try make(ours + [neighbour])
     let quitting = try start("/bin/sleep", ["0.5"])
@@ -51,7 +50,7 @@ struct UninstallScriptTests {
     #expect(ours.allSatisfy { !exists($0) })
     #expect(exists(neighbour))
     let moved = [
-      "Applications/LiveBridge.app", "Application Support/LiveBridge",
+      "Application Support/LiveBridge",
       "Caches/com.getlivebridge.livebridge", "WebKit/com.getlivebridge.livebridge",
       "HTTPStorages/com.getlivebridge.livebridge",
       "HTTPStorages/com.getlivebridge.livebridge.binarycookies",
@@ -61,11 +60,11 @@ struct UninstallScriptTests {
   }
 
   @Test func aFileThatIsNotThereIsSkipped() throws {
-    try make([app])
+    try make([library.appending(path: "Application Support/LiveBridge")])
     let gone = try start("/usr/bin/true", [])
     gone.waitUntilExit()
     try run(pid: gone.processIdentifier)
-    #expect(exists(trash.appending(path: "Applications/LiveBridge.app")))
+    #expect(exists(trash.appending(path: "Application Support/LiveBridge")))
     #expect(!exists(trash.appending(path: "WebKit")))
   }
 }

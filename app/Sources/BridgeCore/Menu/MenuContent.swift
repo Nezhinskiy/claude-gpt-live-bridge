@@ -125,7 +125,7 @@ public struct MenuContent: Sendable, Equatable {
   public init(
     settings: Settings, update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
     available: AppVersion?, codexLimits: UsageLimits? = nil, claudeLimits: UsageLimits? = nil,
-    isInstalledCopy: Bool = true,
+    isInstalledCopy: Bool,
     now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
   ) {
     let footer = Self.foot(

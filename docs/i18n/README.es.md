@@ -218,10 +218,10 @@ permitirlo.
 ### Desinstalación
 
 En la copia de `/Applications`, **Feedback & Support ▸ Uninstall LiveBridge…**, en el menú,
-pregunta primero. Luego termina la llamada abierta y cada sesión deja LiveBridge, como con la ×
+pregunta primero y mueve la app a la Papelera; si no puede, lo dice y no cambia nada más. Luego termina la llamada abierta y cada sesión deja LiveBridge, como con la ×
 del menú, así que `/live` se apaga en ella en vez de volver a abrir LiveBridge; LiveBridge quita
-el inicio de sesión y el permiso del micrófono y se cierra, y una vez cerrado, la app y todos los
-archivos que guarda (los de abajo) van a una carpeta de la Papelera, hasta que la vacíes. Deja
+el inicio de sesión y el permiso del micrófono y se cierra, y una vez cerrado, los archivos que
+guarda (los de abajo) van a una carpeta de la Papelera, hasta que la vacíes. Deja
 el mod de Claude Code y copia el comando que lo quita, `claude plugin uninstall livebridge@livebridge`,
 para que lo ejecutes en Terminal. Una sesión que no estaba abierta entonces puede volver a
 buscar LiveBridge cuando se abra; quitar el mod lo termina.

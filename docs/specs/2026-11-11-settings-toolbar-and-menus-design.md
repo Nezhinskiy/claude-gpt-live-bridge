@@ -80,12 +80,16 @@ A second submenu, **Feedback & Support**, holds:
   Amphetamine has one). Enabled only in the copy in `/Applications`: a debug build would move
   itself and reset the installed copy's login item and microphone permission, which share its
   bundle id. After a confirmation it ends a call and removes every joined session, as the menu's ×
-  does, so each mod turns `/live` off instead of opening the app again; removes the login item and
-  the microphone permission; copies `claude plugin uninstall livebridge@livebridge`; and quits.
-  Once the process has exited, a `/bin/sh` it left moves the app and the files
-  `build-app.sh --uninstall` removes into one folder in the Trash, so nothing the app writes on its
-  way out comes back. The Trash, not deletion, so it can be undone; the mod is left, because it is
-  Claude Code's configuration and the app does not run `claude` on the owner's behalf.
+  does, so each mod turns `/live` off instead of opening the app again (a session that does not
+  poll within the two seconds the app waits is not told); removes the login item and the
+  microphone permission; copies `claude plugin uninstall livebridge@livebridge`; and quits. The app
+  moves its own bundle to the Trash first and stops, changing nothing, if that fails. Once the
+  process has exited, a `/bin/sh` it left moves the other files `build-app.sh --uninstall` removes
+  into a folder in the Trash, so the app does not write them again; WebKit's helper processes and
+  `cfprefsd` were not observed. The Trash, not deletion, keeps the app and its settings
+  recoverable; the removed sessions' conversations, the login item and the microphone permission
+  are not. The mod is left: it is Claude Code's configuration, which only the update's mod step
+  touches, and not on uninstall.
 
 ### The menu's foot
 

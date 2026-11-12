@@ -395,13 +395,26 @@ final class AppModel {
     NSWorkspace.shared.open(folder)
   }
 
-  /// The menu's Uninstall LiveBridge, in the copy in `/Applications`: once confirmed, ends a call
-  /// and removes every joined session, as the menu's × does, so its mod turns off instead of
-  /// opening LiveBridge again; then removes the login item and the microphone permission, copies
-  /// the mod's uninstall command, and quits, leaving `UninstallScript` to move the app and every
-  /// file it keeps to the Trash once the process is gone.
+  /// The menu's Uninstall LiveBridge, in the copy in `/Applications`: once confirmed, the app moves
+  /// itself to the Trash first, and on failure says so and changes nothing else. Then it ends a
+  /// call and removes every joined session, as the menu's × does, so its mod turns off instead of
+  /// opening LiveBridge again; removes the login item and the microphone permission, copies the
+  /// mod's uninstall command, and quits, leaving `UninstallScript` to move the files it keeps to
+  /// the Trash once the process is gone.
   func uninstall() {
     guard isInstalledCopy, Confirm.ask(.uninstall) else { return }
+    do {
+      try FileManager.default.trashItem(at: Bundle.main.bundleURL, resultingItemURL: nil)
+    } catch {
+      let alert = NSAlert()
+      alert.messageText = "LiveBridge could not move itself to the Trash"
+      alert.informativeText =
+        "\(error.localizedDescription) Nothing was changed. The README's Uninstall section "
+        + "shows how to remove LiveBridge by hand."
+      NSApp.activate()
+      alert.runModal()
+      return
+    }
     let bridge = bridge
     let sessions = status?.sessions.map(\.sessionId) ?? []
     Task {
@@ -421,13 +434,14 @@ final class AppModel {
       let library = manager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
       let trash = manager.urls(for: .trashDirectory, in: .userDomainMask)[0]
       let stamp = DateFormatter()
+      stamp.locale = Locale(identifier: "en_US_POSIX")
       stamp.dateFormat = "yyyy-MM-dd HH.mm.ss"  // no colon: the Finder shows one as a slash
       let move = Process()
       move.executableURL = URL(filePath: "/bin/sh")
       move.arguments = UninstallScript.arguments(
         pid: ProcessInfo.processInfo.processIdentifier,
-        trash: trash.appending(path: "LiveBridge \(stamp.string(from: Date()))").path,
-        paths: Paths.uninstalled(app: Bundle.main.bundleURL, library: library).map(\.path))
+        trash: trash.appending(path: "LiveBridge files \(stamp.string(from: Date()))").path,
+        paths: Paths.uninstalled(library: library).map(\.path))
       move.standardInput = FileHandle.nullDevice
       move.standardOutput = FileHandle.nullDevice
       move.standardError = FileHandle.nullDevice
