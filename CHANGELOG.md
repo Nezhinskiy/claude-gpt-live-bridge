@@ -36,9 +36,9 @@ All notable changes to this project are listed here. The format follows
   Connect over TCP) and **Context** (sync).
 - **Star LiveBridge on GitHub** moved from the menu's foot into **Feedback & Support**.
 
-- While Claude works, the menu bar icon shows three dots that light up one after another, for
-  thinking, in place of a turning ring, which read as loading; the session's row in the menu shows
-  an ellipsis in place of turning arrows.
+- While Claude works, the menu bar icon shows dots turning in depth, three and then four, which
+  gather into one between turns, for thinking, in place of a turning ring, which read as loading;
+  the session's row in the menu shows an ellipsis in place of turning arrows.
 - While the call is stopped, the menu bar icon no longer shows that a session's Claude is working;
   the session's row in the menu still says so. A waiting approval still shows.
 
