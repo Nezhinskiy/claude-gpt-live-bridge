@@ -85,8 +85,11 @@ let posts: Promise<unknown> = Promise.resolve()
 /** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
 let sendCount = 0
 
-/** `empty`: nothing to summarise yet; `failed`: no summary reached the app. */
-type ContextOutcome = 'sent' | 'empty' | 'failed'
+/**
+ * `empty`: nothing to summarise yet; `failed`: no summary reached the app; `superseded`: a gap or a
+ * newer ask overtook the send, so its answer is stale and no failure.
+ */
+type ContextOutcome = 'sent' | 'empty' | 'failed' | 'superseded'
 /** What a context ask names: the model to write with, and the one to try if it fails; none from an older app. */
 type ContextAsk = Omit<Extract<Work, { kind: 'context' }>, 'kind'>
 /** The ask's number, which every answer to an ask that names a model echoes. */
@@ -449,7 +452,8 @@ async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, d
   const isTaken = (await link?.context({
     summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }), ...answering(ask),
   })) === true
-  if (!isTaken || send !== sendCount) return 'failed'
+  if (send !== sendCount) return 'superseded'
+  if (!isTaken) return 'failed'
   return text !== '' ? 'sent' : failures.length > 0 ? 'failed' : 'empty'
 }
 

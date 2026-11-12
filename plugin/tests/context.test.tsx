@@ -457,6 +457,19 @@ test('theSummaryEchoesItsAsk', async ($, on) => {
   expect(world.completes.map(one => one.model)).toEqual([OPUS])
 })
 
+test('aSendANewerAskReplacedIsNoFailure', async ($, on) => {
+  // The app numbered the second ask as another, after a gap or a forget: each send answers its own.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await appAsks(world, { ...NAMED, ask: 2 })
+  await world.clock.advance(5000)
+  expect(world.take('context')).toEqual([
+    expect.objectContaining({ ...SUMMARY, ask: 1 }), expect.objectContaining({ ...SUMMARY, ask: 2 }),
+  ])
+  expect(saidNoSummary(world)).toBe(false)
+})
+
 test('aJoinSaysItWritesSummaries', async ($, on) => {
   const world = fakeWorld(on)
   await liveOn($)
