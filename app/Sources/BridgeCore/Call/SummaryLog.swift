@@ -1,6 +1,6 @@
 import Foundation
 
-/// The numbers the mod reports about the summary it wrote; filled by a later wave.
+/// The numbers the mod reports about the summary it wrote.
 public struct SummaryStats: Sendable, Equatable {
   public init() {}
 }

@@ -1411,10 +1411,26 @@ struct BridgeTests {
     await bridge.loadContext()
     time.advance(by: .seconds(7))
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
-    let timing = try #require(timings.withLock { $0.first })
-    #expect(timing.askedFor == 7)
-    #expect(!timing.stale)
-    #expect(timing.hadSummary)
+    let reported = timings.withLock { $0 }
+    #expect(reported.count == 1)
+    #expect(reported.first?.askedFor == 7)
+    #expect(reported.first?.stale == false)
+    #expect(reported.first?.hadSummary == true)
+  }
+
+  @Test func aSummaryNobodyAskedForReportsNothing() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    #expect(timings.withLock { $0.isEmpty })
+  }
+
+  @Test func aBlankSummaryIsReportedAsHavingNone() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: " "))
+    let reported = timings.withLock { $0 }
+    #expect(reported.count == 1)
+    #expect(reported.first?.hadSummary == false)
   }
 
   @Test func aStaleAnswerIsReportedAsStale() async throws {

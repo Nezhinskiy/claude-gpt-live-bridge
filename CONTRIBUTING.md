@@ -206,6 +206,12 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 `CFFIXED_USER_HOME` to the socket as the app does, so `CFFIXED_USER_HOME=/tmp/lb claude
 --plugin-dir plugin` talks to the app started with the same variable.
 
+Every build, not only a debug one, logs a line at debug level in the category `summary` for each
+summary answered within two minutes of its ask: the milliseconds the ask took, whether the answer
+was stale (asked before a gap or a forget, so it is ignored) and had text, and the model's name
+(`custom` for an id you typed, `fork` for a summary the session's own fork wrote). It holds no
+summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
+
 ### Reading `--call-stats`
 
 For when the voice breaks up: was it the network? While a line is open, a debug build started
@@ -233,14 +239,6 @@ one before, and ignore a line's first row, where concealment is only start-up.
   on, a 0 means the line fell back to UDP.
 - Clean numbers rule out delivery of the incoming audio. That leaves what the server generated and
   the local audio output (Bluetooth, echo cancellation), which these numbers cannot separate either.
-
-To see how long each summary ask takes to be answered, which model wrote it and whether the answer
-was ignored as stale, stream the app's debug log. A line holds numbers and a listed model's name
-only (`custom` for any other id), no summary text:
-
-```sh
-log stream --level debug --predicate 'subsystem == "com.getlivebridge.livebridge" AND category == "summary"'
-```
 
 ## Conventions
 
