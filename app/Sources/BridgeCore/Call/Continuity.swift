@@ -75,8 +75,6 @@ public struct Conversation: Codable, Sendable, Equatable {
   var turn: TurnDecision?
   /// The summary asked for and not yet arrived.
   private var summaryAsk: SummaryAsk?
-  /// The number the last new ask took; it outlives the ask, so an old number never comes back.
-  private var asksMade: Int?
 
   struct TurnDecision: Codable, Sendable, Equatable {
     var id: String
@@ -90,7 +88,8 @@ public struct Conversation: Codable, Sendable, Equatable {
     /// The model the ask named and its fallback; nil on an ask to a mod that forks.
     var model: String?
     var fallbackModel: String?
-    /// The ask's number in the session, which a current mod's answer echoes; nil in an older file.
+    /// The ask's number, which a current mod's answer echoes; nil on an ask that names no model,
+    /// and in an older file.
     var number: Int?
   }
 
@@ -131,14 +130,17 @@ public struct Conversation: Codable, Sendable, Equatable {
     summaryAsk?.isStale = true
   }
 
-  /// A summary was asked for; the ask now open. An ask still open and current stays as it is,
-  /// number included: the mod joins a second ask to the summary on its way, which is the first
-  /// ask's. A stale one is replaced by a new ask with the next number.
-  mutating func noteSummaryAsk(at now: Date, model: String?, fallbackModel: String?) -> SummaryAsk {
-    if let open = openAsk(at: now), !open.isStale { return open }
-    let number = (asksMade ?? 0) + 1
-    asksMade = number
-    let ask = SummaryAsk(at: now, model: model, fallbackModel: fallbackModel, number: number)
+  /// A summary was asked for; the ask now open. An ask still open stays as it is, as the mod joins
+  /// a second ask to the summary on its way, which is the first ask's. An ask naming a model, to a
+  /// mod that echoes `number`, replaces an open one that is stale or has no number.
+  mutating func noteSummaryAsk(
+    at now: Date, model: String?, fallbackModel: String?, number: Int
+  ) -> SummaryAsk {
+    if let open = openAsk(at: now), model == nil || (!open.isStale && open.number != nil) {
+      return open
+    }
+    let ask = SummaryAsk(
+      at: now, model: model, fallbackModel: fallbackModel, number: model == nil ? nil : number)
     summaryAsk = ask
     return ask
   }
@@ -164,7 +166,6 @@ public struct Conversation: Codable, Sendable, Equatable {
   var afterForgetting: Conversation? {
     var kept = Conversation()
     kept.lastUsed = lastUsed
-    kept.asksMade = asksMade
     kept.turn = turn
     if outOfSync == .paused { kept.outOfSync = .paused }
     kept.summaryAsk = summaryAsk
@@ -202,6 +203,9 @@ public struct Continuity: Codable, Sendable, Equatable {
   public static let keptConversations = 20
 
   private(set) var conversations: [String: Conversation] = [:]
+  /// The number the last numbered ask took, for every session, so a forget or an eviction never
+  /// brings an old number back.
+  private var asksMade: Int?
 
   public init() {}
 
@@ -225,7 +229,12 @@ public struct Continuity: Codable, Sendable, Equatable {
   mutating func noteSummaryAsk(
     of id: SessionID, at now: Date, model: String? = nil, fallbackModel: String? = nil
   ) -> Conversation.SummaryAsk {
-    use(id) { $0.noteSummaryAsk(at: now, model: model, fallbackModel: fallbackModel) }
+    let next = (asksMade ?? 0) + 1
+    let ask = use(id) {
+      $0.noteSummaryAsk(at: now, model: model, fallbackModel: fallbackModel, number: next)
+    }
+    if ask.number == next { asksMade = next }
+    return ask
   }
 
   /// The ask of `id` still open at `now`, without taking it.

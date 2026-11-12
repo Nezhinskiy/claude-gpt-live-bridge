@@ -297,6 +297,38 @@ extension ContinuityTests {
     #expect(!taken)
   }
 
+  /// The mod joins a second ask to the summary on its way, which is the first ask's.
+  @Test func aSecondAskDoesNotFreshenTheFirst() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    continuity.markMissed(a, asPaused: false)
+    continuity.noteSummaryAsk(of: a, at: now + 1)
+    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
+    #expect(!taken)
+  }
+
+  /// An ask recorded with no number (for a mod that forks, or by 0.5.x) cannot be told from a
+  /// stale one by a numbered answer, so an ask naming a model replaces it.
+  @Test func anAskNamingAModelReplacesOneWithNoNumber() {
+    var continuity = Continuity()
+    let now = Date()
+    continuity.noteSummaryAsk(of: a, at: now)
+    let ask = continuity.noteSummaryAsk(of: a, at: now + 1, model: "claude-haiku-5-5")
+    #expect(ask.number != nil)
+    #expect(continuity.openSummaryAsk(of: a, at: now + 2)?.model == "claude-haiku-5-5")
+  }
+
+  @Test func aForgetDoesNotRestartTheNumbering() {
+    var continuity = Continuity()
+    let now = Date()
+    let first = continuity.noteSummaryAsk(of: a, at: now, model: "claude-haiku-5-5")
+    _ = continuity.takeSummaryAsk(of: a, at: now, number: first.number)
+    continuity.forget(a)
+    let second = continuity.noteSummaryAsk(of: a, at: now + 1, model: "claude-haiku-5-5")
+    #expect(second.number != first.number)
+  }
+
   /// An ask after a gap is a fresh one, with its own model, not blocked behind the stale ask.
   @Test func aFreshAskReplacesAStaleOne() {
     var continuity = Continuity()

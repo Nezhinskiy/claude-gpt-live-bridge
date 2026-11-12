@@ -1479,7 +1479,7 @@ struct BridgeTests {
     summaryModel.withLock { $0 = "claude-opus-5-5" }
     try await join(a, "Alpha")
     await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context(ask: 1))
+    #expect(try await registry.poll(a) == .context())
   }
 
   /// Only an answer to an ask that named a model says which model wrote it.
@@ -1546,14 +1546,16 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
   }
 
-  /// An older mod echoes no number, so its post is matched as before.
-  @Test func aPostWithoutANumberIsGuessedAsBefore() async throws {
+  /// An older mod echoes no number and joins a second ask to the send on its way, so the stale
+  /// ask stays open and its post is still refused.
+  @Test func anOlderModsPostAfterAForgetAndASecondAskIsRefused() async throws {
     try await join(a, "Alpha")
     await bridge.loadContext()
-    try await join(a, "Alpha", missed: true)
+    #expect(try await registry.poll(a)?.asksForContext == true)
+    await bridge.newConversation()
     await bridge.loadContext()
-    try await post("/v1/context", context())
-    #expect(await bridge.current.context == summary)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    #expect(await bridge.current.context == nil)
   }
 
   /// A summary on its way when the owner presses New conversation does not bring back what was

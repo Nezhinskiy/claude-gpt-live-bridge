@@ -277,14 +277,16 @@ those shapes goes to OpenAI as typed, personal text included.
     recorded. So may text typed as feedback at a permission dialog, which as far as the hooks show
     reaches none of them; that was not run.
   - A summary nobody asked for can reach past the pause and past a forget. From 0.4.2 the mod sends
-    a summary only when the app asks for one, but the app still takes one it did not ask for, as it
-    cannot date it (`Bridge.context`): mods update separately from the app, so a session on an older
+    a summary only when the app asks for one, but the app still takes one it did not ask for that
+    carries no ask's number, as it cannot date it (`Bridge.context`): mods update separately from the app, so a session on an older
     mod can send one with `/live context`. It takes no more than the pause on, the call off and
     typing during that command to clear the *paused* mark, and the paused text may be in that
     summary; one written across **New conversation** brings back what was forgotten
     ([BR-002](docs/bugs/BR-002.md)). This is accepted, as a 60 second window on an explicit command.
-    The current mod can land there too, for about a second: the reply to a second ask that came
-    after a poll took the first and before that summary landed finds no ask open.
+    An older mod since 0.4.2 can land there too, for about a second: the reply to a second ask that
+    came after a poll took the first and before that summary landed finds no ask open. A current
+    mod with a current app echoes the ask's number, and the app refuses a numbered summary that
+    finds no ask open, or another ask open.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
   conversation** with the session as the target, or remove it with ×, or when 20 sessions used since
   push them out (which also loses a paused mark); a load of a new summary replaces the old one for
