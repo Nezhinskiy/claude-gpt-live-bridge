@@ -23,8 +23,11 @@ export type Band = {
   problem?: string
   /** Absent until the first poll reply. */
   status?: BandStatus
-  /** This session's summary on its way to the app, then for a moment after it arrived. */
-  context?: 'loading' | 'sent'
+  /**
+   * This session's summary on its way to the app, then for a moment after it arrived; `failed`, no
+   * model wrote one the app asked for, until the next ask.
+   */
+  context?: 'loading' | 'sent' | 'failed'
 }
 
 declare module 'claude-code' {
