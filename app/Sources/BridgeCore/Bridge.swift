@@ -63,8 +63,8 @@ public actor Bridge: Router {
   private var lineKnowsSession = false
   /// The line waiting for a summary, woken to look again at every change.
   private var waiter: CheckedContinuation<Void, Never>?
-  /// The target the call was last at, which a target change asks ahead of its line; nil while
-  /// the call is off.
+  /// The target the call was last at, which a target change asks ahead of its line; Start clears
+  /// it.
   private var callTarget: SessionID?
   /// The context line the opening line was seeded with.
   private var seededContext: String?
@@ -746,10 +746,7 @@ public actor Bridge: Router {
   /// left nobody is there to talk to, so the call stops as Stop does, a Start still launching
   /// codex included, and says why, as Start with no session does.
   private func followTarget() async {
-    guard machine.phase != .off || connecting != nil else {
-      callTarget = nil
-      return
-    }
+    guard machine.phase != .off || connecting != nil else { return }
     guard let target = await registry.target else {
       problem = .noSession
       await perform(.stop)
