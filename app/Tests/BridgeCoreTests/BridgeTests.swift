@@ -1858,6 +1858,18 @@ struct BridgeTests {
     #expect(await bridge.status.call == .off)
   }
 
+  /// Stop ends the logged wait too: an answer after it counts no line's wait.
+  @Test func stopEndsTheLoggedWait() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(3, polling: a)
+    await bridge.perform(.stop)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(timings.withLock { $0.last?.waited } == nil)
+  }
+
   /// The waiting line closes, the new target is asked at once, and the old summary is stored
   /// when it lands.
   @Test func aTargetChangeEndsTheWaitAndAsksTheNew() async throws {

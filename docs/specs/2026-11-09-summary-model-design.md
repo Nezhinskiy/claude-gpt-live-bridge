@@ -357,8 +357,7 @@ comes back by `POST` at once.
 `POST /v1/context` carries `stats: { durationMs, transcriptChars, inputTokens, outputTokens }` for
 the attempt that wrote it with `complete`; no cache counts, as no cache mark is set, and a fork
 sends none. The app adds the model it asked for (the fallback when `failures` has one entry), how
-long the ask took to answer and how long the line that got it waited (from when it began to wait;
-a reconnect keeps that start, Start and a target change begin it again), and writes one `.debug` line to the
+long the ask took to answer and how long the line that got it waited ([`waited`](../../CONTRIBUTING.md#running-the-app-while-you-work)), and writes one `.debug` line to the
 unified log (`Logger`, category `summary`): numbers and the model as its listed name or `custom`,
 never a custom id (a Bedrock ARN holds an account number), no text and no session id. A debug
 line is not kept unless someone streams it; CONTRIBUTING says how. Nothing is sent, so "no

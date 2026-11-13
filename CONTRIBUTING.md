@@ -212,7 +212,7 @@ than the open one, so it is ignored); `hadSummary`, whether it had text; `model`
 (`custom` for an id you typed, `fork` for a summary the session's own fork wrote), the fallback's
 when the model asked for failed; `waited`, the
 milliseconds the line waited for it, when one did, from when that line began to wait (a reconnect
-keeps that start; Start and a change of target begin it again); then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
+keeps that start; Stop, Start and a change of target drop it); then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
 `outputTokens`. A post for an ask other than the open one has no `askedFor` and no `model`: the app
 keeps only the open ask's record. It holds no summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
 

@@ -172,6 +172,7 @@ public actor Bridge: Router {
       guard machine.phase == .off, connecting == nil else { return }
       await attempt { await self.launch() }
     case .stop:
+      summaries.callStartedOrStopped()
       await send(.stop)
       await endCodex()
     case .mute: await send(.mute)
@@ -201,7 +202,7 @@ public actor Bridge: Router {
     }
     guard !Task.isCancelled else { return }
     callStart = time.now
-    summaries.newCall()
+    summaries.callStartedOrStopped()
     callTarget = nil  // so the call's first `changed()` asks the target ahead of its line
     await send(.start)
   }

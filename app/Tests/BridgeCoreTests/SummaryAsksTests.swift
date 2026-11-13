@@ -181,7 +181,7 @@ struct SummaryAsksTests {
     _ = asks.answer(a, number: first.number, wrote: false, in: &continuity, at: t0 + 1)
     asks.ask(a, in: &continuity, at: t0 + 2, model: haiku, fallback: nil)
     #expect(asks.wait(a, in: continuity, at: t0 + 2) == nil)
-    asks.newCall()
+    asks.callStartedOrStopped()
     #expect(asks.wait(a, in: continuity, at: t0 + 2) == t0 + 2 + SummaryAsks.Policy.waitLimit)
   }
 
@@ -238,7 +238,7 @@ struct SummaryAsksTests {
     let ask = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
     _ = asks.wait(a, in: continuity, at: t0)
     asks.endWait(at: t0 + 1)
-    asks.newCall()
+    asks.callStartedOrStopped()
     _ = asks.wait(a, in: continuity, at: t0 + 3)
     #expect(
       asks.answer(a, number: 1, wrote: true, in: &continuity, at: t0 + 5)
