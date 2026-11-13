@@ -143,65 +143,72 @@ struct SummaryAsksTests {
   // MARK: The wait
 
   @Test func noAskNoWait() {
-    #expect(SummaryAsks().waitDeadline(for: a, in: Continuity(), at: t0) == nil)
+    var asks = SummaryAsks()
+    #expect(asks.wait(a, in: Continuity(), at: t0) == nil)
   }
 
   /// An ask with no number went to a mod that forks, which posts nothing when it has nothing.
   @Test func anOlderModIsNeverWaitedFor() {
     var continuity = Continuity()
-    let asks = SummaryAsks()
+    var asks = SummaryAsks()
     asks.ask(a, in: &continuity, at: t0, model: nil, fallback: nil)
-    #expect(asks.waitDeadline(for: a, in: continuity, at: t0) == nil)
+    #expect(asks.wait(a, in: continuity, at: t0) == nil)
   }
 
   /// A line opened late in a summary's run waits only for the rest of it.
   @Test func theLimitCountsFromTheAsk() {
     var continuity = Continuity()
-    let asks = SummaryAsks()
+    var asks = SummaryAsks()
     asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil)
-    #expect(
-      asks.waitDeadline(for: a, in: continuity, at: t0 + 4) == t0 + SummaryAsks.Policy.waitLimit)
+    #expect(asks.wait(a, in: continuity, at: t0 + 4) == t0 + SummaryAsks.Policy.waitLimit)
   }
 
   /// Its summary would be ignored, so nothing waits for it.
   @Test func aStaleAskIsNotWaitedFor() {
     var continuity = Continuity()
-    let asks = SummaryAsks()
+    var asks = SummaryAsks()
     asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil)
     continuity.markMissed(a, asPaused: false)
-    #expect(asks.waitDeadline(for: a, in: continuity, at: t0) == nil)
+    #expect(asks.wait(a, in: continuity, at: t0) == nil)
   }
 
-  /// An empty answer to a waiting line, or the limit, ends the session's waits for the call; a
-  /// new call waits again.
-  @Test func aWaitThatEndedEmptyIsNotRepeatedThisCall() {
+  /// An answer with no summary spends the session's wait for the call, though no line waited for
+  /// it; a new call waits again.
+  @Test func anEmptyAnswerSpendsTheWaitForTheCall() {
     var continuity = Continuity()
     var asks = SummaryAsks()
     let first = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
-    asks.beginWait(a, in: continuity, at: t0)
     _ = asks.answer(a, number: first.number, wrote: false, in: &continuity, at: t0 + 1)
     asks.ask(a, in: &continuity, at: t0 + 2, model: haiku, fallback: nil)
-    #expect(asks.waitDeadline(for: a, in: continuity, at: t0 + 2) == nil)
+    #expect(asks.wait(a, in: continuity, at: t0 + 2) == nil)
     asks.newCall()
-    #expect(
-      asks.waitDeadline(for: a, in: continuity, at: t0 + 2) == t0 + 2 + SummaryAsks.Policy.waitLimit
-    )
-    asks.waitedOut(a)
-    #expect(asks.waitDeadline(for: a, in: continuity, at: t0 + 2) == nil)
+    #expect(asks.wait(a, in: continuity, at: t0 + 2) == t0 + 2 + SummaryAsks.Policy.waitLimit)
   }
 
-  /// An empty answer that no line waits for leaves the next line's wait as it was.
-  @Test func anEmptyAnswerAfterTheWaitEndedSpendsNothing() {
+  /// A line that waits until the limit spends the session's wait for the call.
+  @Test func aLineThatWaitsOutTheLimitSpendsTheWait() {
     var continuity = Continuity()
     var asks = SummaryAsks()
     let first = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
-    asks.beginWait(a, in: continuity, at: t0)
-    asks.endWait(at: t0 + 1)
-    _ = asks.answer(a, number: first.number, wrote: false, in: &continuity, at: t0 + 2)
-    asks.ask(a, in: &continuity, at: t0 + 3, model: haiku, fallback: nil)
-    #expect(
-      asks.waitDeadline(for: a, in: continuity, at: t0 + 3) == t0 + 3 + SummaryAsks.Policy.waitLimit
-    )
+    let limit = t0 + SummaryAsks.Policy.waitLimit
+    #expect(asks.wait(a, in: continuity, at: t0) == limit)
+    #expect(asks.wait(a, in: continuity, at: limit) == nil)
+    _ = asks.answer(a, number: first.number, wrote: true, in: &continuity, at: limit + 1)
+    asks.ask(a, in: &continuity, at: limit + 2, model: haiku, fallback: nil)
+    #expect(asks.wait(a, in: continuity, at: limit + 2) == nil)
+  }
+
+  /// A line that comes after the limit, the ask still in flight, opens without waiting and leaves
+  /// the session's wait for a later ask.
+  @Test func aLineAfterTheLimitDoesNotSpendTheWait() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    let first = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
+    let limit = t0 + SummaryAsks.Policy.waitLimit
+    #expect(asks.wait(a, in: continuity, at: limit) == nil)
+    _ = asks.answer(a, number: first.number, wrote: true, in: &continuity, at: limit + 1)
+    asks.ask(a, in: &continuity, at: limit + 2, model: haiku, fallback: nil)
+    #expect(asks.wait(a, in: continuity, at: limit + 2) == limit + 2 + SummaryAsks.Policy.waitLimit)
   }
 
   /// The log's `waited`: from the wait's start to the answer, or to the wait's end if it ended
@@ -210,14 +217,14 @@ struct SummaryAsksTests {
     var continuity = Continuity()
     var asks = SummaryAsks()
     let ask = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
-    asks.beginWait(a, in: continuity, at: t0 + 2)
+    _ = asks.wait(a, in: continuity, at: t0 + 2)
     asks.endWait(at: t0 + 3)
-    asks.beginWait(a, in: continuity, at: t0 + 4)
+    _ = asks.wait(a, in: continuity, at: t0 + 4)
     #expect(
       asks.answer(a, number: 1, wrote: true, in: &continuity, at: t0 + 5)
         == .taken(ask, waited: 3))
     let next = asks.ask(a, in: &continuity, at: t0 + 6, model: haiku, fallback: nil).ask
-    asks.beginWait(a, in: continuity, at: t0 + 6)
+    _ = asks.wait(a, in: continuity, at: t0 + 6)
     asks.endWait(at: t0 + 7)
     #expect(
       asks.answer(a, number: 2, wrote: true, in: &continuity, at: t0 + 9)

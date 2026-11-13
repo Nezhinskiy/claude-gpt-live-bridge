@@ -592,22 +592,16 @@ public actor Bridge: Router {
     }
   }
 
-  /// Holds the opening line while its session's summary is in flight
-  /// (`SummaryAsks.waitDeadline`): until the post that answers the open ask, the limit, the
-  /// session's drop, a gap or forget that makes the ask stale, or the line's cancellation. Each
-  /// change wakes it to look again; nothing is awaited between its look and its sleep, so no change
-  /// is missed. An empty answer (`context(_:)`) and the limit end this call's waits for the
-  /// session; nothing goes to the voice meanwhile, as the line is not open and the page queues
-  /// what is said.
+  /// Holds the opening line while its session's summary is in flight (`SummaryAsks.wait`, which
+  /// also says what spends the session's wait for the call): until the post that answers the open
+  /// ask, the limit, the session's drop, a gap or forget that makes the ask stale, or the line's
+  /// cancellation. Each change wakes it to look again; nothing is awaited between its look and its
+  /// sleep, so no change is missed. Nothing goes to the voice meanwhile, as the line is not open
+  /// and the page queues what is said.
   private func waitForSummary() async {
-    while !Task.isCancelled, let id = lineSession {
-      let now = time.now
-      guard let deadline = summaries.waitDeadline(for: id, in: continuity, at: now) else { break }
-      guard now < deadline else {
-        summaries.waitedOut(id)
-        break
-      }
-      summaries.beginWait(id, in: continuity, at: now)
+    while !Task.isCancelled, let id = lineSession,
+      let deadline = summaries.wait(id, in: continuity, at: time.now)
+    {
       await sleep(until: deadline)
     }
     summaries.endWait(at: time.now)
