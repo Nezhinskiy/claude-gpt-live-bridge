@@ -4173,6 +4173,12 @@ struct BridgeTests {
     throw StillRunning(limit: .seconds(2))
   }
 
+  /// Starts Settings' check of `claude-x-1`. Settle the task: it fails the test unless the check
+  /// ends with `expected`, and a check that never ends fails it within `settle`'s bound.
+  func check(endsWith expected: ModelCheckResult) -> Task<Void, Never> {
+    Task { #expect(await bridge.checkModel("claude-x-1") == expected) }
+  }
+
   func checkResult(
     from session: SessionID, _ id: String, ok: Bool = false,
     _ reason: SummaryFailure.Reason? = .modelRefused, _ kind: String? = nil
@@ -4192,11 +4198,11 @@ struct BridgeTests {
   @Test func theTargetChecksFirst() async throws {
     try await join(a, "Alpha", writesSummaries: true)
     try await join(b, "Beta", writesSummaries: true)
-    async let result = bridge.checkModel("claude-x-1")
+    let checking = check(endsWith: .works)
     let id = try await checkHanded(to: a)
     #expect(try await registry.poll(b) == nil)
     try await checkResult(from: a, id, ok: true)
-    #expect(await result == .works)
+    try await settle(checking)
   }
 
   /// A target on an older mod cannot check: the session that joined last and can, does.
@@ -4205,39 +4211,39 @@ struct BridgeTests {
     try await join(a, "Alpha")
     try await join(b, "Beta", writesSummaries: true)
     try await join(c, "Gamma", writesSummaries: true)
-    async let result = bridge.checkModel("claude-x-1")
+    let checking = check(endsWith: .works)
     let id = try await checkHanded(to: c)
     #expect(try await registry.poll(b) == nil)
     try await checkResult(from: c, id, ok: true)
-    #expect(await result == .works)
+    try await settle(checking)
   }
 
   @Test func aResultFromAnotherSessionIsIgnored() async throws {
     try await join(a, "Alpha", writesSummaries: true)
     try await join(b, "Beta", writesSummaries: true)
-    async let result = bridge.checkModel("claude-x-1")
+    let checking = check(endsWith: .refused(.modelRefused, kind: nil))
     let id = try await checkHanded(to: a)
     try await checkResult(from: b, id, ok: true)
     try await checkResult(from: a, "another check", ok: true)
     try await checkResult(from: a, id)
-    #expect(await result == .refused(.modelRefused, kind: nil))
+    try await settle(checking)
   }
 
   @Test func noAnswerIn20Seconds() async throws {
     try await join(a, "Alpha", writesSummaries: true)
     let asked = time.now
-    async let result = bridge.checkModel("claude-x-1")
+    let checking = check(endsWith: .noAnswer)
     _ = try await checkHanded(to: a)
     #expect(await eventually { time.deadlines.contains(asked + 20) })
     time.advance(by: .seconds(20))
-    #expect(await result == .noAnswer)
+    try await settle(checking)
   }
 
   @Test func theSessionLeavingGivesNoAnswer() async throws {
     try await join(a, "Alpha", writesSummaries: true)
-    async let result = bridge.checkModel("claude-x-1")
+    let checking = check(endsWith: .noAnswer)
     _ = try await checkHanded(to: a)
     try await post("/v1/leave", LeaveBody(sessionId: a))
-    #expect(await result == .noAnswer)
+    try await settle(checking)
   }
 }
