@@ -284,7 +284,7 @@ after `makeOffer` and before the seed is built and `voice.open` is called: the p
 `connecting`, which arms no silence timer, nothing leaves the Mac, and the page queues what is said
 and plays it once the line connects. It ends at the post that answers the open ask, whatever it
 carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit,
-30 seconds from the ask, when the session drops or a gap makes the ask stale, or when the line is
+10 seconds from the ask, when the session drops or a gap makes the ask stale, or when the line is
 cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
 one, and a reconnect waits again for the same ask. An answer with no summary, or the limit, ends
 that session's waits for the rest of the call, so a summary that keeps failing holds one line, not

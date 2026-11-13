@@ -67,7 +67,7 @@ All notable changes to this project are listed here. The format follows
 - A line no longer reaches the voice before its context: for a session on a mod of this release,
   the line waits for the summary in flight before it connects, while what you say is recorded and
   queued on the Mac, then opens with the summary in its seed and plays what you said. It opens
-  without one 30 seconds after the ask, or as soon as the mod answers with none; either ends the
+  without one 10 seconds after the ask, or as soon as the mod answers with none; either ends the
   waits for that session until the next Start. Such a session is asked at Start and when the
   target changes during the call, so the summary is often in before you speak. A session on an
   older mod is asked when its line opens and is not waited for, as before.

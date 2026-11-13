@@ -5,8 +5,8 @@ import Foundation
 /// `writesSummaries`, and in this call no wait of that session's ended without a summary, so a
 /// persistent failure holds one line, not every line.
 struct SummaryWait: Sendable {
-  /// Provisional: the gate's measurement of the real model sets it.
-  static let limit: TimeInterval = 30
+  /// The spec's "The time limit" says how the measurement set it.
+  static let limit: TimeInterval = 10
 
   /// The sessions whose wait ended this call with no summary: an empty answer, or the limit.
   private var endedEmpty: Set<SessionID> = []

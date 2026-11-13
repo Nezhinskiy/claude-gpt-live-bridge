@@ -296,7 +296,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   lack part of it (see **Load context** below), but while **Pause sync** is on or after a
   pause only when it has none yet ([details](docs/architecture/overview.md#components)). With a mod of this
   release the summary is asked for at Start and when the target changes during the call, and the
-  line waits for it before it connects, at most 30 seconds from the ask: what you say meanwhile is
+  line waits for it before it connects, at most 10 seconds from the ask: what you say meanwhile is
   held on the Mac and played to the voice once the line opens. Stop or a target change during the
   wait drops what was held, and so does a reconnect after **Connect over TCP** changes, which keeps
   at most the last 2 seconds for the line that opens again. While the call talks to another
