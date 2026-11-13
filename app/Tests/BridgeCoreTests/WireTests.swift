@@ -28,7 +28,9 @@ struct WireTests {
     "limits": roundTrip(LimitsBody.self),
     "answer-ok": roundTrip(AnswerBody.self), "answer-failed": roundTrip(AnswerBody.self),
     "next-request": roundTrip(PollReply.self), "next-context": roundTrip(PollReply.self),
-    "next-context-model": roundTrip(PollReply.self),
+    "next-context-model": roundTrip(PollReply.self), "next-check-model": roundTrip(PollReply.self),
+    "model-check-ok": roundTrip(ModelCheckBody.self),
+    "model-check-failed": roundTrip(ModelCheckBody.self),
     "next-idle": roundTrip(PollReply.self), "next-reply": roundTrip(PollReply.self),
     "error": roundTrip(ErrorReply.self), "error-removed": roundTrip(ErrorReply.self),
   ]

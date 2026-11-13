@@ -1,0 +1,21 @@
+{
+  "status": {
+    "call": "off",
+    "isMuted": false,
+    "minutesToday": 0,
+    "sessions": [
+      {
+        "activity": "idle",
+        "isTarget": true,
+        "label": "Example session",
+        "sessionId": "00000000-0000-0000-0000-000000000001"
+      }
+    ],
+    "unheard": 0
+  },
+  "work": {
+    "id": "00000000-0000-0000-0000-00000000000c",
+    "kind": "checkModel",
+    "model": "claude-example-6"
+  }
+}
