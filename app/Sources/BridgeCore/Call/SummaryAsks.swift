@@ -12,15 +12,17 @@ enum SummaryAnswer: Equatable {
   case taken(SummaryAsks.Ask, waited: TimeInterval?)
   /// It answers the open ask, asked for before the latest gap or forget, so it is ignored.
   case stale(SummaryAsks.Ask, waited: TimeInterval?)
-  /// It carries the number of an ask that is not open: ignored, and the open ask stays open.
+  /// It carries the number of another ask than the open one: ignored, and the open ask stays open.
   case otherAsk
+  /// It carries a number and no ask is open: it answers one already closed, and is ignored.
+  case closedAsk
   /// No ask is open and it names none: an older mod's `/live context`, undated, and taken.
   case unasked
 
   var isTaken: Bool {
     switch self {
     case .taken, .unasked: true
-    case .stale, .otherAsk: false
+    case .stale, .otherAsk, .closedAsk: false
     }
   }
 }
@@ -125,7 +127,7 @@ struct SummaryAsks: Sendable {
     let open = openAsk(of: id, in: continuity, at: now)
     let isOtherAsk = number != nil && open?.number != number
     continuity.changeSummaryAsk(of: id) { if !isOtherAsk { $0 = nil } }
-    if isOtherAsk { return .otherAsk }
+    if isOtherAsk { return open == nil ? .closedAsk : .otherAsk }
     guard let open else {
       loadedAt[id] = wrote ? now : nil
       return .unasked

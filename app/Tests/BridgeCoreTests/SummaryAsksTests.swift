@@ -133,11 +133,11 @@ struct SummaryAsksTests {
     #expect(asks.openAsk(of: a, in: continuity, at: t0) == open)
   }
 
-  /// A numbered post when no ask is open answers an ask that is closed: it is not taken.
+  /// A numbered post when no ask is open answers one already closed: it is not taken.
   @Test func aNumberedPostWithNoAskOpenIsNotTaken() {
     var continuity = Continuity()
     var asks = SummaryAsks()
-    #expect(asks.answer(a, number: 1, wrote: true, in: &continuity, at: t0) == .otherAsk)
+    #expect(asks.answer(a, number: 1, wrote: true, in: &continuity, at: t0) == .closedAsk)
   }
 
   // MARK: The wait

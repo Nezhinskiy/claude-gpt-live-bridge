@@ -1594,7 +1594,46 @@ struct BridgeTests {
     #expect(reported.first?.stats == stats)
   }
 
+  /// Two failures before a summary is a shape the mod never sends; the log names the writer
+  /// Settings' line names.
+  @Test func theLogNamesTheWriterSettingsNames() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let failed = [
+      SummaryFailure(reason: .modelRefused, error: nil),
+      SummaryFailure(reason: .emptyReply, error: nil),
+    ]
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", failures: failed, ask: 1))
+    #expect(timings.withLock { $0.last?.model } == "claude-haiku-5-5")
+    #expect(await bridge.lastSummary?.line?.hasPrefix("The last summary used Haiku 5.5") == true)
+  }
+
   // MARK: The ask's number
+
+  /// A post for another ask is logged with its own facts: not the open ask's time or model.
+  @Test func aPostForAnotherAskLogsOnlyItsOwnFacts() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await join(a, "Alpha", missed: true, writesSummaries: true)
+    await bridge.loadContext()
+    let stats = SummaryStats(durationMs: 1, transcriptChars: 2, inputTokens: 3, outputTokens: 4)
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "From before.", stats: stats, ask: 1))
+    let timing = try #require(timings.withLock { $0.last })
+    #expect(timing.askedFor == nil && timing.model == nil)
+    #expect(timing.stats == stats && timing.stale)
+  }
+
+  /// A post that repeats an answered ask's number is ignored, and logged as nothing.
+  @Test func aRepeatedAnswerIsNotLogged() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(timings.withLock { $0.count } == 1)
+  }
 
   /// A post that a gap made stale carries the old number, so it cannot take the fresh ask.
   @Test func aStalePostDoesNotAnswerTheFreshAsk() async throws {

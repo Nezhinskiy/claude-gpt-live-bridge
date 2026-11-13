@@ -33,6 +33,16 @@ struct SummaryLogTests {
     #expect(SummaryLog.line(waited).contains("waited=3500ms"))
   }
 
+  /// A post for another ask is logged with its own facts only: the app keeps the open ask's alone.
+  @Test func aPostForAnotherAskHasNoTimeOrModel() {
+    var other = timing(model: nil)
+    other.askedFor = nil
+    other.stale = true
+    let line = SummaryLog.line(other)
+    #expect(!line.contains("askedFor=") && !line.contains("model="))
+    #expect(line.contains("stale=true hadSummary=true"))
+  }
+
   @Test func aLineWithoutAModelSaysFork() {
     #expect(SummaryLog.line(timing(model: nil)).contains("model=fork"))
   }

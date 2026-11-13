@@ -905,7 +905,8 @@ public actor Bridge: Router {
   /// it is and kept in the session's conversation. One asked for before the latest gap or forget
   /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and the
   /// menu is told of nothing loaded. A post with the number of an ask other than the open one is
-  /// such a summary, and leaves the open ask open; one with no number is matched by its time. An
+  /// such a summary, and leaves the open ask open; one with no number is matched by its time
+  /// (`SummaryAsks.answer`). An
   /// empty one keeps the stored line and closes the ask: a mod that writes summaries sends one when
   /// it has none. The answer to an ask that named a model, if a model was tried, is `lastSummary`.
   /// A line waiting for the summary (`waitForSummary`) is seeded with it; a live line about that
@@ -918,27 +919,26 @@ public actor Bridge: Router {
     let now = time.now
     let wrote = !body.summary.allSatisfy(\.isWhitespace)
     let failures = body.failures ?? []
-    let ask = summaries.openAsk(of: id, in: continuity, at: now)
+    // The waiting line looks again at the `changed()` after every post, this one ignored or not.
     let answer = summaries.answer(id, number: body.ask, wrote: wrote, in: &continuity, at: now)
-    if let ask {
-      let model = failures.count == 1 && wrote ? ask.fallbackModel : ask.model
-      // A post with another ask's number was written for an ask a gap made stale.
-      let isOtherAsk = body.ask != nil && body.ask != ask.number
-      var waited: TimeInterval?
-      if case .taken(_, let line) = answer { waited = line }
-      if case .stale(_, let line) = answer { waited = line }
+    switch answer {
+    case .taken(let ask, let waited), .stale(let ask, let waited):
+      let report = ask.model.map {
+        SummaryReport(asked: $0, fallback: ask.fallbackModel, failures: failures, wrote: wrote)
+      }
       reportsSummary(
         SummaryTiming(
-          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale || isOtherAsk,
-          hadSummary: wrote, model: model, stats: body.stats, waited: waited))
+          askedFor: now.timeIntervalSince(ask.at), stale: !answer.isTaken, hadSummary: wrote,
+          model: report?.writer, stats: body.stats, waited: waited))
+      // An answer on which no model was tried leaves Settings' line as it was.
+      if answer.isTaken, let report, wrote || !failures.isEmpty { lastSummary = report }
+    case .otherAsk:
+      reportsSummary(
+        SummaryTiming(
+          askedFor: nil, stale: true, hadSummary: wrote, model: nil, stats: body.stats))
+    case .closedAsk, .unasked: break
     }
-    // The waiting line looks again at the `changed()` after every post, this one ignored or not.
     guard answer.isTaken else { return }
-    // An answer on which no model was tried leaves Settings' line as it was.
-    if let asked = ask?.model, wrote || !failures.isEmpty {
-      lastSummary = SummaryReport(
-        asked: asked, fallback: ask?.fallbackModel, failures: failures, wrote: wrote)
-    }
     let line =
       wrote
       ? AnswerShaper.line(
