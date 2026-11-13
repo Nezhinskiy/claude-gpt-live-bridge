@@ -271,8 +271,8 @@ public actor Bridge: Router {
   /// Settings' check of a custom summary model, run by a joined session's mod: the target if its
   /// mod writes summaries, else the most recently joined one whose mod does. The result is taken
   /// only from that session, under the check's id; 20 s without one, or the session's drop, is
-  /// `noAnswer`. A newer check ends the one before it. It takes the session's word: a process
-  /// joined as that session can say any model works (SECURITY.md).
+  /// `noAnswer`. A newer check ends the one before it. It takes the poller's word: a process
+  /// that polls as that session before its mod does can say any model works (SECURITY.md).
   public func checkModel(_ model: String) async -> ModelCheckResult {
     guard let session = await registry.sessionThatChecks() else { return .noSession }
     let id = UUID().uuidString

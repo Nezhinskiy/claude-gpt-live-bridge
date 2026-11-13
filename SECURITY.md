@@ -99,12 +99,19 @@ voices.
     answers each ask, with any text, just before the limit, or that ends each wait by joining again
     as one that missed a turn, is asked again by the next line, so it can hold every line of the
     call, each for up to 10 seconds from that line's ask;
-  - join with `writesSummaries` and make itself the target (or, with a target that cannot check,
-    be the latest joined session that can), and so be handed Settings' check of a custom
-    **Summary model** with the check's id. It can answer that any model works, and Settings saves
-    that model; Haiku 5.5 then writes the summaries that model fails to, and no permission or
-    data is reached. The check carries only the model's id, and the mod asks that model only
-    "Reply with OK.";
+  - take Settings' check of a custom **Summary model**, with the check's id, and post its
+    result. The check goes to the target if its mod writes summaries, else to the latest joined
+    session whose mod does, and the app takes a result only under that session's id and the
+    check's id. A process can be that session, by joining with `writesSummaries` and making
+    itself the target, or it can poll `GET /v1/next` with that session's id, which the status
+    names, without joining: a poll that comes before the mod's takes the check, and the mod never
+    sees it. Either way it can answer that any model works, and Settings saves that model. It
+    cannot change the id saved, which is the one you typed, and it must win that poll to answer a
+    check that went to a session it is not. Haiku 5.5 then writes a summary that model fails to
+    write, except when its request runs out of the time the mod allows a summary, as one to a
+    model whose requests hang does: then no model writes it, and the line opens without that
+    summary. No permission or data is reached. The check carries only the model's id, and the mod
+    asks that model only "Reply with OK.";
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation;
   - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as
