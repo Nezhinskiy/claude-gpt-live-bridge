@@ -379,6 +379,7 @@ public actor Bridge: Router {
         if let old = body.replaces, replaced {  // after /clear: the same session, a new id
           continuity.move(old, to: body.sessionId)
           machine.rename(old, to: body.sessionId)
+          if modelCheck?.session == old { modelCheck?.session = body.sessionId }
           if lineSession == old {
             lineSession = body.sessionId
             heldContext?.session = body.sessionId

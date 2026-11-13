@@ -4239,6 +4239,20 @@ struct BridgeTests {
     try await settle(checking)
   }
 
+  /// `/clear` before the session polls: the new id is handed the check, and its result counts.
+  @Test func aCheckFollowsTheSessionsNewID() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let asked = time.now
+    let checking = check(endsWith: .works)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await post(
+      "/v1/join",
+      JoinBody(sessionId: cleared, title: "Alpha", replaces: a, writesSummaries: true))
+    try await checkResult(from: cleared, try await checkHanded(to: cleared), ok: true)
+    try await settle(checking)
+  }
+
   @Test func theSessionLeavingGivesNoAnswer() async throws {
     try await join(a, "Alpha", writesSummaries: true)
     let checking = check(endsWith: .noAnswer)
