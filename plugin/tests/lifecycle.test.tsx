@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import type { Work } from '../hooks/wire.ts'
+import type { StatusReply, Work } from '../hooks/wire.ts'
 import { fakeWorld, framed, ID, LIVE, liveOn, SOCKET } from './fake-bridge.ts'
 
 const START = { cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true } as const
@@ -674,4 +674,90 @@ test('anUnreadManifestIsLogged', async ($, on) => {
   const world = fakeWorld(on)
   await $.session.start(START)
   expect(world.logs.some(line => line.includes('could not read its version'))).toBe(true)
+})
+
+/** This session as the call's target, and the same app with another session as the target. */
+const asTarget = (isTarget: boolean): StatusReply => ({
+  call: 'listening', unheard: 0, minutesToday: 0, isMuted: false,
+  sessions: [
+    { sessionId: ID, label: 'Example session', activity: 'idle', isTarget },
+    { sessionId: OTHER, label: 'Other session', activity: 'idle', isTarget: !isTarget },
+  ],
+})
+
+/** The summary ask reaches the target on its poll, so the target polls every 200 ms. */
+test('theTargetPollsFiveTimesASecond', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = asTarget(true)
+  await liveOn($)
+  await world.clock.advance(1000)  // the first poll says this session is the target
+  world.take('next')
+  await world.clock.advance(1000)
+  expect(world.take('next')).toHaveLength(5)
+})
+
+test('othersPollOnceASecond', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = asTarget(false)
+  await liveOn($)
+  await world.clock.advance(1000)
+  world.take('next')
+  for (let at = 200; at < 1000; at += 200) {
+    await world.clock.advance(200)
+    expect(world.take('next')).toEqual([])
+  }
+  await world.clock.advance(200)
+  expect(world.take('next')).toHaveLength(1)
+})
+
+/** The title still follows the session's record once a second, not on every poll. */
+test('aFastTickDoesNotFollowTheTitle', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = asTarget(true)
+  await liveOn($)
+  await world.clock.advance(1000)
+  world.take('join')
+  world.take('next')
+  world.read.length = 0
+  world.title = 'Renamed session'
+  await world.clock.advance(800)
+  expect(world.take('next')).toHaveLength(4)
+  expect(world.read).toEqual([])
+  expect(world.take('join')).toEqual([])
+  await world.clock.advance(200)
+  expect(world.take('join').map(body => body?.title)).toEqual(['Renamed session'])
+})
+
+/** A fast tick whose reply changes nothing the band shows writes nothing, so it redraws nothing. */
+test('anUnchangedBandIsNotRewritten', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = asTarget(true)
+  const writes: unknown[] = []
+  on('state.set', async (_, e, next) => {
+    writes.push(e.value)
+    return next(e)
+  })
+  await liveOn($)
+  await world.clock.advance(1000)
+  world.take('next')
+  writes.length = 0
+  await world.clock.advance(800)
+  expect(world.take('next')).toHaveLength(4)
+  expect(writes).toEqual([])
+})
+
+test('aFastTickWritesAChangedBand', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = asTarget(true)
+  const writes: unknown[] = []
+  on('state.set', async (_, e, next) => {
+    writes.push(e.value)
+    return next(e)
+  })
+  await liveOn($)
+  await world.clock.advance(1000)
+  writes.length = 0
+  world.status = { ...asTarget(true), call: 'live' }
+  await world.clock.advance(200)
+  expect(writes).toMatchObject([{ status: { call: 'live' } }])
 })

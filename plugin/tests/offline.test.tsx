@@ -140,3 +140,22 @@ test('anInstalledAppIsOpenedByItsPath', async ($, on) => {
   expect(await band.find({ type: 'Text', text: /menu bar/ })).toBeUndefined()
   await band.unmount()
 })
+
+/** The target's fast polls stop at the first failed one: the band says offline when it always did. */
+test('aTargetSaysOfflineAfterTenSecondsAsBefore', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = {
+    call: 'listening', unheard: 0, minutesToday: 0, isMuted: false,
+    sessions: [{ sessionId: ID, label: 'Example session', activity: 'idle', isTarget: true }],
+  }
+  await liveOn($)
+  await world.clock.advance(1000)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  world.isAppUp = false
+  await world.clock.advance(10_000)
+  expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeUndefined()
+  expect(world.launches).toHaveLength(2)
+  await world.clock.advance(1000)
+  expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeDefined()
+  await band.unmount()
+})

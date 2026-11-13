@@ -76,6 +76,8 @@ All notable changes to this project are listed here. The format follows
   press; it waits until the summary arrives or, for one that never comes, two minutes from the ask,
   in place of a press's own 60 seconds. A summary that arrives shows **Context loaded** for a
   moment, whatever asked for it; an empty answer goes back to **Load context** without it.
+- The target session polls the app five times a second, call on or off, and the others still once
+  a second, so a summary ask reaches it up to 0.8 s sooner; its title is still read once a second.
 - A session's band draws a call phase it does not know, from a later app, as **Connecting**, where
   it could not draw the band before.
 - The mod answers every summary ask from this app, with an empty summary when it has none, and

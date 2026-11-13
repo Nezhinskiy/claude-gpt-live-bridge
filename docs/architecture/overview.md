@@ -35,7 +35,7 @@ flowchart LR
   Codex -- stdio --> CodexProc
   CodexProc -- signalling --> OpenAI
   Audio -- "WebRTC audio + data channel" --> OpenAI
-  Mod -- "HTTP/1.1, 1 poll per second" --> Server
+  Mod -- "HTTP/1.1, 1 poll per second, 5 for the target" --> Server
   Mod -- "prompt.submit" --> Claude
 ```
 
@@ -140,8 +140,10 @@ reading into the menu's row and tooltip.
 
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
 desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
-and joins again when that title changes, polls it once a second, submits each voice request to
-the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
+and joins again when that title changes, polls it once a second (the target five times a second,
+call on or off, so a summary ask reaches it sooner; the title is still read once a second, and a
+poll in between writes the band only when it changed), submits each voice request to the session
+as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
 origin. It posts every other main-loop turn to the app as synced lines (`POST /v1/sync`; a
 background turn inside the follow-up window posts its answer as an update instead): the
