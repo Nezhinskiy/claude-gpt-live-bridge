@@ -75,14 +75,17 @@ let summary: { model: string | undefined; text: string; failures: SummaryFailure
 /** Counts what ends a summary's use, so a summary written across one is not kept as current. */
 let turnsDone = 0
 /**
- * The summary on its way, which a second ask joins instead of asking a model again, and gets what
- * the first ask's model writes; not once a gap crossed it (`send` behind `sendCount`), nor when the
- * app numbered the second ask as another (`ask`).
+ * The summary on its way, which an ask with the same number (`ask`; none from an older app) joins
+ * instead of asking a model again, and gets what the first ask's model writes; not once a gap
+ * `crossed` it. `send`: its place in `sendCount`.
  */
-let sending: { send: number; ask: number | undefined; outcome: Promise<ContextOutcome> } | null = null
+let sending: { send: number; ask: number | undefined; crossed: boolean; outcome: Promise<ContextOutcome> } | null = null
 /** The hooks' posts to the app, in the order the hooks ran. */
 let posts: Promise<unknown> = Promise.resolve()
-/** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
+/**
+ * Counts sends, for an older app's fork, which a gap or its time-out ends, so what it writes later
+ * is dropped, and for the band's "Context sent", which only the latest send takes down.
+ */
 let sendCount = 0
 
 /**
@@ -129,12 +132,14 @@ async function save($: EngineInterface): Promise<void> {
 /**
  * A turn did not reach the app, which the next join says. No summary from before it covers it: the
  * one kept goes. The one being written for an older app's ask is dropped; for a named ask it is
- * posted all the same, and the app takes it as fresh if it arrives before that join.
+ * posted all the same, after that join (`BridgeLink.context`), so the app ignores it as stale.
  */
 function noteGap(): void {
   link?.noteGap()
   staleSummary()
-  if (sending !== null) sendCount += 1
+  if (sending === null) return
+  sending.crossed = true
+  sendCount += 1
 }
 
 /** Posts a line of a turn, cut to `ANSWER_LIMIT`; one the app did not take is a gap, which the next join says. */
@@ -479,7 +484,7 @@ async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, d
   const isTaken = (await link?.context({
     summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }), ...answering(ask),
   })) === true
-  if (send !== sendCount) return 'superseded'
+  if (sending?.send !== send || sending.crossed) return 'superseded'
   if (!isTaken) return 'failed'
   return text !== '' ? 'sent' : failures.length > 0 ? 'failed' : 'empty'
 }
@@ -500,14 +505,14 @@ async function forkAndPost($: EngineInterface, send: number): Promise<ContextOut
 
 /**
  * Sends the summary the app asked for, which has no reply line of its own, and never rejects. While
- * one is on its way a second ask joins it, unless a gap crossed it or the app numbered the second
- * ask as another: that one is over.
+ * one is on its way an ask with its number joins it, unless a gap crossed it: that one is over.
  */
 async function contextAsked($: EngineInterface, ask: ContextAsk): Promise<void> {
-  if (sending === null || sending.send !== sendCount || sending.ask !== ask.ask) {
+  if (sending === null || sending.crossed || sending.ask !== ask.ask) {
     const send = ++sendCount
     const mine: NonNullable<typeof sending> = {
-      send, ask: ask.ask, outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
+      send, ask: ask.ask, crossed: false,
+      outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
     }
     sending = mine
   }

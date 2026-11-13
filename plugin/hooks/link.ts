@@ -153,8 +153,17 @@ export class BridgeLink {
     return (await this.#forSession('sync', line))?.ok === true
   }
 
-  /** Posts the session's summary, and what went wrong on the way; false when the app did not take it. */
+  /**
+   * Posts the session's summary, and what went wrong on the way; false when the app did not take
+   * it. A gap noted and not yet said is said first, by joining again after the link work queued
+   * before it, so the app hears of the gap before a summary written across it; while the gap stays
+   * unsaid, nothing is posted.
+   */
   async context(body: Omit<ContextBody, 'sessionId'>): Promise<boolean> {
+    if (this.#hasGap) {
+      await this.serial(async () => { if (this.#hasGap && this.#joined !== null) await this.join(this.#joined) })
+      if (this.#hasGap) return false
+    }
     return (await this.#forSession('context', body))?.ok === true
   }
 

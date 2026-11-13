@@ -402,6 +402,27 @@ test('aGapDuringTheWriteStillPosts', async ($, on) => {
   expect(world.take('context')).toEqual([expect.objectContaining(SUMMARY)])
 })
 
+test('aGapThePollHasNotSaidIsSaidBeforeThePost', async ($, on) => {
+  // The poll that would join with the gap is held, so only the mod can say it before the answer:
+  // t1 never ended (a crash, then --resume), which t2's start finds.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  let release = () => {}
+  world.holdNext = new Promise<void>(resolve => { release = resolve })
+  await world.clock.advance(200)
+  const first = $.turn.start({ text: 'Count the files', turnId: 't1' })
+  await world.clock.advance(200)
+  const second = $.turn.start({ text: 'Count them again', turnId: 't2' })
+  await world.clock.advance(5000)
+  release()
+  world.holdNext = null
+  await Promise.all([first, second])
+  await world.clock.advance(200)
+  const told = world.calls.filter(call => call.route === 'join' || call.route === 'context')
+  expect(told.map(call => [call.route, call.body?.missed ?? call.body?.ask])).toEqual([['join', true], ['context', 1]])
+})
+
 test('aThrowWhileReadingTheTranscriptPostsEmpty', async ($, on) => {
   const world = await joined($, on)
   world.isTranscriptBroken = true
