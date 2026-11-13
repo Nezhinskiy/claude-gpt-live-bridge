@@ -210,7 +210,7 @@ summary answered within two minutes of its ask: `askedFor`, the milliseconds the
 `stale`, whether the answer was stale (asked before a gap or a forget, or posted for an ask other
 than the open one, so it is ignored); `hadSummary`, whether it had text; `model`, the model's name
 (`custom` for an id you typed, `fork` for a summary the session's own fork wrote), the fallback's
-when the model asked for failed; `waited`, the
+when the model asked for failed, and none when the transcript could not be read; `waited`, the
 milliseconds the line waited for it, when one did, from when that line began to wait (a reconnect
 keeps that start; Stop, Start and a change of target drop it); then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
 `outputTokens`. A post for an ask other than the open one has no `askedFor` and no `model`: the app

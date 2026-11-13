@@ -14,10 +14,12 @@ public struct SummaryTiming: Sendable, Equatable {
   public var stats: SummaryStats?
   /// Seconds a line waited for it (`Bridge.waitForSummary`); nil when no line waited.
   public var waited: TimeInterval?
+  /// No model was tried, as the transcript could not be read: the line names none.
+  public var triedNoModel: Bool
 
   public init(
     askedFor: TimeInterval?, stale: Bool, hadSummary: Bool, model: String?, stats: SummaryStats?,
-    waited: TimeInterval? = nil
+    waited: TimeInterval? = nil, triedNoModel: Bool = false
   ) {
     self.askedFor = askedFor
     self.stale = stale
@@ -25,12 +27,14 @@ public struct SummaryTiming: Sendable, Equatable {
     self.model = model
     self.stats = stats
     self.waited = waited
+    self.triedNoModel = triedNoModel
   }
 }
 
 public enum SummaryLog {
   /// `key=value` pairs, durations in ms, how long a line waited if one did, then the post's
-  /// `stats` if it sent them. A post for another ask has no time and no model. It holds numbers and a listed model's name only: a model id the
+  /// `stats` if it sent them. A post for another ask has no time and no model, and one on which no
+  /// model was tried no model. It holds numbers and a listed model's name only: a model id the
   /// owner typed can be an ARN with an account number, so it is logged as `custom`.
   public static func line(_ timing: SummaryTiming) -> String {
     let model: String
@@ -49,7 +53,8 @@ public enum SummaryLog {
     let waited = timing.waited.map { ["waited=\(Self.ms($0))ms"] }
     var head = ["stale=\(timing.stale)", "hadSummary=\(timing.hadSummary)"]
     if let askedFor = timing.askedFor {
-      head = ["askedFor=\(Self.ms(askedFor))ms"] + head + ["model=\(model)"]
+      let named = timing.triedNoModel ? [] : ["model=\(model)"]
+      head = ["askedFor=\(Self.ms(askedFor))ms"] + head + named
     }
     return (head + (waited ?? []) + (stats ?? [])).joined(separator: " ")
   }

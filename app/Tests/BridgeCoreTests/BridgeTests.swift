@@ -1593,6 +1593,17 @@ struct BridgeTests {
     #expect(await bridge.lastSummary?.line?.hasPrefix("The last summary used Haiku 5.5") == true)
   }
 
+  /// No model was tried on a transcript that could not be read, so the log names none.
+  @Test func anUnreadableTranscriptLogsNoModel() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let unreadable = [SummaryFailure(reason: .transcriptUnreadable, error: nil)]
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "", failures: unreadable, ask: 1))
+    let timing = try #require(timings.withLock { $0.last })
+    #expect(!SummaryLog.line(timing).contains("model="))
+  }
+
   // MARK: The ask's number
 
   /// A post for another ask is logged with its own facts: not the open ask's time or model.

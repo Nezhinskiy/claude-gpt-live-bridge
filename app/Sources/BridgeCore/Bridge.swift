@@ -910,7 +910,8 @@ public actor Bridge: Router {
       reportsSummary(
         SummaryTiming(
           askedFor: now.timeIntervalSince(ask.at), stale: !answer.isTaken, hadSummary: wrote,
-          model: report?.writer, stats: body.stats, waited: waited))
+          model: report?.writer, stats: body.stats, waited: waited,
+          triedNoModel: report?.triedAModel == false))
       // An answer on which no model was tried leaves Settings' line as it was.
       if answer.isTaken, let report, wrote || !failures.isEmpty { lastSummary = report }
     case .otherAsk:

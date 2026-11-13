@@ -39,11 +39,13 @@ public struct SummaryReport: Sendable, Equatable {
   /// The model that wrote it: the fallback once the model asked for failed, else that one, which
   /// an empty answer also names. The log and Settings' line both name it.
   public var writer: String { wrote && !failures.isEmpty ? fallback ?? asked : asked }
+  /// A model was tried: the session's transcript could be read.
+  public var triedAModel: Bool { !failures.contains { $0.reason == .transcriptUnreadable } }
 
   /// Settings' line about it; nil when the model asked for wrote it, or when no model was tried.
   public var line: String? {
     guard !failures.isEmpty else { return nil }
-    if failures.contains(where: { $0.reason == .transcriptUnreadable }) {
+    if !triedAModel {
       return "The voice got no new summary: the session's transcript could not be read."
     }
     let models = [asked, fallback ?? asked]
