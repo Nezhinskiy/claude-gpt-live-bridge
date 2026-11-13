@@ -12,7 +12,7 @@ import { askedText, keyboardAnswer, PLUGIN_NAME, spokenReply, voicePrompt } from
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
-import { socketPath } from './wire.ts'
+import { CONTEXT_TIMEOUT_MS, socketPath } from './wire.ts'
 import type {
   ActivityBody, AnswerStatus, ContextBody, LimitWindowBody, SummaryFailure, TurnRef, VoiceRequest, Work,
 } from './wire.ts'
@@ -21,8 +21,6 @@ const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
 const RESCAN_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
-/** How long a summary may take: the models an ask names share it, and a fork is given up after it. */
-const CONTEXT_TIMEOUT_MS = 60_000
 /** How long the band says "Context sent". */
 const SENT_NOTE_MS = 3_000
 /** How long the polled band may go undrawn before every surface is asked for it again. */

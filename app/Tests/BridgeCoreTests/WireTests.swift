@@ -85,4 +85,10 @@ struct WireTests {
     #expect(try Self.canonical(sent) == Self.canonical(json))
   }
 
+  /// The mod gives a summary up after the budget the app waits on: both read it from one file.
+  @Test func theSummaryBudgetIsTheMods() throws {
+    let file = Self.fixtures.appending(path: "../summary-budget.json")
+    let budget = try JSONDecoder().decode([String: Double].self, from: Data(contentsOf: file))
+    #expect(budget["summaryBudgetMs"] == SummaryAsks.Policy.modBudget * 1000)
+  }
 }

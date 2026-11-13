@@ -20,6 +20,12 @@ export function socketPath(home: string, fixedHome: string | undefined): string 
   return `${fixedHome || home}/${SOCKET_REL}`;
 }
 
+/**
+ * How long a summary may take: the models an ask names share it, and a fork is given up after it.
+ * The app's `SummaryAsks.Policy.modBudget` is the same, both tested against `wire/summary-budget.json`.
+ */
+export const CONTEXT_TIMEOUT_MS = 60_000;
+
 export type SessionId = string;
 export type RequestId = string;
 

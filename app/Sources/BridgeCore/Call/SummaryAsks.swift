@@ -34,8 +34,8 @@ struct SummaryAsks: Sendable {
   typealias Ask = Conversation.SummaryAsk
 
   enum Policy {
-    /// The mod's budget for a summary (`CONTEXT_TIMEOUT_MS`): a numbered ask is answered within it
-    /// or not at all.
+    /// The mod's budget for a summary (`CONTEXT_TIMEOUT_MS`, both tested against
+    /// `wire/summary-budget.json`): a numbered ask is answered within it or not at all.
     static let modBudget: TimeInterval = 60
     /// How long an ask can still be answered: an older mod may never answer.
     static let answerable: TimeInterval = 2 * modBudget
