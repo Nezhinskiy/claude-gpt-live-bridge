@@ -14,7 +14,7 @@ import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
 import type {
-  ActivityBody, AnswerStatus, LimitWindowBody, SummaryFailure, TurnRef, VoiceRequest, Work,
+  ActivityBody, AnswerStatus, ContextBody, LimitWindowBody, SummaryFailure, TurnRef, VoiceRequest, Work,
 } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
@@ -440,7 +440,7 @@ async function deliverContext($: EngineInterface, ask: ContextAsk, send: number)
   const deadline = (await $.clock.now()) + CONTEXT_TIMEOUT_MS
   const isNamed = ask.model !== undefined
   if (!(await hasTurns($))) {
-    if (isNamed) await link?.context({ summary: '', ...answering(ask) })
+    if (isNamed) await postContext($, { summary: '', ...answering(ask) })
     return 'empty'
   }
   await showContext($, 'loading')
@@ -475,12 +475,20 @@ async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, d
   const { text, failures, stats }: Summary = kept ?? (await summarize($, ask, deadline)
     .catch(() => ({ text: '', failures: [{ reason: 'transcript-unreadable' as const }] })))
   if (text !== '' && turns === turnsDone) summary = { model: ask.model, text, failures }
-  const isTaken = (await link?.context({
+  const isTaken = await postContext($, {
     summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }), ...answering(ask),
-  })) === true
+  })
   if (sending?.send !== send || sending.crossed) return 'superseded'
   if (!isTaken) return 'failed'
   return text !== '' ? 'sent' : failures.length > 0 ? 'failed' : 'empty'
+}
+
+/** Posts a summary (`BridgeLink.context`); a gap its join said is saved, so a reload does not say it again. */
+async function postContext($: EngineInterface, body: Omit<ContextBody, 'sessionId'>): Promise<boolean> {
+  const hadGap = link?.hasGap
+  const isTaken = (await link?.context(body)) === true
+  if (hadGap && !link?.hasGap) await save($)
+  return isTaken
 }
 
 /** An older app's ask: the session's own model forks, and only a summary is posted. */
@@ -491,7 +499,7 @@ async function forkAndPost($: EngineInterface, send: number): Promise<ContextOut
     if (send !== sendCount) return 'failed'
     if (text === '') return 'empty'
     if (turns === turnsDone) summary = { model: undefined, text, failures: [] }
-    return (await link?.context({ summary: text })) === true ? 'sent' : 'failed'
+    return (await postContext($, { summary: text })) ? 'sent' : 'failed'
   } catch {
     return 'failed'
   }

@@ -423,6 +423,22 @@ test('aGapThePollHasNotSaidIsSaidBeforeThePost', async ($, on) => {
   expect(told.map(call => [call.route, call.body?.missed ?? call.body?.ask])).toEqual([['join', true], ['context', 1]])
 })
 
+test('aGapSaidBeforeThePostIsSaved', async ($, on) => {
+  // The join before the post said the gap, so a reload must not say it again.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  let release = () => {}
+  world.holdNext = new Promise<void>(resolve => { release = resolve })
+  await world.clock.advance(200)
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Done elsewhere.' })  // a turn it never saw start
+  await world.clock.advance(5000)
+  release()
+  world.holdNext = null
+  await world.clock.advance(200)
+  expect(world.stored.get(`joined:${ID}`)).toEqual(expect.objectContaining({ hasGap: false }))
+})
+
 test('aSummaryWaitsForTheJoinThatSaysItsGap', async ($, on) => {
   // The poll's join with `missed` is on its way when the summary is done: the post goes after it.
   const world = await joined($, on)
