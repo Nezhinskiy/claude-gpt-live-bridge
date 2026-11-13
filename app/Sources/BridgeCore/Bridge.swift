@@ -56,6 +56,11 @@ public actor Bridge: Router {
   /// The lines waiting for a summary, each woken to look again at every change.
   private var waiting: [Int: CheckedContinuation<Void, Never>] = [:]
   private var waits = 0
+  /// Counts the wakes of `changed()`, so a change that comes while a line looks is not missed.
+  private var wakes = 0
+  /// Runs in each look of a waiting line, past its awaits and before it sleeps: where a test lands
+  /// a change.
+  private var whileLooking: @Sendable () async -> Void = {}
   /// The line's latest wait, for the log: the session and its ask's time, when the wait began,
   /// and when it ended if the answer did not end it.
   private var lineWait: (session: SessionID, ask: Date, since: Date, until: Date?)?
@@ -562,11 +567,12 @@ public actor Bridge: Router {
   /// (`context(_:)`) and the limit end this call's waits for the session; nothing goes to the
   /// voice meanwhile, as the line is not open and the page queues what is said.
   private func waitForSummary() async {
-    while !Task.isCancelled, let id = lineSession,
-      let ask = continuity.openSummaryAsk(of: id, at: time.now),
-      let deadline = summaryWait.deadline(
-        for: id, ask: ask, writesSummaries: await registry.writesSummaries(id))
-    {
+    while !Task.isCancelled, let id = lineSession {
+      let looked = wakes
+      guard let ask = continuity.openSummaryAsk(of: id, at: time.now),
+        let deadline = summaryWait.deadline(
+          for: id, ask: ask, writesSummaries: await registry.writesSummaries(id))
+      else { break }
       guard time.now < deadline else {
         summaryWait.endedWithout(id)
         break
@@ -576,7 +582,8 @@ public actor Bridge: Router {
       } else {
         lineWait = (id, ask.at, time.now, nil)
       }
-      await sleep(until: deadline)
+      await whileLooking()
+      if wakes == looked { await sleep(until: deadline) }  // else a change came since it looked
     }
     if lineWait != nil, lineWait?.until == nil { lineWait?.until = time.now }
   }
@@ -596,6 +603,8 @@ public actor Bridge: Router {
     }
     timer.cancel()
   }
+
+  func whileLooking(_ run: @escaping @Sendable () async -> Void) { whileLooking = run }
 
   private func wake(_ wait: Int) { waiting.removeValue(forKey: wait)?.resume() }
 
@@ -961,6 +970,7 @@ public actor Bridge: Router {
   @discardableResult private func changed() async -> StatusReply {
     for wait in waiting.values { wait.resume() }  // a waiting line looks again
     waiting = [:]
+    wakes += 1
     await withdrawQuestionsOfDroppedSessions()
     await followTarget()
     if !isLineOpen { growing = GrowingLines() }  // no final text comes for what a closed line said

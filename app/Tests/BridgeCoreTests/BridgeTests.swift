@@ -1754,6 +1754,17 @@ struct BridgeTests {
     #expect(await voice.opens.first?.first?.text == "[CONTEXT] Alpha: Newer work.")
   }
 
+  /// The answer that lands after the waiting line looked, before it sleeps, still opens it.
+  @Test func anAnswerDuringTheLookOpensTheLine() async throws {
+    try await startWriting()
+    await bridge.whileLooking { [self] in
+      let answer = ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1)
+      _ = try? await post("/v1/context", answer)
+    }
+    try await settle(Task { await bridge.audioEvent(.speechStarted) })
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
   @Test func stopDuringTheWaitOpensNothing() async throws {
     let asked = time.now
     try await startWriting()
