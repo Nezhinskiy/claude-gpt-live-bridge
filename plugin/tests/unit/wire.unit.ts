@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 import { TurnTracker } from '../../hooks/turns.ts'
-import { socketPath } from '../../hooks/wire.ts'
+import { CONTEXT_TIMEOUT_MS, socketPath } from '../../hooks/wire.ts'
 import type * as Wire from '../../hooks/wire.ts'
 
 // A field-by-field description of each wire type. `fields<T>` takes exactly the keys of T, so
@@ -47,7 +47,7 @@ const WORK: Shape = {
   ],
 }
 
-const REASON = { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out'] } as const
+const REASON = { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out', 'transcript-unreadable'] } as const
 
 const TURN = fields<Wire.TurnRef>({ id: S, request: optional(S) })
 
@@ -148,4 +148,10 @@ test('socketFollowsTheHomeFoundationUses', () => {
   assert.equal(socketPath('/Users/example', undefined), `/Users/example/${rel}`)
   assert.equal(socketPath('/Users/example', ''), `/Users/example/${rel}`)
   assert.equal(socketPath('/Users/example', '/tmp/lb'), `/tmp/lb/${rel}`)
+})
+
+/** The mod gives a summary up after the budget the app waits on: both read it from one file. */
+test('theSummaryBudgetIsTheApps', () => {
+  const budget = JSON.parse(readFileSync(`${import.meta.dirname}/../../../wire/summary-budget.json`, 'utf8'))
+  assert.equal(CONTEXT_TIMEOUT_MS, budget.summaryBudgetMs)
 })

@@ -36,15 +36,24 @@ public struct SummaryReport: Sendable, Equatable {
     "authentication_failed", "billing_error",
   ]
 
+  /// The model that wrote it: the fallback once the model asked for failed, else that one, which
+  /// an empty answer also names. The log and Settings' line both name it.
+  public var writer: String { wrote && !failures.isEmpty ? fallback ?? asked : asked }
+  /// A model was tried: the session's transcript could be read.
+  public var triedAModel: Bool { !failures.contains { $0.reason == .transcriptUnreadable } }
+
   /// Settings' line about it; nil when the model asked for wrote it, or when no model was tried.
   public var line: String? {
     guard !failures.isEmpty else { return nil }
+    if !triedAModel {
+      return "The voice got no new summary: the session's transcript could not be read."
+    }
     let models = [asked, fallback ?? asked]
     let failed = failures.enumerated().map { index, failure in
       "\(SummaryModel.name(models[min(index, 1)])) \(Self.phrase(failure))"
     }
     if wrote {
-      return "The last summary used \(SummaryModel.name(fallback ?? asked)): \(failed[0])."
+      return "The last summary used \(SummaryModel.name(writer)): \(failed[0])."
     }
     return "The voice got no new summary: \(failed.joined(separator: ", then "))."
   }
@@ -61,7 +70,7 @@ public struct SummaryReport: Sendable, Equatable {
       }
     case .emptyReply: "wrote nothing"
     case .timedOut: "ran out of time"
-    case .unknown: "failed"
+    case .unknown, .transcriptUnreadable: "failed"
     }
   }
 }

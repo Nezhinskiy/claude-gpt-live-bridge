@@ -402,12 +402,73 @@ test('aGapDuringTheWriteStillPosts', async ($, on) => {
   expect(world.take('context')).toEqual([expect.objectContaining(SUMMARY)])
 })
 
-test('aThrowWhileReadingTheTranscriptPostsEmpty', async ($, on) => {
+test('aGapThePollHasNotSaidIsSaidBeforeThePost', async ($, on) => {
+  // The poll that would join with the gap is held, so only the mod can say it before the answer:
+  // t1 never ended (a crash, then --resume), which t2's start finds.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  let release = () => {}
+  world.holdNext = new Promise<void>(resolve => { release = resolve })
+  await world.clock.advance(200)
+  const first = $.turn.start({ text: 'Count the files', turnId: 't1' })
+  await world.clock.advance(200)
+  const second = $.turn.start({ text: 'Count them again', turnId: 't2' })
+  await world.clock.advance(5000)
+  release()
+  world.holdNext = null
+  await Promise.all([first, second])
+  await world.clock.advance(200)
+  const told = world.calls.filter(call => call.route === 'join' || call.route === 'context')
+  expect(told.map(call => [call.route, call.body?.missed ?? call.body?.ask])).toEqual([['join', true], ['context', 1]])
+})
+
+test('aGapSaidBeforeThePostIsSaved', async ($, on) => {
+  // The join before the post said the gap, so a reload must not say it again.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  let release = () => {}
+  world.holdNext = new Promise<void>(resolve => { release = resolve })
+  await world.clock.advance(200)
+  await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Done elsewhere.' })  // a turn it never saw start
+  await world.clock.advance(5000)
+  release()
+  world.holdNext = null
+  await world.clock.advance(200)
+  expect(world.stored.get(`joined:${ID}`)).toEqual(expect.objectContaining({ hasGap: false }))
+})
+
+test('aSummaryWaitsForTheJoinThatSaysItsGap', async ($, on) => {
+  // The poll's join with `missed` is on its way when the summary is done: the post goes after it.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  world.syncStatus = 503
+  world.joinMs = 10_000
+  await $.turn.start({ text: 'Count the files', turnId: 't1' })
+  world.syncStatus = 200
+  await world.clock.advance(5000)
+  expect(world.take('context')).toEqual([])
+  await world.clock.advance(10_000)
+  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 1 })])
+})
+
+test('aThrowWhileReadingTheTranscriptPostsItsFailure', async ($, on) => {
   const world = await joined($, on)
   world.isTranscriptBroken = true
   await appAsks(world, NAMED)
-  expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '' }])
+  expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '', failures: [{ reason: 'transcript-unreadable' }] }])
   expect(world.completes).toEqual([])
+  expect(saidNoSummary(world)).toBe(true)
+})
+
+test('aThrowAfterTheTranscriptIsReadIsNoUnreadableTranscript', async ($, on) => {
+  // The transcript was read, so it is not called unreadable; no model wrote, and nothing says why.
+  const world = await joined($, on)
+  world.messages = [{ role: 'user', content: [null] }] as never
+  await appAsks(world, NAMED)
+  expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '' }])
   expect(saidNoSummary(world)).toBe(true)
 })
 
@@ -436,6 +497,26 @@ test('anAskWithoutAModelIsAsBefore', async ($, on) => {
   expect(world.take('context')).toEqual([])
 })
 
+test('anAskAsAForkTimesOutStartsItsOwnSend', async ($, on) => {
+  // An older app asks again while the timed-out fork's note comes down: that send is over, not joined.
+  let release = () => {}
+  const held = new Promise<void>(resolve => { release = resolve })
+  let forks = () => 0
+  on('state.set', async (_, e, next) => {
+    if (forks() === 1 && !('context' in (e.value ?? {}))) await held  // the time-out's write
+    return next(e)
+  })
+  const world = await joined($, on)
+  world.forkMs = 2 * MINUTE
+  forks = () => world.forks
+  await appAsks(world)
+  await world.clock.advance(MINUTE)
+  await appAsks(world)
+  release()
+  await world.clock.advance(200)
+  expect(world.forks).toBe(2)
+})
+
 test('aCachedFallbackSummaryKeepsItsFailures', async ($, on) => {
   const world = await joined($, on)
   world.completeFails = { [OPUS]: 'refused' }
@@ -455,6 +536,27 @@ test('theSummaryEchoesItsAsk', async ($, on) => {
   await appAsks(world, { ...NAMED, ask: 8 })
   expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 8 })])
   expect(world.completes.map(one => one.model)).toEqual([OPUS])
+})
+
+test('anAskWithTheSendsNumberJoinsIt', async ($, on) => {
+  // The app hands an open ask again with its number: the send on its way answers both, once.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await world.clock.advance(5000)
+  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 1 })])
+  expect(world.completes).toHaveLength(1)
+})
+
+test('aFailingSendItsJoinedAskSharesSaysSoOnce', async ($, on) => {
+  const world = await joined($, on)
+  world.completeMs = 5000
+  world.completeFails = { [OPUS]: 'api-error', [HAIKU]: 'api-error' }
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await world.clock.advance(MINUTE)
+  expect(world.logs.filter(line => line.includes('could not summarise'))).toHaveLength(1)
 })
 
 test('aSendANewerAskReplacedIsNoFailure', async ($, on) => {

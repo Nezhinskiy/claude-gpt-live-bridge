@@ -179,6 +179,32 @@ extension ContinuityTests {
     #expect(continuity[a].isCurrent)
   }
 
+  /// A file as 0.5.x and the summary model write it, with an open numbered ask and a stale one:
+  /// the asks, their numbering and the rest still load.
+  @Test func aFileWithOpenAsksStillDecodes() throws {
+    let file = """
+      {"conversations":{"\(a.rawValue)":{"lines":[{"speaker":"owner","text":"hi"},\
+      {"speaker":"context","text":"[CONTEXT] Alpha: x"}],"context":"[CONTEXT] Alpha: x",\
+      "lastUsed":2,"linesSinceContext":0,"turn":{"id":"turn-1","admitted":true},\
+      "summaryAsk":{"at":800000000,"isStale":false,"model":"claude-opus-5-5",\
+      "fallbackModel":"claude-haiku-5-5","number":3}},\
+      "\(b.rawValue)":{"lines":[],"lastUsed":1,"outOfSync":"missed",\
+      "summaryAsk":{"at":800000000,"isStale":true}}},"asksMade":3}
+      """
+    var continuity = try JSONDecoder().decode(Continuity.self, from: Data(file.utf8))
+    let at = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    let asks = SummaryAsks()
+    #expect(
+      asks.openAsk(of: a, in: continuity, at: at + 1)
+        == Conversation.SummaryAsk(
+          at: at, model: "claude-opus-5-5", fallbackModel: "claude-haiku-5-5", number: 3))
+    #expect(asks.openAsk(of: b, in: continuity, at: at + 1)?.isStale == true)
+    #expect(continuity[a].context == "[CONTEXT] Alpha: x" && continuity[a].isCurrent)
+    #expect(continuity[b].outOfSync == .missed)
+    let next = asks.ask(b, in: &continuity, at: at + 2, model: SummaryModel.default, fallback: nil)
+    #expect(next.ask.number == 4)
+  }
+
   /// A voice turn holds nothing of the owner's to keep out, until the owner types into it.
   @Test func aVoiceTurnIsAdmittedWhilePausing() {
     var continuity = Continuity()
@@ -270,113 +296,6 @@ extension ContinuityTests {
   }
 
   /// New conversation drops lines and context; a pause and the turn's decision stay.
-  /// The ask came after the gap, so its summary covers it.
-  @Test func aSummaryAskedForAfterAGapCoversIt() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.markMissed(a, asPaused: false)
-    continuity.noteSummaryAsk(of: a, at: now)
-    let taken = continuity.takeSummaryAsk(of: a, at: now)
-    #expect(taken)
-  }
-
-  @Test func aSummaryNobodyAskedForIsTaken() {
-    var continuity = Continuity()
-    continuity.markMissed(a, asPaused: false)
-    let taken = continuity.takeSummaryAsk(of: a, at: Date())
-    #expect(taken)
-  }
-
-  /// A gap the join reports after the ask makes it stale, as a refused line does.
-  @Test func aMissedTurnAfterTheAskRefusesItsSummary() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now)
-    continuity.markMissed(a, asPaused: false)
-    let taken = continuity.takeSummaryAsk(of: a, at: now)
-    #expect(!taken)
-  }
-
-  /// The mod joins a second ask to the summary on its way, which is the first ask's.
-  @Test func aSecondAskDoesNotFreshenTheFirst() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now)
-    continuity.markMissed(a, asPaused: false)
-    continuity.noteSummaryAsk(of: a, at: now + 1)
-    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
-    #expect(!taken)
-  }
-
-  /// An ask recorded with no number (for a mod that forks, or by 0.5.x) cannot be told from a
-  /// stale one by a numbered answer, so an ask naming a model replaces it.
-  @Test func anAskNamingAModelReplacesOneWithNoNumber() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now)
-    let ask = continuity.noteSummaryAsk(of: a, at: now + 1, model: "claude-haiku-5-5")
-    #expect(ask.number != nil)
-    #expect(continuity.openSummaryAsk(of: a, at: now + 2)?.model == "claude-haiku-5-5")
-  }
-
-  @Test func aForgetDoesNotRestartTheNumbering() {
-    var continuity = Continuity()
-    let now = Date()
-    let first = continuity.noteSummaryAsk(of: a, at: now, model: "claude-haiku-5-5")
-    _ = continuity.takeSummaryAsk(of: a, at: now, number: first.number)
-    continuity.forget(a)
-    let second = continuity.noteSummaryAsk(of: a, at: now + 1, model: "claude-haiku-5-5")
-    #expect(second.number != first.number)
-  }
-
-  /// An ask after a gap is a fresh one, with its own model, not blocked behind the stale ask.
-  @Test func aFreshAskReplacesAStaleOne() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now, model: "claude-opus-5-5")
-    continuity.markMissed(a, asPaused: false)
-    continuity.noteSummaryAsk(of: a, at: now + 1, model: "claude-sonnet-5-5")
-    let open = continuity.openSummaryAsk(of: a, at: now + 2)
-    #expect(open?.isStale == false)
-    #expect(open?.model == "claude-sonnet-5-5")
-    #expect(open?.at == now + 1)
-  }
-
-  /// A summary refused closes its ask: the owner's next press stands on its own.
-  @Test func aRefusedSummaryClosesItsAsk() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now)
-    continuity.markMissed(a, asPaused: false)
-    _ = continuity.takeSummaryAsk(of: a, at: now)
-    continuity.noteSummaryAsk(of: a, at: now + 1)
-    let taken = continuity.takeSummaryAsk(of: a, at: now + 2)
-    #expect(taken)
-  }
-
-  /// A summary that never came (nothing to summarise, or a failure) does not hold back a later one.
-  @Test func anAskPastItsLifeRefusesNothing() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now)
-    continuity.markMissed(a, asPaused: false)
-    let later = now + Conversation.askLife
-    continuity.noteSummaryAsk(of: a, at: later)
-    let taken = continuity.takeSummaryAsk(of: a, at: later)
-    #expect(taken)
-  }
-
-  /// `/clear` moves the conversation, and the ask with it.
-  @Test func anAskMovesWithItsConversation() {
-    var continuity = Continuity()
-    let now = Date()
-    continuity.noteSummaryAsk(of: a, at: now)
-    continuity.markMissed(a, asPaused: false)
-    continuity.move(a, to: b)
-    let taken = continuity.takeSummaryAsk(of: b, at: now)
-    #expect(!taken)
-  }
-
   @Test func forgetKeepsAPauseAndItsDecision() {
     var continuity = Continuity()
     continuity.record(.owner, "hi", in: a)

@@ -40,8 +40,8 @@ export class BridgeLink {
   /** What this session last joined as, kept so that it can join again after the app restarts. */
   #joined: JoinBody | null = null
   #isKnown = false
-  /** A turn did not reach the app, and no join has said so yet. */
-  #hasGap = false
+  /** Turns that did not reach the app, which no join the app took has said yet. */
+  #gaps = 0
   #timer: Timer | null = null
   #ticks = 0
   /** A once-a-second tick came while a poll ran, so the next tick that polls is it. */
@@ -63,12 +63,12 @@ export class BridgeLink {
   }
 
   get hasGap(): boolean {
-    return this.#hasGap
+    return this.#gaps > 0
   }
 
   /** A turn did not reach the app: the next poll joins again with `missed`. */
   noteGap(): void {
-    this.#hasGap = true
+    this.#gaps += 1
     this.#isKnown = false
   }
 
@@ -88,12 +88,11 @@ export class BridgeLink {
     // owner's: it must not bring back a session the owner removed.
     const { replaces: _, owner: __, ...kept } = body
     this.#joined = kept
-    // A gap noted while this join is on its way is one it did not say: only the one it said clears.
-    const saysGap = this.#hasGap
-    this.#hasGap = false
-    const isTaken = (await this.#send('join', { ...body, ...(saysGap && { missed: true }) }))?.ok === true
-    if (!isTaken) this.#hasGap ||= saysGap
-    this.#isKnown = isTaken && !this.#hasGap
+    // Only the gaps it said clear, once the app took it: one noted while it is on its way stays.
+    const said = this.#gaps
+    const isTaken = (await this.#send('join', { ...body, ...(said > 0 && { missed: true }) }))?.ok === true
+    if (isTaken) this.#gaps -= said
+    this.#isKnown = isTaken && !this.hasGap
     if (isTaken) this.#ports.joined()
     return isTaken
   }
@@ -153,8 +152,15 @@ export class BridgeLink {
     return (await this.#forSession('sync', line))?.ok === true
   }
 
-  /** Posts the session's summary, and what went wrong on the way; false when the app did not take it. */
+  /**
+   * Posts the session's summary, and what went wrong on the way; false when the app did not take
+   * it. A gap noted and not yet said goes first (the overview's `POST /v1/context`).
+   */
   async context(body: Omit<ContextBody, 'sessionId'>): Promise<boolean> {
+    if (this.hasGap) {
+      await this.serial(async () => { if (this.hasGap && this.#joined !== null) await this.join(this.#joined) })
+      if (this.hasGap) return false
+    }
     return (await this.#forSession('context', body))?.ok === true
   }
 

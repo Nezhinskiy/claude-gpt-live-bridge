@@ -25,6 +25,7 @@ struct WireTests {
     "activity-voice-question": roundTrip(ActivityBody.self),
     "context": roundTrip(ContextBody.self), "context-stats": roundTrip(ContextBody.self),
     "context-fallback": roundTrip(ContextBody.self), "context-failed": roundTrip(ContextBody.self),
+    "context-unreadable": roundTrip(ContextBody.self),
     "limits": roundTrip(LimitsBody.self),
     "answer-ok": roundTrip(AnswerBody.self), "answer-failed": roundTrip(AnswerBody.self),
     "next-request": roundTrip(PollReply.self), "next-context": roundTrip(PollReply.self),
@@ -84,4 +85,10 @@ struct WireTests {
     #expect(try Self.canonical(sent) == Self.canonical(json))
   }
 
+  /// The mod gives a summary up after the budget the app waits on: both read it from one file.
+  @Test func theSummaryBudgetIsTheMods() throws {
+    let file = Self.fixtures.appending(path: "../summary-budget.json")
+    let budget = try JSONDecoder().decode([String: Double].self, from: Data(contentsOf: file))
+    #expect(budget["summaryBudgetMs"] == SummaryAsks.Policy.modBudget * 1000)
+  }
 }

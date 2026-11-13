@@ -12,17 +12,15 @@ import { askedText, keyboardAnswer, PLUGIN_NAME, spokenReply, voicePrompt } from
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
-import { socketPath } from './wire.ts'
+import { CONTEXT_TIMEOUT_MS, socketPath } from './wire.ts'
 import type {
-  ActivityBody, AnswerStatus, LimitWindowBody, SummaryFailure, TurnRef, VoiceRequest, Work,
+  ActivityBody, AnswerStatus, ContextBody, LimitWindowBody, SummaryFailure, TurnRef, VoiceRequest, Work,
 } from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
 const RESCAN_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
-/** How long a summary may take: the models an ask names share it, and a fork is given up after it. */
-const CONTEXT_TIMEOUT_MS = 60_000
 /** How long the band says "Context sent". */
 const SENT_NOTE_MS = 3_000
 /** How long the polled band may go undrawn before every surface is asked for it again. */
@@ -75,14 +73,17 @@ let summary: { model: string | undefined; text: string; failures: SummaryFailure
 /** Counts what ends a summary's use, so a summary written across one is not kept as current. */
 let turnsDone = 0
 /**
- * The summary on its way, which a second ask joins instead of asking a model again, and gets what
- * the first ask's model writes; not once a gap crossed it (`send` behind `sendCount`), nor when the
- * app numbered the second ask as another (`ask`).
+ * The summary on its way, which an ask with the same number (`ask`; none from an older app) joins
+ * instead of asking a model again, and gets what the first ask's model writes; not once a gap, or a
+ * fork's time-out, `crossed` it. `send`: its place in `sendCount`.
  */
-let sending: { send: number; ask: number | undefined; outcome: Promise<ContextOutcome> } | null = null
+let sending: { send: number; ask: number | undefined; crossed: boolean; outcome: Promise<ContextOutcome> } | null = null
 /** The hooks' posts to the app, in the order the hooks ran. */
 let posts: Promise<unknown> = Promise.resolve()
-/** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
+/**
+ * Counts sends, for an older app's fork, which a gap or its time-out ends, so what it writes later
+ * is dropped, and for the band's "Context sent", which only the latest send takes down.
+ */
 let sendCount = 0
 
 /**
@@ -129,12 +130,14 @@ async function save($: EngineInterface): Promise<void> {
 /**
  * A turn did not reach the app, which the next join says. No summary from before it covers it: the
  * one kept goes. The one being written for an older app's ask is dropped; for a named ask it is
- * posted all the same, and the app takes it as fresh if it arrives before that join.
+ * posted all the same (`BridgeLink.context`).
  */
 function noteGap(): void {
   link?.noteGap()
   staleSummary()
-  if (sending !== null) sendCount += 1
+  if (sending === null) return
+  sending.crossed = true
+  sendCount += 1
 }
 
 /** Posts a line of a turn, cut to `ANSWER_LIMIT`; one the app did not take is a gap, which the next join says. */
@@ -435,7 +438,7 @@ async function deliverContext($: EngineInterface, ask: ContextAsk, send: number)
   const deadline = (await $.clock.now()) + CONTEXT_TIMEOUT_MS
   const isNamed = ask.model !== undefined
   if (!(await hasTurns($))) {
-    if (isNamed) await link?.context({ summary: '', ...answering(ask) })
+    if (isNamed) await postContext($, { summary: '', ...answering(ask) })
     return 'empty'
   }
   await showContext($, 'loading')
@@ -448,7 +451,10 @@ async function deliverContext($: EngineInterface, ask: ContextAsk, send: number)
     const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
     outcome = await Promise.race([forkAndPost($, send), late])
     timer?.cancel()
-    if (outcome !== 'sent') sendCount += 1  // a summary this send writes after its time is dropped
+    if (outcome !== 'sent') {
+      sendCount += 1  // a summary this send writes after its time is dropped
+      if (sending?.send === send) sending.crossed = true  // and no later ask joins it
+    }
   }
   // A newer send, after a gap, owns the band's note.
   if (sending?.send !== send) return outcome
@@ -466,22 +472,24 @@ async function deliverContext($: EngineInterface, ask: ContextAsk, send: number)
 async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, deadline: number): Promise<ContextOutcome> {
   const turns = turnsDone
   const kept = summary !== null && summary.model === ask.model ? summary : null
-  let written: Summary
-  try {
-    written = kept ?? (await summarize($, ask, deadline))
-  } catch {
-    // The transcript could not be read, so no model was asked.
-    await link?.context({ summary: '', ...answering(ask) })
-    return 'failed'
-  }
-  const { text, failures, stats } = written
+  // Any other throw (`summarize` names an unreadable transcript) fails with no reason to give.
+  const written = kept ?? (await summarize($, ask, deadline).catch(() => null))
+  const { text, failures, stats }: Summary = written ?? { text: '', failures: [] }
   if (text !== '' && turns === turnsDone) summary = { model: ask.model, text, failures }
-  const isTaken = (await link?.context({
+  const isTaken = await postContext($, {
     summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }), ...answering(ask),
-  })) === true
-  if (send !== sendCount) return 'superseded'
-  if (!isTaken) return 'failed'
+  })
+  if (sending?.send !== send || sending.crossed) return 'superseded'
+  if (!isTaken || written === null) return 'failed'
   return text !== '' ? 'sent' : failures.length > 0 ? 'failed' : 'empty'
+}
+
+/** Posts a summary (`BridgeLink.context`); a gap its join said is saved, so a reload does not say it again. */
+async function postContext($: EngineInterface, body: Omit<ContextBody, 'sessionId'>): Promise<boolean> {
+  const hadGap = link?.hasGap
+  const isTaken = (await link?.context(body)) === true
+  if (hadGap && !link?.hasGap) await save($)
+  return isTaken
 }
 
 /** An older app's ask: the session's own model forks, and only a summary is posted. */
@@ -492,7 +500,7 @@ async function forkAndPost($: EngineInterface, send: number): Promise<ContextOut
     if (send !== sendCount) return 'failed'
     if (text === '') return 'empty'
     if (turns === turnsDone) summary = { model: undefined, text, failures: [] }
-    return (await link?.context({ summary: text })) === true ? 'sent' : 'failed'
+    return (await postContext($, { summary: text })) ? 'sent' : 'failed'
   } catch {
     return 'failed'
   }
@@ -500,19 +508,19 @@ async function forkAndPost($: EngineInterface, send: number): Promise<ContextOut
 
 /**
  * Sends the summary the app asked for, which has no reply line of its own, and never rejects. While
- * one is on its way a second ask joins it, unless a gap crossed it or the app numbered the second
- * ask as another: that one is over.
+ * one is on its way an ask with its number joins it, unless a gap or its time-out crossed it.
  */
 async function contextAsked($: EngineInterface, ask: ContextAsk): Promise<void> {
-  if (sending === null || sending.send !== sendCount || sending.ask !== ask.ask) {
-    const send = ++sendCount
-    const mine: NonNullable<typeof sending> = {
-      send, ask: ask.ask, outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
-    }
-    sending = mine
+  // An ask that joins the send says nothing: the ask that started it says a failure, once.
+  if (sending !== null && !sending.crossed && sending.ask === ask.ask) return
+  const send = ++sendCount
+  const mine: NonNullable<typeof sending> = {
+    send, ask: ask.ask, crossed: false,
+    outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
   }
+  sending = mine
   // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
-  if ((await sending.outcome) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
+  if ((await mine.outcome) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
 }
 
 async function statusText($: EngineInterface): Promise<string> {

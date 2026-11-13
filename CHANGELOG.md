@@ -40,7 +40,8 @@ All notable changes to this project are listed here. The format follows
 - **Summary model**, in Settings under Context: Haiku 5.5 (the default), Sonnet 5.5 or Opus 5.5
   writes the summary the voice gets as context, always at low effort, on your Claude usage. If
   another model fails, Haiku 5.5 writes it instead, and a line under the setting says so; if no
-  model writes one, it says why. When a summary fails, the session's band says **Context failed**.
+  model writes one, it says why, or that the session's transcript could not be read. When a
+  summary fails, the session's band says **Context failed**.
   **Custom…** takes a model id, refusing text that cannot be one (with a space, say, or over 128
   characters), which a joined session checks with one short request before it is saved.
 
@@ -69,10 +70,14 @@ All notable changes to this project are listed here. The format follows
 - A line no longer reaches the voice before its context: for a session on a mod of this release,
   the line waits for the summary in flight before it connects, while what you say is recorded and
   queued on the Mac, then opens with the summary in its seed and plays what you said. It opens
-  without one 10 seconds after the ask, or as soon as the mod answers with none; either ends the
-  waits for that session until the next Start. Such a session is asked at Start and when the
-  target changes during the call, so the summary is often in before you speak. A session on an
-  older mod is asked when its line opens and is not waited for, as before.
+  without one 10 seconds after the ask, or as soon as the mod answers with none; an answer with none,
+  or a line that waits the 10 seconds, ends that session's waits until the next Start
+  ([the wait](docs/architecture/overview.md#silent-hang-up)). Such a session is asked at
+  Start and when the target changes during the call, so the summary is often in before you speak;
+  a line that opens while that ask is on its way joins it, and the mod writes one summary for both,
+  or writes it again if it lost it (it restarted, or the app did), so a failing summary is reported
+  once in the session, unless a line asks in the last moment of a write and the mod writes it again. A session on an older mod is asked when its line opens
+  and is not waited for, as before.
 - The menu's **Load context** reads **Loading context…**, disabled, while any summary of the target
   is on its way from a mod of this release, whatever asked for it (Start, a new target, a line or
   a press), not only after a press; it waits until the summary arrives or the mod's 60 seconds from
@@ -84,8 +89,8 @@ All notable changes to this project are listed here. The format follows
   it could not draw the band before.
 - The mod answers every summary ask from this app, with an empty summary when it has none, and
   each ask carries a number that its answer repeats, so a summary written before a gap the app
-  has heard of is not taken for a fresh one. One that reaches the app before the mod's next join
-  reports the gap is still taken ([BR-002](docs/bugs/BR-002.md)).
+  has heard of is not taken for a fresh one, nor one written across a gap the mod noted and had
+  not yet reported ([the wire](docs/architecture/overview.md#the-wire)). An older app or mod sends no number and still guesses ([BR-002](docs/bugs/BR-002.md)).
 
 ### Deprecated
 

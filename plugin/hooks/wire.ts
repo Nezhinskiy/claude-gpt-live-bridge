@@ -20,6 +20,12 @@ export function socketPath(home: string, fixedHome: string | undefined): string 
   return `${fixedHome || home}/${SOCKET_REL}`;
 }
 
+/**
+ * How long a summary may take: the models an ask names share it, and a fork is given up after it.
+ * The app's `SummaryAsks.Policy.modBudget` is the same, both tested against `wire/summary-budget.json`.
+ */
+export const CONTEXT_TIMEOUT_MS = 60_000;
+
 export type SessionId = string;
 export type RequestId = string;
 
@@ -90,9 +96,12 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  */
 export type ActivityBody =
   { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; turn?: TurnRef };
-/** Why one attempt at a summary wrote nothing; `error`, with `api-error`, the engine's kind of error. */
+/**
+ * Why one attempt at a summary wrote nothing; `error`, with `api-error`, the engine's kind of error.
+ * `transcript-unreadable`: the session's transcript could not be read, so no model was asked.
+ */
 export type SummaryFailure = {
-  reason: 'model-refused' | 'api-error' | 'empty-reply' | 'timed-out'; error?: string;
+  reason: 'model-refused' | 'api-error' | 'empty-reply' | 'timed-out' | 'transcript-unreadable'; error?: string;
 };
 /** The numbers of the attempt that wrote a summary with a named model; a fork sends none. */
 export type SummaryStats =

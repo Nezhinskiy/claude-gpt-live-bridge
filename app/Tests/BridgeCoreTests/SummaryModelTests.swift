@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import BridgeCore
@@ -37,6 +38,30 @@ struct SummaryModelTests {
       report(
         "claude-sonnet-5-5", [SummaryFailure(reason: .apiError, error: "overloaded")], wrote: true
       ).line == "The last summary used Haiku 5.5: Sonnet 5.5 returned an error (overloaded).")
+  }
+
+  /// The log and Settings' line name the same writer: the fallback once the asked model failed.
+  @Test func theWriterIsTheFallbackOnceTheAskedModelFailed() {
+    let refused = SummaryFailure(reason: .modelRefused, error: nil)
+    let timedOut = SummaryFailure(reason: .timedOut, error: nil)
+    #expect(report("claude-opus-5-5", [], wrote: true).writer == "claude-opus-5-5")
+    #expect(report("claude-opus-5-5", [refused], wrote: true).writer == "claude-haiku-5-5")
+    #expect(
+      report("claude-opus-5-5", [refused, timedOut], wrote: true).writer == "claude-haiku-5-5")
+    #expect(
+      report("claude-sonnet-5-5", fallback: nil, [refused], wrote: true).writer
+        == "claude-sonnet-5-5")
+    #expect(
+      report("claude-opus-5-5", [refused, timedOut], wrote: false).writer == "claude-opus-5-5")
+  }
+
+  /// The mod could not read the transcript, so no model ran: Settings' line says so, not a model.
+  @Test func anUnreadableTranscriptIsNoModelsFailure() throws {
+    let failure = try JSONDecoder().decode(
+      SummaryFailure.self, from: Data(#"{"reason":"transcript-unreadable"}"#.utf8))
+    #expect(
+      report("claude-opus-5-5", [failure], wrote: false).line
+        == "The voice got no new summary: the session's transcript could not be read.")
   }
 
   /// The kind comes from a local process, so only one the engine documents is shown.

@@ -108,25 +108,23 @@ struct StatusPresentationTests {
   /// The ring turns while the target's own summary is on its way and the call is on.
   @Test func loadingContextShowsWhileTheTargetsSummaryIsInFlight() {
     for phase in [CallPhase.listening, .connecting, .live] {
-      let shown = StatusPresentation(Self.status(phase), summariesInFlight: [Self.target])
+      let shown = StatusPresentation(Self.status(phase), targetSummary: .loading)
       #expect(shown.badge == .loadingContext, "\(phase)")
     }
-    #expect(
-      StatusPresentation(Self.status(.off), summariesInFlight: [Self.target]).badge == .none)
-    #expect(
-      StatusPresentation(Self.status(.live), summariesInFlight: [Self.other]).badge == .none)
+    #expect(StatusPresentation(Self.status(.off), targetSummary: .loading).badge == .none)
+    #expect(StatusPresentation(Self.status(.live), targetSummary: .none).badge == .none)
   }
 
   @Test func loadingContextRanksAfterProblemAndApprovalBeforeUnheard() {
-    let loading: Set = [Self.target]
+    let loading = SummaryDisplay.loading
     let problem = StatusPresentation(
-      Self.status(.listening, problem: "The line dropped.", unheard: 1), summariesInFlight: loading)
+      Self.status(.listening, problem: "The line dropped.", unheard: 1), targetSummary: loading)
     #expect(problem.badge == .problem)
     let approval = StatusPresentation(
-      Self.status(.live, other: .approval, unheard: 1), summariesInFlight: loading)
+      Self.status(.live, other: .approval, unheard: 1), targetSummary: loading)
     #expect(approval.badge == .approval)
     let unheard = StatusPresentation(
-      Self.status(.live, other: .working, unheard: 1), summariesInFlight: loading)
+      Self.status(.live, other: .working, unheard: 1), targetSummary: loading)
     #expect(unheard.badge == .loadingContext)
   }
 

@@ -50,9 +50,9 @@ public struct StatusPresentation: Sendable, Equatable {
   public static let joinCommand = "/live"
 
   /// A problem outranks everything; then a session waiting for approval, the target's summary on
-  /// its way during a call (`summariesInFlight`, `Bridge.summariesInFlight`), results the owner
-  /// has not heard, and a session at work during a call.
-  public init(_ s: StatusReply, summariesInFlight: Set<SessionID> = []) {
+  /// its way during a call (`BridgeUpdate.targetSummary`), results the owner has not heard, and a
+  /// session at work during a call.
+  public init(_ s: StatusReply, targetSummary: SummaryDisplay = .none) {
     let activities = Set(s.sessions.map(\.activity))
     bars = s.call
     problem = s.problem
@@ -60,10 +60,7 @@ public struct StatusPresentation: Sendable, Equatable {
     badge =
       if s.problem != nil { .problem } else if activities.contains(.approval) {
         .approval
-      } else if s.call != .off,
-        let target = s.sessions.first(where: \.isTarget)?.sessionId,
-        summariesInFlight.contains(target)
-      {
+      } else if s.call != .off, targetSummary == .loading {
         .loadingContext
       } else if s.unheard > 0 { .unheard } else if activities.contains(.working) && s.call != .off {
         .working

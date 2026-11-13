@@ -197,7 +197,7 @@ that both test suites parse.
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `turn` the main-loop turn it belongs to: `{ id, request? }`, `request` being the voice request the turn's answer belongs to; absent between turns and from a released mod |
 | `POST /v1/sync` | `sessionId`, `turn`, `kind` and `text`: a line of a main-loop turn. A voice turn posts its `start`, what is typed into it and the mod's lines; its answer goes by `/v1/answer`. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
 | `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
-| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. A post that echoes an ask's number (a current app with a current mod) is taken only by the open ask with that number; one that finds no ask open is ignored. Without a number, from an older mod, one the app asked for before the latest gap or forget is ignored, also after a second ask, which joins the stale one; one nobody asked for cannot be dated and is taken, so it can clear a *paused* mark across a refused turn. That is an older mod's `/live context`, and from an older mod since 0.4.2, which sends a summary only when asked, the reply to a second ask (a press or a line opening) that came after a poll took the first and before that summary landed, as that summary closed the ask |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. A post that echoes an ask's number (a current app with a current mod) is taken only by the open ask with that number; one that finds no ask open is ignored. Without a number, from an older mod, one the app asked for before the latest gap or forget is ignored, also after a second ask, which joins the stale one; one nobody asked for cannot be dated and is taken, so it can clear a *paused* mark across a refused turn. That is an older mod's `/live context`, and from an older mod since 0.4.2, which sends a summary only when asked, the reply to a second ask (a press or a line opening) that came after a poll took the first and before that summary landed, as that summary closed the ask. A mod of this release that noted a gap the app has not heard of joins again with `missed` before it posts, and posts nothing while it cannot, so the app ignores a summary written across that gap as stale |
 | `POST /v1/model-check` | `sessionId`, `id`, `ok`, `reason?`, `error?`: the result of Settings' check of a custom summary model, which goes to the target if its mod writes summaries, else to the latest joined session whose mod does. Only a result under that session's id and the check's `id` is taken; the first poll with that session's id is handed the check, whether or not it is that session's mod ([SECURITY.md](../../SECURITY.md)). None within 20 s, or that session's drop, is no answer. The app writes its own sentence from `reason`, an `api-error` kind being shown only if the engine documents it |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
@@ -275,23 +275,29 @@ on the Mac, and the next speech opens a new session seeded with the target's con
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
 its context when the voice would lack part of the session (see the mod's Start above) and the
-pause does not hold it back (the same rule); an ask already open is joined, not repeated.
+pause does not hold it back (the same rule); an ask already open is joined and handed to the mod
+again, with its number if it has one: the mod joins it to its send on its way, and one with none
+(it restarted, or the app lost its post) writes it again.
 
 **The wait.** A line, whether speech or a result opened it, waits for its session's summary
-(`SummaryWait`, decided in `Bridge.waitForSummary`) while that session has an open, current ask
-(asked at Start, at a target change during the call, by Load context or by this line), its mod said
-`writesSummaries`, and no wait of that session ended this call without a summary. The wait sits
+(`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current
+ask with a number (asked at Start, at a target change during the call, by Load context or by this
+line; an ask is numbered when the session's mod said `writesSummaries`), and the session's wait is
+not spent this call. The wait sits
 after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
 `connecting`, which arms no silence timer, nothing leaves the Mac, and the page queues what is said
 and plays it once the line connects. It ends at the post that answers the open ask, whatever it
 carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit,
 10 seconds from the ask, when the session drops or a gap makes the ask stale, or when the line is
 cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
-one, and a reconnect waits again for the same ask. An answer with no summary, or the limit, ends
-that session's waits for the rest of the call, so a summary that keeps failing holds one line, not
-every line; the next Start waits again. That is no bound per call: a mod that answers each ask with
-text, however late, or whose gap makes each ask stale, is asked again by the next line, so every
-line of the call can wait, each up to the limit from its own ask. A summary that comes after the
+one, and a reconnect waits again for the same ask. An answer to the open, current ask with no
+summary, whether or not a line was waiting for it, or a line that waits until the limit, spends
+that session's wait for the rest of the call, so a summary that keeps failing holds at most one
+line; the next Start waits again. A line that comes after the limit, the ask still in flight,
+opens without waiting and spends nothing, so the next ask can still be waited for. That is no
+bound per call: a mod that answers each ask with text, however late, or whose gap makes each ask
+stale, is asked again by the next line, so every line of the call can wait, each up to the limit
+from its own ask. A summary that comes after the
 wait, or while a line that does not wait connects, is added once the line is connected, unless
 the line was seeded with the same one; with no line open, it is in the next seed.
 

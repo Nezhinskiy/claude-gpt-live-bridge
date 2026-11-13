@@ -126,8 +126,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     read: [] as string[],
     /** The version the mod's own plugin.json names, or null when it cannot be read. */
     modVersion: null as string | null,
-    /** How long the app takes over a poll, on the mocked clock. */
+    /** How long the app takes over a poll, and over a join, on the mocked clock. */
     nextMs: 0,
+    joinMs: 0,
     /** While set, the app's reply to a poll is held until it resolves (built before, as the app does). */
     holdNext: null as Promise<void> | null,
     /** Called once a poll is being held. */
@@ -247,6 +248,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
         : undefined
     const text = JSON.stringify(reply ?? { error: 'unknown session' })
     if (route === 'next' && world.nextMs > 0) await world.clock.sleep(world.nextMs)
+    if (route === 'join' && world.joinMs > 0) await world.clock.sleep(world.joinMs)
     if (route === 'next' && world.holdNext !== null) {
       world.onNextHeld()
       await world.holdNext

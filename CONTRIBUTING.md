@@ -14,6 +14,7 @@ says, not in an issue. Everyone taking part follows the [Code of Conduct](CODE_O
 | `app/` | The SwiftPM package: `BridgeCore` (pure logic, tested without codex, a microphone or Claude) and `LiveBridge` (the menu bar app and its invisible audio page). |
 | `plugin/` | The Claude Code mod `livebridge`. `hooks/register.tsx` is wiring only; the other `hooks/*.ts` modules are pure. |
 | `wire/fixtures/` | One JSON file per message between the mod and the app: the shared oracle both sides test against. |
+| `wire/summary-budget.json` | The time the mod allows a summary, which both sides test their constant against. |
 | `scripts/` | `check.sh` (every check CI runs but the floor run), `check-mod.sh` (the mod's engine-facing half), `check-floor.sh` (that half on the lowest Claude Code the README promises), `build-app.sh` (build, install, uninstall, package), `smoke.sh` (end to end). |
 | `docs/` | [Architecture](docs/architecture/overview.md) and [ADRs](docs/adr/); the rest is the stayfixed scaffold (below). |
 
@@ -209,9 +210,12 @@ Every build, not only a debug one, logs a line at debug level in the category `s
 summary answered within two minutes of its ask: `askedFor`, the milliseconds the ask took;
 `stale`, whether the answer was stale (asked before a gap or a forget, or posted for an ask other
 than the open one, so it is ignored); `hadSummary`, whether it had text; `model`, the model's name
-(`custom` for an id you typed, `fork` for a summary the session's own fork wrote); `waited`, the
-milliseconds a line waited for it, when one did; then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
-`outputTokens`. It holds no summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
+(`custom` for an id you typed, `fork` for a summary the session's own fork wrote), the fallback's
+when the model asked for failed, and none when the transcript could not be read; `waited`, the
+milliseconds the line waited for it, when one did, from when that line began to wait (a reconnect
+keeps that start; Stop, Start and a change of target drop it); then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
+`outputTokens`. A post for an ask other than the open one has no `askedFor` and no `model`: the app
+keeps only the open ask's record. It holds no summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
 
 ### Reading debug mode's numbers
 
