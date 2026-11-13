@@ -278,7 +278,7 @@ its context when the voice would lack part of the session (see the mod's Start a
 pause does not hold it back (the same rule); an ask already open is joined, not repeated.
 
 **The wait.** A line, whether speech or a result opened it, waits for its session's summary
-(`SummaryWait`, decided in `Bridge.waitForSummary`) while that session has an open, current ask
+(`SummaryAsks.waitDeadline`, decided in `Bridge.waitForSummary`) while that session has an open, current ask
 (asked at Start, at a target change during the call, by Load context or by this line), its mod said
 `writesSummaries`, and no wait of that session ended this call without a summary. The wait sits
 after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays

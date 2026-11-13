@@ -11,7 +11,7 @@ public struct SummaryTiming: Sendable, Equatable {
   /// The id of the model that wrote it; nil when the summary came from a fork.
   public var model: String?
   public var stats: SummaryStats?
-  /// Seconds a line waited for it (`SummaryWait`); nil when no line waited.
+  /// Seconds a line waited for it (`Bridge.waitForSummary`); nil when no line waited.
   public var waited: TimeInterval?
 
   public init(

@@ -37,6 +37,8 @@ struct SummaryAsks: Sendable {
     static let modBudget: TimeInterval = 60
     /// How long an ask can still be answered: an older mod may never answer.
     static let answerable: TimeInterval = 2 * modBudget
+    /// The wait's limit, from the ask; the spec's "The time limit" says how it was set.
+    static let waitLimit: TimeInterval = 10
     static let shownLoaded: TimeInterval = 3
   }
 
@@ -51,6 +53,11 @@ struct SummaryAsks: Sendable {
     }
   }
 
+  /// The sessions whose wait ended this call with no summary: an empty answer, or the limit.
+  private var spent: Set<SessionID> = []
+  /// The line's latest wait, for the log: the session, its ask's number, when the wait began, and
+  /// when it ended if the answer did not end it.
+  private var wait: (session: SessionID, number: Int, began: Date, ended: Date?)?
   /// When each session's last summary with text was taken.
   private var loadedAt: [SessionID: Date] = [:]
 
@@ -80,8 +87,38 @@ struct SummaryAsks: Sendable {
     return result
   }
 
+  /// When a line of `id` stops waiting at the latest; nil: it does not wait. It waits for an open,
+  /// current, numbered ask, unless a wait of the session ended this call without a summary.
+  func waitDeadline(for id: SessionID, in continuity: Continuity, at now: Date) -> Date? {
+    guard let ask = openAsk(of: id, in: continuity, at: now), ask.number != nil, !ask.isStale,
+      !spent.contains(id)
+    else { return nil }
+    return ask.at + Policy.waitLimit
+  }
+
+  /// A line of `id` waits for the open ask; for the same ask again, after a reconnect, the wait
+  /// keeps its start.
+  mutating func beginWait(_ id: SessionID, in continuity: Continuity, at now: Date) {
+    guard let number = openAsk(of: id, in: continuity, at: now)?.number else { return }
+    if let wait, wait.session == id, wait.number == number {
+      self.wait?.ended = nil
+    } else {
+      wait = (id, number, now, nil)
+    }
+  }
+
+  /// The line stopped waiting before the answer came.
+  mutating func endWait(at now: Date) { if wait?.ended == nil { wait?.ended = now } }
+
+  /// A line of `id` found the limit passed: no later line of this call waits for it.
+  mutating func waitedOut(_ id: SessionID) { spent.insert(id) }
+
+  /// The call started: every session may be waited for again.
+  mutating func newCall() { spent = [] }
+
   /// A summary post from `id`, with the ask's `number` if the mod echoes one; `wrote` is false for
-  /// an empty one. A post for another ask leaves the open ask open; any other closes it.
+  /// an empty one. A post for another ask leaves the open ask open; any other closes it. An empty
+  /// answer to a waiting line ends the session's waits for the call.
   mutating func answer(
     _ id: SessionID, number: Int?, wrote: Bool, in continuity: inout Continuity, at now: Date
   ) -> SummaryAnswer {
@@ -93,9 +130,17 @@ struct SummaryAsks: Sendable {
       loadedAt[id] = wrote ? now : nil
       return .unasked
     }
-    if open.isStale { return .stale(open, waited: nil) }
+    var waited: TimeInterval?
+    var isWaitedFor = false
+    if let wait, wait.session == id, wait.number == open.number {
+      waited = (wait.ended ?? now).timeIntervalSince(wait.began)
+      isWaitedFor = wait.ended == nil
+      self.wait = nil
+    }
+    if open.isStale { return .stale(open, waited: waited) }
+    if isWaitedFor, !wrote { spent.insert(id) }
     loadedAt[id] = wrote ? now : nil
-    return .taken(open, waited: nil)
+    return .taken(open, waited: waited)
   }
 
   /// Loading while an open ask to a mod that writes summaries is current and within the mod's

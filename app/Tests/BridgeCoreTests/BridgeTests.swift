@@ -1689,7 +1689,7 @@ struct BridgeTests {
   /// Speech opens the line, which waits for the summary asked for at `asked`.
   func speakAndWait(asked: Date) async -> Task<Void, Never> {
     let opening = Task { await bridge.audioEvent(.speechStarted) }
-    #expect(await eventually { time.deadlines.contains(asked + SummaryWait.limit) })
+    #expect(await eventually { time.deadlines.contains(asked + SummaryAsks.Policy.waitLimit) })
     return opening
   }
 
@@ -1732,7 +1732,7 @@ struct BridgeTests {
     let asked = time.now
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
-    try await pass(Int(SummaryWait.limit) - 1, polling: a)
+    try await pass(Int(SummaryAsks.Policy.waitLimit) - 1, polling: a)
     #expect(await voice.opens.isEmpty)
     try await pass(1, polling: a)
     try await settle(opening)
@@ -1747,21 +1747,22 @@ struct BridgeTests {
     let asked = time.now
     await bridge.loadContext()
     try await answer(request(1), from: a)
-    #expect(await eventually { time.deadlines.contains(asked + SummaryWait.limit) })
+    #expect(await eventually { time.deadlines.contains(asked + SummaryAsks.Policy.waitLimit) })
     #expect(await voice.opens.isEmpty)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Newer work.", ask: 2))
     #expect(await eventually { await voice.opens.count == 1 })
     #expect(await voice.opens.first?.first?.text == "[CONTEXT] Alpha: Newer work.")
   }
 
-  /// The answer that lands after the waiting line looked, before it sleeps, still opens it.
-  @Test func anAnswerDuringTheLookOpensTheLine() async throws {
+  /// A change wakes the waiting line to look again, and the answer lands at once, while it looks:
+  /// it still opens the line.
+  @Test func anAnswerJustAfterAWakeOpensTheLine() async throws {
+    let asked = time.now
     try await startWriting()
-    await bridge.whileLooking { [self] in
-      let answer = ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1)
-      _ = try? await post("/v1/context", answer)
-    }
-    try await settle(Task { await bridge.audioEvent(.speechStarted) })
+    let opening = await speakAndWait(asked: asked)
+    await bridge.loadContext()  // joins ask 1, and its change wakes the line
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await settle(opening)
     #expect(await voice.opens.first?.first?.text == summary)
   }
 
@@ -1831,7 +1832,7 @@ struct BridgeTests {
     let asked = time.now
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
-    try await pass(Int(SummaryWait.limit), polling: a)
+    try await pass(Int(SummaryAsks.Policy.waitLimit), polling: a)
     try await settle(opening)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
     #expect(await voice.added == [summary])
@@ -1885,7 +1886,7 @@ struct BridgeTests {
     let asked = time.now
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
-    try await pass(Int(SummaryWait.limit), polling: a)
+    try await pass(Int(SummaryAsks.Policy.waitLimit), polling: a)
     try await settle(opening)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
     voice.emit(.closed(.other("The voice session closed (example).")))
