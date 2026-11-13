@@ -34,6 +34,13 @@ struct SettingsView: View {
   let tab: SettingsTab
   /// Counts the reconnects the owner cancelled, so the switch is drawn again as it was.
   @State private var cancelledReconnects = 0
+  /// The owner picked Custom… over a listed summary model, which stays in force until a check works.
+  @State private var picksCustom = false
+  /// The custom model id as typed, kept after a refusal for correcting.
+  @State private var customModel = ""
+  @State private var isChecking = false
+  /// Why the last check did not save the typed id.
+  @State private var checkMessage: String?
 
   var body: some View {
     Group {
@@ -162,8 +169,13 @@ struct SettingsView: View {
             + "quotes them."
         )
         .font(.caption).foregroundStyle(.secondary)
-        Picker("Summary model", selection: setting(\.summaryModel)) {
+        Picker("Summary model", selection: summaryModelChoice) {
           ForEach(SummaryModel.listed, id: \.id) { Text($0.name).tag($0.id) }
+          Text("Custom…").tag(Self.custom)
+        }
+        .disabled(isChecking)  // a check that works stores its model over a later pick
+        if summaryModelChoice.wrappedValue == Self.custom {
+          customModelField
         }
         Text(
           "Writes the summary the voice gets as context, always at low effort, on your Claude "
@@ -176,6 +188,60 @@ struct SettingsView: View {
       }
     }
     .formStyle(.grouped)
+  }
+
+  /// The tag of Custom… in the picker, which no model id can be.
+  private static let custom = " custom"
+
+  private var isListed: Bool {
+    SummaryModel.listed.contains { $0.id == model.settings.current.summaryModel }
+  }
+
+  /// The picker's choice: a listed model is stored at once, with no check; Custom… only shows the
+  /// field, and the stored model stays in force.
+  private var summaryModelChoice: Binding<String> {
+    Binding {
+      picksCustom || !isListed ? Self.custom : model.settings.current.summaryModel
+    } set: { picked in
+      checkMessage = nil
+      guard picked != Self.custom else {
+        picksCustom = true
+        return
+      }
+      picksCustom = false
+      model.settings.update { $0.summaryModel = picked }
+    }
+  }
+
+  /// The custom id and **Check and save**, which alone spends a request; text that cannot be an id,
+  /// or the id already stored, checks nothing.
+  private var customModelField: some View {
+    let id = SummaryModel.accepted(customModel)
+    return VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        TextField("Model id", text: $customModel, prompt: Text("claude-…"))
+          .labelsHidden()
+          .onSubmit { check(id) }
+        Button(isChecking ? "Checking…" : "Check and save") { check(id) }
+          .disabled(isChecking || id == nil || id == model.settings.current.summaryModel)
+      }
+      if let checkMessage {
+        warning(checkMessage)
+      }
+    }
+    .onAppear {
+      if !isListed, customModel.isEmpty { customModel = model.settings.current.summaryModel }
+    }
+  }
+
+  private func check(_ id: String?) {
+    guard !isChecking, let id, id != model.settings.current.summaryModel else { return }
+    isChecking = true
+    checkMessage = nil
+    Task {
+      checkMessage = await model.checkSummaryModel(id).message
+      isChecking = false
+    }
   }
 
   private var generalTab: some View {

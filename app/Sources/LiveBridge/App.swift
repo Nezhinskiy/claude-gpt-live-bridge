@@ -469,6 +469,12 @@ final class AppModel {
     Task { await bridge?.remove(row.id) }
   }
 
+  /// Settings' Check and save: a joined session checks `model`, which is stored only if it works.
+  func checkSummaryModel(_ model: String) async -> ModelCheckResult {
+    guard let bridge else { return .noSession }
+    return await settings.save(summaryModel: model) { await bridge.checkModel($0) }
+  }
+
   /// Asks the target for its summary; the item shows it loading while the bridge has it in
   /// flight.
   func loadContext() {

@@ -41,6 +41,8 @@ All notable changes to this project are listed here. The format follows
   writes the summary the voice gets as context, always at low effort, on your Claude usage. If
   another model fails, Haiku 5.5 writes it instead, and a line under the setting says so; if no
   model writes one, it says why. When a summary fails, the session's band says **Context failed**.
+  **Custom…** takes any model id, which a joined session checks with one short request before it
+  is saved.
 
 ### Changed
 

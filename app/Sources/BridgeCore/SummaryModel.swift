@@ -49,7 +49,8 @@ public struct SummaryReport: Sendable, Equatable {
     return "The voice got no new summary: \(failed.joined(separator: ", then "))."
   }
 
-  private static func phrase(_ failure: SummaryFailure) -> String {
+  /// What the model did, after its name: "was refused", "returned an error (overloaded)".
+  static func phrase(_ failure: SummaryFailure) -> String {
     switch failure.reason {
     case .modelRefused: "was refused"
     case .apiError:

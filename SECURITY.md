@@ -99,6 +99,12 @@ voices.
     answers each ask, with any text, just before the limit, or that ends each wait by joining again
     as one that missed a turn, is asked again by the next line, so it can hold every line of the
     call, each for up to 10 seconds from that line's ask;
+  - join with `writesSummaries` and make itself the target (or, with a target that cannot check,
+    be the latest joined session that can), and so be handed Settings' check of a custom
+    **Summary model** with the check's id. It can answer that any model works, and Settings saves
+    that model; Haiku 5.5 then writes the summaries that model fails to, and no permission or
+    data is reached. The check carries only the model's id, and the mod asks that model only
+    "Reply with OK.";
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation;
   - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as

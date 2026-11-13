@@ -406,11 +406,16 @@ depuración:
   conversation**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste, y va a
   OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
   Desactivado, bajo la pausa solo **Load context** carga un resumen.
-- **Summary model** (Haiku 5.5 por defecto, también al actualizar; o Sonnet 5.5 u Opus 5.5): el
+- **Summary model** (Haiku 5.5 por defecto, también al actualizar; o Sonnet 5.5, Opus 5.5 o **Custom…**): el
   modelo que escribe el resumen que la voz recibe como contexto, siempre con esfuerzo bajo, a cargo
   de tu uso de Claude. Si otro modelo falla, lo escribe Haiku 5.5. Una línea debajo dice cuándo el
   último resumen vino de Haiku 5.5, o de ningún modelo, y por qué. Una sesión con un mod anterior a
-  este ajuste lo ignora y escribe con el modelo propio de la sesión.
+  este ajuste lo ignora y escribe con el modelo propio de la sesión. **Custom…** toma un id de
+  modelo y **Check and save**, que hace que una sesión unida envíe a ese modelo una petición corta
+  ("Reply with OK.") a cargo de tu uso de Claude, y guarda el id solo si responde; si no, el motivo
+  aparece junto al campo y la elección anterior sigue. Necesita una sesión con un mod de esta
+  versión y habla por el Claude Code de esa sesión: otra sesión puede diferir, y un id guardado no
+  se vuelve a comprobar.
 
 ### Qué hace la voz
 

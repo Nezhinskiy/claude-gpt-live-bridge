@@ -4161,4 +4161,83 @@ struct BridgeTests {
     #expect(lines.first?.hasPrefix("Weekly window resets ") == true)
     #expect(lines.last?.hasPrefix("Read at ") == true)
   }
+
+  // MARK: Checking a custom summary model
+
+  /// Polls `session` until it is handed a model check, and returns the check's id.
+  func checkHanded(to session: SessionID) async throws -> String {
+    for _ in 0..<200 {
+      if case .checkModel(let id, _) = try await registry.poll(session) { return id }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    throw StillRunning(limit: .seconds(2))
+  }
+
+  func checkResult(
+    from session: SessionID, _ id: String, ok: Bool = false,
+    _ reason: SummaryFailure.Reason? = .modelRefused, _ kind: String? = nil
+  ) async throws {
+    try await post(
+      "/v1/model-check",
+      ModelCheckBody(
+        sessionId: session, id: id, ok: ok, reason: ok ? nil : reason, error: kind))
+  }
+
+  @Test func noSessionThatCanCheck() async throws {
+    try await join(a, "Alpha")
+    #expect(await bridge.checkModel("claude-x-1") == .noSession)
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  @Test func theTargetChecksFirst() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    async let result = bridge.checkModel("claude-x-1")
+    let id = try await checkHanded(to: a)
+    #expect(try await registry.poll(b) == nil)
+    try await checkResult(from: a, id, ok: true)
+    #expect(await result == .works)
+  }
+
+  /// A target on an older mod cannot check: the session that joined last and can, does.
+  @Test func elseTheNewestSessionThatCanChecks() async throws {
+    let c = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await join(a, "Alpha")
+    try await join(b, "Beta", writesSummaries: true)
+    try await join(c, "Gamma", writesSummaries: true)
+    async let result = bridge.checkModel("claude-x-1")
+    let id = try await checkHanded(to: c)
+    #expect(try await registry.poll(b) == nil)
+    try await checkResult(from: c, id, ok: true)
+    #expect(await result == .works)
+  }
+
+  @Test func aResultFromAnotherSessionIsIgnored() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    async let result = bridge.checkModel("claude-x-1")
+    let id = try await checkHanded(to: a)
+    try await checkResult(from: b, id, ok: true)
+    try await checkResult(from: a, "another check", ok: true)
+    try await checkResult(from: a, id)
+    #expect(await result == .refused(.modelRefused, kind: nil))
+  }
+
+  @Test func noAnswerIn20Seconds() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let asked = time.now
+    async let result = bridge.checkModel("claude-x-1")
+    _ = try await checkHanded(to: a)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    time.advance(by: .seconds(20))
+    #expect(await result == .noAnswer)
+  }
+
+  @Test func theSessionLeavingGivesNoAnswer() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    async let result = bridge.checkModel("claude-x-1")
+    _ = try await checkHanded(to: a)
+    try await post("/v1/leave", LeaveBody(sessionId: a))
+    #expect(await result == .noAnswer)
+  }
 }
