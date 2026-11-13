@@ -14,6 +14,7 @@ says, not in an issue. Everyone taking part follows the [Code of Conduct](CODE_O
 | `app/` | The SwiftPM package: `BridgeCore` (pure logic, tested without codex, a microphone or Claude) and `LiveBridge` (the menu bar app and its invisible audio page). |
 | `plugin/` | The Claude Code mod `livebridge`. `hooks/register.tsx` is wiring only; the other `hooks/*.ts` modules are pure. |
 | `wire/fixtures/` | One JSON file per message between the mod and the app: the shared oracle both sides test against. |
+| `wire/summary-budget.json` | The time the mod allows a summary, which both sides test their constant against. |
 | `scripts/` | `check.sh` (every check CI runs but the floor run), `check-mod.sh` (the mod's engine-facing half), `check-floor.sh` (that half on the lowest Claude Code the README promises), `build-app.sh` (build, install, uninstall, package), `smoke.sh` (end to end). |
 | `docs/` | [Architecture](docs/architecture/overview.md) and [ADRs](docs/adr/); the rest is the stayfixed scaffold (below). |
 

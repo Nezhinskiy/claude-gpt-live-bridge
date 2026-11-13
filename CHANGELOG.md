@@ -76,7 +76,7 @@ All notable changes to this project are listed here. The format follows
   Start and when the target changes during the call, so the summary is often in before you speak;
   a line that opens while that ask is on its way joins it, and the mod writes one summary for both,
   or writes it again if it lost it (it restarted, or the app did), so a failing summary is reported
-  once in the session. A session on an older mod is asked when its line opens
+  once in the session, unless a line asks in the last moment of a write and the mod writes it again. A session on an older mod is asked when its line opens
   and is not waited for, as before.
 - The menu's **Load context** reads **Loading context…**, disabled, while any summary of the target
   is on its way from a mod of this release, whatever asked for it (Start, a new target, a line or
