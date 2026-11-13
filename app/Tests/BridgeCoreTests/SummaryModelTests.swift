@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import BridgeCore
@@ -52,6 +53,15 @@ struct SummaryModelTests {
         == "claude-sonnet-5-5")
     #expect(
       report("claude-opus-5-5", [refused, timedOut], wrote: false).writer == "claude-opus-5-5")
+  }
+
+  /// The mod could not read the transcript, so no model ran: Settings' line says so, not a model.
+  @Test func anUnreadableTranscriptIsNoModelsFailure() throws {
+    let failure = try JSONDecoder().decode(
+      SummaryFailure.self, from: Data(#"{"reason":"transcript-unreadable"}"#.utf8))
+    #expect(
+      report("claude-opus-5-5", [failure], wrote: false).line
+        == "The voice got no new summary: the session's transcript could not be read.")
   }
 
   /// The kind comes from a local process, so only one the engine documents is shown.

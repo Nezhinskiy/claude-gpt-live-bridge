@@ -25,6 +25,7 @@ struct WireTests {
     "activity-voice-question": roundTrip(ActivityBody.self),
     "context": roundTrip(ContextBody.self), "context-stats": roundTrip(ContextBody.self),
     "context-fallback": roundTrip(ContextBody.self), "context-failed": roundTrip(ContextBody.self),
+    "context-unreadable": roundTrip(ContextBody.self),
     "limits": roundTrip(LimitsBody.self),
     "answer-ok": roundTrip(AnswerBody.self), "answer-failed": roundTrip(AnswerBody.self),
     "next-request": roundTrip(PollReply.self), "next-context": roundTrip(PollReply.self),

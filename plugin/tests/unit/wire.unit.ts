@@ -47,7 +47,7 @@ const WORK: Shape = {
   ],
 }
 
-const REASON = { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out'] } as const
+const REASON = { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out', 'transcript-unreadable'] } as const
 
 const TURN = fields<Wire.TurnRef>({ id: S, request: optional(S) })
 

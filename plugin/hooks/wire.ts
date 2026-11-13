@@ -90,9 +90,12 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  */
 export type ActivityBody =
   { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; turn?: TurnRef };
-/** Why one attempt at a summary wrote nothing; `error`, with `api-error`, the engine's kind of error. */
+/**
+ * Why one attempt at a summary wrote nothing; `error`, with `api-error`, the engine's kind of error.
+ * `transcript-unreadable`: the session's transcript could not be read, so no model was asked.
+ */
 export type SummaryFailure = {
-  reason: 'model-refused' | 'api-error' | 'empty-reply' | 'timed-out'; error?: string;
+  reason: 'model-refused' | 'api-error' | 'empty-reply' | 'timed-out' | 'transcript-unreadable'; error?: string;
 };
 /** The numbers of the attempt that wrote a summary with a named model; a fork sends none. */
 export type SummaryStats =

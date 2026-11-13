@@ -194,6 +194,8 @@ public struct SummaryFailure: Codable, Sendable, Equatable {
     case apiError = "api-error"
     case emptyReply = "empty-reply"
     case timedOut = "timed-out"
+    /// The mod could not read the session's transcript, so no model was asked.
+    case transcriptUnreadable = "transcript-unreadable"
     /// One this app does not know, as from a later mod.
     case unknown
 

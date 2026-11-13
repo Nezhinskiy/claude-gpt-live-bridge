@@ -471,15 +471,9 @@ async function deliverContext($: EngineInterface, ask: ContextAsk, send: number)
 async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, deadline: number): Promise<ContextOutcome> {
   const turns = turnsDone
   const kept = summary !== null && summary.model === ask.model ? summary : null
-  let written: Summary
-  try {
-    written = kept ?? (await summarize($, ask, deadline))
-  } catch {
-    // The transcript could not be read, so no model was asked.
-    await link?.context({ summary: '', ...answering(ask) })
-    return 'failed'
-  }
-  const { text, failures, stats } = written
+  // A throw is the transcript that could not be read, so no model was asked.
+  const { text, failures, stats }: Summary = kept ?? (await summarize($, ask, deadline)
+    .catch(() => ({ text: '', failures: [{ reason: 'transcript-unreadable' as const }] })))
   if (text !== '' && turns === turnsDone) summary = { model: ask.model, text, failures }
   const isTaken = (await link?.context({
     summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }), ...answering(ask),

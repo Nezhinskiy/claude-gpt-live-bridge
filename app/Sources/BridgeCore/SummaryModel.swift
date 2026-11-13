@@ -43,6 +43,9 @@ public struct SummaryReport: Sendable, Equatable {
   /// Settings' line about it; nil when the model asked for wrote it, or when no model was tried.
   public var line: String? {
     guard !failures.isEmpty else { return nil }
+    if failures.contains(where: { $0.reason == .transcriptUnreadable }) {
+      return "The voice got no new summary: the session's transcript could not be read."
+    }
     let models = [asked, fallback ?? asked]
     let failed = failures.enumerated().map { index, failure in
       "\(SummaryModel.name(models[min(index, 1)])) \(Self.phrase(failure))"
@@ -65,7 +68,7 @@ public struct SummaryReport: Sendable, Equatable {
       }
     case .emptyReply: "wrote nothing"
     case .timedOut: "ran out of time"
-    case .unknown: "failed"
+    case .unknown, .transcriptUnreadable: "failed"
     }
   }
 }

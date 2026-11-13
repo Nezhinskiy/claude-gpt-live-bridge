@@ -423,11 +423,11 @@ test('aGapThePollHasNotSaidIsSaidBeforeThePost', async ($, on) => {
   expect(told.map(call => [call.route, call.body?.missed ?? call.body?.ask])).toEqual([['join', true], ['context', 1]])
 })
 
-test('aThrowWhileReadingTheTranscriptPostsEmpty', async ($, on) => {
+test('aThrowWhileReadingTheTranscriptPostsItsFailure', async ($, on) => {
   const world = await joined($, on)
   world.isTranscriptBroken = true
   await appAsks(world, NAMED)
-  expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '' }])
+  expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '', failures: [{ reason: 'transcript-unreadable' }] }])
   expect(world.completes).toEqual([])
   expect(saidNoSummary(world)).toBe(true)
 })
