@@ -5,7 +5,8 @@ import Observation
 /// The menu bar glyph, "Span": nine bars standing on a bridge deck whose heights trace one span
 /// of a suspension bridge (two tall towers, the main cable sagging between them, short side
 /// spans). The bars double as a level meter and move per call phase; a badge between the towers
-/// shows sessions at work, an approval, or unheard results, and a broken deck shows a problem.
+/// shows sessions at work, an approval, the target's context loading, or unheard results, and a
+/// broken deck shows a problem.
 /// Drawn as a 24 × 18 pt template image, so the menu bar tints it for light and dark.
 enum SpanGlyph {
   static let size = NSSize(width: 24, height: 18)
@@ -44,8 +45,8 @@ enum SpanGlyph {
     }
   }
 
-  /// One frame; `t` runs the working dots and pulses the approval diamond, and nil is the still
-  /// frame used when motion is reduced.
+  /// One frame; `t` runs the working dots, turns the loading ring and pulses the approval diamond,
+  /// and nil is the still frame used when motion is reduced.
   static func image(heights: [CGFloat], badge: Badge, faded: Bool, t: Double?) -> NSImage {
     let image = NSImage(size: size, flipped: true) { _ in
       NSColor.black.withAlphaComponent(faded ? 0.5 : 1).setFill()
@@ -86,6 +87,15 @@ enum SpanGlyph {
             height: 2 * dot.radius)
         ).fill()
       }
+    case .loadingContext:  // a three-quarter ring that turns once a second
+      let ring = NSBezierPath()
+      let turn = t.truncatingRemainder(dividingBy: 1) * 360
+      ring.appendArc(
+        withCenter: NSPoint(x: 12, y: 4.4), radius: 2.8, startAngle: turn - 90,
+        endAngle: turn + 180)
+      ring.lineWidth = 1.6
+      ring.lineCapStyle = .round
+      ring.stroke()
     case .approval:  // a diamond with an exclamation mark cut out, pulsing
       NSColor.black.withAlphaComponent(0.65 + 0.35 * cos(t * 2 * .pi)).setFill()
       let diamond = NSBezierPath()

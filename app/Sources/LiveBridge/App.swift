@@ -524,11 +524,11 @@ final class AppModel {
     let statusChanged = next != status
     let inFlightChanged = update.summariesInFlight != self.update?.summariesInFlight
     if update != self.update { self.update = update }
-    if statusChanged {
-      presentation = StatusPresentation(next)
-      loads.keep(only: Set(next.sessions.map(\.sessionId)))
+    if statusChanged { loads.keep(only: Set(next.sessions.map(\.sessionId))) }
+    if statusChanged || inFlightChanged {
+      presentation = StatusPresentation(next, summariesInFlight: update.summariesInFlight)
+      refreshLoads()
     }
-    if statusChanged || inFlightChanged { refreshLoads() }
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
   }
 

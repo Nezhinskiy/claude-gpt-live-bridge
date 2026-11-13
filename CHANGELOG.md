@@ -52,6 +52,9 @@ All notable changes to this project are listed here. The format follows
 - While Claude works, the menu bar icon shows dots turning in depth, three and then four, which
   gather into one between turns, for thinking, in place of a turning ring, which read as loading;
   the session's row in the menu shows an ellipsis in place of turning arrows.
+- During a call, while the target's summary is on its way, the menu bar icon shows a
+  three-quarter ring turning once a second, still when macOS is set to reduce motion. A problem
+  or a waiting approval shows instead of it; it shows instead of unheard results or Claude working.
 - While the call is stopped, the menu bar icon no longer shows that a session's Claude is working;
   the session's row in the menu still says so. A waiting approval still shows.
 - Summaries are written by Haiku 5.5 by default, on an update too, in place of the session's own
