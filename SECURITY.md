@@ -427,17 +427,18 @@ not otherwise reset the permission, so a prompt at another time is worth a secon
 ### What leaves the Mac
 
 The list of what goes to OpenAI, and when, is in the README's
-[Privacy](README.md#privacy) section. LiveBridge sends no audio or text while the line is
-closed: voice detection runs on the Mac. Codex itself keeps running between lines, and opening
+[Privacy](README.md#privacy) section. LiveBridge sends OpenAI no audio or text while the line
+is closed: voice detection runs on the Mac. Codex itself keeps running between lines, and opening
 Settings starts another codex to list the voices, and opening the menu starts a short-lived one
 that reads your Codex usage from OpenAI, also while the call is off; what codex sends on its own
 is codex's. Codex
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
 session sends its work to Anthropic as it always does, and so does the summary the voice gets as
-context: at Start, at a change of target, when a line opens and on **Load context**, also while
-the line is closed, the session's mod sends its transcript (a mod of this release cuts it to
-120,000 characters) to the summary model through Claude Code, on your Claude usage; Settings' check of a custom **Summary
-model** sends one short request the same way. LiveBridge has no telemetry. The menu's
+context, also while the line is closed: a mod of this release, asked at Start, at a change of
+target, when a line opens or on **Load context**, sends the transcript, cut to 120,000
+characters, to the summary model through Claude Code, on your Claude usage; an older mod, asked
+when a line opens or on **Load context**, forks the session's own model over the whole request.
+Settings' check of a custom **Summary model** sends one short request the same way. LiveBridge has no telemetry. The menu's
 **Feedback & Support** links, **Report a Bug…**, **LiveBridge Website** and **Star LiveBridge on
 GitHub**, only open the repository's bug form, getlivebridge.com and the repository's page in your
 browser; the app sends nothing. Its other items stay on the Mac: **Debug Mode** writes the voice's
