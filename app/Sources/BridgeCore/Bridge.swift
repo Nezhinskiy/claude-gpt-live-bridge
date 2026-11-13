@@ -596,12 +596,9 @@ public actor Bridge: Router {
     }
   }
 
-  /// Holds the opening line while its session's summary is in flight (`SummaryAsks.wait`, which
-  /// also says what spends the session's wait for the call): until the post that answers the open
-  /// ask, the limit, the session's drop, a gap or forget that makes the ask stale, or the line's
-  /// cancellation. Each change wakes it to look again; nothing is awaited between its look and its
-  /// sleep, so no change is missed. Nothing goes to the voice meanwhile, as the line is not open
-  /// and the page queues what is said.
+  /// Holds the opening line while `SummaryAsks.wait` says to. Each change wakes it to look again;
+  /// nothing is awaited between its look and its sleep, so no change is missed. Nothing goes to the
+  /// voice meanwhile, as the line is not open and the page queues what is said.
   private func waitForSummary() async {
     while !Task.isCancelled, let id = lineSession,
       let deadline = summaries.wait(id, in: continuity, at: time.now)
@@ -882,13 +879,10 @@ public actor Bridge: Router {
   }
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
-  /// it is and kept in the session's conversation. One asked for before the latest gap or forget
-  /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and the
-  /// menu is told of nothing loaded. A post with the number of an ask other than the open one is
-  /// such a summary, and leaves the open ask open; one with no number is matched by its time
-  /// (`SummaryAsks.answer`). An
-  /// empty one keeps the stored line and closes the ask: a mod that writes summaries sends one when
-  /// it has none. The answer to an ask that named a model, if a model was tried, is `lastSummary`.
+  /// it is and kept in the session's conversation, unless `SummaryAsks.answer` ignores it: one
+  /// asked for before the latest gap or forget would clear a mark it does not cover, or bring back
+  /// what was forgotten. An empty one keeps the stored line and closes the ask: a mod that writes
+  /// summaries sends one when it has none. The answer to an ask that named a model, if a model was tried, is `lastSummary`.
   /// A line waiting for the summary (`waitForSummary`) is seeded with it; a live line about that
   /// session gets it at once, and one still connecting gets it when connected; it does not hold
   /// the line open. A summary equal to the stored one is not

@@ -154,9 +154,7 @@ export class BridgeLink {
 
   /**
    * Posts the session's summary, and what went wrong on the way; false when the app did not take
-   * it. A gap noted and not yet said is said first, by joining again after the link work queued
-   * before it, so the app hears of the gap before a summary written across it; while the gap stays
-   * unsaid, nothing is posted.
+   * it. A gap noted and not yet said goes first (the overview's `POST /v1/context`).
    */
   async context(body: Omit<ContextBody, 'sessionId'>): Promise<boolean> {
     if (this.hasGap) {

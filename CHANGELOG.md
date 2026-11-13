@@ -70,10 +70,9 @@ All notable changes to this project are listed here. The format follows
 - A line no longer reaches the voice before its context: for a session on a mod of this release,
   the line waits for the summary in flight before it connects, while what you say is recorded and
   queued on the Mac, then opens with the summary in its seed and plays what you said. It opens
-  without one 10 seconds after the ask, or as soon as the mod answers with none. An answer with
-  none, even one that comes before you speak, or a line that waits the 10 seconds, ends the waits
-  for that session until the next Start; a line you open after the 10 seconds, with the summary
-  still on its way, opens at once and leaves later lines free to wait. Such a session is asked at
+  without one 10 seconds after the ask, or as soon as the mod answers with none; an answer with none,
+  or a line that waits the 10 seconds, ends that session's waits until the next Start
+  ([the wait](docs/architecture/overview.md#silent-hang-up)). Such a session is asked at
   Start and when the target changes during the call, so the summary is often in before you speak;
   a line that opens while that ask is on its way joins it, and the mod writes one summary for both,
   or writes it again if it lost it (it restarted, or the app did). A session on an older mod is asked when its line opens
@@ -89,9 +88,8 @@ All notable changes to this project are listed here. The format follows
   it could not draw the band before.
 - The mod answers every summary ask from this app, with an empty summary when it has none, and
   each ask carries a number that its answer repeats, so a summary written before a gap the app
-  has heard of is not taken for a fresh one. Before it posts a summary, the mod tells the app of a
-  gap it noted and has not yet reported, so a summary written across that gap is not taken either.
-  An older app or mod sends no number and still guesses ([BR-002](docs/bugs/BR-002.md)).
+  has heard of is not taken for a fresh one, nor one written across a gap the mod noted and had
+  not yet reported ([the wire](docs/architecture/overview.md#the-wire)). An older app or mod sends no number and still guesses ([BR-002](docs/bugs/BR-002.md)).
 
 ### Deprecated
 

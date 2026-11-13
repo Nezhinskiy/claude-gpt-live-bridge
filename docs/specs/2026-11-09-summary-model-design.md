@@ -261,9 +261,7 @@ route already tolerates an empty summary and closes the ask.
 The mod's cached summary (`summary` in `register.tsx`) is keyed by the model asked for. An ask with
 the number of the send in flight joins it (`sending`) and gets what the first model writes, unless a
 gap crossed that send; a change of model takes effect at the next ask that finds none in flight.
-Before it posts a summary while a gap it noted is unsaid, the mod joins again with `missed`, after
-the poll in flight, and posts nothing while it cannot, so the app ignores a summary written across
-that gap as stale.
+[The wire](../architecture/overview.md#the-wire) says how it posts after a gap it noted.
 
 ## Waiting
 
@@ -275,16 +273,13 @@ hold:
 1. Its session has a summary ask in flight: asked at Start, at a target change, by Load context, or
    by this line (`pauseHoldsBackSummary` and `needsContext` decide an ask, unchanged).
 2. That ask has a number, which it has when the session's mod said `writesSummaries` at the ask.
-3. In this call the session's wait is not spent: an answer to its open, current ask with no
-   summary spends it, whether or not a line was waiting, and so does a line that waits until the
-   limit, so a persistent failure does not hold every line. A line that comes after the limit, the
-   ask still in flight, opens without waiting and spends nothing.
+3. In this call the session's wait is not spent ([what spends it](../architecture/overview.md#silent-hang-up)),
+   so a persistent failure does not hold every line.
 
 It ends at the first `POST /v1/context` from that session that answers the open ask, whatever it
 carries; at the limit; when the session drops (5 s without a poll); or when the line is cancelled
 (Stop, a target change). A post that `Bridge.context` ignores, one asked for before the latest gap or
-forget (`SummaryAsks.answer`), does not end it and spends nothing. `SummaryAsks.wait` decides each
-look, rule 3 included.
+forget (`SummaryAsks.answer`), does not end it. `SummaryAsks.wait` decides each look.
 
 The review's third rule, a 3 s deadline for the mod to take the ask, is dropped: a polling session
 takes it within one poll, one that stops polling is dropped within 5 s, and the registry keeps no

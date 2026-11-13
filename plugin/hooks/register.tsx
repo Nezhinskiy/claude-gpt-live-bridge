@@ -130,7 +130,7 @@ async function save($: EngineInterface): Promise<void> {
 /**
  * A turn did not reach the app, which the next join says. No summary from before it covers it: the
  * one kept goes. The one being written for an older app's ask is dropped; for a named ask it is
- * posted all the same, after that join (`BridgeLink.context`), so the app ignores it as stale.
+ * posted all the same (`BridgeLink.context`).
  */
 function noteGap(): void {
   link?.noteGap()
