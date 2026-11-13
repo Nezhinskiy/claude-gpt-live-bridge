@@ -44,8 +44,9 @@ struct SettingsView: View {
       case .context: contextTab
       }
     }
+    // No fixed height: the grouped form's ideal height is all of its content, which is what the
+    // window measures, and in a window capped at the screen it scrolls in the height it gets.
     .frame(width: 480)
-    .fixedSize(horizontal: false, vertical: true)
   }
 
   private var voiceTab: some View {
@@ -306,6 +307,16 @@ final class SettingsWindow {
     window.styleMask = [.titled, .closable]
     window.toolbarStyle = .preference
     window.isReleasedWhenClosed = false
+    // On another screen, or a screen whose visible frame changed, the tab is fitted again.
+    let center = NotificationCenter.default
+    for (name, object) in [
+      (NSWindow.didChangeScreenNotification, window),
+      (NSApplication.didChangeScreenParametersNotification, nil),
+    ] {
+      center.addObserver(forName: name, object: object, queue: .main) { [tabs] _ in
+        MainActor.assumeIsolated { tabs.selectedPage?.fitWindow() }
+      }
+    }
   }
 
   func show() {
@@ -313,8 +324,13 @@ final class SettingsWindow {
     if !window.isVisible {
       // Sized before it shows, so it opens at its height rather than sliding to it, and
       // centered the first time at that height; after that it opens where it was left.
+      // `center()` puts it above the middle, which can push a tall window's top under the menu
+      // bar, so the centred window is fitted again.
       tabs.selectedPage?.fitWindow()
-      if !placed { window.center() }
+      if !placed {
+        window.center()
+        tabs.selectedPage?.fitWindow()
+      }
       placed = true
     }
     NSApp.activate()
@@ -364,13 +380,18 @@ private final class SettingsTabs: NSTabViewController {
 }
 
 /// One tab: its form hangs from the top, and the window slides to the form's height, top edge
-/// still, the way a Mac settings window moves between tabs. AppKit's own fitting snaps, since
+/// still, the way a Mac settings window moves between tabs, but no taller than the screen's
+/// visible frame (`SettingsWindowFit`); a taller form scrolls. AppKit's own fitting snaps, since
 /// it sizes the window through layout constraints, so the form gives the window no constraint
 /// and reports its height instead.
 @MainActor
 private final class SettingsPage: NSViewController {
   private let form: NSHostingController<SettingsView>
   private var height: NSKeyValueObservation?
+  /// The height the form is shown at. It sits on a holder around the form: AppKit gives the
+  /// form's own view a height of its preferred size, at a priority above the window's, which
+  /// would pull the window to the form's full height if the form were tied to the window.
+  private var shown: NSLayoutConstraint!
 
   init(model: AppModel, tab: SettingsTab) {
     form = NSHostingController(rootView: SettingsView(model: model, tab: tab))
@@ -384,12 +405,21 @@ private final class SettingsPage: NSViewController {
 
   override func loadView() {
     view = NSView()
+    let holder = NSView()
+    holder.translatesAutoresizingMaskIntoConstraints = false
     form.view.translatesAutoresizingMaskIntoConstraints = false
-    view.addSubview(form.view)
+    view.addSubview(holder)
+    holder.addSubview(form.view)
+    shown = holder.heightAnchor.constraint(equalToConstant: 0)
     NSLayoutConstraint.activate([
-      form.view.topAnchor.constraint(equalTo: view.topAnchor),
-      form.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      form.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      holder.topAnchor.constraint(equalTo: view.topAnchor),
+      holder.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      holder.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      shown,
+      form.view.topAnchor.constraint(equalTo: holder.topAnchor),
+      form.view.bottomAnchor.constraint(equalTo: holder.bottomAnchor),
+      form.view.leadingAnchor.constraint(equalTo: holder.leadingAnchor),
+      form.view.trailingAnchor.constraint(equalTo: holder.trailingAnchor),
     ])
     // A hint that comes or goes inside the tab moves the window too.
     height = form.observe(\.preferredContentSize) { [weak self] _, _ in
@@ -402,14 +432,10 @@ private final class SettingsPage: NSViewController {
     if !window.isVisible { view.layoutSubtreeIfNeeded() }  // the form measures itself in layout
     let size = form.preferredContentSize
     guard size.height > 0 else { return }
-    var frame = window.frame
-    frame.size.width += size.width - content.frame.width
-    frame.size.height += size.height - content.frame.height
-    frame.origin.y = window.frame.maxY - frame.height
-    // A window low on the screen grows upward instead, so a tall tab's bottom stays reachable.
-    if let screen = window.screen?.visibleFrame {
-      frame.origin.y = max(frame.origin.y, screen.minY)
-    }
+    let frame = SettingsWindowFit.frame(
+      window: window.frame, content: content.frame, preferred: size,
+      visible: window.screen?.visibleFrame)
+    shown.constant = frame.height - (window.frame.height - content.frame.height)
     guard frame != window.frame else { return }
     if window.isVisible {
       NSAnimationContext.runAnimationGroup { _ in window.animator().setFrame(frame, display: true) }

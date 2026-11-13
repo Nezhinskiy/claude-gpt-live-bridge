@@ -72,6 +72,11 @@ All notable changes to this project are listed here. The format follows
   is removed in the first mod release after the app that names one has been the oldest supported
   app for one release.
 
+### Fixed
+
+- The Settings window no longer runs past the bottom of a small screen: it is never taller than
+  the screen above the Dock and below the menu bar, and a tab taller than that scrolls.
+
 ## [0.5.0]
 
 ### Added
