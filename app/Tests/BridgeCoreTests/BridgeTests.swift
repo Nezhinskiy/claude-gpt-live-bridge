@@ -622,7 +622,7 @@ struct BridgeTests {
     #expect(await bridge.status.call == .live)
     let closes = await voice.closes
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.closes == closes)
     #expect(await bridge.status.call == .live)
     #expect(await audio.calls.filter { $0 == "applyAnswer" }.count == 1)
@@ -1037,7 +1037,7 @@ struct BridgeTests {
     await bridge.perform(.stop)
     let opens = await voice.opens.count
     await audio.releaseSound()
-    try await answering.value
+    try await settle(answering)
     #expect(await bridge.status.call == .off)
     try await Task.sleep(for: .milliseconds(100))  // a line opened late would be there by now
     #expect(await voice.opens.count == opens)
@@ -1332,7 +1332,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await bridge.status.call == .off)
     #expect(await bridge.status.problem?.contains("No.") == true)
   }
@@ -1708,7 +1708,7 @@ struct BridgeTests {
     #expect(await voice.opens.isEmpty)
     #expect(await bridge.status.call == .connecting)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
-    await opening.value
+    try await settle(opening)
     #expect(await voice.opens.first?.first?.text == summary)
   }
 
@@ -1719,7 +1719,7 @@ struct BridgeTests {
     try await pass(Int(SummaryWait.limit) - 1, polling: a)
     #expect(await voice.opens.isEmpty)
     try await pass(1, polling: a)
-    await opening.value
+    try await settle(opening)
     #expect(await voice.opens == [[]])
   }
 
@@ -1743,7 +1743,7 @@ struct BridgeTests {
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
     await bridge.perform(.stop)
-    await opening.value
+    try await settle(opening)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
     #expect(await voice.opens.isEmpty)
     #expect(await bridge.status.call == .off)
@@ -1758,7 +1758,7 @@ struct BridgeTests {
     await bridge.perform(.start)
     let opening = await speakAndWait(asked: asked)
     await bridge.setTarget(b)
-    await opening.value
+    try await settle(opening)
     #expect(await bridge.status.call == .listening)
     #expect(await voice.opens.isEmpty)
     #expect(try await registry.poll(b) == .context(model: SummaryModel.default, ask: 2))
@@ -1790,7 +1790,7 @@ struct BridgeTests {
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
     await bridge.reconnect()
-    await opening.value
+    try await settle(opening)
     #expect(await eventually { await audio.offers.count == 2 })
     #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
     #expect(await voice.opens.isEmpty)
@@ -1805,7 +1805,7 @@ struct BridgeTests {
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
     try await pass(Int(SummaryWait.limit), polling: a)
-    await opening.value
+    try await settle(opening)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
     #expect(await voice.added == [summary])
   }
@@ -1818,7 +1818,7 @@ struct BridgeTests {
     await bridge.perform(.start)
     let opening = await speakAndWait(asked: asked)
     try await post("/v1/leave", LeaveBody(sessionId: a))
-    await opening.value
+    try await settle(opening)
     #expect(await voice.opens.isEmpty)
     #expect(await bridge.status.call == .listening)
   }
@@ -1833,7 +1833,7 @@ struct BridgeTests {
     try await Task.sleep(for: .milliseconds(100))  // a line opened by it would be there by now
     #expect(await voice.opens.isEmpty)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
-    await opening.value
+    try await settle(opening)
     #expect(await voice.opens.first?.first?.text == summary)
   }
 
@@ -1844,7 +1844,7 @@ struct BridgeTests {
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
-    await opening.value
+    try await settle(opening)
     voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     Task { await bridge.audioEvent(.speechStarted) }
@@ -1859,7 +1859,7 @@ struct BridgeTests {
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
     try await pass(Int(SummaryWait.limit), polling: a)
-    await opening.value
+    try await settle(opening)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
     voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
@@ -1872,14 +1872,14 @@ struct BridgeTests {
     try await startWriting()
     let opening = await speakAndWait(asked: asked)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
-    await opening.value
+    try await settle(opening)
     await bridge.perform(.stop)
     let again = time.now
     await bridge.perform(.start)
     let reopening = await speakAndWait(asked: again)
     #expect(await voice.opens.count == 1)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
-    await reopening.value
+    try await settle(reopening)
     #expect(await voice.opens.last?.first?.text == summary)
   }
 
@@ -1891,7 +1891,7 @@ struct BridgeTests {
     let opening = await speakAndWait(asked: asked)
     try await pass(3, polling: a)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
-    await opening.value
+    try await settle(opening)
     #expect(timings.withLock { $0.last?.waited } == 3)
   }
 
@@ -2161,7 +2161,7 @@ struct BridgeTests {
     try await post("/v1/context", context())
     #expect(await voice.added.isEmpty)
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added == [summary])
   }
 
@@ -2181,7 +2181,7 @@ struct BridgeTests {
     #expect(await eventually { await voices.waiting == 1 })
     try await test.post("/v1/context", test.context())
     await voices.finishLaunch()
-    await opening.value
+    try await settle(opening)
     let second = try #require(await voices.made.last)
     #expect(await second.opens.last?.map(\.text).contains(test.summary) == true)
     #expect(await second.added.isEmpty)
@@ -2197,7 +2197,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added.isEmpty)
   }
 
@@ -2655,7 +2655,7 @@ struct BridgeTests {
     try await test.post(
       "/v1/join", JoinBody(sessionId: new, title: "Alpha", replaces: test.a, syncs: true))
     await test.voice.releaseOpen()
-    await opened.value
+    try await settle(opened)
     #expect(await eventually { await test.bridge.status.call == .live })
     #expect(await test.voice.added.contains { $0.contains("Held summary") })
   }
@@ -3165,7 +3165,7 @@ struct BridgeTests {
     let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
     try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
     await audio.releaseOffer()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
   }
 
@@ -3205,7 +3205,7 @@ struct BridgeTests {
     #expect(await eventually { await voices.waiting == 1 })
     try await test.sync(test.a, "Fix the build.")
     await voices.finishLaunch()
-    await opening.value
+    try await settle(opening)
     let second = try #require(await voices.made.last)
     #expect(await second.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
     #expect(await second.added.isEmpty)
@@ -3220,7 +3220,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     try await sync(a, "Fix the build.")
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added == ["[TYPED] Alpha: Fix the build."])
     #expect(await voice.opens.last?.isEmpty == true)
   }
@@ -3718,7 +3718,7 @@ struct BridgeTests {
     try await sync(a, "Rename the folder.")
     await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await bridge.status.call == .off)
     await live()
     #expect(await seeded("[TYPED] Alpha: Rename the folder.") == 1)
