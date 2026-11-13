@@ -74,8 +74,8 @@ let summary: { model: string | undefined; text: string; failures: SummaryFailure
 let turnsDone = 0
 /**
  * The summary on its way, which an ask with the same number (`ask`; none from an older app) joins
- * instead of asking a model again, and gets what the first ask's model writes; not once a gap
- * `crossed` it. `send`: its place in `sendCount`.
+ * instead of asking a model again, and gets what the first ask's model writes; not once a gap, or a
+ * fork's time-out, `crossed` it. `send`: its place in `sendCount`.
  */
 let sending: { send: number; ask: number | undefined; crossed: boolean; outcome: Promise<ContextOutcome> } | null = null
 /** The hooks' posts to the app, in the order the hooks ran. */
@@ -451,7 +451,10 @@ async function deliverContext($: EngineInterface, ask: ContextAsk, send: number)
     const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
     outcome = await Promise.race([forkAndPost($, send), late])
     timer?.cancel()
-    if (outcome !== 'sent') sendCount += 1  // a summary this send writes after its time is dropped
+    if (outcome !== 'sent') {
+      sendCount += 1  // a summary this send writes after its time is dropped
+      if (sending?.send === send) sending.crossed = true  // and no later ask joins it
+    }
   }
   // A newer send, after a gap, owns the band's note.
   if (sending?.send !== send) return outcome
@@ -505,7 +508,7 @@ async function forkAndPost($: EngineInterface, send: number): Promise<ContextOut
 
 /**
  * Sends the summary the app asked for, which has no reply line of its own, and never rejects. While
- * one is on its way an ask with its number joins it, unless a gap crossed it: that one is over.
+ * one is on its way an ask with its number joins it, unless a gap or its time-out crossed it.
  */
 async function contextAsked($: EngineInterface, ask: ContextAsk): Promise<void> {
   if (sending === null || sending.crossed || sending.ask !== ask.ask) {

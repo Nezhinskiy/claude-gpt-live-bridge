@@ -497,6 +497,26 @@ test('anAskWithoutAModelIsAsBefore', async ($, on) => {
   expect(world.take('context')).toEqual([])
 })
 
+test('anAskAsAForkTimesOutStartsItsOwnSend', async ($, on) => {
+  // An older app asks again while the timed-out fork's note comes down: that send is over, not joined.
+  let release = () => {}
+  const held = new Promise<void>(resolve => { release = resolve })
+  let forks = () => 0
+  on('state.set', async (_, e, next) => {
+    if (forks() === 1 && !('context' in (e.value ?? {}))) await held  // the time-out's write
+    return next(e)
+  })
+  const world = await joined($, on)
+  world.forkMs = 2 * MINUTE
+  forks = () => world.forks
+  await appAsks(world)
+  await world.clock.advance(MINUTE)
+  await appAsks(world)
+  release()
+  await world.clock.advance(200)
+  expect(world.forks).toBe(2)
+})
+
 test('aCachedFallbackSummaryKeepsItsFailures', async ($, on) => {
   const world = await joined($, on)
   world.completeFails = { [OPUS]: 'refused' }
