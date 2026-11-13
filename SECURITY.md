@@ -89,6 +89,11 @@ voices.
   - join a session as one that missed a turn, or that does not sync, which makes the next line
     that session opens ask it for a fresh summary (while the pause setting is on or the
     session is marked paused, only one with no summary yet, below), and so makes it write one;
+  - join with `writesSummaries`, make itself the target and never answer the summary ask, which
+    holds what you say on the Mac, unsent, for up to 30 seconds from the ask while the line waits
+    for that summary. The line then opens without it, and no later line of that call waits for
+    that session id; joining again under a new id and making itself the target holds the next line
+    the same way;
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation;
   - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as

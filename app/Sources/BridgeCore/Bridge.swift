@@ -51,6 +51,17 @@ public actor Bridge: Router {
   /// when the attempt starts: the `changed()` that follows that decision could otherwise take the
   /// last line's session for this line's, and close it.
   private var lineKnowsSession = false
+  /// Which lines of this call wait for their session's summary.
+  private var summaryWait = SummaryWait()
+  /// The lines waiting for a summary, each woken to look again at every change.
+  private var waiting: [Int: CheckedContinuation<Void, Never>] = [:]
+  private var waits = 0
+  /// The line's latest wait, for the log: the session and its ask's time, when the wait began,
+  /// and when it ended if the answer did not end it.
+  private var lineWait: (session: SessionID, ask: Date, since: Date, until: Date?)?
+  /// The target the call was last at, which a target change asks ahead of its line; nil while
+  /// the call is off.
+  private var callTarget: SessionID?
   /// The context line the opening line was seeded with.
   private var seededContext: String?
   /// A summary for the opening line's session that came while it connected, added once the line
@@ -188,6 +199,8 @@ public actor Bridge: Router {
     }
     guard !Task.isCancelled else { return }
     callStart = time.now
+    summaryWait.newCall()
+    callTarget = nil  // so the call's first `changed()` asks the target ahead of its line
     await send(.start)
   }
 
@@ -198,6 +211,17 @@ public actor Bridge: Router {
   public func loadContext() async {
     guard let target = await registry.target else { return }
     await askForContext(of: target)
+  }
+
+  /// At Start and at a target change during the call, a session whose mod writes summaries is
+  /// asked at once, if its line would ask (`needsContext`, unless the pause holds it back), so its
+  /// line waits less. One that forks is asked when its line opens, so Start spends nothing on the
+  /// session's own model before anyone speaks.
+  private func askAhead(of id: SessionID) async {
+    guard await registry.writesSummaries(id), !pauseHoldsBackSummary(of: id),
+      await needsContext(id)
+    else { return }
+    await askForContext(of: id)
   }
 
   /// A mod that writes summaries is told the model and, unless it is the default, the default to
@@ -466,7 +490,8 @@ public actor Bridge: Router {
   }
 
   /// Opens the line with the target's conversation, and asks the target for its context when it
-  /// needs one and may have one; the line does not wait for it. Cancelled, it does nothing
+  /// needs one and may have one. While that session's summary is in flight the line waits, after
+  /// the offer and before the seed and the connect (`waitForSummary`). Cancelled, it does nothing
   /// more: whoever cancelled it closes what it opened. A line the voice closed itself
   /// (`CancellationError`) says why in its `closed` event.
   private func openLine(preroll: Bool) async {
@@ -481,6 +506,8 @@ public actor Bridge: Router {
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer(preroll: preroll)
+      await waitForSummary()
+      try Task.checkCancellation()
       // `lineSession` from here: `/clear` during the awaits gives the session a new id.
       let tasks =
         if let lineSession { await registry.openTasks(of: lineSession) } else { [String]() }
@@ -512,6 +539,49 @@ public actor Bridge: Router {
       await send(.connectFailed(Problem(error)))
     }
   }
+
+  /// Holds the opening line while its session's summary is in flight (`SummaryWait`): until the
+  /// post that answers the open ask, the limit, the session's drop, a gap or forget that makes the
+  /// ask stale, or the line's cancellation. Each change wakes it to look again. An empty answer
+  /// (`context(_:)`) and the limit end this call's waits for the session; nothing goes to the
+  /// voice meanwhile, as the line is not open and the page queues what is said.
+  private func waitForSummary() async {
+    while !Task.isCancelled, let id = lineSession,
+      let ask = continuity.openSummaryAsk(of: id, at: time.now),
+      let deadline = summaryWait.deadline(
+        for: id, ask: ask, writesSummaries: await registry.writesSummaries(id))
+    {
+      guard time.now < deadline else {
+        summaryWait.endedWithout(id)
+        break
+      }
+      if let wait = lineWait, wait.session == id, wait.ask == ask.at {
+        lineWait?.until = nil  // the same ask again, after a reconnect
+      } else {
+        lineWait = (id, ask.at, time.now, nil)
+      }
+      await sleep(until: deadline)
+    }
+    if lineWait != nil, lineWait?.until == nil { lineWait?.until = time.now }
+  }
+
+  /// Returns at `deadline`, at the next `changed()` or when the task is cancelled.
+  private func sleep(until deadline: Date) async {
+    waits += 1
+    let wait = waits
+    let timer = Task { [time] in
+      guard (try? await time.sleep(until: deadline)) != nil else { return }
+      self.wake(wait)
+    }
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { waiting[wait] = $0 }
+    } onCancel: {
+      Task { await self.wake(wait) }
+    }
+    timer.cancel()
+  }
+
+  private func wake(_ wait: Int) { waiting.removeValue(forKey: wait)?.resume() }
 
   /// The running codex controller, or a new one. A launch runs to its end, outside the
   /// attempt's cancellation; an attempt cancelled meanwhile ends what it launched.
@@ -620,15 +690,23 @@ public actor Bridge: Router {
   }
 
   /// A new target closes a line opened with another session's conversation; the next speech
-  /// opens it with the target's. With no session left nobody is there to talk to, so the call
-  /// stops as Stop does, a Start still launching codex included, and says why, as Start with no
-  /// session does.
+  /// opens it with the target's. The call's first target, and each new one, from the menu, the
+  /// band or the registry after a drop, is asked ahead of its line (`askAhead`). With no session
+  /// left nobody is there to talk to, so the call stops as Stop does, a Start still launching
+  /// codex included, and says why, as Start with no session does.
   private func followTarget() async {
-    guard machine.phase != .off || connecting != nil else { return }
+    guard machine.phase != .off || connecting != nil else {
+      callTarget = nil
+      return
+    }
     guard let target = await registry.target else {
       problem = .noSession
       await perform(.stop)
       return
+    }
+    if machine.phase != .off, target != callTarget {
+      callTarget = target
+      await askAhead(of: target)
     }
     guard isLineOpen, lineKnowsSession, target != lineSession else { return }
     await send(.conversationChanged)
@@ -770,16 +848,26 @@ public actor Bridge: Router {
     let wrote = !body.summary.allSatisfy(\.isWhitespace)
     let failures = body.failures ?? []
     let ask = continuity.openSummaryAsk(of: id, at: now)
+    // The line waiting for this ask, if one is.
+    var isWaitedFor = false
     if let ask {
       let model = failures.count == 1 && wrote ? ask.fallbackModel : ask.model
       // A post with another ask's number was written for an ask a gap made stale.
       let isOtherAsk = body.ask != nil && body.ask != ask.number
+      var waited: TimeInterval?
+      if !isOtherAsk, let wait = lineWait, wait.session == id, wait.ask == ask.at {
+        waited = (wait.until ?? now).timeIntervalSince(wait.since)
+        isWaitedFor = wait.until == nil
+        lineWait = nil
+      }
       reportsSummary(
         SummaryTiming(
           askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale || isOtherAsk,
-          hadSummary: wrote, model: model, stats: body.stats))
+          hadSummary: wrote, model: model, stats: body.stats, waited: waited))
     }
+    // The waiting line looks again at the `changed()` after every post, this one ignored or not.
     guard continuity.takeSummaryAsk(of: id, at: now, number: body.ask) else { return }
+    if isWaitedFor, !wrote { summaryWait.endedWithout(id) }
     // An answer on which no model was tried leaves Settings' line as it was.
     if let asked = ask?.model, wrote || !failures.isEmpty {
       lastSummary = SummaryReport(
@@ -854,6 +942,8 @@ public actor Bridge: Router {
   /// Two changes can interleave across the awaits, so only the latest one publishes: an older
   /// one finishing last would show the status from before the newer change.
   @discardableResult private func changed() async -> StatusReply {
+    for wait in waiting.values { wait.resume() }  // a waiting line looks again
+    waiting = [:]
     await withdrawQuestionsOfDroppedSessions()
     await followTarget()
     if !isLineOpen { growing = GrowingLines() }  // no final text comes for what a closed line said

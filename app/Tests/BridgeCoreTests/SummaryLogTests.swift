@@ -26,6 +26,13 @@ struct SummaryLogTests {
     #expect(line.contains("outputTokens=400"))
   }
 
+  @Test func theLineSaysHowLongTheLineWaited() {
+    var waited = timing(model: nil)
+    #expect(!SummaryLog.line(waited).contains("waited="))
+    waited.waited = 3.5
+    #expect(SummaryLog.line(waited).contains("waited=3500ms"))
+  }
+
   @Test func aLineWithoutAModelSaysFork() {
     #expect(SummaryLog.line(timing(model: nil)).contains("model=fork"))
   }

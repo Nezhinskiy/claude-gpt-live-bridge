@@ -61,6 +61,13 @@ All notable changes to this project are listed here. The format follows
   turn of a resumed or new Claude Code process to end ([BR-003](docs/bugs/BR-003.md), for an app
   and a mod of this release). Where Claude Code's provider does not offer Haiku 5.5, the session gets no
   summary ([known limitations](README.md#known-limitations)).
+- A line no longer reaches the voice before its context: for a session on a mod of this release,
+  the line waits for the summary in flight before it connects, while what you say is recorded and
+  queued on the Mac, then opens with the summary in its seed and plays what you said. It opens
+  without one 30 seconds after the ask, or as soon as the mod answers with none; either ends the
+  waits for that session until the next Start. Such a session is asked at Start and when the
+  target changes during the call, so the summary is often in before you speak. A session on an
+  older mod is asked when its line opens and is not waited for, as before.
 - The mod answers every summary ask from this app, with an empty summary when it has none, and
   each ask carries a number that its answer repeats, so a summary written before a gap the app
   has heard of is not taken for a fresh one. One that reaches the app before the mod's next join
