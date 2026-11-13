@@ -728,6 +728,19 @@ test('aFastTickDoesNotFollowTheTitle', async ($, on) => {
   expect(world.take('join').map(body => body?.title)).toEqual(['Renamed session'])
 })
 
+/** A poll that takes most of a second leaves the once-a-second work running about once a second. */
+test('aSlowPollStillFollowsTheTitle', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = asTarget(true)
+  await liveOn($)
+  await world.clock.advance(1000)
+  world.take('join')
+  world.nextMs = 900
+  world.title = 'Renamed session'
+  await world.clock.advance(3000)
+  expect(world.take('join').map(body => body?.title)).toEqual(['Renamed session'])
+})
+
 /** A fast tick whose reply changes nothing the band shows writes nothing, so it redraws nothing. */
 test('anUnchangedBandIsNotRewritten', async ($, on) => {
   const world = fakeWorld(on)
@@ -742,6 +755,27 @@ test('anUnchangedBandIsNotRewritten', async ($, on) => {
   world.take('next')
   writes.length = 0
   await world.clock.advance(800)
+  expect(world.take('next')).toHaveLength(4)
+  expect(writes).toEqual([])
+})
+
+/** The minutes grow while a line is open, and the band draws none of them. */
+test('aLiveLinesMinutesDoNotRewriteTheBand', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = { ...asTarget(true), call: 'live' }
+  const writes: unknown[] = []
+  on('state.set', async (_, e, next) => {
+    writes.push(e.value)
+    return next(e)
+  })
+  await liveOn($)
+  await world.clock.advance(1000)
+  world.take('next')
+  writes.length = 0
+  for (const minutesToday of [0.01, 0.02, 0.03, 0.04]) {
+    world.status = { ...asTarget(true), call: 'live', minutesToday }
+    await world.clock.advance(200)
+  }
   expect(world.take('next')).toHaveLength(4)
   expect(writes).toEqual([])
 })

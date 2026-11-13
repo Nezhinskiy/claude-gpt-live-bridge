@@ -44,6 +44,8 @@ export class BridgeLink {
   #hasGap = false
   #timer: Timer | null = null
   #ticks = 0
+  /** A once-a-second tick came while a poll ran, so the next tick that polls is it. */
+  #isSlowDue = false
   /** The last poll's reply named this session the target. */
   #isTarget = false
   #isPolling = false
@@ -189,12 +191,15 @@ export class BridgeLink {
   /**
    * Queues `tick` every 200 ms while the last poll named this session the target, and once a
    * second otherwise, until `stop`, never two at once. `isFast`: a tick between the once-a-second
-   * ones, which only the target polls on.
+   * ones, which only the target polls on. A once-a-second tick that a slow poll held back is the
+   * next one that polls, so its work runs about once a second whatever a poll takes.
    */
   start(tick: (isFast: boolean) => Promise<void>): void {
     this.#timer ??= this.#ports.every(POLL_MS, () => {
-      const isFast = ++this.#ticks % TICKS_A_SECOND !== 0
+      if (++this.#ticks % TICKS_A_SECOND === 0) this.#isSlowDue = true
+      const isFast = !this.#isSlowDue
       if (this.#isPolling || (isFast && !this.#isTarget)) return
+      this.#isSlowDue = false
       this.#isPolling = true
       void this.serial(() => tick(isFast))
         .catch((error: unknown) => this.#ports.log(`voice poll failed: ${String(error)}`))
@@ -206,6 +211,7 @@ export class BridgeLink {
     this.#timer?.cancel()
     this.#timer = null
     this.#ticks = 0
+    this.#isSlowDue = false
   }
 
   async #forSession(route: string, body: object) {

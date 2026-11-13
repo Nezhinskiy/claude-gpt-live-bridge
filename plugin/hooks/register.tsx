@@ -98,15 +98,18 @@ const answering = (ask: ContextAsk) => (ask.ask === undefined ? {} : { ask: ask.
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
 
+/** The band as it draws: `minutesToday`, which grows while a line is open, is only `/live`'s text. */
+const drawn = (state: Band | null) => JSON.stringify(state, (key, value: unknown) => (key === 'minutesToday' ? undefined : value))
+
 /**
- * Writes the band; with `isFast`, only when that changes it, since every write redraws each
- * surface that shows it. The once-a-second write stays, which tells a surface that dropped the
- * band from one that draws it (`UNDRAWN_MS`).
+ * Writes the band; with `isFast`, only when that changes what it draws, since every write redraws
+ * each surface that shows it. The once-a-second write stays, which keeps `/live`'s minutes and
+ * tells a surface that dropped the band from one that draws it (`UNDRAWN_MS`).
  */
 async function writeBand($: EngineInterface, change: (now: Band | null) => Band | null, isFast: boolean): Promise<void> {
   if (isFast) {
     const now = await read($, band)
-    if (JSON.stringify(change(now)) === JSON.stringify(now)) return
+    if (drawn(change(now)) === drawn(now)) return
   }
   await update($, band, change)
 }
