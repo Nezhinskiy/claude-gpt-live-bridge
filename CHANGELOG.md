@@ -75,9 +75,9 @@ All notable changes to this project are listed here. The format follows
   ([the wait](docs/architecture/overview.md#silent-hang-up)). Such a session is asked at
   Start and when the target changes during the call, so the summary is often in before you speak;
   a line that opens while that ask is on its way joins it, and the mod writes one summary for both,
-  or writes it again if it lost it (it restarted, or the app did), so a failing summary is reported
-  once in the session, unless a line asks in the last moment of a write and the mod writes it again. A session on an older mod is asked when its line opens
-  and is not waited for, as before.
+  or writes it again if it lost it (it restarted, or the app did). A failing summary is reported
+  once for each write, and the next line that needs it asks, and may report, again. A session on
+  an older mod is asked when its line opens and is not waited for, as before.
 - The menu's **Load context** reads **Loading context…**, disabled, while any summary of the target
   is on its way from a mod of this release, whatever asked for it (Start, a new target, a line or
   a press), not only after a press; it waits until the summary arrives or the mod's 60 seconds from

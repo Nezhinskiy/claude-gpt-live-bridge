@@ -433,7 +433,11 @@ Settings starts another codex to list the voices, and opening the menu starts a 
 that reads your Codex usage from OpenAI, also while the call is off; what codex sends on its own
 is codex's. Codex
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
-session sends its work to Anthropic as it always does. LiveBridge has no telemetry. The menu's
+session sends its work to Anthropic as it always does, and so does the summary the voice gets as
+context: at Start, at a change of target, when a line opens and on **Load context**, also while
+the line is closed, the session's mod sends its transcript (a mod of this release cuts it to
+120,000 characters) to the summary model through Claude Code, on your Claude usage; Settings' check of a custom **Summary
+model** sends one short request the same way. LiveBridge has no telemetry. The menu's
 **Feedback & Support** links, **Report a Bug…**, **LiveBridge Website** and **Star LiveBridge on
 GitHub**, only open the repository's bug form, getlivebridge.com and the repository's page in your
 browser; the app sends nothing. Its other items stay on the Mac: **Debug Mode** writes the voice's
