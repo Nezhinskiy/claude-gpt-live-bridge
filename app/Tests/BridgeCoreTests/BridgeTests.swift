@@ -1655,6 +1655,18 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
   }
 
+  /// An answer that closes the ask, empty or stale, is kept, so a restart does not open it again.
+  @Test func anAnswerThatClosesTheAskIsSaved() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now) == nil)
+    await bridge.loadContext()
+    await bridge.newConversation()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "From before.", ask: 2))
+    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now) == nil)
+  }
+
   /// A joined ask changes no stored ask, so the conversation file is not written again.
   @Test func aJoinedAskWritesNothing() async throws {
     try await join(a, "Alpha", writesSummaries: true)

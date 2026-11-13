@@ -902,6 +902,7 @@ public actor Bridge: Router {
     let answer = summaries.answer(id, number: body.ask, wrote: wrote, in: &continuity, at: now)
     switch answer {
     case .taken(let ask, let waited), .stale(let ask, let waited):
+      save()  // the ask is closed, also for the app after a restart
       let report = ask.model.map {
         SummaryReport(asked: $0, fallback: ask.fallbackModel, failures: failures, wrote: wrote)
       }
