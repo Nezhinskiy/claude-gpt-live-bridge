@@ -463,6 +463,15 @@ test('aThrowWhileReadingTheTranscriptPostsItsFailure', async ($, on) => {
   expect(saidNoSummary(world)).toBe(true)
 })
 
+test('aThrowAfterTheTranscriptIsReadIsNoUnreadableTranscript', async ($, on) => {
+  // The transcript was read, so it is not called unreadable; no model wrote, and nothing says why.
+  const world = await joined($, on)
+  world.messages = [{ role: 'user', content: [null] }] as never
+  await appAsks(world, NAMED)
+  expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '' }])
+  expect(saidNoSummary(world)).toBe(true)
+})
+
 test('anAskAfterAGapDoesNotJoinTheDoomedSend', async ($, on) => {
   const world = await joined($, on)
   world.completeMs = 5000
