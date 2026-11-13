@@ -1794,6 +1794,32 @@ struct BridgeTests {
     #expect(await voice.opens == [[]])
   }
 
+  /// A summary after the limit is still the open ask's answer: it reaches the open line.
+  @Test func aLateSummaryReachesTheOpenLine() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryAsks.Policy.waitLimit), polling: a)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await voice.added == [summary])
+  }
+
+  /// A line that waited out the limit spends the wait: the next line, for a new ask, opens at once.
+  @Test func theLimitIsNotWaitedForAgainThisCall() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryAsks.Policy.waitLimit), polling: a)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await bridge.loadContext()
+    Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.opens.count == 2 })
+  }
+
   /// A result that would open the line waits for the summary as speech does.
   @Test func aResultWaitsLikeSpeech() async throws {
     try await startWriting()
