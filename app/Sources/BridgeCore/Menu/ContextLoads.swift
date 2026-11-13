@@ -49,41 +49,20 @@ public enum ContextLoadState: Sendable, Equatable {
   }
 }
 
-/// A session's answer to a context ask, as the bridge took it; `wrote` is false for an empty one.
-public struct ContextArrival: Sendable, Equatable {
-  public let session: SessionID
-  public let wrote: Bool
-}
-
-/// The menu's Load context item for one session. While the bridge has the session's summary in
-/// flight (`Bridge.summariesInFlight`, whatever asked for it) it is loading; a summary with text
-/// that arrived (`POST /v1/context`) is then shown as loaded for `shownLoaded`. An empty answer
-/// shows nothing. Pure: the caller passes the time and what is in flight.
-public struct ContextLoads: Sendable, Equatable {
-  public static let shownLoaded: TimeInterval = 3
-
-  private var loadedAt: [SessionID: Date] = [:]
-
-  public init() {}
-
-  /// An answer from `id`; `wrote` is false for an empty one, which loaded nothing.
-  public mutating func arrived(_ id: SessionID, at now: Date, wrote: Bool) {
-    loadedAt[id] = wrote ? now : nil
+/// The menu's Load context item for the target: loading while the bridge has its summary in flight
+/// (`SummaryDisplay.loading`, whatever asked for it), then loaded for `shownLoaded` after a summary
+/// with text was taken. An empty answer shows nothing. Pure: the caller passes the time.
+public enum ContextLoads {
+  public static func state(_ display: SummaryDisplay, at now: Date) -> ContextLoadState {
+    if display == .loading { return .loading }
+    return nextChange(display, after: now) == nil ? .ready : .loaded
   }
 
-  /// Forgets the sessions not in `ids`: they left or were removed.
-  public mutating func keep(only ids: Set<SessionID>) {
-    loadedAt = loadedAt.filter { ids.contains($0.key) }
-  }
-
-  public func state(of id: SessionID, inFlight: Set<SessionID>, at now: Date) -> ContextLoadState {
-    if inFlight.contains(id) { return .loading }
-    if let loaded = loadedAt[id], now < loaded + Self.shownLoaded { return .loaded }
-    return .ready
-  }
-
-  /// The first moment after `now` at which some session's state changes by itself.
-  public func nextChange(after now: Date) -> Date? {
-    loadedAt.values.map { $0 + Self.shownLoaded }.filter { $0 > now }.min()
+  /// When the state of `display` next changes by itself, after `now`: the end of loaded.
+  public static func nextChange(_ display: SummaryDisplay, after now: Date) -> Date? {
+    guard case .loaded(let at) = display, now < at + SummaryAsks.Policy.shownLoaded else {
+      return nil
+    }
+    return at + SummaryAsks.Policy.shownLoaded
   }
 }

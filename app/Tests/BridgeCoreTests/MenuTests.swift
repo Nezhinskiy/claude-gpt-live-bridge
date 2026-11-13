@@ -4,51 +4,25 @@ import Testing
 @testable import BridgeCore
 
 struct ContextLoadsTests {
-  let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
-  let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
   let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 
   /// Whatever asked for it, Start, a target change, a line or a press: Load context waits.
   @Test func anyAskInFlightShowsLoading() {
-    var loads = ContextLoads()
-    #expect(loads.state(of: a, inFlight: [a], at: t0) == .loading)
-    #expect(!loads.state(of: a, inFlight: [a], at: t0).isEnabled)
-    #expect(loads.state(of: b, inFlight: [a], at: t0) == .ready)  // per session
-    loads.arrived(a, at: t0, wrote: true)
-    #expect(loads.state(of: a, inFlight: [a], at: t0) == .loading)  // a newer ask, on its way
+    #expect(ContextLoads.state(.loading, at: t0) == .loading)
+    #expect(!ContextLoads.state(.loading, at: t0).isEnabled)
+    #expect(ContextLoads.state(.none, at: t0) == .ready)
   }
 
   @Test func aSummaryShowsAsLoadedForThreeSeconds() {
-    var loads = ContextLoads()
-    loads.arrived(a, at: t0, wrote: true)
-    #expect(loads.state(of: a, inFlight: [], at: t0 + 2.9) == .loaded)
-    #expect(loads.state(of: a, inFlight: [], at: t0 + 3) == .ready)
+    #expect(ContextLoads.state(.loaded(at: t0), at: t0 + 2.9) == .loaded)
+    #expect(ContextLoads.state(.loaded(at: t0), at: t0 + 3) == .ready)
   }
 
-  /// An empty answer is no summary: nothing was loaded.
-  @Test func anEmptyReplyGoesBackToLoadContext() {
-    var loads = ContextLoads()
-    loads.arrived(a, at: t0 + 5, wrote: false)
-    #expect(loads.state(of: a, inFlight: [], at: t0 + 5) == .ready)
-  }
-
-  @Test func aSessionThatLeftIsForgotten() {
-    var loads = ContextLoads()
-    loads.arrived(a, at: t0, wrote: true)
-    loads.arrived(b, at: t0, wrote: true)
-    loads.keep(only: [b])
-    #expect(loads.state(of: a, inFlight: [], at: t0) == .ready)
-    #expect(loads.state(of: b, inFlight: [], at: t0) == .loaded)
-  }
-
-  @Test func theNextChangeIsTheEarliestEndOfLoaded() {
-    var loads = ContextLoads()
-    #expect(loads.nextChange(after: t0) == nil)
-    loads.arrived(a, at: t0, wrote: true)
-    loads.arrived(b, at: t0 + 1, wrote: true)
-    #expect(loads.nextChange(after: t0) == t0 + 3)
-    #expect(loads.nextChange(after: t0 + 3) == t0 + 4)
-    #expect(loads.nextChange(after: t0 + 4) == nil)
+  @Test func theNextChangeIsTheEndOfLoaded() {
+    #expect(ContextLoads.nextChange(.none, after: t0) == nil)
+    #expect(ContextLoads.nextChange(.loading, after: t0) == nil)
+    #expect(ContextLoads.nextChange(.loaded(at: t0), after: t0) == t0 + 3)
+    #expect(ContextLoads.nextChange(.loaded(at: t0), after: t0 + 3) == nil)
   }
 }
 

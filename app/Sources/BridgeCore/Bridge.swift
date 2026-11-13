@@ -82,10 +82,6 @@ public actor Bridge: Router {
   private var changes = 0
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
-  /// The sessions whose summary was just taken (`POST /v1/context`), so the menu shows it loaded;
-  /// an empty one is announced as such.
-  public nonisolated let contextArrivals: AsyncStream<ContextArrival>
-  private let announceContext: AsyncStream<ContextArrival>.Continuation
   /// The running app's version; sessions on an older mod are listed against it.
   private let appVersion: AppVersion?
 
@@ -125,8 +121,6 @@ public actor Bridge: Router {
       (try? JSONDecoder().decode(Continuity.self, from: Data(contentsOf: continuityFile)))
       ?? Continuity()
     (updates, publish) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
-    (contextArrivals, announceContext) = AsyncStream.makeStream(
-      bufferingPolicy: .bufferingNewest(8))
     Task { [weak self] in
       while (try? await time.sleep(for: .seconds(1))) != nil, let bridge = self {
         await bridge.sweep()
@@ -144,7 +138,8 @@ public actor Bridge: Router {
     }
   }
 
-  /// What the app shows: the status, and what only the app needs.
+  /// What the app shows: the status, and what only the app needs. What was loaded is forgotten
+  /// for a session that left.
   public var current: BridgeUpdate {
     get async {
       let status = await status
@@ -154,25 +149,14 @@ public actor Bridge: Router {
       let contextNeed = if let target { await contextNeed(target) } else { ContextNeed.none }
       var olderMods: [String] = []
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
+      summaries.keep(only: Set(status.sessions.map(\.sessionId)))
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes,
         conversation: shown.shownLines + growing.lines,
         labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
         claudeLimits: claudeLimits, lastSummary: lastSummary,
-        summariesInFlight: await summariesInFlight)
-    }
-  }
-
-  /// The joined sessions whose summary is on its way, whatever asked for it (Start, a target
-  /// change, Load context or a line): an open ask to a mod that writes summaries, within the
-  /// mod's budget, that no gap or forget has made stale (`SummaryAsks.display`).
-  public var summariesInFlight: Set<SessionID> {
-    get async {
-      let now = time.now
-      return Set(
-        await registry.rows().map(\.sessionId).filter {
-          summaries.display(of: $0, in: continuity, at: now) == .loading
-        })
+        targetSummary: target.map { summaries.display(of: $0, in: continuity, at: time.now) }
+          ?? .none)
     }
   }
 
@@ -944,14 +928,10 @@ public actor Bridge: Router {
       ? AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
       : nil
-    guard let line else {
-      announceContext.yield(ContextArrival(session: id, wrote: false))
-      return
-    }
+    guard let line else { return }
     let isNew = line.text != continuity[id].context
     continuity.setContext(line.text, for: id)
     save()
-    announceContext.yield(ContextArrival(session: id, wrote: true))
     guard isNew, lineSession == id else { return }
     switch machine.phase {
     case .live: try? await realtime?.addContext(line.text)
@@ -1057,6 +1037,7 @@ public struct BridgeUpdate: Sendable, Equatable {
   public var claudeLimits: UsageLimits? = nil
   /// What came of the last summary asked for with a model, for Settings.
   public var lastSummary: SummaryReport? = nil
-  /// The joined sessions whose summary is on its way (`Bridge.summariesInFlight`).
-  public var summariesInFlight: Set<SessionID> = []
+  /// The target's summary: on its way, whatever asked for it (Start, a target change, Load context
+  /// or a line), or when the last one was taken (`SummaryAsks.display`).
+  public var targetSummary = SummaryDisplay.none
 }

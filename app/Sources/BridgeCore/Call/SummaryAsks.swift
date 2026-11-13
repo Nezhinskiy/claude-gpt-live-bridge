@@ -61,7 +61,7 @@ struct SummaryAsks: Sendable {
   /// when it ended if the answer did not end it.
   private var wait: (session: SessionID, number: Int, began: Date, ended: Date?)?
   /// When each session's last summary with text was taken.
-  private var loadedAt: [SessionID: Date] = [:]
+  private var lastLoaded: [SessionID: Date] = [:]
 
   /// The ask of `id` that can still be answered at `now`, without taking it.
   func openAsk(of id: SessionID, in continuity: Continuity, at now: Date) -> Ask? {
@@ -129,7 +129,7 @@ struct SummaryAsks: Sendable {
     continuity.changeSummaryAsk(of: id) { if !isOtherAsk { $0 = nil } }
     if isOtherAsk { return open == nil ? .closedAsk : .otherAsk }
     guard let open else {
-      loadedAt[id] = wrote ? now : nil
+      lastLoaded[id] = wrote ? now : nil
       return .unasked
     }
     var waited: TimeInterval?
@@ -141,7 +141,7 @@ struct SummaryAsks: Sendable {
     }
     if open.isStale { return .stale(open, waited: waited) }
     if isWaitedFor, !wrote { spent.insert(id) }
-    loadedAt[id] = wrote ? now : nil
+    lastLoaded[id] = wrote ? now : nil
     return .taken(open, waited: waited)
   }
 
@@ -153,11 +153,11 @@ struct SummaryAsks: Sendable {
     {
       return .loading
     }
-    return loadedAt[id].map { .loaded(at: $0) } ?? .none
+    return lastLoaded[id].map { .loaded(at: $0) } ?? .none
   }
 
   /// Forgets what was loaded for the sessions not in `ids`: they left or were removed.
   mutating func keep(only ids: Set<SessionID>) {
-    loadedAt = loadedAt.filter { ids.contains($0.key) }
+    lastLoaded = lastLoaded.filter { ids.contains($0.key) }
   }
 }

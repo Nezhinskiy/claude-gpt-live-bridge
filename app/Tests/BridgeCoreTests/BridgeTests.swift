@@ -688,16 +688,16 @@ struct BridgeTests {
   /// Whatever made the ask, here Start, the summary is on its way until its answer.
   @Test func anyAskIsInFlightUntilItsAnswer() async throws {
     try await startWriting()
-    #expect(await bridge.current.summariesInFlight == [a])
+    #expect(await bridge.current.targetSummary == .loading)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
-    #expect(await bridge.current.summariesInFlight.isEmpty)
+    #expect(await bridge.current.targetSummary != .loading)
   }
 
   /// An older mod posts nothing when it has nothing to summarise, so the menu does not wait for it.
   @Test func anAskToAnOlderModIsNotInFlight() async throws {
     await live()
     #expect(try await registry.poll(a) == .context())
-    #expect(await bridge.current.summariesInFlight.isEmpty)
+    #expect(await bridge.current.targetSummary != .loading)
   }
 
   /// The mod answers within its budget or not at all, so the menu stops waiting there.
@@ -705,9 +705,9 @@ struct BridgeTests {
     try await join(a, "Alpha", writesSummaries: true)
     await bridge.loadContext()
     try await pass(59, polling: a)
-    #expect(await bridge.current.summariesInFlight == [a])
+    #expect(await bridge.current.targetSummary == .loading)
     try await pass(1, polling: a)
-    #expect(await bridge.current.summariesInFlight.isEmpty)
+    #expect(await bridge.current.targetSummary != .loading)
   }
 
   /// Its summary would be ignored, so the menu does not wait for it.
@@ -715,7 +715,7 @@ struct BridgeTests {
     try await join(a, "Alpha", writesSummaries: true)
     await bridge.loadContext()
     await bridge.newConversation()
-    #expect(await bridge.current.summariesInFlight.isEmpty)
+    #expect(await bridge.current.targetSummary != .loading)
   }
 
   /// The menu shows the press at once: the bridge publishes the ask it made.
@@ -723,25 +723,33 @@ struct BridgeTests {
     try await join(a, "Alpha", writesSummaries: true)
     var updates = bridge.updates.makeAsyncIterator()
     await bridge.loadContext()
-    #expect(await updates.next()?.summariesInFlight == [a])
+    #expect(await updates.next()?.targetSummary == .loading)
+  }
+
+  /// The menu and the glyph show the target's summary alone: another session's on its way is not.
+  @Test func anotherSessionsAskIsNotTheTargets() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    await bridge.loadContext()
+    await bridge.setTarget(b)
+    #expect(await bridge.current.targetSummary == .none)
   }
 
   /// A session's summary is announced to the menu, which stops waiting for it; one from a
   /// session that never joined is not.
   @Test func arrivingContextIsAnnounced() async throws {
     try await join(a, "Alpha")
-    var arrivals = bridge.contextArrivals.makeAsyncIterator()
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Not joined."))
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
-    #expect(await arrivals.next()?.session == a)
+    #expect(await bridge.current.targetSummary == .loaded(at: time.now))
   }
 
   /// An empty answer is announced as one, so the menu's press ends without saying it loaded.
   @Test func anEmptyAnswerIsAnnouncedAsEmpty() async throws {
     try await join(a, "Alpha")
-    var arrivals = bridge.contextArrivals.makeAsyncIterator()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
     try await post("/v1/context", ContextBody(sessionId: a, summary: ""))
-    #expect(await arrivals.next() == ContextArrival(session: a, wrote: false))
+    #expect(await bridge.current.targetSummary == .none)
   }
 
   @Test func theMenuSetsTheTarget() async throws {
@@ -1688,12 +1696,11 @@ struct BridgeTests {
   @Test func anIgnoredSummaryIsNotAnnounced() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
-    var arrivals = bridge.contextArrivals.makeAsyncIterator()
     await bridge.loadContext()
     await bridge.newConversation()
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
-    #expect(await arrivals.next()?.session == b)
+    #expect(await bridge.current.targetSummary == .none)
   }
 
   /// The context line is shown exactly as the voice gets it, also after the app restarts.

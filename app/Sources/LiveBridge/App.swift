@@ -108,7 +108,6 @@ final class AppModel {
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
-  @ObservationIgnored private var loads = ContextLoads()
   @ObservationIgnored private var loadsTimer: Task<Void, Never>?
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
   /// The running app's `CFBundleShortVersionString`.
@@ -197,9 +196,6 @@ final class AppModel {
       }
       Task { [weak self] in
         for await update in bridge.updates { self?.show(update) }
-      }
-      Task { [weak self] in
-        for await arrival in bridge.contextArrivals { self?.contextArrived(arrival) }
       }
       // A relaunch after an update starts while the old instance may still hold the socket.
       Task { [weak self] in
@@ -495,21 +491,15 @@ final class AppModel {
 
   private var targetRow: SessionRow? { status?.sessions.first(where: \.isTarget) }
 
-  private func contextArrived(_ arrival: ContextArrival) {
-    loads.arrived(arrival.session, at: Date(), wrote: arrival.wrote)
-    refreshLoads()
-  }
-
   /// Shows the target's Load context state, and comes back when a state ends by itself.
   private func refreshLoads() {
     let now = Date()
-    let inFlight = update?.summariesInFlight ?? []
-    let state =
-      targetRow.map { loads.state(of: $0.sessionId, inFlight: inFlight, at: now) } ?? .ready
+    let shown = update?.targetSummary ?? .none
+    let state = ContextLoads.state(shown, at: now)
     if state != contextLoad { contextLoad = state }
     loadsTimer?.cancel()
     loadsTimer = nil
-    guard let next = loads.nextChange(after: now) else { return }
+    guard let next = ContextLoads.nextChange(shown, after: now) else { return }
     loadsTimer = Task { [weak self] in
       try? await Task.sleep(for: .seconds(next.timeIntervalSince(now)))
       guard !Task.isCancelled else { return }
@@ -531,11 +521,10 @@ final class AppModel {
     }
     if next.call != .live { level = 0 }
     let statusChanged = next != status
-    let inFlightChanged = update.summariesInFlight != self.update?.summariesInFlight
+    let summaryChanged = update.targetSummary != self.update?.targetSummary
     if update != self.update { self.update = update }
-    if statusChanged { loads.keep(only: Set(next.sessions.map(\.sessionId))) }
-    if statusChanged || inFlightChanged {
-      presentation = StatusPresentation(next, summariesInFlight: update.summariesInFlight)
+    if statusChanged || summaryChanged {
+      presentation = StatusPresentation(next, targetSummary: update.targetSummary)
       refreshLoads()
     }
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
