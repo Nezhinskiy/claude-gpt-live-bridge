@@ -549,6 +549,16 @@ test('anAskWithTheSendsNumberJoinsIt', async ($, on) => {
   expect(world.completes).toHaveLength(1)
 })
 
+test('aFailingSendItsJoinedAskSharesSaysSoOnce', async ($, on) => {
+  const world = await joined($, on)
+  world.completeMs = 5000
+  world.completeFails = { [OPUS]: 'api-error', [HAIKU]: 'api-error' }
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await world.clock.advance(MINUTE)
+  expect(world.logs.filter(line => line.includes('could not summarise'))).toHaveLength(1)
+})
+
 test('aSendANewerAskReplacedIsNoFailure', async ($, on) => {
   // The app numbered the second ask as another, after a gap or a forget: each send answers its own.
   const world = await joined($, on)

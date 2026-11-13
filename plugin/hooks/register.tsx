@@ -511,16 +511,16 @@ async function forkAndPost($: EngineInterface, send: number): Promise<ContextOut
  * one is on its way an ask with its number joins it, unless a gap or its time-out crossed it.
  */
 async function contextAsked($: EngineInterface, ask: ContextAsk): Promise<void> {
-  if (sending === null || sending.crossed || sending.ask !== ask.ask) {
-    const send = ++sendCount
-    const mine: NonNullable<typeof sending> = {
-      send, ask: ask.ask, crossed: false,
-      outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
-    }
-    sending = mine
+  // An ask that joins the send says nothing: the ask that started it says a failure, once.
+  if (sending !== null && !sending.crossed && sending.ask === ask.ask) return
+  const send = ++sendCount
+  const mine: NonNullable<typeof sending> = {
+    send, ask: ask.ask, crossed: false,
+    outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
   }
+  sending = mine
   // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
-  if ((await sending.outcome) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
+  if ((await mine.outcome) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
 }
 
 async function statusText($: EngineInterface): Promise<string> {
