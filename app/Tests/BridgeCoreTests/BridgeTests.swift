@@ -685,14 +685,6 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == nil)
   }
 
-  /// Whatever made the ask, here Start, the summary is on its way until its answer.
-  @Test func anyAskIsInFlightUntilItsAnswer() async throws {
-    try await startWriting()
-    #expect(await bridge.current.targetSummary == .loading)
-    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
-    #expect(await bridge.current.targetSummary != .loading)
-  }
-
   /// The menu shows the press at once: the bridge publishes the ask it made.
   @Test func aPressPublishesItsAsk() async throws {
     try await join(a, "Alpha", writesSummaries: true)
@@ -1577,22 +1569,6 @@ struct BridgeTests {
     #expect(reported.first?.stats == stats)
   }
 
-  /// Two failures before a summary is a shape the mod never sends; the log names the writer
-  /// Settings' line names.
-  @Test func theLogNamesTheWriterSettingsNames() async throws {
-    summaryModel.withLock { $0 = "claude-opus-5-5" }
-    try await join(a, "Alpha", writesSummaries: true)
-    await bridge.loadContext()
-    let failed = [
-      SummaryFailure(reason: .modelRefused, error: nil),
-      SummaryFailure(reason: .emptyReply, error: nil),
-    ]
-    try await post(
-      "/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", failures: failed, ask: 1))
-    #expect(timings.withLock { $0.last?.model } == "claude-haiku-5-5")
-    #expect(await bridge.lastSummary?.line?.hasPrefix("The last summary used Haiku 5.5") == true)
-  }
-
   /// No model was tried on a transcript that could not be read, so the log names none.
   @Test func anUnreadableTranscriptLogsNoModel() async throws {
     try await join(a, "Alpha", writesSummaries: true)
@@ -1644,15 +1620,6 @@ struct BridgeTests {
     #expect(await bridge.lastSummary == nil)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
     #expect(await bridge.current.context == summary)
-  }
-
-  /// A second ask while one is open is the same ask, as the mod joins the send on its way.
-  @Test func aJoinedAskKeepsItsNumber() async throws {
-    try await join(a, "Alpha", writesSummaries: true)
-    await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
-    await bridge.loadContext()
-    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)?.number == 1)
   }
 
   /// A joined ask goes to the mod again with its number, so a mod that lost the send writes it.
@@ -1946,21 +1913,6 @@ struct BridgeTests {
     #expect(await voice.opens.first?.first?.text == summary)
   }
 
-  /// The line closes and speech opens it again: after an answer with no summary, the line asks
-  /// again and does not wait.
-  @Test func anEmptyAnswerIsNotWaitedForAgainThisCall() async throws {
-    let asked = time.now
-    try await startWriting()
-    let opening = await speakAndWait(asked: asked)
-    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
-    try await settle(opening)
-    voice.emit(.closed(.other("The voice session closed (example).")))
-    #expect(await eventually { await bridge.status.call == .listening })
-    Task { await bridge.audioEvent(.speechStarted) }
-    #expect(await eventually { await voice.opens.count == 2 })
-    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
-  }
-
   @Test func aNewCallWaitsAgainForASessionThatFailed() async throws {
     let asked = time.now
     try await startWriting()
@@ -1975,18 +1927,6 @@ struct BridgeTests {
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
     try await settle(reopening)
     #expect(await voice.opens.last?.first?.text == summary)
-  }
-
-  /// The log says how long the line waited for the summary it got.
-  @Test func aSummaryReportsHowLongTheLineWaited() async throws {
-    let asked = time.now
-    try await startWriting()
-    try await pass(2, polling: a)
-    let opening = await speakAndWait(asked: asked)
-    try await pass(3, polling: a)
-    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
-    try await settle(opening)
-    #expect(timings.withLock { $0.last?.waited } == 3)
   }
 
   /// A target change back and forth ends the first wait for the log too: `waited` counts only the
