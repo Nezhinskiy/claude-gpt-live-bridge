@@ -173,7 +173,7 @@ The effort is not on the wire: `low` is a constant in the mod.
 |---|---|---|
 | `Work.context.model?: string` | app | the model to write this summary with; absent from an older app |
 | `Work.context.fallbackModel?: string` | app | the default, used if `model` fails; absent when `model` is the default |
-| `Work.context.ask?: number` | app | the ask's number, on every ask that names a model: a new ask, one that replaces a stale ask or one with no number included, takes the next, and no number comes back after a forget; a second ask that joins an open, current one keeps its number. Absent from an older app, and on an ask to an older mod, whose open ask is kept as before |
+| `Work.context.ask?: number` | app | the ask's number, on every ask that names a model: a new ask, one that replaces a stale ask or one with no number included, takes the next, and no number comes back after a forget; a second ask that joins an open, current one keeps its number and is not sent to the mod again. Absent from an older app, and on an ask to an older mod, whose open ask is kept as before |
 | `JoinBody.writesSummaries?: true` | mod | writes with the model asked, answers every context ask with `POST /v1/context` (an empty summary when it has none), runs model checks |
 | `ContextBody.failures?: [{ reason, error? }]` | mod | one per attempt that wrote nothing, in order: with a summary, the fallback wrote it; with `summary: ""`, nothing did |
 | `ContextBody.stats?` | mod | the [timing log](#the-timing-log) |
@@ -243,6 +243,7 @@ transcript, and only if the ask named one, so never when `model` is the default.
 | `empty-reply`, including a refusal with no text | yes | `empty-reply` |
 | `aborted`, or its time ran out | no: the time is spent | `timed-out` |
 | No turn yet, or no text in the transcript | no model call | `summary: ""`, no `failures` |
+| The transcript cannot be read (`$.session.messages` throws) | no model call | `summary: ""`, `transcript-unreadable`; Settings' line says the transcript could not be read |
 
 A refusal that comes back as ordinary text would pass as a summary; that is unverified.
 
@@ -257,9 +258,12 @@ covers a session with an older summary and a gap. The mod's `NO_SUMMARY` line st
 replies are posted only when the ask carried `model`, so an older app never sees one; its `context`
 route already tolerates an empty summary and closes the ask.
 
-The mod's cached summary (`summary` in `register.tsx`) is keyed by the model asked for. A second ask
-while one is in flight joins it (`sending ??=`) and gets what the first model writes, so a change of
-model takes effect at the next ask that finds none in flight.
+The mod's cached summary (`summary` in `register.tsx`) is keyed by the model asked for. An ask with
+the number of the send in flight joins it (`sending`) and gets what the first model writes, unless a
+gap crossed that send; a change of model takes effect at the next ask that finds none in flight.
+Before it posts a summary while a gap it noted is unsaid, the mod joins again with `missed`, after
+the poll in flight, and posts nothing while it cannot, so the app ignores a summary written across
+that gap as stale.
 
 ## Waiting
 
@@ -271,14 +275,16 @@ hold:
 1. Its session has a summary ask in flight: asked at Start, at a target change, by Load context, or
    by this line (`pauseHoldsBackSummary` and `needsContext` decide an ask, unchanged).
 2. That session's mod said `writesSummaries`.
-3. In this call the session has not already ended a wait without a summary (no summary from any
-   model, or the limit), so a persistent failure does not hold every line.
+3. In this call the session's wait is not spent: an answer to its open, current ask with no
+   summary spends it, whether or not a line was waiting, and so does a line that waits until the
+   limit, so a persistent failure does not hold every line. A line that comes after the limit, the
+   ask still in flight, opens without waiting and spends nothing.
 
 It ends at the first `POST /v1/context` from that session that answers the open ask, whatever it
 carries; at the limit; when the session drops (5 s without a poll); or when the line is cancelled
 (Stop, a target change). A post that `Bridge.context` ignores, one asked for before the latest gap or
-forget (`takeSummaryAsk`), does not end it, and only a reply with no summary, or the limit, counts for
-rule 3. The wait's end is decided before that guard returns.
+forget (`SummaryAsks.answer`), does not end it and spends nothing. `SummaryAsks.wait` decides each
+look, rule 3 included.
 
 The review's third rule, a 3 s deadline for the mod to take the ask, is dropped: a polling session
 takes it within one poll, one that stops polling is dropped within 5 s, and the registry keeps no
@@ -351,7 +357,8 @@ comes back by `POST` at once.
 `POST /v1/context` carries `stats: { durationMs, transcriptChars, inputTokens, outputTokens }` for
 the attempt that wrote it with `complete`; no cache counts, as no cache mark is set, and a fork
 sends none. The app adds the model it asked for (the fallback when `failures` has one entry), how
-long the ask took to answer and how long the line waited, and writes one `.debug` line to the
+long the ask took to answer and how long the line that got it waited (from when it began to wait;
+a reconnect keeps that start, Start and a target change begin it again), and writes one `.debug` line to the
 unified log (`Logger`, category `summary`): numbers and the model as its listed name or `custom`,
 never a custom id (a Bedrock ARN holds an account number), no text and no session id. A debug
 line is not kept unless someone streams it; CONTRIBUTING says how. Nothing is sent, so "no
