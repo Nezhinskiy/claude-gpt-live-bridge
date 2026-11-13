@@ -408,7 +408,7 @@ depuración:
   Desactivado, bajo la pausa solo **Load context** carga un resumen.
 - **Summary model** (Haiku 5.5 por defecto, también al actualizar; o Sonnet 5.5, Opus 5.5 o **Custom…**): el
   modelo que escribe el resumen que la voz recibe como contexto, siempre con esfuerzo bajo, a cargo
-  de tu uso de Claude. Si otro modelo falla, lo escribe Haiku 5.5. Una línea debajo dice cuándo el
+  de tu uso de Claude. Si otro modelo falla, lo escribe Haiku 5.5, salvo que a ese modelo se le acabara el tiempo. Una línea debajo dice cuándo el
   último resumen vino de Haiku 5.5, o de ningún modelo, y por qué. Una sesión con un mod anterior a
   este ajuste lo ignora y escribe con el modelo propio de la sesión. **Custom…** toma un id de
   modelo y **Check and save**, que hace que una sesión unida envíe a ese modelo una petición corta

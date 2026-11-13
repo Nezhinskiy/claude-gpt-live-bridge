@@ -1,6 +1,6 @@
 # A summary model of its own, and a voice that waits for its context
 
-Status: approved 2026-11-12, when the owner chose it over a small fix for
+Status: delivered in 0.6.0; approved 2026-11-12, when the owner chose it over a small fix for
 [BR-003](../bugs/BR-003.md); proposed 2026-11-09, revised 2026-11-10 after the review
 (`docs/reviews/2026-11-10-summary-model-spec-review.md` on branch
 `review/pr74-summary-model-spec`) and the owner's answers to it. Only the `working` glyph is built;
@@ -328,9 +328,12 @@ that is 6.4 s and the floor sets the limit at 10 s.
   none reached the trim. At that rate 120,000 characters are about 50,000 tokens.
 - **A resumed session is summarised before its first turn.** Each summary arrived on a resumed
   process before any turn ran, so `$.session.messages` returns the history then.
-- **The refusal probe is still open.** A custom id that does not exist was to show what a refusal
-  comes back as. Setting it by editing `settings.json` did not take: the Settings picker rewrote
-  the value. It runs once **Custom…** (Wave F) is installed.
+- **The refusal probe ran in part.** Setting a custom id by editing `settings.json` did not take:
+  the Settings picker rewrote the value. On 2026-11-13 the owner typed an id that does not exist
+  into **Custom…** on the app built from `dev` at `d1f75e2`, with the mod from the same commit:
+  the check refused it, by the button and by Return, and nothing was saved. Which reason it came
+  back as, and how long it took, was not noted, so what a refusal comes back as is still
+  unverified.
 
 The research note's own estimate for Sonnet low at 100k input was 6 to 8 s, and a third party's
 average for a single low-effort request 21.4 s for Sonnet 5.5 and 23.8 s for Haiku 5.5; on the

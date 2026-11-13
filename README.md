@@ -421,9 +421,10 @@ the switch here asks.
   loads a summary under the pause.
 - **Summary model** (Haiku 5.5 by default, on an update too; or Sonnet 5.5, Opus 5.5 or
   **Custom…**): the model that writes the summary the voice gets as context, always at low effort,
-  on your Claude usage. If another model fails, Haiku 5.5 writes it instead. A line under it says
-  when the last summary came from Haiku 5.5 instead, or from no model, and why. A session on a mod
-  from before this setting ignores it and writes with the session's own model. **Custom…** takes
+  on your Claude usage. If another model fails, Haiku 5.5 writes it instead, unless that model ran
+  out of time. A line under it says when the last summary came from Haiku 5.5 instead, or from no
+  model, and why. A session on a mod from before this setting ignores it and writes with the
+  session's own model. **Custom…** takes
   a model id and **Check and save**, which has a joined session send that model one short request
   ("Reply with OK.") on your Claude usage, and saves the id only if it answers; otherwise the
   reason shows beside the field and the previous choice stays. It needs a session on a mod of

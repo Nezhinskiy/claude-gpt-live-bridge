@@ -4,7 +4,7 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0]
 
 ### Added
 
@@ -39,9 +39,9 @@ All notable changes to this project are listed here. The format follows
   mod for you to run.
 - **Summary model**, in Settings under Context: Haiku 5.5 (the default), Sonnet 5.5 or Opus 5.5
   writes the summary the voice gets as context, always at low effort, on your Claude usage. If
-  another model fails, Haiku 5.5 writes it instead, and a line under the setting says so; if no
-  model writes one, it says why, or that the session's transcript could not be read. When a
-  summary fails, the session's band says **Context failed**.
+  another model fails, Haiku 5.5 writes it instead, unless that model ran out of time, and a line
+  under the setting says so; if no model writes one, it says why, or that the session's transcript
+  could not be read. When a summary fails, the session's band says **Context failed**.
   **Custom…** takes a model id, refusing text that cannot be one (with a space, say, or over 128
   characters), which a joined session checks with one short request before it is saved.
 
@@ -75,9 +75,9 @@ All notable changes to this project are listed here. The format follows
   ([the wait](docs/architecture/overview.md#silent-hang-up)). Such a session is asked at
   Start and when the target changes during the call, so the summary is often in before you speak;
   a line that opens while that ask is on its way joins it, and the mod writes one summary for both,
-  or writes it again if it lost it (it restarted, or the app did), so a failing summary is reported
-  once in the session, unless a line asks in the last moment of a write and the mod writes it again. A session on an older mod is asked when its line opens
-  and is not waited for, as before.
+  or writes it again if it lost it (it restarted, or the app did). A failing summary is reported
+  once for each write, and the next line that needs it asks, and may report, again. A session on
+  an older mod is asked when its line opens and is not waited for, as before.
 - The menu's **Load context** reads **Loading context…**, disabled, while any summary of the target
   is on its way from a mod of this release, whatever asked for it (Start, a new target, a line or
   a press), not only after a press; it waits until the summary arrives or the mod's 60 seconds from
