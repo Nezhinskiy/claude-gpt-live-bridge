@@ -54,15 +54,31 @@ export async function summarize(
         stats: { durationMs, transcriptChars: transcript.length, inputTokens, outputTokens },
       }
     }
-    if (reply === null) failures.push({ reason: 'model-refused' })
-    else if (reply.isAnswered || reply.reason === 'empty-reply') failures.push({ reason: 'empty-reply' })
-    else if (reply.reason === 'api-error') failures.push({ reason: 'api-error', error: reply.error })
-    else {
-      failures.push({ reason: 'timed-out' })  // its time is spent, so nothing is left for another
-      break
-    }
+    const failure = failureOf(reply)
+    failures.push(failure)
+    if (failure.reason === 'timed-out') break  // its time is spent, so nothing is left for another
   }
   return { text: '', failures }
+}
+
+type Completion = Awaited<ReturnType<EngineInterface['model']['complete']>>
+
+/** Why a reply wrote nothing; null is a call the engine refused to send. */
+function failureOf(reply: Completion | null): SummaryFailure {
+  if (reply === null) return { reason: 'model-refused' }
+  if (reply.isAnswered || reply.reason === 'empty-reply') return { reason: 'empty-reply' }
+  if (reply.reason === 'api-error') return { reason: 'api-error', error: reply.error }
+  return { reason: 'timed-out' }
+}
+
+/**
+ * Settings' check of a model: one short request with the default token cap, as low-effort thinking
+ * counts against a lower one. Any text means it works; otherwise why it did not, as for a summary.
+ */
+export async function checkModel($: EngineInterface, model: string): Promise<SummaryFailure | null> {
+  const reply = await $.model.complete({ model, prompt: 'Reply with OK.', effort: 'low', timeoutMs: 15_000 })
+    .catch(() => null)
+  return reply?.isAnswered && reply.text.trim() !== '' ? null : failureOf(reply)
 }
 
 /** The session's own model's summary over its own last request; "" when it has none to fork. */

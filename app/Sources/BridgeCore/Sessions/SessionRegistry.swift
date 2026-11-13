@@ -81,6 +81,8 @@ public actor SessionRegistry {
     var reply: VoiceRequest?
     /// The context ask the next poll hands over.
     var wantsContext: Work?
+    /// The model check the next poll hands over, before a context ask.
+    var wantsCheck: Work?
 
     var hasOpenRequest: Bool { inFlight != nil || !queued.isEmpty }
   }
@@ -184,6 +186,10 @@ public actor SessionRegistry {
         session.inFlight = (request.id, request.brief, now, false)
         return .request(request)
       }
+      if let check = session.wantsCheck {
+        session.wantsCheck = nil
+        return check
+      }
       defer { session.wantsContext = nil }
       return session.wantsContext
     }
@@ -208,6 +214,25 @@ public actor SessionRegistry {
     for id: SessionID, model: String? = nil, fallbackModel: String? = nil, ask: Int? = nil
   ) {
     sessions[id]?.wantsContext = .context(model: model, fallbackModel: fallbackModel, ask: ask)
+  }
+
+  /// The session a model check goes to: the target if its mod writes summaries, else the most
+  /// recently joined one whose mod does; nil when none does.
+  public func sessionThatChecks() -> SessionID? {
+    if let target, writesSummaries(target) { return target }
+    return ordered().last { $0.value.writesSummaries }?.key
+  }
+
+  /// Hands the session check `check` of `model` at its next poll.
+  public func requestCheck(for id: SessionID, check: String, model: String) {
+    sessions[id]?.wantsCheck = .checkModel(id: check, model: model)
+  }
+
+  /// Takes check `check` back from whichever session has not polled it yet.
+  public func withdrawCheck(_ check: String) {
+    for (id, session) in sessions {
+      if case .checkModel(check, _) = session.wantsCheck { sessions[id]?.wantsCheck = nil }
+    }
   }
 
   /// The turn of `request` refused what the owner typed into it, so its answer may repeat that

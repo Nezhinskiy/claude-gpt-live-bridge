@@ -4161,4 +4161,118 @@ struct BridgeTests {
     #expect(lines.first?.hasPrefix("Weekly window resets ") == true)
     #expect(lines.last?.hasPrefix("Read at ") == true)
   }
+
+  // MARK: Checking a custom summary model
+
+  /// Polls `session` until it is handed a model check, and returns the check's id.
+  func checkHanded(to session: SessionID) async throws -> String {
+    for _ in 0..<200 {
+      if case .checkModel(let id, _) = try await registry.poll(session) { return id }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    throw StillRunning(limit: .seconds(2))
+  }
+
+  /// Starts Settings' check of `claude-x-1`. Settle the task: it fails the test unless the check
+  /// ends with `expected`, and a check that never ends fails it within `settle`'s bound.
+  func check(endsWith expected: ModelCheckResult) -> Task<Void, Never> {
+    Task { #expect(await bridge.checkModel("claude-x-1") == expected) }
+  }
+
+  func checkResult(
+    from session: SessionID, _ id: String, ok: Bool = false,
+    _ reason: SummaryFailure.Reason? = .modelRefused, _ kind: String? = nil
+  ) async throws {
+    try await post(
+      "/v1/model-check",
+      ModelCheckBody(
+        sessionId: session, id: id, ok: ok, reason: ok ? nil : reason, error: kind))
+  }
+
+  @Test func noSessionThatCanCheck() async throws {
+    try await join(a, "Alpha")
+    #expect(await bridge.checkModel("claude-x-1") == .noSession)
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  @Test func theTargetChecksFirst() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let checking = check(endsWith: .works)
+    let id = try await checkHanded(to: a)
+    #expect(try await registry.poll(b) == nil)
+    try await checkResult(from: a, id, ok: true)
+    try await settle(checking)
+  }
+
+  /// A target on an older mod cannot check: the session that joined last and can, does.
+  @Test func elseTheNewestSessionThatCanChecks() async throws {
+    let c = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await join(a, "Alpha")
+    try await join(b, "Beta", writesSummaries: true)
+    try await join(c, "Gamma", writesSummaries: true)
+    let checking = check(endsWith: .works)
+    let id = try await checkHanded(to: c)
+    #expect(try await registry.poll(b) == nil)
+    try await checkResult(from: c, id, ok: true)
+    try await settle(checking)
+  }
+
+  @Test func aResultFromAnotherSessionIsIgnored() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let checking = check(endsWith: .refused(.modelRefused, kind: nil))
+    let id = try await checkHanded(to: a)
+    try await checkResult(from: b, id, ok: true)
+    try await checkResult(from: a, "another check", ok: true)
+    try await checkResult(from: a, id)
+    try await settle(checking)
+  }
+
+  @Test func noAnswerIn20Seconds() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let asked = time.now
+    let checking = check(endsWith: .noAnswer)
+    _ = try await checkHanded(to: a)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    time.advance(by: .seconds(20))
+    try await settle(checking)
+  }
+
+  /// A check that ended before its session polled, here by a newer check that went to another
+  /// session, is not handed over and run for nothing.
+  @Test func aCheckThatEndedIsNotHandedOut() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let asked = time.now
+    let older = check(endsWith: .noAnswer)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    await bridge.setTarget(b)
+    _ = check(endsWith: .works)
+    try await settle(older)
+    let handed = try await registry.poll(a)
+    #expect(handed == nil)
+  }
+
+  /// `/clear` before the session polls: the new id is handed the check, and its result counts.
+  @Test func aCheckFollowsTheSessionsNewID() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let asked = time.now
+    let checking = check(endsWith: .works)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await post(
+      "/v1/join",
+      JoinBody(sessionId: cleared, title: "Alpha", replaces: a, writesSummaries: true))
+    try await checkResult(from: cleared, try await checkHanded(to: cleared), ok: true)
+    try await settle(checking)
+  }
+
+  @Test func theSessionLeavingGivesNoAnswer() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let checking = check(endsWith: .noAnswer)
+    _ = try await checkHanded(to: a)
+    try await post("/v1/leave", LeaveBody(sessionId: a))
+    try await settle(checking)
+  }
 }

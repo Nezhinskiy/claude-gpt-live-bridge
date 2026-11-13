@@ -475,3 +475,44 @@ test('aJoinSaysItWritesSummaries', async ($, on) => {
   await liveOn($)
   expect(world.take('join')).toEqual([expect.objectContaining({ sessionId: ID, writesSummaries: true })])
 })
+
+// Settings' Check and save: the app hands a custom model to a session that writes summaries.
+
+const CHECK = { id: '00000000-0000-0000-0000-00000000000c', model: 'claude-example-6' }
+
+async function appChecks(world: ReturnType<typeof fakeWorld>) {
+  world.work.push({ kind: 'checkModel', ...CHECK })
+  await world.clock.advance(200)
+}
+
+test('aCheckSendsOneShortRequest', async ($, on) => {
+  const world = await joined($, on)
+  await appChecks(world)
+  expect(world.completes).toEqual([
+    { model: CHECK.model, prompt: 'Reply with OK.', effort: 'low', timeoutMs: 15_000, system: undefined, maxTokens: undefined },
+  ])
+  expect(world.forks).toBe(0)
+})
+
+test('anyTextIsOk', async ($, on) => {
+  const world = await joined($, on)
+  world.summary = 'Sure.'
+  await appChecks(world)
+  expect(world.take('model-check')).toEqual([{ sessionId: ID, id: CHECK.id, ok: true }])
+})
+
+test('aRejectionIsModelRefused', async ($, on) => {
+  const world = await joined($, on)
+  world.completeFails = { [CHECK.model]: 'refused' }
+  await appChecks(world)
+  expect(world.take('model-check')).toEqual([{ sessionId: ID, id: CHECK.id, ok: false, reason: 'model-refused' }])
+})
+
+test('anApiErrorCarriesItsKind', async ($, on) => {
+  const world = await joined($, on)
+  world.completeFails = { [CHECK.model]: 'api-error' }
+  await appChecks(world)
+  expect(world.take('model-check')).toEqual([
+    { sessionId: ID, id: CHECK.id, ok: false, reason: 'api-error', error: 'overloaded' },
+  ])
+})

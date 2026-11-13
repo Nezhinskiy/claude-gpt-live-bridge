@@ -43,8 +43,11 @@ const WORK: Shape = {
     fields<Extract<Wire.Work, { kind: 'context' }>>({
       kind: { oneOf: ['context'] }, model: optional(S), fallbackModel: optional(S), ask: optional('number'),
     }),
+    fields<Extract<Wire.Work, { kind: 'checkModel' }>>({ kind: { oneOf: ['checkModel'] }, id: S, model: S }),
   ],
 }
+
+const REASON = { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out'] } as const
 
 const TURN = fields<Wire.TurnRef>({ id: S, request: optional(S) })
 
@@ -62,7 +65,7 @@ const SHAPES: Record<string, Shape> = {
     sessionId: S, summary: S,
     failures: optional({
       list: fields<Wire.SummaryFailure>({
-        reason: { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out'] }, error: optional(S),
+        reason: REASON, error: optional(S),
       }),
     }),
     stats: optional(fields<Wire.SummaryStats>({
@@ -76,6 +79,9 @@ const SHAPES: Record<string, Shape> = {
   'limits': fields<Wire.LimitsBody>({
     sessionId: S,
     windows: { list: fields<Wire.LimitWindowBody>({ kind: S, percentUsed: 'number', resetsAt: optional(S) }) },
+  }),
+  'model': fields<Wire.ModelCheckBody>({
+    sessionId: S, id: S, ok: 'boolean', reason: optional(REASON), error: optional(S),
   }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
   'sync': fields<Wire.SyncBody>({

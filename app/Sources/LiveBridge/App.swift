@@ -97,6 +97,9 @@ final class AppModel {
   @ObservationIgnored private var settingsWindow: SettingsWindow?
   /// The Settings tab shown; the window opens on the one last shown.
   var settingsTab = SettingsTab.general
+  /// How many times the Settings window has opened; the window is kept, and so is its forms'
+  /// state, which an opening resets to what is in force.
+  var settingsOpenings = 0
   @ObservationIgnored private var codexCwd: URL?
   /// When codex's usage is read, and the last reading.
   private(set) var limitsPoll = LimitsPoll()
@@ -467,6 +470,12 @@ final class AppModel {
   func remove(_ row: SessionRowPresentation) {
     guard Confirm.ask(.remove(label: row.label)) else { return }
     Task { await bridge?.remove(row.id) }
+  }
+
+  /// Settings' Check and save: a joined session checks `model`, which is stored only if it works.
+  func checkSummaryModel(_ model: String) async -> ModelCheckResult {
+    guard let bridge else { return .noSession }
+    return await settings.save(summaryModel: model) { await bridge.checkModel($0) }
   }
 
   /// Asks the target for its summary; the item shows it loading while the bridge has it in

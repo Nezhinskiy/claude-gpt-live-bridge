@@ -5,7 +5,7 @@ import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 
 import type { Band } from '../types'
 import { bandStatus, drawBand, JOINING } from './band.tsx'
-import { summarize } from './context.ts'
+import { checkModel, summarize } from './context.ts'
 import type { Summary } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
 import { askedText, keyboardAnswer, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
@@ -289,8 +289,8 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
 }
 
 /**
- * One poll: status into the band, a voice request queued as a prompt, a context request
- * answered. It polls before it follows the title: any join clears the app's removal mark, so
+ * One poll: status into the band, a voice request queued as a prompt, a context request answered
+ * or a model check run. It polls before it follows the title: any join clears the app's removal mark, so
  * only a session the app still holds may join again. `isFast`: one of the target's polls between
  * the once-a-second ones, which neither follows the title nor rewrites an unchanged band.
  */
@@ -341,7 +341,15 @@ async function tick($: EngineInterface, isFast: boolean): Promise<void> {
   } else if (work?.kind === 'context') {
     const { kind: _, ...ask } = work
     void contextAsked($, ask)
+  } else if (work?.kind === 'checkModel') {
+    void modelChecked($, work.id, work.model)
   }
+}
+
+/** Runs the app's check of a model, without holding the poll, and posts what came of it. */
+async function modelChecked($: EngineInterface, id: string, model: string): Promise<void> {
+  const failure = await checkModel($, model)
+  await link?.modelCheck({ id, ok: failure === null, ...failure })
 }
 
 /**

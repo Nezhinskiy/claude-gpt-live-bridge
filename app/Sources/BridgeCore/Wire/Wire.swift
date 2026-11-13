@@ -1,5 +1,5 @@
 // The JSON messages between the mod and the app: `POST /v1/join|leave|answer|activity|context|
-// sync|limits|target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
+// sync|limits|target|call|model-check` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
 // `wire/fixtures` holds an example of each and `plugin/hooks/wire.ts` mirrors these types; a
 // change here changes both. Optional fields are omitted when absent, never `null`.
 
@@ -35,7 +35,9 @@ public struct VoiceRequest: Codable, Sendable, Equatable {
 /// Work for a session, tagged by `kind`: `{"kind":"request", <VoiceRequest>}`,
 /// `{"kind":"reply", <VoiceRequest>, "forRequest"}` (the owner's reply to the question Claude is
 /// waiting on; `forRequest` is the request its answer belongs to) or
-/// `{"kind":"context","model"?,"fallbackModel"?,"ask"?}` (summarise the session for the voice).
+/// `{"kind":"context","model"?,"fallbackModel"?,"ask"?}` (summarise the session for the voice) or
+/// `{"kind":"checkModel","id","model"}` (check that `model` answers; only to a mod that said
+/// `writesSummaries`).
 public enum Work: Sendable, Equatable {
   case request(VoiceRequest)
   /// `forRequest`: the request the turn's answer belongs to, the one in flight once this reply
@@ -45,11 +47,15 @@ public enum Work: Sendable, Equatable {
   /// the default, tried once if `model` fails; nil when `model` is the default. `ask`: the ask's
   /// number in its session, which the answer echoes; nil from an older app.
   case context(model: String? = nil, fallbackModel: String? = nil, ask: Int? = nil)
+  /// `id`: the check's, which its result (`ModelCheckBody`) quotes.
+  case checkModel(id: String, model: String)
 }
 
 extension Work: Codable {
-  private enum Kind: String, Codable { case request, reply, context }
-  private enum CodingKeys: String, CodingKey { case kind, forRequest, model, fallbackModel, ask }
+  private enum Kind: String, Codable { case request, reply, context, checkModel }
+  private enum CodingKeys: String, CodingKey {
+    case kind, forRequest, model, fallbackModel, ask, id
+  }
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -63,6 +69,10 @@ extension Work: Codable {
         model: try container.decodeIfPresent(String.self, forKey: .model),
         fallbackModel: try container.decodeIfPresent(String.self, forKey: .fallbackModel),
         ask: try container.decodeIfPresent(Int.self, forKey: .ask))
+    case .checkModel:
+      self = .checkModel(
+        id: try container.decode(String.self, forKey: .id),
+        model: try container.decode(String.self, forKey: .model))
     }
   }
 
@@ -81,6 +91,10 @@ extension Work: Codable {
       try container.encodeIfPresent(model, forKey: .model)
       try container.encodeIfPresent(fallbackModel, forKey: .fallbackModel)
       try container.encodeIfPresent(ask, forKey: .ask)
+    case .checkModel(let id, let model):
+      try container.encode(Kind.checkModel, forKey: .kind)
+      try container.encode(id, forKey: .id)
+      try container.encode(model, forKey: .model)
     }
   }
 }
@@ -222,6 +236,17 @@ extension ContextBody {
     stats = try? container.decodeIfPresent(SummaryStats.self, forKey: .stats)
     ask = try container.decodeIfPresent(Int.self, forKey: .ask)
   }
+}
+
+/// `POST /v1/model-check`: the result of `Work.checkModel` `id`. `ok`: the model answered with
+/// text. Otherwise `reason` says why not, and `error`, with `apiError`, the engine's kind of API
+/// error, which the app shows only if it is one the engine documents.
+public struct ModelCheckBody: Codable, Sendable, Equatable {
+  public var sessionId: SessionID
+  public var id: String
+  public var ok: Bool
+  public var reason: SummaryFailure.Reason?
+  public var error: String?
 }
 
 /// One usage window as the mod reads it from Claude Code. The app takes `five_hour` as a window of

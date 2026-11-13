@@ -31,6 +31,14 @@ public actor Bridge: Router {
   private let summaryModel: @Sendable () -> String
   /// What came of the last summary asked for with a model.
   public private(set) var lastSummary: SummaryReport?
+  /// Settings' model check in flight: its id, the session it went to, who waits on it, and the task
+  /// that hands it over and ends it after `checkSeconds`.
+  private var modelCheck:
+    (
+      id: String, session: SessionID, done: CheckedContinuation<ModelCheckResult, Never>,
+      timer: Task<Void, Never>
+    )?
+  private static let checkSeconds = 20
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -260,6 +268,51 @@ public actor Bridge: Router {
       for: id, model: ask.model, fallbackModel: ask.fallbackModel, ask: ask.number)
   }
 
+  /// Settings' check of a custom summary model, run by a joined session's mod: the target if its
+  /// mod writes summaries, else the most recently joined one whose mod does. The result is taken
+  /// only from that session, under the check's id; 20 s without one, or the session's drop, is
+  /// `noAnswer`. A newer check ends the one before it. It takes the poller's word: a process
+  /// that polls as that session before its mod does can say any model works (SECURITY.md).
+  public func checkModel(_ model: String) async -> ModelCheckResult {
+    guard let session = await registry.sessionThatChecks() else { return .noSession }
+    let id = UUID().uuidString
+    return await withCheckedContinuation { done in
+      let older = endCheck(.noAnswer)
+      let timer = Task { [registry, time] in
+        if let older { await registry.withdrawCheck(older) }
+        // the check may have ended since, and its session may have a new id after /clear
+        guard let check = self.modelCheck, check.id == id else { return }
+        await registry.requestCheck(for: check.session, check: id, model: model)
+        guard (try? await time.sleep(for: .seconds(Self.checkSeconds))) != nil else { return }
+        await self.finishCheck(.noAnswer, of: id)
+      }
+      modelCheck = (id, session, done, timer)
+    }
+  }
+
+  /// Ends the check in flight with `result`, if it is check `id` or no id is given, and takes it
+  /// back from a session that has not polled it yet.
+  private func finishCheck(_ result: ModelCheckResult, of id: String? = nil) async {
+    guard let ended = endCheck(result, of: id) else { return }
+    await registry.withdrawCheck(ended)
+  }
+
+  /// Ends the check as `finishCheck` does but leaves it with its session; returns the ended id.
+  private func endCheck(_ result: ModelCheckResult, of id: String? = nil) -> String? {
+    guard let check = modelCheck, id == nil || id == check.id else { return nil }
+    modelCheck = nil
+    check.timer.cancel()
+    check.done.resume(returning: result)
+    return check.id
+  }
+
+  /// `POST /v1/model-check`: the result of the check in flight, from the session it went to.
+  private func modelChecked(_ body: ModelCheckBody) async throws {
+    _ = try await label(of: body.sessionId)
+    guard modelCheck?.session == body.sessionId else { return }
+    await finishCheck(ModelCheckResult(body), of: body.id)
+  }
+
   /// The menu's choice of target; a session that left is ignored.
   public func setTarget(_ id: SessionID) async {
     try? await pickTarget(id)
@@ -337,6 +390,7 @@ public actor Bridge: Router {
         if let old = body.replaces, replaced {  // after /clear: the same session, a new id
           continuity.move(old, to: body.sessionId)
           machine.rename(old, to: body.sessionId)
+          if modelCheck?.session == old { modelCheck?.session = body.sessionId }
           if lineSession == old {
             lineSession = body.sessionId
             heldContext?.session = body.sessionId
@@ -361,6 +415,8 @@ public actor Bridge: Router {
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/limits"): await limits(try req.decodeBody(LimitsBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
+      case ("POST", "/v1/model-check"):
+        try await modelChecked(try req.decodeBody(ModelCheckBody.self))
       case ("POST", "/v1/sync"): try await sync(try req.decodeBody(SyncBody.self))
       case ("POST", "/v1/target"):
         try await pickTarget(try req.decodeBody(TargetBody.self).sessionId)
@@ -699,9 +755,10 @@ public actor Bridge: Router {
   }
 
   /// A session that left can take no reply: its route ends, and neither its question nor its
-  /// approval notice is said. Both stay recorded.
+  /// approval notice is said. Both stay recorded. A model check it was running gets no answer.
   private func withdrawQuestionsOfDroppedSessions() async {
     for id in await registry.takeDropped() {
+      if modelCheck?.session == id { await finishCheck(.noAnswer) }
       machine.endQuestionRoute(of: id)
       await withdraw { $0.session == id && ($0.asks || $0.kind == .approval) }
     }

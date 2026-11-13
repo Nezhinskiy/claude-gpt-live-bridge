@@ -1,6 +1,7 @@
 // The JSON messages between the mod and LiveBridge.app, mirroring
 // app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). The routes:
-// `POST /v1/join|leave|answer|activity|context|sync|limits|target|call` and `GET /v1/next?sessionId=`,
+// `POST /v1/join|leave|answer|activity|context|sync|limits|target|call|model-check` and
+// `GET /v1/next?sessionId=`,
 // which answers a PollReply. Optional
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
@@ -33,12 +34,14 @@ export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance
  * older app's reply. `context`: summarise the session; `model` is the model to write it with,
  * absent from an older app, and `fallbackModel` the one tried once if `model` fails, absent when
  * `model` is the app's default. `ask` is the ask's number, which the answer echoes; absent from an
- * older app.
+ * older app. `checkModel`: check that `model` answers, and post the result (`ModelCheckBody`) under
+ * the check's `id`; sent only to a mod that says `writesSummaries`.
  */
 export type Work =
   | ({ kind: 'request' } & VoiceRequest)
   | ({ kind: 'reply'; forRequest?: RequestId } & VoiceRequest)
-  | { kind: 'context'; model?: string; fallbackModel?: string; ask?: number };
+  | { kind: 'context'; model?: string; fallbackModel?: string; ask?: number }
+  | { kind: 'checkModel'; id: string; model: string };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
@@ -100,6 +103,14 @@ export type SummaryStats =
  */
 export type ContextBody = {
   sessionId: SessionId; summary: string; failures?: SummaryFailure[]; stats?: SummaryStats; ask?: number;
+};
+
+/**
+ * The result of the check `id`. `ok`: the model answered with text; otherwise `reason` says why not,
+ * and `error`, with `api-error`, the engine's kind of error.
+ */
+export type ModelCheckBody = {
+  sessionId: SessionId; id: string; ok: boolean; reason?: SummaryFailure['reason']; error?: string;
 };
 
 /**

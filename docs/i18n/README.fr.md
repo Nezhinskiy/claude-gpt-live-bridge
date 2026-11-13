@@ -428,12 +428,16 @@ se connecte :
   ou après **New conversation**. Ce résumé est écrit à partir de la transcription, donc il porte ce
   que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
   la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
-- **Summary model** (Haiku 5.5 par défaut, après une mise à jour aussi ; ou Sonnet 5.5 ou
-  Opus 5.5) : le modèle qui écrit le résumé que la voix reçoit comme contexte, toujours avec un
+- **Summary model** (Haiku 5.5 par défaut, après une mise à jour aussi ; ou Sonnet 5.5,
+  Opus 5.5 ou **Custom…**) : le modèle qui écrit le résumé que la voix reçoit comme contexte, toujours avec un
   effort faible, sur votre usage de Claude. Si un autre modèle échoue, Haiku 5.5 l'écrit à sa place.
   Une ligne en dessous dit quand le dernier résumé est venu de Haiku 5.5, ou d'aucun modèle, et
   pourquoi. Une session sur un mod antérieur à ce réglage l'ignore et écrit avec le modèle de la
-  session.
+  session. **Custom…** prend un id de modèle et **Check and save**, qui fait envoyer par une session
+  jointe une requête courte à ce modèle (« Reply with OK. »), sur votre usage de Claude, et n'enregistre
+  l'id que s'il répond ; sinon la raison s'affiche à côté du champ et le choix précédent reste. Il
+  faut une session sur un mod de cette version, et le résultat vaut pour le Claude Code de cette
+  session : une autre session peut différer, et un id enregistré n'est plus vérifié.
 
 ### Ce que fait la voix
 
