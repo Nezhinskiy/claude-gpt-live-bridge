@@ -179,7 +179,8 @@ struct SettingsView: View {
         }
         Text(
           "Writes the summary the voice gets as context, always at low effort, on your Claude "
-            + "usage. If another model fails, Haiku 5.5 writes it instead."
+            + "usage. If another model fails, Haiku 5.5 writes it instead, unless that model ran out of "
+            + "time."
         )
         .font(.caption).foregroundStyle(.secondary)
         if let line = model.update?.lastSummary?.line {

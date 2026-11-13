@@ -39,9 +39,9 @@ All notable changes to this project are listed here. The format follows
   mod for you to run.
 - **Summary model**, in Settings under Context: Haiku 5.5 (the default), Sonnet 5.5 or Opus 5.5
   writes the summary the voice gets as context, always at low effort, on your Claude usage. If
-  another model fails, Haiku 5.5 writes it instead, and a line under the setting says so; if no
-  model writes one, it says why, or that the session's transcript could not be read. When a
-  summary fails, the session's band says **Context failed**.
+  another model fails, Haiku 5.5 writes it instead, unless that model ran out of time, and a line
+  under the setting says so; if no model writes one, it says why, or that the session's transcript
+  could not be read. When a summary fails, the session's band says **Context failed**.
   **Custom…** takes a model id, refusing text that cannot be one (with a space, say, or over 128
   characters), which a joined session checks with one short request before it is saved.
 

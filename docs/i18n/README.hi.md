@@ -390,7 +390,7 @@ menu का **Quick Settings** इसके पाँच switches रखता �
   load करता है।
 - **Summary model** (डिफ़ॉल्ट Haiku 5.5, update के बाद भी; या Sonnet 5.5, Opus 5.5 या **Custom…**): वह model जो
   voice को context के रूप में मिलने वाला सारांश लिखता है, हमेशा low effort पर, आपके Claude usage से।
-  कोई दूसरा model विफल हो तो Haiku 5.5 उसे लिखता है। इसके नीचे एक पंक्ति बताती है कि पिछला सारांश कब
+  कोई दूसरा model विफल हो तो Haiku 5.5 उसे लिखता है, जब तक उस model का समय खत्म न हुआ हो। इसके नीचे एक पंक्ति बताती है कि पिछला सारांश कब
   Haiku 5.5 से आया, या किसी model से नहीं आया, और क्यों। इस setting से पहले के mod पर चल रहा session इसे
   अनदेखा करता है और session के अपने model से लिखता है। **Custom…** एक model id और **Check and save** लेता है: कोई
   जुड़ा हुआ session उस model को आपके Claude usage से एक छोटा request ("Reply with OK.") भेजता है, और id
