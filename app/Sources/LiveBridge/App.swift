@@ -469,12 +469,10 @@ final class AppModel {
     Task { await bridge?.remove(row.id) }
   }
 
-  /// Asks the target for its summary; the item waits until it arrives, 60 s pass or the
-  /// session leaves.
+  /// Asks the target for its summary; the item shows it loading while the bridge has it in
+  /// flight.
   func loadContext() {
-    guard contextLoad.isEnabled, let target = targetRow else { return }
-    loads.pressed(target.sessionId, at: Date())
-    refreshLoads()
+    guard contextLoad.isEnabled, targetRow != nil else { return }
     Task { await bridge?.loadContext() }
   }
 
@@ -496,7 +494,9 @@ final class AppModel {
   /// Shows the target's Load context state, and comes back when a state ends by itself.
   private func refreshLoads() {
     let now = Date()
-    let state = targetRow.map { loads.state(of: $0.sessionId, at: now) } ?? .ready
+    let inFlight = update?.summariesInFlight ?? []
+    let state =
+      targetRow.map { loads.state(of: $0.sessionId, inFlight: inFlight, at: now) } ?? .ready
     if state != contextLoad { contextLoad = state }
     loadsTimer?.cancel()
     loadsTimer = nil
@@ -522,12 +522,13 @@ final class AppModel {
     }
     if next.call != .live { level = 0 }
     let statusChanged = next != status
+    let inFlightChanged = update.summariesInFlight != self.update?.summariesInFlight
     if update != self.update { self.update = update }
     if statusChanged {
       presentation = StatusPresentation(next)
       loads.keep(only: Set(next.sessions.map(\.sessionId)))
-      refreshLoads()
     }
+    if statusChanged || inFlightChanged { refreshLoads() }
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)
   }
 

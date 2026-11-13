@@ -17,9 +17,9 @@ public struct Conversation: Codable, Sendable, Equatable {
   /// codex's limits on `initialItems`; tokens are estimated at 4 UTF-8 bytes each, as codex counts.
   public static let maxItems = 128
   public static let maxTokens = 8_192
-  /// How long an ask can still be answered: twice what the mod allows a summary, which may never
-  /// come (a failure, or a session with nothing to summarise).
-  static let askLife = 2 * ContextLoads.timeout
+  /// How long an ask can still be answered: twice the 60 s the mod allows a summary, which may
+  /// never come (an older mod's failure, or a session with nothing to summarise).
+  static let askLife: TimeInterval = 120
 
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval

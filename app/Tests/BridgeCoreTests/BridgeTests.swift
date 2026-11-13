@@ -685,6 +685,31 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == nil)
   }
 
+  /// Whatever made the ask, here the line on an older mod, the summary is on its way until its
+  /// answer.
+  @Test func anyAskIsInFlightUntilItsAnswer() async throws {
+    await live()
+    #expect(await bridge.current.summariesInFlight == [a])
+    try await post("/v1/context", context())
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// Its summary would be ignored, so the menu does not wait for it.
+  @Test func aStaleAskIsNotInFlight() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    await bridge.newConversation()
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// The menu shows the press at once: the bridge publishes the ask it made.
+  @Test func aPressPublishesItsAsk() async throws {
+    try await join(a, "Alpha")
+    var updates = bridge.updates.makeAsyncIterator()
+    await bridge.loadContext()
+    #expect(await updates.next()?.summariesInFlight == [a])
+  }
+
   /// A session's summary is announced to the menu, which stops waiting for it; one from a
   /// session that never joined is not.
   @Test func arrivingContextIsAnnounced() async throws {

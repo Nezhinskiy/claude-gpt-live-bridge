@@ -68,6 +68,13 @@ All notable changes to this project are listed here. The format follows
   waits for that session until the next Start. Such a session is asked at Start and when the
   target changes during the call, so the summary is often in before you speak. A session on an
   older mod is asked when its line opens and is not waited for, as before.
+- The menu's **Load context** reads **Loading context…**, disabled, while any summary of the target
+  is on its way, whatever asked for it (Start, a new target, a line or a press), not only after a
+  press; it waits until the summary arrives or, for one that never comes, two minutes from the ask,
+  in place of a press's own 60 seconds. A summary that arrives shows **Context loaded** for a
+  moment, whatever asked for it; an empty answer goes back to **Load context** without it.
+- A session's band draws a call phase it does not know, from a later app, as **Connecting**, where
+  it could not draw the band before.
 - The mod answers every summary ask from this app, with an empty summary when it has none, and
   each ask carries a number that its answer repeats, so a summary written before a gap the app
   has heard of is not taken for a fresh one. One that reaches the app before the mod's next join

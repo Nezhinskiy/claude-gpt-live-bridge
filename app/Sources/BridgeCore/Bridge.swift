@@ -78,8 +78,8 @@ public actor Bridge: Router {
   private var changes = 0
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
-  /// The sessions whose summary was just taken (`POST /v1/context`), so the menu's Load context
-  /// stops waiting for it; an empty one is announced as such.
+  /// The sessions whose summary was just taken (`POST /v1/context`), so the menu shows it loaded;
+  /// an empty one is announced as such.
   public nonisolated let contextArrivals: AsyncStream<ContextArrival>
   private let announceContext: AsyncStream<ContextArrival>.Continuation
   /// The running app's version; sessions on an older mod are listed against it.
@@ -154,7 +154,20 @@ public actor Bridge: Router {
         status: status, problem: problem, minutesThisCall: minutes,
         conversation: shown.shownLines + growing.lines,
         labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
-        claudeLimits: claudeLimits, lastSummary: lastSummary)
+        claudeLimits: claudeLimits, lastSummary: lastSummary,
+        summariesInFlight: await summariesInFlight)
+    }
+  }
+
+  /// The joined sessions whose summary is on its way, whatever asked for it (Start, a target
+  /// change, Load context or a line): an open ask that no gap or forget has made stale.
+  public var summariesInFlight: Set<SessionID> {
+    get async {
+      let now = time.now
+      return Set(
+        await registry.rows().map(\.sessionId).filter {
+          continuity.openSummaryAsk(of: $0, at: now).map { !$0.isStale } ?? false
+        })
     }
   }
 
@@ -207,10 +220,12 @@ public actor Bridge: Router {
   /// Whether any session has a request open, which an update installs only after.
   public var hasOpenRequests: Bool { get async { await registry.hasOpenRequests } }
 
-  /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
+  /// Asks the target session for its context summary; it arrives as `POST /v1/context`. The
+  /// menu shows the ask in flight at once.
   public func loadContext() async {
     guard let target = await registry.target else { return }
     await askForContext(of: target)
+    await changed()
   }
 
   /// At Start and at a target change during the call, a session whose mod writes summaries is
@@ -833,13 +848,14 @@ public actor Bridge: Router {
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
   /// it is and kept in the session's conversation. One asked for before the latest gap or forget
-  /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
-  /// the menu's press stays pending. A post with the number of an ask other than the open one is
-  /// such a summary, and leaves the open ask open; one with no number is matched by its time. An empty one keeps the stored line and closes the ask: a mod
-  /// that writes summaries sends one when it has none. The answer to an ask that named a model, if a
-  /// model was tried, is `lastSummary`.
-  /// A live line about that session gets the summary at once, and one still connecting gets it
-  /// when connected; it does not hold the line open. A summary equal to the stored one is not
+  /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and the
+  /// menu is told of nothing loaded. A post with the number of an ask other than the open one is
+  /// such a summary, and leaves the open ask open; one with no number is matched by its time. An
+  /// empty one keeps the stored line and closes the ask: a mod that writes summaries sends one when
+  /// it has none. The answer to an ask that named a model, if a model was tried, is `lastSummary`.
+  /// A line waiting for the summary (`waitForSummary`) is seeded with it; a live line about that
+  /// session gets it at once, and one still connecting gets it when connected; it does not hold
+  /// the line open. A summary equal to the stored one is not
   /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
@@ -992,4 +1008,6 @@ public struct BridgeUpdate: Sendable, Equatable {
   public var claudeLimits: UsageLimits? = nil
   /// What came of the last summary asked for with a model, for Settings.
   public var lastSummary: SummaryReport? = nil
+  /// The joined sessions whose summary is on its way (`Bridge.summariesInFlight`).
+  public var summariesInFlight: Set<SessionID> = []
 }

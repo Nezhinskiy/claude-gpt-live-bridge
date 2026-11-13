@@ -276,7 +276,10 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **El Start de la banda** convierte su sesión en el destino e inicia la llamada; la línea que abre
   recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
   de ella (mira **Load context** abajo), pero con **Pause sync** activado o tras una pausa solo si aún no tiene ninguno
-  ([detalles](../../docs/architecture/overview.md#components)). Mientras la llamada habla con otra sesión,
+  ([detalles](../../docs/architecture/overview.md#components)). Con un mod de esta versión, el resumen
+  se pide al pulsar Start y al cambiar el destino, y la línea lo espera antes de conectar, como mucho
+  30 segundos desde la petición: lo que digas mientras tanto se guarda en el Mac y llega a la voz al
+  abrirse la línea. Mientras la llamada habla con otra sesión,
   la banda muestra **Talk here**. Si la banda no aparece en una sesión unida, `/live` la
   recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
@@ -310,7 +313,9 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   conversación larga lo supera), la sesión estuvo en pausa y tiene resumen, o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
   Sin línea abierta, cuando la siguiente línea va a cargar el resumen y no falta nada más, dice **Context loads with the line** y está deshabilitado, porque
-  la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
+  la siguiente línea lo pide sola. Mientras un resumen del destino está en camino, lo haya pedido
+  quien sea, dice **Loading context…** y está deshabilitado; uno que llega muestra **Context loaded**
+  un momento, y una respuesta vacía vuelve a **Load context**. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
   ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
