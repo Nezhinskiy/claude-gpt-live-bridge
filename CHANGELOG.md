@@ -55,14 +55,16 @@ All notable changes to this project are listed here. The format follows
 - While the call is stopped, the menu bar icon no longer shows that a session's Claude is working;
   the session's row in the menu still says so. A waiting approval still shows.
 - Summaries are written by Haiku 5.5 by default, on an update too, in place of the session's own
-  model at the session's own effort. The model reads the session's transcript without tool output,
-  thinking or system reminders, cut to 120,000 characters. Unlike the fork, it does not wait for a
+  model at the session's own effort. The model reads the session's transcript with tool output,
+  thinking and system reminders left out, but not text that quotes them, cut to 120,000
+  characters. Unlike the fork, it does not wait for a
   turn of a resumed or new Claude Code process to end ([BR-003](docs/bugs/BR-003.md), for an app
   and a mod of this release). Where Claude Code's provider does not offer Haiku 5.5, the session gets no
   summary ([known limitations](README.md#known-limitations)).
 - The mod answers every summary ask from this app, with an empty summary when it has none, and
-  each ask carries a number that its answer repeats, so a summary written before a gap cannot be
-  taken for a fresh one ([BR-002](docs/bugs/BR-002.md)).
+  each ask carries a number that its answer repeats, so a summary written before a gap the app
+  has heard of is not taken for a fresh one. One that reaches the app before the mod's next join
+  reports the gap is still taken ([BR-002](docs/bugs/BR-002.md)).
 
 ### Deprecated
 

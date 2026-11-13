@@ -235,7 +235,9 @@ those shapes goes to OpenAI as typed, personal text included.
   the mark. The pause does not hold that summary back: it is written from the session's transcript,
   paused text included, goes to OpenAI, and clears the *paused* mark. A current mod with a current
   app leaves tool results, thinking and system reminders out of what the summary model reads, but
-  text that quotes them stays, as does anything pasted, so this is a reduction, not a property; an
+  text that quotes them stays, as does anything pasted and every text block of a user message,
+  which holds the output of a `!` command typed in the session if Claude Code stores it as user
+  text, so this is a reduction, not a property; an
   older app or mod sends the whole request. Otherwise only **Load
   context** loads one, and it carries the same text. An
   older mod's `/live context` does too; the last point below says what that can do.

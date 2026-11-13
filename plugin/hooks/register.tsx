@@ -112,7 +112,8 @@ async function save($: EngineInterface): Promise<void> {
 
 /**
  * A turn did not reach the app, which the next join says. No summary from before it covers it: the
- * one kept goes, and the one being written is dropped, as nothing could date it once posted.
+ * one kept goes. The one being written for an older app's ask is dropped; for a named ask it is
+ * posted all the same, and the app takes it as fresh if it arrives before that join.
  */
 function noteGap(): void {
   link?.noteGap()
