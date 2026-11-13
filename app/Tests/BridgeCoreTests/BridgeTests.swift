@@ -1505,7 +1505,7 @@ struct BridgeTests {
     #expect(
       try await registry.poll(a)
         == .context(model: "claude-opus-5-5", fallbackModel: "claude-haiku-5-5", ask: 1))
-    let recorded = try saved()[a].openSummaryAsk(at: time.now)
+    let recorded = SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)
     #expect(recorded?.model == "claude-opus-5-5")
     #expect(recorded?.fallbackModel == "claude-haiku-5-5")
   }
@@ -1606,7 +1606,7 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
     try await post("/v1/context", ContextBody(sessionId: a, summary: "From before.", ask: 1))
     #expect(await bridge.current.context == nil)
-    #expect(try saved()[a].openSummaryAsk(at: time.now)?.number == 2)
+    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)?.number == 2)
     #expect(timings.withLock { $0.last?.stale } == true)
     #expect(await bridge.lastSummary == nil)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))

@@ -50,6 +50,8 @@ public actor Bridge: Router {
   private var timers: [CallTimer: Task<Void, Never>] = [:]
   /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
+  /// What the summary asks kept in `continuity` mean.
+  private var summaries = SummaryAsks()
   /// What the open line is still saying, which belongs to `lineSession`.
   private var growing = GrowingLines()
   /// The session whose conversation the line last opened with; its transcripts are kept there.
@@ -174,13 +176,13 @@ public actor Bridge: Router {
 
   /// The joined sessions whose summary is on its way, whatever asked for it (Start, a target
   /// change, Load context or a line): an open ask to a mod that writes summaries, within the
-  /// mod's budget, that no gap or forget has made stale (`SummaryAsk.isInFlight`).
+  /// mod's budget, that no gap or forget has made stale (`SummaryAsks.display`).
   public var summariesInFlight: Set<SessionID> {
     get async {
       let now = time.now
       return Set(
         await registry.rows().map(\.sessionId).filter {
-          continuity.openSummaryAsk(of: $0, at: now)?.isInFlight(at: now) ?? false
+          summaries.display(of: $0, in: continuity, at: now) == .loading
         })
     }
   }
@@ -262,7 +264,7 @@ public actor Bridge: Router {
       model = summaryModel()
       fallback = model == SummaryModel.default ? nil : SummaryModel.default
     }
-    let ask = continuity.noteSummaryAsk(of: id, at: time.now, model: model, fallbackModel: fallback)
+    let ask = summaries.ask(id, in: &continuity, at: time.now, model: model, fallback: fallback).ask
     save()
     await registry.requestContext(
       for: id, model: ask.model, fallbackModel: ask.fallbackModel, ask: ask.number)
@@ -625,7 +627,7 @@ public actor Bridge: Router {
   private func waitForSummary() async {
     while !Task.isCancelled, let id = lineSession {
       let looked = wakes
-      guard let ask = continuity.openSummaryAsk(of: id, at: time.now),
+      guard let ask = summaries.openAsk(of: id, in: continuity, at: time.now),
         let deadline = summaryWait.deadline(
           for: id, ask: ask, writesSummaries: await registry.writesSummaries(id))
       else { break }
@@ -930,7 +932,7 @@ public actor Bridge: Router {
     let now = time.now
     let wrote = !body.summary.allSatisfy(\.isWhitespace)
     let failures = body.failures ?? []
-    let ask = continuity.openSummaryAsk(of: id, at: now)
+    let ask = summaries.openAsk(of: id, in: continuity, at: now)
     // The line waiting for this ask, if one is.
     var isWaitedFor = false
     if let ask {
@@ -949,7 +951,8 @@ public actor Bridge: Router {
           hadSummary: wrote, model: model, stats: body.stats, waited: waited))
     }
     // The waiting line looks again at the `changed()` after every post, this one ignored or not.
-    guard continuity.takeSummaryAsk(of: id, at: now, number: body.ask) else { return }
+    guard summaries.answer(id, number: body.ask, wrote: wrote, in: &continuity, at: now).isTaken
+    else { return }
     if isWaitedFor, !wrote { summaryWait.endedWithout(id) }
     // An answer on which no model was tried leaves Settings' line as it was.
     if let asked = ask?.model, wrote || !failures.isEmpty {
