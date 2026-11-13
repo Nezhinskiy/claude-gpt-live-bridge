@@ -97,6 +97,9 @@ final class AppModel {
   @ObservationIgnored private var settingsWindow: SettingsWindow?
   /// The Settings tab shown; the window opens on the one last shown.
   var settingsTab = SettingsTab.general
+  /// How many times the Settings window has opened; the window is kept, and so is its forms'
+  /// state, which an opening resets to what is in force.
+  var settingsOpenings = 0
   @ObservationIgnored private var codexCwd: URL?
   /// When codex's usage is read, and the last reading.
   private(set) var limitsPoll = LimitsPoll()

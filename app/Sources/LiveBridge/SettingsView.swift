@@ -188,6 +188,16 @@ struct SettingsView: View {
       }
     }
     .formStyle(.grouped)
+    .onChange(of: model.settingsOpenings) { showModelInForce() }
+  }
+
+  /// Settings opened again: the picker shows the model in force, not a Custom… pick or text that
+  /// no check saved. A check still running keeps its field, which its result fills in.
+  private func showModelInForce() {
+    guard !isChecking else { return }
+    picksCustom = false
+    customModel = isListed ? "" : model.settings.current.summaryModel
+    checkMessage = nil
   }
 
   /// The tag of Custom… in the picker, which no model id can be.
@@ -388,6 +398,7 @@ final class SettingsWindow {
   func show() {
     tabs.select(tabs.model.settingsTab)
     if !window.isVisible {
+      tabs.model.settingsOpenings += 1
       // Sized before it shows, so it opens at its height rather than sliding to it, and
       // centered the first time at that height; after that it opens where it was left.
       // `center()` puts it above the middle, which can push a tall window's top under the menu
