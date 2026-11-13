@@ -28,6 +28,14 @@ struct ContextLoadsTests {
     #expect(loads.state(of: a, at: t0 + 61) == .ready)
   }
 
+  /// An empty answer ends the press as a timeout would: nothing was loaded.
+  @Test func anEmptyReplyGoesBackToLoadContext() {
+    var loads = ContextLoads()
+    loads.pressed(a, at: t0)
+    loads.arrived(a, at: t0 + 5, wrote: false)
+    #expect(loads.state(of: a, at: t0 + 5) == .ready)
+  }
+
   @Test func aContextNobodyPressedForShowsNothing() {
     var loads = ContextLoads()
     loads.arrived(a, at: t0)  // as when automatic context asks a new target for it

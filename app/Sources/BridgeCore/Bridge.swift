@@ -68,9 +68,9 @@ public actor Bridge: Router {
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
   /// The sessions whose summary was just taken (`POST /v1/context`), so the menu's Load context
-  /// stops waiting for it.
-  public nonisolated let contextArrivals: AsyncStream<SessionID>
-  private let announceContext: AsyncStream<SessionID>.Continuation
+  /// stops waiting for it; an empty one is announced as such.
+  public nonisolated let contextArrivals: AsyncStream<ContextArrival>
+  private let announceContext: AsyncStream<ContextArrival>.Continuation
   /// The running app's version; sessions on an older mod are listed against it.
   private let appVersion: AppVersion?
 
@@ -791,13 +791,13 @@ public actor Bridge: Router {
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
       : nil
     guard let line else {
-      announceContext.yield(id)
+      announceContext.yield(ContextArrival(session: id, wrote: false))
       return
     }
     let isNew = line.text != continuity[id].context
     continuity.setContext(line.text, for: id)
     save()
-    announceContext.yield(id)
+    announceContext.yield(ContextArrival(session: id, wrote: true))
     guard isNew, lineSession == id else { return }
     switch machine.phase {
     case .live: try? await realtime?.addContext(line.text)

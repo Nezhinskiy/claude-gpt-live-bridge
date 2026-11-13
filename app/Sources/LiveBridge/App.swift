@@ -196,7 +196,7 @@ final class AppModel {
         for await update in bridge.updates { self?.show(update) }
       }
       Task { [weak self] in
-        for await id in bridge.contextArrivals { self?.contextArrived(id) }
+        for await arrival in bridge.contextArrivals { self?.contextArrived(arrival) }
       }
       // A relaunch after an update starts while the old instance may still hold the socket.
       Task { [weak self] in
@@ -488,8 +488,8 @@ final class AppModel {
 
   private var targetRow: SessionRow? { status?.sessions.first(where: \.isTarget) }
 
-  private func contextArrived(_ id: SessionID) {
-    loads.arrived(id, at: Date())
+  private func contextArrived(_ arrival: ContextArrival) {
+    loads.arrived(arrival.session, at: Date(), wrote: arrival.wrote)
     refreshLoads()
   }
 

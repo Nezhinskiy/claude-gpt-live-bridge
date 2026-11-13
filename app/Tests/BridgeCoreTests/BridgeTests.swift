@@ -699,7 +699,15 @@ struct BridgeTests {
     var arrivals = bridge.contextArrivals.makeAsyncIterator()
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Not joined."))
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
-    #expect(await arrivals.next() == a)
+    #expect(await arrivals.next()?.session == a)
+  }
+
+  /// An empty answer is announced as one, so the menu's press ends without saying it loaded.
+  @Test func anEmptyAnswerIsAnnouncedAsEmpty() async throws {
+    try await join(a, "Alpha")
+    var arrivals = bridge.contextArrivals.makeAsyncIterator()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: ""))
+    #expect(await arrivals.next() == ContextArrival(session: a, wrote: false))
   }
 
   @Test func theMenuSetsTheTarget() async throws {
@@ -1612,7 +1620,7 @@ struct BridgeTests {
     await bridge.newConversation()
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
-    #expect(await arrivals.next() == b)
+    #expect(await arrivals.next()?.session == b)
   }
 
   /// The context line is shown exactly as the voice gets it, also after the app restarts.
