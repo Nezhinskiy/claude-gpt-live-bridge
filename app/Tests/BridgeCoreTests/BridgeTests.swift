@@ -1666,7 +1666,28 @@ struct BridgeTests {
     await bridge.loadContext()
     #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
     await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)?.number == 1)
+  }
+
+  /// The mod's send on its way answers a joined ask, so nothing more goes to the mod, which
+  /// would say it has no summary twice.
+  @Test func aJoinedAskQueuesNothing() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    _ = try await registry.poll(a)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  /// A joined ask changes no stored ask, so the conversation file is not written again.
+  @Test func aJoinedAskWritesNothing() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let file = dir.appending(path: "continuity.json")
+    let written = try FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber]
+    await bridge.loadContext()
+    let after = try FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber]
+    #expect(after as? Int == written as? Int)
   }
 
   /// An older mod echoes no number and joins a second ask to the send on its way, so the stale

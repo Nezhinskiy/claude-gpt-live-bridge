@@ -71,24 +71,24 @@ struct SummaryAsks: Sendable {
   }
 
   /// `id` is asked for a summary, naming `model` and `fallback` if its mod writes summaries. An open
-  /// ask is joined, as the mod joins the summary on its way, unless a named ask finds it stale or
-  /// unnumbered and replaces it. A new named ask takes the next number, which only grows.
+  /// ask is joined, as the mod joins the summary on its way, and nothing changes, unless a named ask
+  /// finds it stale or unnumbered and replaces it. A new named ask takes the next number, which only
+  /// grows.
   @discardableResult
   func ask(
     _ id: SessionID, in continuity: inout Continuity, at now: Date, model: String?,
     fallback: String?
   ) -> AskResult {
-    let next = (continuity.asksMade ?? 0) + 1
-    let open = openAsk(of: id, in: continuity, at: now)
-    let result = continuity.changeSummaryAsk(of: id) { record -> AskResult in
-      if let open, model == nil || (!open.isStale && open.number != nil) { return .joined(open) }
-      let ask = Ask(
-        at: now, model: model, fallbackModel: fallback, number: model == nil ? nil : next)
-      record = ask
-      return .new(ask)
+    if let open = openAsk(of: id, in: continuity, at: now),
+      model == nil || (!open.isStale && open.number != nil)
+    {
+      return .joined(open)
     }
-    if result.ask.number == next { continuity.asksMade = next }
-    return result
+    let number = model.map { _ in (continuity.asksMade ?? 0) + 1 }
+    let ask = Ask(at: now, model: model, fallbackModel: fallback, number: number)
+    continuity.changeSummaryAsk(of: id) { $0 = ask }
+    if let number { continuity.asksMade = number }
+    return .new(ask)
   }
 
   /// A line of `id` looks at `now`: it sleeps until the deadline this returns, or opens on nil. It

@@ -229,7 +229,8 @@ public actor Bridge: Router {
   }
 
   /// A mod that writes summaries is told the model and, unless it is the default, the default to
-  /// fall back on; one that forks is asked as before.
+  /// fall back on; one that forks is asked as before. A numbered ask that joins the open one asks
+  /// the mod nothing more: its send on its way answers both. An older mod is asked again.
   private func askForContext(of id: SessionID) async {
     var model: String?
     var fallback: String?
@@ -237,8 +238,10 @@ public actor Bridge: Router {
       model = summaryModel()
       fallback = model == SummaryModel.default ? nil : SummaryModel.default
     }
-    let ask = summaries.ask(id, in: &continuity, at: time.now, model: model, fallback: fallback).ask
-    save()
+    let result = summaries.ask(id, in: &continuity, at: time.now, model: model, fallback: fallback)
+    if case .joined(let open) = result, open.number != nil { return }
+    if case .new = result { save() }
+    let ask = result.ask
     await registry.requestContext(
       for: id, model: ask.model, fallbackModel: ask.fallbackModel, ask: ask.number)
   }
