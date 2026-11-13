@@ -685,18 +685,34 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == nil)
   }
 
-  /// Whatever made the ask, here the line on an older mod, the summary is on its way until its
-  /// answer.
+  /// Whatever made the ask, here Start, the summary is on its way until its answer.
   @Test func anyAskIsInFlightUntilItsAnswer() async throws {
-    await live()
+    try await startWriting()
     #expect(await bridge.current.summariesInFlight == [a])
-    try await post("/v1/context", context())
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// An older mod posts nothing when it has nothing to summarise, so the menu does not wait for it.
+  @Test func anAskToAnOlderModIsNotInFlight() async throws {
+    await live()
+    #expect(try await registry.poll(a) == .context())
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// The mod answers within its budget or not at all, so the menu stops waiting there.
+  @Test func anAskIsNotInFlightPastTheModsBudget() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await pass(59, polling: a)
+    #expect(await bridge.current.summariesInFlight == [a])
+    try await pass(1, polling: a)
     #expect(await bridge.current.summariesInFlight.isEmpty)
   }
 
   /// Its summary would be ignored, so the menu does not wait for it.
   @Test func aStaleAskIsNotInFlight() async throws {
-    try await join(a, "Alpha")
+    try await join(a, "Alpha", writesSummaries: true)
     await bridge.loadContext()
     await bridge.newConversation()
     #expect(await bridge.current.summariesInFlight.isEmpty)
@@ -704,7 +720,7 @@ struct BridgeTests {
 
   /// The menu shows the press at once: the bridge publishes the ask it made.
   @Test func aPressPublishesItsAsk() async throws {
-    try await join(a, "Alpha")
+    try await join(a, "Alpha", writesSummaries: true)
     var updates = bridge.updates.makeAsyncIterator()
     await bridge.loadContext()
     #expect(await updates.next()?.summariesInFlight == [a])

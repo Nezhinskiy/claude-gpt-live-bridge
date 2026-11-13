@@ -298,7 +298,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   जाती है), session paused रहा है और उसका सारांश है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
   date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर कोई line खुली न हो, अगली line सारांश load करेगी और बाकी कुछ नहीं छूटा है, तो यह
   **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। जब target का सारांश
-  रास्ते में हो, उसे किसी ने भी माँगा हो, item **Loading context…** दिखाता है और बंद रहता है; आया हुआ
+  रास्ते में हो, उसे किसी ने भी माँगा हो, item **Loading context…** दिखाता है और बंद रहता है, ज़्यादा से ज़्यादा उन 60 सेकंड तक जो mod उसे देता है (पुराने mod पर वह **Load context** ही रहता है); आया हुआ
   सारांश कुछ पल **Context loaded** दिखाता है, और खाली जवाब वापस **Load context** पर ले आता है। सारांश पर कोई तारीख
   नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है ([BR-002](../../docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session

@@ -160,13 +160,14 @@ public actor Bridge: Router {
   }
 
   /// The joined sessions whose summary is on its way, whatever asked for it (Start, a target
-  /// change, Load context or a line): an open ask that no gap or forget has made stale.
+  /// change, Load context or a line): an open ask to a mod that writes summaries, within the
+  /// mod's budget, that no gap or forget has made stale (`SummaryAsk.isInFlight`).
   public var summariesInFlight: Set<SessionID> {
     get async {
       let now = time.now
       return Set(
         await registry.rows().map(\.sessionId).filter {
-          continuity.openSummaryAsk(of: $0, at: now).map { !$0.isStale } ?? false
+          continuity.openSummaryAsk(of: $0, at: now)?.isInFlight(at: now) ?? false
         })
     }
   }

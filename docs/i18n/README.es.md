@@ -314,7 +314,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
   Sin línea abierta, cuando la siguiente línea va a cargar el resumen y no falta nada más, dice **Context loads with the line** y está deshabilitado, porque
   la siguiente línea lo pide sola. Mientras un resumen del destino está en camino, lo haya pedido
-  quien sea, dice **Loading context…** y está deshabilitado; uno que llega muestra **Context loaded**
+  quien sea, dice **Loading context…** y está deshabilitado, como mucho los 60 segundos que el mod le da (con un mod anterior sigue en **Load context**); uno que llega muestra **Context loaded**
   un momento, y una respuesta vacía vuelve a **Load context**. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
   ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una

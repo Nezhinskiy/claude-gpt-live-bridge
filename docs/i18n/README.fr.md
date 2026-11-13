@@ -328,7 +328,7 @@ parlez.
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
   déjà la conversation. Sans ligne ouverte, quand la ligne suivante va charger le résumé et que rien d'autre ne manque, il affiche **Context loads with the
   line** et est désactivé, car la prochaine ligne le demande d'elle-même. Tant qu'un résumé de la
-  cible est en route, quoi qui l'ait demandé, il affiche **Loading context…** et est désactivé ; un
+  cible est en route, quoi qui l'ait demandé, il affiche **Loading context…** et est désactivé, au plus les 60 secondes que le mod lui accorde (avec un mod plus ancien, il reste sur **Load context**) ; un
   résumé qui arrive affiche **Context loaded** un instant, et une réponse vide revient à **Load
   context**. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
   reste activé ([BR-002](../../docs/bugs/BR-002.md)).

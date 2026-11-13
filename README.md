@@ -331,7 +331,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   reads **Context up to date** and is disabled, because the voice already has the conversation. With
   no line open, when the next line will load the summary and nothing else is missing, it reads **Context loads with the line** and is disabled, because
   the next line asks for one by itself. While a summary of the target is on its way, whatever asked
-  for it, the item reads **Loading context…** and is disabled; one that arrives shows **Context
+  for it, the item reads **Loading context…** and is disabled, for at most the 60 seconds the mod allows it (on an older mod it stays **Load context**); one that arrives shows **Context
   loaded** for a moment, and an empty answer goes back to **Load context**. A summary carries no date, so one can be ignored while the item stays enabled
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×

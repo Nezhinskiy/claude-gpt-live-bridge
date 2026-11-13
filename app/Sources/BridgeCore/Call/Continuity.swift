@@ -17,9 +17,12 @@ public struct Conversation: Codable, Sendable, Equatable {
   /// codex's limits on `initialItems`; tokens are estimated at 4 UTF-8 bytes each, as codex counts.
   public static let maxItems = 128
   public static let maxTokens = 8_192
-  /// How long an ask can still be answered: twice the 60 s the mod allows a summary, which may
-  /// never come (an older mod's failure, or a session with nothing to summarise).
-  static let askLife: TimeInterval = 120
+  /// How long the mod allows a summary (`CONTEXT_TIMEOUT_MS`): one that writes summaries answers
+  /// a numbered ask within it, a summary or an empty one, or not at all.
+  static let modBudget: TimeInterval = 60
+  /// How long an ask can still be answered: twice the mod's budget, as the summary may never come
+  /// (an older mod's failure, or a session with nothing to summarise).
+  static let askLife: TimeInterval = 2 * modBudget
 
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
@@ -91,6 +94,12 @@ public struct Conversation: Codable, Sendable, Equatable {
     /// The ask's number, which a current mod's answer echoes; nil on an ask that names no model,
     /// and in an older file.
     var number: Int?
+
+    /// Whether its answer can still come: a current mod's, within the mod's budget. An older mod
+    /// posts nothing when it has nothing to summarise, so its ask is not waited for.
+    func isInFlight(at now: Date) -> Bool {
+      !isStale && number != nil && now < at + Conversation.modBudget
+    }
   }
 
   public init() {}
