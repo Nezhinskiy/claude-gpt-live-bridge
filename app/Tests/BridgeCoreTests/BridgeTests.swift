@@ -4239,6 +4239,21 @@ struct BridgeTests {
     try await settle(checking)
   }
 
+  /// A check that ended before its session polled, here by a newer check that went to another
+  /// session, is not handed over and run for nothing.
+  @Test func aCheckThatEndedIsNotHandedOut() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let asked = time.now
+    let older = check(endsWith: .noAnswer)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    await bridge.setTarget(b)
+    _ = check(endsWith: .works)
+    try await settle(older)
+    let handed = try await registry.poll(a)
+    #expect(handed == nil)
+  }
+
   /// `/clear` before the session polls: the new id is handed the check, and its result counts.
   @Test func aCheckFollowsTheSessionsNewID() async throws {
     try await join(a, "Alpha", writesSummaries: true)

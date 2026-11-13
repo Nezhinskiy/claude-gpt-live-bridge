@@ -228,6 +228,13 @@ public actor SessionRegistry {
     sessions[id]?.wantsCheck = .checkModel(id: check, model: model)
   }
 
+  /// Takes check `check` back from whichever session has not polled it yet.
+  public func withdrawCheck(_ check: String) {
+    for (id, session) in sessions {
+      if case .checkModel(check, _) = session.wantsCheck { sessions[id]?.wantsCheck = nil }
+    }
+  }
+
   /// The turn of `request` refused what the owner typed into it, so its answer may repeat that
   /// text: it stays out. Closed already, the turn is a background one, whose answer would be an
   /// update to the request: no update goes under it.

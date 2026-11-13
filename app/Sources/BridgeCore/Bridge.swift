@@ -277,9 +277,12 @@ public actor Bridge: Router {
     guard let session = await registry.sessionThatChecks() else { return .noSession }
     let id = UUID().uuidString
     return await withCheckedContinuation { done in
-      finishCheck(.noAnswer)
+      let older = endCheck(.noAnswer)
       let timer = Task { [registry, time] in
-        await registry.requestCheck(for: session, check: id, model: model)
+        if let older { await registry.withdrawCheck(older) }
+        // the check may have ended since, and its session may have a new id after /clear
+        guard let check = self.modelCheck, check.id == id else { return }
+        await registry.requestCheck(for: check.session, check: id, model: model)
         guard (try? await time.sleep(for: .seconds(Self.checkSeconds))) != nil else { return }
         await self.finishCheck(.noAnswer, of: id)
       }
@@ -287,19 +290,27 @@ public actor Bridge: Router {
     }
   }
 
-  /// Ends the check in flight with `result`, if it is check `id` or no id is given.
-  private func finishCheck(_ result: ModelCheckResult, of id: String? = nil) {
-    guard let check = modelCheck, id == nil || id == check.id else { return }
+  /// Ends the check in flight with `result`, if it is check `id` or no id is given, and takes it
+  /// back from a session that has not polled it yet.
+  private func finishCheck(_ result: ModelCheckResult, of id: String? = nil) async {
+    guard let ended = endCheck(result, of: id) else { return }
+    await registry.withdrawCheck(ended)
+  }
+
+  /// Ends the check as `finishCheck` does but leaves it with its session; returns the ended id.
+  private func endCheck(_ result: ModelCheckResult, of id: String? = nil) -> String? {
+    guard let check = modelCheck, id == nil || id == check.id else { return nil }
     modelCheck = nil
     check.timer.cancel()
     check.done.resume(returning: result)
+    return check.id
   }
 
   /// `POST /v1/model-check`: the result of the check in flight, from the session it went to.
   private func modelChecked(_ body: ModelCheckBody) async throws {
     _ = try await label(of: body.sessionId)
     guard modelCheck?.session == body.sessionId else { return }
-    finishCheck(ModelCheckResult(body), of: body.id)
+    await finishCheck(ModelCheckResult(body), of: body.id)
   }
 
   /// The menu's choice of target; a session that left is ignored.
@@ -747,7 +758,7 @@ public actor Bridge: Router {
   /// approval notice is said. Both stay recorded. A model check it was running gets no answer.
   private func withdrawQuestionsOfDroppedSessions() async {
     for id in await registry.takeDropped() {
-      if modelCheck?.session == id { finishCheck(.noAnswer) }
+      if modelCheck?.session == id { await finishCheck(.noAnswer) }
       machine.endQuestionRoute(of: id)
       await withdraw { $0.session == id && ($0.asks || $0.kind == .approval) }
     }
