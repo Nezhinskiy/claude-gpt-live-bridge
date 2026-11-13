@@ -1,10 +1,5 @@
 import Foundation
 
-/// The numbers the mod reports about the summary it wrote.
-public struct SummaryStats: Sendable, Equatable {
-  public init() {}
-}
-
 /// How one summary ask went, as the app saw it.
 public struct SummaryTiming: Sendable, Equatable {
   /// Seconds from the ask to the post that answers it.
@@ -29,8 +24,9 @@ public struct SummaryTiming: Sendable, Equatable {
 }
 
 public enum SummaryLog {
-  /// `key=value` pairs, durations in ms. It holds numbers and a listed model's name only: a model
-  /// id the owner typed can be an ARN with an account number, so it is logged as `custom`.
+  /// `key=value` pairs, durations in ms, then the post's `stats` if it sent them. It holds numbers
+  /// and a listed model's name only: a model id the owner typed can be an ARN with an account
+  /// number, so it is logged as `custom`.
   public static func line(_ timing: SummaryTiming) -> String {
     let model: String
     if let id = timing.model {
@@ -39,9 +35,16 @@ public enum SummaryLog {
     } else {
       model = "fork"
     }
-    return [
-      "askedFor=\(Int((timing.askedFor * 1000).rounded()))ms", "stale=\(timing.stale)",
-      "hadSummary=\(timing.hadSummary)", "model=\(model)",
-    ].joined(separator: " ")
+    let stats = timing.stats.map {
+      [
+        "duration=\($0.durationMs)ms", "transcriptChars=\($0.transcriptChars)",
+        "inputTokens=\($0.inputTokens)", "outputTokens=\($0.outputTokens)",
+      ]
+    }
+    return
+      ([
+        "askedFor=\(Int((timing.askedFor * 1000).rounded()))ms", "stale=\(timing.stale)",
+        "hadSummary=\(timing.hadSummary)", "model=\(model)",
+      ] + (stats ?? [])).joined(separator: " ")
   }
 }

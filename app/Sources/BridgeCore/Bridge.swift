@@ -27,6 +27,10 @@ public actor Bridge: Router {
   private let connectsOverTCP: @Sendable () -> Bool
   /// Told how long each summary ask took to be answered (`SummaryLog`).
   private let reportsSummary: @Sendable (SummaryTiming) -> Void
+  /// Settings' summary model, read at each ask.
+  private let summaryModel: @Sendable () -> String
+  /// What came of the last summary asked for with a model.
+  public private(set) var lastSummary: SummaryReport?
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -64,9 +68,9 @@ public actor Bridge: Router {
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
   /// The sessions whose summary was just taken (`POST /v1/context`), so the menu's Load context
-  /// stops waiting for it.
-  public nonisolated let contextArrivals: AsyncStream<SessionID>
-  private let announceContext: AsyncStream<SessionID>.Continuation
+  /// stops waiting for it; an empty one is announced as such.
+  public nonisolated let contextArrivals: AsyncStream<ContextArrival>
+  private let announceContext: AsyncStream<ContextArrival>.Continuation
   /// The running app's version; sessions on an older mod are listed against it.
   private let appVersion: AppVersion?
 
@@ -82,9 +86,11 @@ public actor Bridge: Router {
     timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
     connectsOverTCP: @escaping @Sendable () -> Bool = { false },
+    summaryModel: @escaping @Sendable () -> String = { SummaryModel.default },
     reportsSummary: @escaping @Sendable (SummaryTiming) -> Void = { _ in }, appVersion: AppVersion?
   ) {
     self.reportsSummary = reportsSummary
+    self.summaryModel = summaryModel
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
@@ -137,7 +143,7 @@ public actor Bridge: Router {
         status: status, problem: problem, minutesThisCall: minutes,
         conversation: shown.shownLines + growing.lines,
         labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
-        claudeLimits: claudeLimits)
+        claudeLimits: claudeLimits, lastSummary: lastSummary)
     }
   }
 
@@ -194,10 +200,19 @@ public actor Bridge: Router {
     await askForContext(of: target)
   }
 
+  /// A mod that writes summaries is told the model and, unless it is the default, the default to
+  /// fall back on; one that forks is asked as before.
   private func askForContext(of id: SessionID) async {
-    continuity.noteSummaryAsk(of: id, at: time.now)
+    var model: String?
+    var fallback: String?
+    if await registry.writesSummaries(id) {
+      model = summaryModel()
+      fallback = model == SummaryModel.default ? nil : SummaryModel.default
+    }
+    let ask = continuity.noteSummaryAsk(of: id, at: time.now, model: model, fallbackModel: fallback)
     save()
-    await registry.requestContext(for: id)
+    await registry.requestContext(
+      for: id, model: ask.model, fallbackModel: ask.fallbackModel, ask: ask.number)
   }
 
   /// The menu's choice of target; a session that left is ignored.
@@ -442,7 +457,8 @@ public actor Bridge: Router {
   }
 
   /// Whether the pause, the setting or a session's mark, stops the next line asking for a summary,
-  /// which is written from the whole transcript, paused text included. A session with no summary
+  /// which is written from the transcript, paused text included (a current mod leaves out tool
+  /// output, thinking and reminders, but not text that quotes them). A session with no summary
   /// has its first one asked for all the same, if the owner left `loadsContextOnFirstCall` on.
   private func pauseHoldsBackSummary(of id: SessionID) -> Bool {
     if loadsContextOnFirstCall(), continuity[id].context == nil { return false }
@@ -740,8 +756,10 @@ public actor Bridge: Router {
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
   /// it is and kept in the session's conversation. One asked for before the latest gap or forget
   /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
-  /// the menu's press stays pending. An empty one keeps the stored line: the mod never sends one,
-  /// so this guards only against another socket peer, and it is not a control.
+  /// the menu's press stays pending. A post with the number of an ask other than the open one is
+  /// such a summary, and leaves the open ask open; one with no number is matched by its time. An empty one keeps the stored line and closes the ask: a mod
+  /// that writes summaries sends one when it has none. The answer to an ask that named a model, if a
+  /// model was tried, is `lastSummary`.
   /// A live line about that session gets the summary at once, and one still connecting gets it
   /// when connected; it does not hold the line open. A summary equal to the stored one is not
   /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
@@ -749,26 +767,37 @@ public actor Bridge: Router {
     let id = body.sessionId
     let row = try await label(of: id)
     let now = time.now
-    if let ask = continuity.openSummaryAsk(of: id, at: now) {
+    let wrote = !body.summary.allSatisfy(\.isWhitespace)
+    let failures = body.failures ?? []
+    let ask = continuity.openSummaryAsk(of: id, at: now)
+    if let ask {
+      let model = failures.count == 1 && wrote ? ask.fallbackModel : ask.model
+      // A post with another ask's number was written for an ask a gap made stale.
+      let isOtherAsk = body.ask != nil && body.ask != ask.number
       reportsSummary(
         SummaryTiming(
-          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale,
-          hadSummary: !body.summary.allSatisfy(\.isWhitespace), model: nil, stats: nil))
+          askedFor: now.timeIntervalSince(ask.at), stale: ask.isStale || isOtherAsk,
+          hadSummary: wrote, model: model, stats: body.stats))
     }
-    guard continuity.takeSummaryAsk(of: id, at: now) else { return }
+    guard continuity.takeSummaryAsk(of: id, at: now, number: body.ask) else { return }
+    // An answer on which no model was tried leaves Settings' line as it was.
+    if let asked = ask?.model, wrote || !failures.isEmpty {
+      lastSummary = SummaryReport(
+        asked: asked, fallback: ask?.fallbackModel, failures: failures, wrote: wrote)
+    }
     let line =
-      body.summary.allSatisfy(\.isWhitespace)
-      ? nil
-      : AnswerShaper.line(
+      wrote
+      ? AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
+      : nil
     guard let line else {
-      announceContext.yield(id)
+      announceContext.yield(ContextArrival(session: id, wrote: false))
       return
     }
     let isNew = line.text != continuity[id].context
     continuity.setContext(line.text, for: id)
     save()
-    announceContext.yield(id)
+    announceContext.yield(ContextArrival(session: id, wrote: true))
     guard isNew, lineSession == id else { return }
     switch machine.phase {
     case .live: try? await realtime?.addContext(line.text)
@@ -871,4 +900,6 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let contextNeed: ContextNeed
   /// What Claude Code last said of Claude's usage windows; nil until a session has.
   public var claudeLimits: UsageLimits? = nil
+  /// What came of the last summary asked for with a model, for Settings.
+  public var lastSummary: SummaryReport? = nil
 }

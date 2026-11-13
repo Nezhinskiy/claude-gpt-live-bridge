@@ -1,0 +1,14 @@
+{
+  "ask": 3,
+  "failures": [
+    {
+      "error": "overloaded",
+      "reason": "api-error"
+    },
+    {
+      "reason": "empty-reply"
+    }
+  ],
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "summary": ""
+}

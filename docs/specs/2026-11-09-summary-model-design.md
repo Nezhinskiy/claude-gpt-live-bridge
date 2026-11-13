@@ -173,9 +173,11 @@ The effort is not on the wire: `low` is a constant in the mod.
 |---|---|---|
 | `Work.context.model?: string` | app | the model to write this summary with; absent from an older app |
 | `Work.context.fallbackModel?: string` | app | the default, used if `model` fails; absent when `model` is the default |
+| `Work.context.ask?: number` | app | the ask's number, on every ask that names a model: a new ask, one that replaces a stale ask or one with no number included, takes the next, and no number comes back after a forget; a second ask that joins an open, current one keeps its number. Absent from an older app, and on an ask to an older mod, whose open ask is kept as before |
 | `JoinBody.writesSummaries?: true` | mod | writes with the model asked, answers every context ask with `POST /v1/context` (an empty summary when it has none), runs model checks |
 | `ContextBody.failures?: [{ reason, error? }]` | mod | one per attempt that wrote nothing, in order: with a summary, the fallback wrote it; with `summary: ""`, nothing did |
 | `ContextBody.stats?` | mod | the [timing log](#the-timing-log) |
+| `ContextBody.ask?: number` | mod | the number of the ask it answers, a replayed summary's included; a post with another ask's number is stale and leaves the open ask open. Absent from an older mod, whose post is matched by its time as before ([BR-002](../bugs/BR-002.md)) |
 | `Work.checkModel: { id, model }` | app | check this model; only to a mod that said `writesSummaries` |
 | `POST /v1/model-check: { sessionId, id, ok, reason?, error? }` | mod | the check's result; taken only from the session it was handed to, with its `id` |
 

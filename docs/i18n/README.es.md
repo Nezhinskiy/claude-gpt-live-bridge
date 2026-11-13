@@ -318,7 +318,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   **Stop** los borra. Las preguntas de Claude en espera siguen otras reglas
   ([detalles](../../SECURITY.md#residual-risk-by-design)). Con **Load a session's context on its first call** activado, o con **Pause sync** desactivado y la sesión sin
   pausa, la siguiente línea carga por sí sola un resumen de la misma transcripción de la sesión, que
-  incluye lo que la sesión leyó; para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
+  incluye el texto de la conversación (una app y un mod de esta versión dejan fuera la salida de las herramientas, el razonamiento y los recordatorios, pero no el texto que los cita, y uno anterior envía la petición entera); para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
   conversation**. `/live` en una sesión eliminada la une de nuevo.
 
 ### Ajustes
@@ -389,17 +389,21 @@ depuración:
   el ajuste, desactiva el siguiente si la sesión puede no tener resumen aún, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
   registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
   resumen por sí sola, ni tampoco después de una pausa, salvo para una sesión sin resumen (el ajuste
-  siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
-  pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
+  siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
   nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
   de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
   [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
 - **Load a session's context on its first call** (activado por defecto; desactivado si **Pause sync** estaba activado al actualizar):
   una línea que se abre para una sesión de la que la voz no tiene resumen lo pide aunque **Pause
   sync** esté activado o la sesión esté en pausa, también en un chat antiguo o tras **New
-  conversation**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
-  pausaste, y va a OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
+  conversation**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste, y va a
+  OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
   Desactivado, bajo la pausa solo **Load context** carga un resumen.
+- **Summary model** (Haiku 5.5 por defecto, también al actualizar; o Sonnet 5.5 u Opus 5.5): el
+  modelo que escribe el resumen que la voz recibe como contexto, siempre con esfuerzo bajo, a cargo
+  de tu uso de Claude. Si otro modelo falla, lo escribe Haiku 5.5. Una línea debajo dice cuándo el
+  último resumen vino de Haiku 5.5, o de ningún modelo, y por qué. Una sesión con un mod anterior a
+  este ajuste lo ignora y escribe con el modelo propio de la sesión.
 
 ### Qué hace la voz
 
@@ -636,6 +640,12 @@ sesión.
   agente y presumiblemente Remote Control) no se registra en la conversación de la voz como palabras
   tuyas, aunque sí la respuesta de Claude, y no rechaza un turno en curso bajo la pausa
   ([SECURITY.md](../../SECURITY.md#what-session-text-can-do) dice qué prompts cuentan como tuyos).
+- Donde el proveedor de Claude Code (Bedrock, Vertex o Foundry) no ofrece el modelo elegido en
+  **Summary model**, o la organización no lo permite, ese modelo falla y Haiku 5.5 escribe el
+  resumen; donde tampoco ofrece Haiku 5.5, la voz no recibe resumen, y Settings lo dice. Antes de
+  este ajuste lo escribía el modelo propio de la sesión, que funciona dondequiera que funcione la
+  sesión. Que un id fijo se resuelva en esos proveedores viene de la documentación de Claude Code y
+  no se ha probado.
 - Una sesión que sigue con un mod anterior a esta versión, hasta que se reinicie, no se sincroniza:
   carga un resumen como una sesión a la que le faltan turnos, y ninguna pausa rechaza sus líneas
   ([qué más cambia](../../CHANGELOG.md)).

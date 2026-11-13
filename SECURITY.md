@@ -232,8 +232,13 @@ those shapes goes to OpenAI as typed, personal text included.
   does for a session marked paused after the setting is off again, with one exception. With **Load
   a session's context on its first call** on, which is the default unless the pause was on when you
   updated to it, a line that opens for a session with no summary asks for one, under the pause or
-  the mark. The pause does not hold that summary back: it is written from the whole transcript,
-  paused text included, goes to OpenAI, and clears the *paused* mark. Otherwise only **Load
+  the mark. The pause does not hold that summary back: it is written from the session's transcript,
+  paused text included, goes to OpenAI, and clears the *paused* mark. A current mod with a current
+  app leaves tool results, thinking and system reminders out of what the summary model reads, but
+  text that quotes them stays, as does anything pasted and every text block of a user message,
+  which holds the output of a `!` command typed in the session if Claude Code stores it as user
+  text, so this is a reduction, not a property; an
+  older app or mod sends the whole request. Otherwise only **Load
   context** loads one, and it carries the same text. An
   older mod's `/live context` does too; the last point below says what that can do.
   What the pause does not do:
@@ -274,14 +279,16 @@ those shapes goes to OpenAI as typed, personal text included.
     recorded. So may text typed as feedback at a permission dialog, which as far as the hooks show
     reaches none of them; that was not run.
   - A summary nobody asked for can reach past the pause and past a forget. From 0.4.2 the mod sends
-    a summary only when the app asks for one, but the app still takes one it did not ask for, as it
-    cannot date it (`Bridge.context`): mods update separately from the app, so a session on an older
+    a summary only when the app asks for one, but the app still takes one it did not ask for that
+    carries no ask's number, as it cannot date it (`Bridge.context`): mods update separately from the app, so a session on an older
     mod can send one with `/live context`. It takes no more than the pause on, the call off and
     typing during that command to clear the *paused* mark, and the paused text may be in that
     summary; one written across **New conversation** brings back what was forgotten
     ([BR-002](docs/bugs/BR-002.md)). This is accepted, as a 60 second window on an explicit command.
-    The current mod can land there too, for about a second: the reply to a second ask that came
-    after a poll took the first and before that summary landed finds no ask open.
+    An older mod since 0.4.2 can land there too, for about a second: the reply to a second ask that
+    came after a poll took the first and before that summary landed finds no ask open. A current
+    mod with a current app echoes the ask's number, and the app refuses a numbered summary that
+    finds no ask open, or another ask open.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
   conversation** with the session as the target, or remove it with ×, or when 20 sessions used since
   push them out (which also loses a paused mark); a load of a new summary replaces the old one for
@@ -295,8 +302,8 @@ those shapes goes to OpenAI as typed, personal text included.
   you join it again, since the mod's own joins are refused (`410`). **New conversation** and × keep
   the *paused* mark, so with **Load a session's context on its first call** off the next line asks
   for no summary of that transcript. With it on, or with the pause setting off and no pause mark, a session with no summary
-  does get one from the next line, written from the whole transcript, the text the session read
-  and any paused text included.
+  does get one from the next line, written from the session's transcript (the reduction above),
+  any paused text included.
 - **A result from another session** is still spoken in whatever line is open, and the voice's
   reply to it stays in that line's conversation, so one session's text can still reach the
   conversation about another.

@@ -40,7 +40,9 @@ const WORK: Shape = {
     fields<Extract<Wire.Work, { kind: 'reply' }>>({
       kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE }, forRequest: optional(S),
     }),
-    fields<Extract<Wire.Work, { kind: 'context' }>>({ kind: { oneOf: ['context'] } }),
+    fields<Extract<Wire.Work, { kind: 'context' }>>({
+      kind: { oneOf: ['context'] }, model: optional(S), fallbackModel: optional(S), ask: optional('number'),
+    }),
   ],
 }
 
@@ -56,9 +58,20 @@ const SHAPES: Record<string, Shape> = {
     reason: optional(S),
   }),
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop', 'mute', 'unmute'] } }),
-  'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
+  'context': fields<Wire.ContextBody>({
+    sessionId: S, summary: S,
+    failures: optional({
+      list: fields<Wire.SummaryFailure>({
+        reason: { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out'] }, error: optional(S),
+      }),
+    }),
+    stats: optional(fields<Wire.SummaryStats>({
+      durationMs: 'number', transcriptChars: 'number', inputTokens: 'number', outputTokens: 'number',
+    })),
+    ask: optional('number'),
+  }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
-  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S), syncs: optional('boolean'), missed: optional('boolean') }),
+  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S), syncs: optional('boolean'), missed: optional('boolean'), writesSummaries: optional('boolean') }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
   'limits': fields<Wire.LimitsBody>({
     sessionId: S,

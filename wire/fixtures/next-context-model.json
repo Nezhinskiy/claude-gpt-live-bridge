@@ -1,0 +1,22 @@
+{
+  "status": {
+    "call": "listening",
+    "isMuted": false,
+    "minutesToday": 3,
+    "sessions": [
+      {
+        "activity": "idle",
+        "isTarget": true,
+        "label": "Example session",
+        "sessionId": "00000000-0000-0000-0000-000000000001"
+      }
+    ],
+    "unheard": 0
+  },
+  "work": {
+    "ask": 3,
+    "fallbackModel": "claude-haiku-5-5",
+    "kind": "context",
+    "model": "claude-opus-5-5"
+  }
+}

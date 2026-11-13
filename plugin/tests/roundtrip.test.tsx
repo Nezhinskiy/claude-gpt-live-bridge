@@ -22,7 +22,7 @@ test('roundtrip', async ($, on) => {
   await $.session.start({ cwd: '/Users/example/Dev/example-project', surface: 'terminal', isInteractive: true })
   const reply = await $.command.run({ ...LIVE, args: '' })
   expect(reply.text).toContain('Joined')
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, missed: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', owner: true, syncs: true, writesSummaries: true, missed: true }])
   expect(world.read.every(path => path.endsWith('.json'))).toBe(true)
 
   world.work.push({ kind: 'request', ...REQUEST })
@@ -1197,7 +1197,7 @@ test('aLostVoiceAnswerMeansAMissedJoin', async ($, on) => {
   await $.turn.complete({ ...DONE, turnId: 't1', answer: 'Three files.' })
   world.take('join')
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true, missed: true }])
 })
 
 /** The answer went to neither the voice nor the conversation, whatever the reason the app gave. */
@@ -1214,7 +1214,7 @@ test('aRefusedUpdateMeansAMissedJoin', async ($, on) => {
   await $.turn.complete({ ...DONE, turnId: 't2', answer: 'The build passed.' })
   world.take('join')
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true, missed: true }])
   expect(world.logs.some(line => line.includes('did not get the last answer'))).toBe(false)
 })
 

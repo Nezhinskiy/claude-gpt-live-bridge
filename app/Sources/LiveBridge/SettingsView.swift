@@ -156,9 +156,22 @@ struct SettingsView: View {
           "Load a session's context on its first call", isOn: setting(\.loadContextOnFirstCall))
         Text(
           "A line for a session with no summary yet asks for one, even while sync is paused. It "
-            + "is written from the whole transcript, paused text included, and goes to OpenAI."
+            + "is written from the transcript, paused text included, and goes to OpenAI. A mod of "
+            + "this version leaves out tool output, thinking and reminders, but not text that "
+            + "quotes them."
         )
         .font(.caption).foregroundStyle(.secondary)
+        Picker("Summary model", selection: setting(\.summaryModel)) {
+          ForEach(SummaryModel.listed, id: \.id) { Text($0.name).tag($0.id) }
+        }
+        Text(
+          "Writes the summary the voice gets as context, always at low effort, on your Claude "
+            + "usage. If another model fails, Haiku 5.5 writes it instead."
+        )
+        .font(.caption).foregroundStyle(.secondary)
+        if let line = model.update?.lastSummary?.line {
+          Text(line).font(.caption).foregroundStyle(.secondary)
+        }
       }
     }
     .formStyle(.grouped)

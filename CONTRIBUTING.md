@@ -206,10 +206,12 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 --plugin-dir plugin` talks to the app started with the same variable.
 
 Every build, not only a debug one, logs a line at debug level in the category `summary` for each
-summary answered within two minutes of its ask: the milliseconds the ask took, whether the answer
-was stale (asked before a gap or a forget, so it is ignored) and had text, and the model's name
-(`custom` for an id you typed, `fork` for a summary the session's own fork wrote). It holds no
-summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
+summary answered within two minutes of its ask: `askedFor`, the milliseconds the ask took;
+`stale`, whether the answer was stale (asked before a gap or a forget, or posted for an ask other
+than the open one, so it is ignored); `hadSummary`, whether it had text; `model`, the model's name
+(`custom` for an id you typed, `fork` for a summary the session's own fork wrote); then, when the
+post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
+`outputTokens`. It holds no summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
 
 ### Reading debug mode's numbers
 

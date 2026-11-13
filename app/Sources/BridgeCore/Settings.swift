@@ -11,8 +11,8 @@ public struct Settings: Codable, Sendable, Equatable {
   /// session's first summary under `loadContextOnFirstCall`.
   public var pauseSyncWhileStopped: Bool
   /// A line that opens for a session the voice has no summary for asks for one, even under the
-  /// pause or a paused mark. That summary is written from the whole transcript, paused text
-  /// included.
+  /// pause or a paused mark. That summary is written from the transcript, paused text included; a
+  /// current mod leaves out tool output, thinking and reminders, but not text that quotes them.
   public var loadContextOnFirstCall: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
@@ -37,6 +37,9 @@ public struct Settings: Codable, Sendable, Equatable {
   public var silenceSeconds: Int
   public var firstWordSeconds: Int
   public var noiseSeconds: Int
+  /// The model that writes a session's summary (`SummaryModel`), at low effort; a value that is
+  /// not a model id reads as the default.
+  public var summaryModel = SummaryModel.default
 
   public init(
     voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
@@ -94,6 +97,10 @@ public struct Settings: Codable, Sendable, Equatable {
     silenceSeconds = try timeout(.silenceSeconds, defaults.silence)
     firstWordSeconds = try timeout(.firstWordSeconds, defaults.firstWord)
     noiseSeconds = try timeout(.noiseSeconds, defaults.noise)
+    // A value of any other type reads as the default too, not as a file to start over from.
+    summaryModel =
+      (try? container.decodeIfPresent(String.self, forKey: .summaryModel)).flatMap(
+        SummaryModel.accepted) ?? SummaryModel.default
   }
 }
 

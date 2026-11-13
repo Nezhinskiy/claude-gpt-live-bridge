@@ -6,19 +6,22 @@ import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 import type { Band } from '../types'
 import { bandStatus, drawBand, JOINING } from './band.tsx'
 import { summarize } from './context.ts'
+import type { Summary } from './context.ts'
 import { BridgeLink, REMOVED } from './link.ts'
 import { askedText, keyboardAnswer, PLUGIN_NAME, spokenReply, voicePrompt } from './prompt.ts'
 import { fallbackTitle, recordIndex, titleFromRegistry } from './title.ts'
 import { ANSWER_LIMIT, clip, originOf, TurnTracker } from './turns.ts'
 import type { SyncLine, TurnOrigin, TurnSnapshot } from './turns.ts'
 import { socketPath } from './wire.ts'
-import type { ActivityBody, AnswerStatus, LimitWindowBody, TurnRef, VoiceRequest, Work } from './wire.ts'
+import type {
+  ActivityBody, AnswerStatus, LimitWindowBody, SummaryFailure, TurnRef, VoiceRequest, Work,
+} from './wire.ts'
 
 const OFFLINE_AFTER_MS = 10_000
 /** How often a poll looks through the whole registry while this session's record is not found. */
 const RESCAN_MS = 10_000
 const OPEN_APP = 'Open LiveBridge from the menu bar.'
-/** How long a summary may take before the band stops saying it is loading. */
+/** How long a summary may take: the models an ask names share it, and a fork is given up after it. */
 const CONTEXT_TIMEOUT_MS = 60_000
 /** How long the band says "Context sent". */
 const SENT_NOTE_MS = 3_000
@@ -63,21 +66,34 @@ let note: string | null = null
 let recordFile: string | null = null
 let lastScan = -Infinity
 /**
- * The last summary the model wrote, while nothing has happened since: until any main turn
- * completes, a gap, or `/clear`. Sending it again costs no model call. Kept in memory only, as the
- * transcript it summarises is the session's own.
+ * The last summary a model wrote, while nothing has happened since: until any main turn completes,
+ * a gap, or `/clear`. `model` is the one the ask named (undefined: a fork), and only an ask naming
+ * it gets the summary again, with the failures that came before it, at no model call. Kept in
+ * memory only, as the transcript it summarises is the session's own.
  */
-let summary: string | null = null
+let summary: { model: string | undefined; text: string; failures: SummaryFailure[] } | null = null
 /** Counts what ends a summary's use, so a summary written across one is not kept as current. */
 let turnsDone = 0
-/** The summary on its way, which a second ask joins instead of asking the model again. */
-let sending: Promise<ContextOutcome> | null = null
+/**
+ * The summary on its way, which a second ask joins instead of asking a model again, and gets what
+ * the first ask's model writes; not once a gap crossed it (`send` behind `sendCount`), nor when the
+ * app numbered the second ask as another (`ask`).
+ */
+let sending: { send: number; ask: number | undefined; outcome: Promise<ContextOutcome> } | null = null
 /** The hooks' posts to the app, in the order the hooks ran. */
 let posts: Promise<unknown> = Promise.resolve()
 /** Counts sends; one that timed out or that a gap crossed is over, and what it wrote later is dropped. */
 let sendCount = 0
 
-type ContextOutcome = 'sent' | 'empty' | 'failed'
+/**
+ * `empty`: nothing to summarise yet; `failed`: no summary reached the app; `superseded`: a gap or a
+ * newer ask overtook the send, so its answer is stale and no failure.
+ */
+type ContextOutcome = 'sent' | 'empty' | 'failed' | 'superseded'
+/** What a context ask names: the model to write with, and the one to try if it fails; none from an older app. */
+type ContextAsk = Omit<Extract<Work, { kind: 'context' }>, 'kind'>
+/** The ask's number, which every answer to an ask that names a model echoes. */
+const answering = (ask: ContextAsk) => (ask.ask === undefined ? {} : { ask: ask.ask })
 
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
@@ -96,7 +112,8 @@ async function save($: EngineInterface): Promise<void> {
 
 /**
  * A turn did not reach the app, which the next join says. No summary from before it covers it: the
- * one kept goes, and the one being written is dropped, as nothing could date it once posted.
+ * one kept goes. The one being written for an older app's ask is dropped; for a named ask it is
+ * posted all the same, and the app takes it as fresh if it arrives before that join.
  */
 function noteGap(): void {
   link?.noteGap()
@@ -206,7 +223,9 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   // The app got no turn from before the owner's join; a reload's gap is in its snapshot.
   if (byOwner && (await hasTurns($))) noteGap()
   // Only the owner's own join brings back a session they removed.
-  const isJoined = (await link?.join({ sessionId, title, modVersion, syncs: true, ...(byOwner && { owner: true }) })) === true
+  const isJoined = (await link?.join({
+    sessionId, title, modVersion, syncs: true, writesSummaries: true, ...(byOwner && { owner: true }),
+  })) === true
   await save($)
   await setBand($, {})
   redrawBand($)
@@ -302,7 +321,8 @@ async function tick($: EngineInterface): Promise<void> {
       await link?.answer({ id: work.id, status: 'failed', text: '', reason: ANSWERED_HERE })
     }
   } else if (work?.kind === 'context') {
-    void contextAsked($)
+    const { kind: _, ...ask } = work
+    void contextAsked($, ask)
   }
 }
 
@@ -381,30 +401,72 @@ async function hasTurns($: EngineInterface): Promise<boolean> {
   return ((await turnCount($)) ?? 1) > 0  // not known: the model says when there is nothing
 }
 
-async function deliverContext($: EngineInterface): Promise<ContextOutcome> {
-  if (!(await hasTurns($))) return 'empty'
-  const send = ++sendCount
+/**
+ * Answers one ask. An ask that names a model, from an app that waits on the answer, is answered at
+ * every exit, an empty summary when there is none; an older app's ask is answered only with one.
+ */
+async function deliverContext($: EngineInterface, ask: ContextAsk, send: number): Promise<ContextOutcome> {
+  const deadline = (await $.clock.now()) + CONTEXT_TIMEOUT_MS
+  const isNamed = ask.model !== undefined
+  if (!(await hasTurns($))) {
+    if (isNamed) await link?.context({ summary: '', ...answering(ask) })
+    return 'empty'
+  }
   await showContext($, 'loading')
-  let timer: { cancel(): void } | undefined
-  const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
-  const outcome = await Promise.race([writeAndPost($, send), late])
-  timer?.cancel()
-  if (outcome !== 'sent') sendCount += 1  // a summary this send writes after its time is dropped
-  await showContext($, outcome === 'sent' ? 'sent' : undefined)
+  let outcome: ContextOutcome
+  if (isNamed) {
+    // The models share the minute: each call's own time limit is what is left of it.
+    outcome = await writeAndPost($, ask, send, deadline)
+  } else {
+    let timer: { cancel(): void } | undefined
+    const late = new Promise<'failed'>(resolve => { timer = $.clock.after(CONTEXT_TIMEOUT_MS, () => resolve('failed')) })
+    outcome = await Promise.race([forkAndPost($, send), late])
+    timer?.cancel()
+    if (outcome !== 'sent') sendCount += 1  // a summary this send writes after its time is dropped
+  }
+  // A newer send, after a gap, owns the band's note.
+  if (sending?.send !== send) return outcome
+  await showContext($, outcome === 'sent' ? 'sent' : outcome === 'failed' && isNamed ? 'failed' : undefined)
   if (outcome === 'sent') {
     $.clock.after(SENT_NOTE_MS, () => void (send === sendCount && showContext($, undefined)))
   }
   return outcome
 }
 
-async function writeAndPost($: EngineInterface, send: number): Promise<ContextOutcome> {
+/**
+ * Writes with the model the ask names and posts what came of it, the failures included. One a gap
+ * crossed is posted all the same, as its ask's answer, which the app then ignores as stale.
+ */
+async function writeAndPost($: EngineInterface, ask: ContextAsk, send: number, deadline: number): Promise<ContextOutcome> {
+  const turns = turnsDone
+  const kept = summary !== null && summary.model === ask.model ? summary : null
+  let written: Summary
+  try {
+    written = kept ?? (await summarize($, ask, deadline))
+  } catch {
+    // The transcript could not be read, so no model was asked.
+    await link?.context({ summary: '', ...answering(ask) })
+    return 'failed'
+  }
+  const { text, failures, stats } = written
+  if (text !== '' && turns === turnsDone) summary = { model: ask.model, text, failures }
+  const isTaken = (await link?.context({
+    summary: text, ...(failures.length > 0 && { failures }), ...(stats && { stats }), ...answering(ask),
+  })) === true
+  if (send !== sendCount) return 'superseded'
+  if (!isTaken) return 'failed'
+  return text !== '' ? 'sent' : failures.length > 0 ? 'failed' : 'empty'
+}
+
+/** An older app's ask: the session's own model forks, and only a summary is posted. */
+async function forkAndPost($: EngineInterface, send: number): Promise<ContextOutcome> {
   try {
     const turns = turnsDone
-    const text = summary ?? (await summarize($))
+    const text = summary !== null && summary.model === undefined ? summary.text : (await summarize($, {}, Infinity)).text
     if (send !== sendCount) return 'failed'
     if (text === '') return 'empty'
-    if (turns === turnsDone) summary = text
-    return (await link?.context(text)) === true ? 'sent' : 'failed'
+    if (turns === turnsDone) summary = { model: undefined, text, failures: [] }
+    return (await link?.context({ summary: text })) === true ? 'sent' : 'failed'
   } catch {
     return 'failed'
   }
@@ -412,12 +474,19 @@ async function writeAndPost($: EngineInterface, send: number): Promise<ContextOu
 
 /**
  * Sends the summary the app asked for, which has no reply line of its own, and never rejects. While
- * one is on its way a second ask joins it.
+ * one is on its way a second ask joins it, unless a gap crossed it or the app numbered the second
+ * ask as another: that one is over.
  */
-async function contextAsked($: EngineInterface): Promise<void> {
-  sending ??= deliverContext($).finally(() => { sending = null })
+async function contextAsked($: EngineInterface, ask: ContextAsk): Promise<void> {
+  if (sending === null || sending.send !== sendCount || sending.ask !== ask.ask) {
+    const send = ++sendCount
+    const mine: NonNullable<typeof sending> = {
+      send, ask: ask.ask, outcome: deliverContext($, ask, send).finally(() => { if (sending === mine) sending = null }),
+    }
+    sending = mine
+  }
   // A send that outlived the join (the owner left meanwhile) is no failure worth a line.
-  if ((await sending) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
+  if ((await sending.outcome) === 'failed' && link?.session) $.ui.log(NO_SUMMARY)
 }
 
 async function statusText($: EngineInterface): Promise<string> {

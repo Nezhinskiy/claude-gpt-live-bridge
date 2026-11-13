@@ -85,6 +85,12 @@ public struct Conversation: Codable, Sendable, Equatable {
     var at: Date
     /// A gap or a forget came after the ask, so its summary cannot cover the conversation.
     var isStale = false
+    /// The model the ask named and its fallback; nil on an ask to a mod that forks.
+    var model: String?
+    var fallbackModel: String?
+    /// The ask's number, which a current mod's answer echoes; nil on an ask that names no model,
+    /// and in an older file.
+    var number: Int?
   }
 
   public init() {}
@@ -124,22 +130,32 @@ public struct Conversation: Codable, Sendable, Equatable {
     summaryAsk?.isStale = true
   }
 
-  /// A summary was asked for. An ask still open stays as it is: the mod joins a second ask to the
-  /// summary on its way, which is the first ask's.
-  mutating func noteSummaryAsk(at now: Date) {
-    if openAsk(at: now) == nil { summaryAsk = SummaryAsk(at: now) }
+  /// A summary was asked for; the ask now open. An ask still open stays as it is, as the mod joins
+  /// a second ask to the summary on its way, which is the first ask's. An ask naming a model, to a
+  /// mod that echoes `number`, replaces an open one that is stale or has no number.
+  mutating func noteSummaryAsk(
+    at now: Date, model: String?, fallbackModel: String?, number: Int
+  ) -> SummaryAsk {
+    if let open = openAsk(at: now), model == nil || (!open.isStale && open.number != nil) {
+      return open
+    }
+    let ask = SummaryAsk(
+      at: now, model: model, fallbackModel: fallbackModel, number: model == nil ? nil : number)
+    summaryAsk = ask
+    return ask
   }
 
   /// A summary arrived and answers the open ask. False: it was asked for before a gap or a forget.
-  mutating func takeSummaryAsk(at now: Date) -> Bool {
-    defer { summaryAsk = nil }
-    return openAsk(at: now)?.isStale != true
+  /// One that carries the number of another ask answers none and leaves the open ask as it is.
+  mutating func takeSummaryAsk(at now: Date, number: Int?) -> Bool {
+    let open = openAsk(at: now)
+    if let number, open?.number != number { return false }
+    summaryAsk = nil
+    return open?.isStale != true
   }
 
-  /// The open ask's time and whether a gap or a forget came after it; nil when none is open.
-  func openSummaryAsk(at now: Date) -> (at: Date, isStale: Bool)? {
-    openAsk(at: now).map { ($0.at, $0.isStale) }
-  }
+  /// The open ask; nil when none is open.
+  func openSummaryAsk(at now: Date) -> SummaryAsk? { openAsk(at: now) }
 
   private func openAsk(at now: Date) -> SummaryAsk? {
     summaryAsk.flatMap { now < $0.at + Self.askLife ? $0 : nil }
@@ -187,6 +203,9 @@ public struct Continuity: Codable, Sendable, Equatable {
   public static let keptConversations = 20
 
   private(set) var conversations: [String: Conversation] = [:]
+  /// The number the last numbered ask took, for every session, so a forget or an eviction never
+  /// brings an old number back.
+  private var asksMade: Int?
 
   public init() {}
 
@@ -204,21 +223,31 @@ public struct Continuity: Codable, Sendable, Equatable {
     use(id) { $0.setContext(line) }
   }
 
-  /// The app asked `id` for a summary.
-  public mutating func noteSummaryAsk(of id: SessionID, at now: Date) {
-    use(id) { $0.noteSummaryAsk(at: now) }
+  /// The app asked `id` for a summary, with `model` and `fallbackModel` if it named them; the ask
+  /// now open, whose number the ask carries.
+  @discardableResult
+  mutating func noteSummaryAsk(
+    of id: SessionID, at now: Date, model: String? = nil, fallbackModel: String? = nil
+  ) -> Conversation.SummaryAsk {
+    let next = (asksMade ?? 0) + 1
+    let ask = use(id) {
+      $0.noteSummaryAsk(at: now, model: model, fallbackModel: fallbackModel, number: next)
+    }
+    if ask.number == next { asksMade = next }
+    return ask
   }
 
   /// The ask of `id` still open at `now`, without taking it.
-  public func openSummaryAsk(of id: SessionID, at now: Date) -> (at: Date, isStale: Bool)? {
+  func openSummaryAsk(of id: SessionID, at now: Date) -> Conversation.SummaryAsk? {
     self[id].openSummaryAsk(at: now)
   }
 
   /// A summary from `id` arrived. False: it was asked for before the latest gap or forget, so it
   /// covers less than the conversation lacks and must not be taken. One nobody asked for (an older
-  /// mod's `/live context`) cannot be dated, and is taken.
-  public mutating func takeSummaryAsk(of id: SessionID, at now: Date) -> Bool {
-    use(id) { $0.takeSummaryAsk(at: now) }
+  /// mod's `/live context`) cannot be dated, and is taken. `number`: the ask a current mod says it
+  /// answers; only the open ask's own number takes it.
+  public mutating func takeSummaryAsk(of id: SessionID, at now: Date, number: Int? = nil) -> Bool {
+    use(id) { $0.takeSummaryAsk(at: now, number: number) }
   }
 
   /// Whether a line of `turn` goes in. A turn's first line decides, and later lines keep that

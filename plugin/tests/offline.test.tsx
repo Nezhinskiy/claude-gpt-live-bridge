@@ -47,10 +47,10 @@ test('aFailedPostMeansAMissedJoin', async ($, on) => {
   world.joined.delete(ID)
   world.isAppUp = true
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true, missed: true }])
   world.joined.delete(ID)
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true }])
 })
 
 test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
@@ -63,7 +63,7 @@ test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
   world.syncStatus = 404
   await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true, missed: true }])
 })
 
 /** The voice never hears of the question or the prompt, so its picture of the turn has a hole. */

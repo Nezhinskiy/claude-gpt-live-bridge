@@ -49,6 +49,12 @@ public enum ContextLoadState: Sendable, Equatable {
   }
 }
 
+/// A session's answer to a context ask, as the bridge took it; `wrote` is false for an empty one.
+public struct ContextArrival: Sendable, Equatable {
+  public let session: SessionID
+  public let wrote: Bool
+}
+
 /// The menu's Load context presses, per session: pending from the press until that session's
 /// summary arrives (`POST /v1/context`), `timeout` passes or the session leaves; then shown as
 /// loaded for `shownLoaded`. Pure: the caller passes the time.
@@ -66,11 +72,11 @@ public struct ContextLoads: Sendable, Equatable {
     loadedAt[id] = nil
   }
 
-  /// A summary from `id`; it counts only as the answer to a press still pending.
-  public mutating func arrived(_ id: SessionID, at now: Date) {
-    guard let pressed = pressedAt.removeValue(forKey: id), now < pressed + Self.timeout else {
-      return
-    }
+  /// A summary from `id`; it counts only as the answer to a press still pending. An empty one
+  /// ends the press as the timeout would, with nothing shown as loaded.
+  public mutating func arrived(_ id: SessionID, at now: Date, wrote: Bool = true) {
+    guard let pressed = pressedAt.removeValue(forKey: id), now < pressed + Self.timeout, wrote
+    else { return }
     loadedAt[id] = now
   }
 

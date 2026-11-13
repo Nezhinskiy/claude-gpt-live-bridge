@@ -37,6 +37,10 @@ All notable changes to this project are listed here. The format follows
   LiveBridge, so `/live` turns off, LiveBridge removes its login item and microphone permission and
   quits, and the files it keeps go to the Trash. It copies the command that removes the Claude Code
   mod for you to run.
+- **Summary model**, in Settings under Context: Haiku 5.5 (the default), Sonnet 5.5 or Opus 5.5
+  writes the summary the voice gets as context, always at low effort, on your Claude usage. If
+  another model fails, Haiku 5.5 writes it instead, and a line under the setting says so; if no
+  model writes one, it says why. When a summary fails, the session's band says **Context failed**.
 
 ### Changed
 
@@ -50,6 +54,23 @@ All notable changes to this project are listed here. The format follows
   the session's row in the menu shows an ellipsis in place of turning arrows.
 - While the call is stopped, the menu bar icon no longer shows that a session's Claude is working;
   the session's row in the menu still says so. A waiting approval still shows.
+- Summaries are written by Haiku 5.5 by default, on an update too, in place of the session's own
+  model at the session's own effort. The model reads the session's transcript with tool output,
+  thinking and system reminders left out, but not text that quotes them, cut to 120,000
+  characters. Unlike the fork, it does not wait for a
+  turn of a resumed or new Claude Code process to end ([BR-003](docs/bugs/BR-003.md), for an app
+  and a mod of this release). Where Claude Code's provider does not offer Haiku 5.5, the session gets no
+  summary ([known limitations](README.md#known-limitations)).
+- The mod answers every summary ask from this app, with an empty summary when it has none, and
+  each ask carries a number that its answer repeats, so a summary written before a gap the app
+  has heard of is not taken for a fresh one. One that reaches the app before the mod's next join
+  reports the gap is still taken ([BR-002](docs/bugs/BR-002.md)).
+
+### Deprecated
+
+- The mod's fork of the session's own model, kept only for an app that names no summary model. It
+  is removed in the first mod release after the app that names one has been the oldest supported
+  app for one release.
 
 ## [0.5.0]
 

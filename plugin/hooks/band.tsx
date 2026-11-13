@@ -13,7 +13,7 @@ export type BandActions = { start(): void; stop(): void; mute(): void; unmute():
 /** What the band and `/live` say before the app's first reply. */
 export const JOINING = 'LiveBridge: joining…'
 
-const CONTEXT_NOTE = { loading: 'Loading context…', sent: 'Context sent' } as const
+const CONTEXT_NOTE = { loading: 'Loading context…', sent: 'Context sent', failed: 'Context failed' } as const
 
 const PHASE: Record<CallPhase, [color: string, label: string]> = {
   off: ['inactive', 'Voice off'],
