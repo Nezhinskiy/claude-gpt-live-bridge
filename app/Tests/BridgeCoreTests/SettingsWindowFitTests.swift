@@ -40,6 +40,13 @@ struct SettingsWindowFitTests {
     #expect(frame.maxY == 919)
   }
 
+  /// `NSWindow.center()` puts a window above the middle, so one as tall as the visible frame
+  /// ends up with its top under the menu bar; fitted again at the same size, it moves inside.
+  @Test func aFullHeightWindowCentredAboveTheMiddleMovesBackInside() {
+    let frame = Self.fit(windowY: 90, height: 849, content: 761)
+    #expect(frame == CGRect(x: 100, y: 70, width: 480, height: 849))
+  }
+
   /// A second display, right of the main one and lower, with no Dock.
   @Test func aWindowOnASecondScreenIsFittedToThatScreen() {
     let second = CGRect(x: 1470, y: -200, width: 1280, height: 700)

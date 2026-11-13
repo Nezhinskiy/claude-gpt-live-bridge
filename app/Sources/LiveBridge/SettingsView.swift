@@ -324,8 +324,13 @@ final class SettingsWindow {
     if !window.isVisible {
       // Sized before it shows, so it opens at its height rather than sliding to it, and
       // centered the first time at that height; after that it opens where it was left.
+      // `center()` puts it above the middle, which can push a tall window's top under the menu
+      // bar, so the centred window is fitted again.
       tabs.selectedPage?.fitWindow()
-      if !placed { window.center() }
+      if !placed {
+        window.center()
+        tabs.selectedPage?.fitWindow()
+      }
       placed = true
     }
     NSApp.activate()
