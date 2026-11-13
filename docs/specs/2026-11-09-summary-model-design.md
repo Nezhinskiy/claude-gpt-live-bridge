@@ -274,7 +274,7 @@ hold:
 
 1. Its session has a summary ask in flight: asked at Start, at a target change, by Load context, or
    by this line (`pauseHoldsBackSummary` and `needsContext` decide an ask, unchanged).
-2. That session's mod said `writesSummaries`.
+2. That ask has a number, which it has when the session's mod said `writesSummaries` at the ask.
 3. In this call the session's wait is not spent: an answer to its open, current ask with no
    summary spends it, whether or not a line was waiting, and so does a line that waits until the
    limit, so a persistent failure does not hold every line. A line that comes after the limit, the

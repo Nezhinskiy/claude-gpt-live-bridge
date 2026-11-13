@@ -280,9 +280,10 @@ again, with its number if it has one: the mod joins it to its send on its way, a
 (it restarted, or the app lost its post) writes it again.
 
 **The wait.** A line, whether speech or a result opened it, waits for its session's summary
-(`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current ask
-(asked at Start, at a target change during the call, by Load context or by this line), its mod said
-`writesSummaries`, and the session's wait is not spent this call. The wait sits
+(`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current
+ask with a number (asked at Start, at a target change during the call, by Load context or by this
+line; an ask is numbered when the session's mod said `writesSummaries`), and the session's wait is
+not spent this call. The wait sits
 after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
 `connecting`, which arms no silence timer, nothing leaves the Mac, and the page queues what is said
 and plays it once the line connects. It ends at the post that answers the open ask, whatever it

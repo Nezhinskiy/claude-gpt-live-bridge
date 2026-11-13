@@ -91,6 +91,7 @@ All notable changes to this project are listed here. The format follows
   each ask carries a number that its answer repeats, so a summary written before a gap the app
   has heard of is not taken for a fresh one. Before it posts a summary, the mod tells the app of a
   gap it noted and has not yet reported, so a summary written across that gap is not taken either.
+  An older app or mod sends no number and still guesses ([BR-002](docs/bugs/BR-002.md)).
 
 ### Deprecated
 

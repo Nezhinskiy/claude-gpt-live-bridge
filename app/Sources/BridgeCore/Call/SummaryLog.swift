@@ -12,7 +12,8 @@ public struct SummaryTiming: Sendable, Equatable {
   /// The id of the model that wrote it (`SummaryReport.writer`); nil when a fork wrote it.
   public var model: String?
   public var stats: SummaryStats?
-  /// Seconds a line waited for it (`Bridge.waitForSummary`); nil when no line waited.
+  /// Seconds a line waited for it, from `SummaryAsks.wait` to `SummaryAsks.answer`; nil when no
+  /// line waited.
   public var waited: TimeInterval?
   /// No model was tried, as the transcript could not be read: the line names none.
   public var triedNoModel: Bool
