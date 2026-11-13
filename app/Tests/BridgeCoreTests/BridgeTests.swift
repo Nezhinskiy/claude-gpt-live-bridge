@@ -1644,14 +1644,15 @@ struct BridgeTests {
     #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)?.number == 1)
   }
 
-  /// The mod's send on its way answers a joined ask, so nothing more goes to the mod, which
-  /// would say it has no summary twice.
-  @Test func aJoinedAskQueuesNothing() async throws {
+  /// A joined ask goes to the mod again with its number, so a mod that lost the send writes it.
+  @Test func aJoinedAskIsHandedAgainWithItsNumber() async throws {
     try await join(a, "Alpha", writesSummaries: true)
     await bridge.loadContext()
-    _ = try await registry.poll(a)
+    _ = try await registry.poll(a)  // taken by a mod that then dies
+    try await join(a, "Alpha", writesSummaries: true)
+    try await pass(5, polling: a)
     await bridge.loadContext()
-    #expect(try await registry.poll(a) == nil)
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
   }
 
   /// A joined ask changes no stored ask, so the conversation file is not written again.

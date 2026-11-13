@@ -478,6 +478,17 @@ test('theSummaryEchoesItsAsk', async ($, on) => {
   expect(world.completes.map(one => one.model)).toEqual([OPUS])
 })
 
+test('anAskWithTheSendsNumberJoinsIt', async ($, on) => {
+  // The app hands an open ask again with its number: the send on its way answers both, once.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await world.clock.advance(5000)
+  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 1 })])
+  expect(world.completes).toHaveLength(1)
+})
+
 test('aSendANewerAskReplacedIsNoFailure', async ($, on) => {
   // The app numbered the second ask as another, after a gap or a forget: each send answers its own.
   const world = await joined($, on)

@@ -275,9 +275,9 @@ on the Mac, and the next speech opens a new session seeded with the target's con
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
 its context when the voice would lack part of the session (see the mod's Start above) and the
-pause does not hold it back (the same rule); an ask already open is joined: a mod that writes
-summaries is not asked again, as the summary on its way answers both, and an older mod is asked
-again and joins its own send.
+pause does not hold it back (the same rule); an ask already open is joined and handed to the mod
+again, with its number if it has one: the mod joins it to its send on its way, and one with none
+(it restarted, or the app lost its post) writes it again.
 
 **The wait.** A line, whether speech or a result opened it, waits for its session's summary
 (`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current ask

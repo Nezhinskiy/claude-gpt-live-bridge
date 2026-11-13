@@ -173,7 +173,7 @@ The effort is not on the wire: `low` is a constant in the mod.
 |---|---|---|
 | `Work.context.model?: string` | app | the model to write this summary with; absent from an older app |
 | `Work.context.fallbackModel?: string` | app | the default, used if `model` fails; absent when `model` is the default |
-| `Work.context.ask?: number` | app | the ask's number, on every ask that names a model: a new ask, one that replaces a stale ask or one with no number included, takes the next, and no number comes back after a forget; a second ask that joins an open, current one keeps its number and is not sent to the mod again. Absent from an older app, and on an ask to an older mod, whose open ask is kept as before |
+| `Work.context.ask?: number` | app | the ask's number, on every ask that names a model: a new ask, one that replaces a stale ask or one with no number included, takes the next, and no number comes back after a forget; a second ask that joins an open, current one keeps its number and is sent to the mod again, which joins it to its send on its way or, with none, writes it again. Absent from an older app, and on an ask to an older mod, whose open ask is kept as before |
 | `JoinBody.writesSummaries?: true` | mod | writes with the model asked, answers every context ask with `POST /v1/context` (an empty summary when it has none), runs model checks |
 | `ContextBody.failures?: [{ reason, error? }]` | mod | one per attempt that wrote nothing, in order: with a summary, the fallback wrote it; with `summary: ""`, nothing did |
 | `ContextBody.stats?` | mod | the [timing log](#the-timing-log) |
