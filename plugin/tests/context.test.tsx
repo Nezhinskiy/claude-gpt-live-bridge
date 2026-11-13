@@ -423,6 +423,21 @@ test('aGapThePollHasNotSaidIsSaidBeforeThePost', async ($, on) => {
   expect(told.map(call => [call.route, call.body?.missed ?? call.body?.ask])).toEqual([['join', true], ['context', 1]])
 })
 
+test('aSummaryWaitsForTheJoinThatSaysItsGap', async ($, on) => {
+  // The poll's join with `missed` is on its way when the summary is done: the post goes after it.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  await appAsks(world, { ...NAMED, ask: 1 })
+  world.syncStatus = 503
+  world.joinMs = 10_000
+  await $.turn.start({ text: 'Count the files', turnId: 't1' })
+  world.syncStatus = 200
+  await world.clock.advance(5000)
+  expect(world.take('context')).toEqual([])
+  await world.clock.advance(10_000)
+  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 1 })])
+})
+
 test('aThrowWhileReadingTheTranscriptPostsItsFailure', async ($, on) => {
   const world = await joined($, on)
   world.isTranscriptBroken = true
