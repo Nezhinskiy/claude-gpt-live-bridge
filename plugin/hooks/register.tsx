@@ -98,6 +98,22 @@ const answering = (ask: ContextAsk) => (ask.ask === undefined ? {} : { ask: ask.
 const setBand = ($: EngineInterface, change: Partial<Band> | null) =>
   update($, band, now => (change === null ? null : { isOffline: false, ...now, ...change }))
 
+/** The band as it draws: `minutesToday`, which grows while a line is open, is only `/live`'s text. */
+const drawn = (state: Band | null) => JSON.stringify(state, (key, value: unknown) => (key === 'minutesToday' ? undefined : value))
+
+/**
+ * Writes the band; with `isFast`, only when that changes what it draws, since every write redraws
+ * each surface that shows it. The once-a-second write stays, which keeps `/live`'s minutes and
+ * tells a surface that dropped the band from one that draws it (`UNDRAWN_MS`).
+ */
+async function writeBand($: EngineInterface, change: (now: Band | null) => Band | null, isFast: boolean): Promise<void> {
+  if (isFast) {
+    const now = await read($, band)
+    if (drawn(change(now)) === drawn(now)) return
+  }
+  await update($, band, change)
+}
+
 /**
  * Keeps the tracker and the gap for a reload. A store that fails costs nothing else: what goes to
  * the app matters more, and a hook past its `next` would have its `.catch` run the event again.
@@ -229,7 +245,7 @@ async function turnOn($: EngineInterface, byOwner: boolean): Promise<boolean> {
   await save($)
   await setBand($, {})
   redrawBand($)
-  link?.start(() => tick($))
+  link?.start(isFast => tick($, isFast))
   return isJoined
 }
 
@@ -255,7 +271,7 @@ async function turnOff($: EngineInterface): Promise<void> {
 /**
  * Joins again when its title changed, or when /clear gave the session a new id: that join
  * replaces the old id, so the app keeps the target and the request in flight. `isPoll`: the
- * one-second poll, which looks for the title as cheaply as `readTitle` allows.
+ * once-a-second poll, which looks for the title as cheaply as `readTitle` allows.
  */
 async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
   const joined = link?.session
@@ -275,9 +291,10 @@ async function follow($: EngineInterface, isPoll: boolean): Promise<void> {
 /**
  * One poll: status into the band, a voice request queued as a prompt, a context request
  * answered. It polls before it follows the title: any join clears the app's removal mark, so
- * only a session the app still holds may join again.
+ * only a session the app still holds may join again. `isFast`: one of the target's polls between
+ * the once-a-second ones, which neither follows the title nor rewrites an unchanged band.
  */
-async function tick($: EngineInterface): Promise<void> {
+async function tick($: EngineInterface, isFast: boolean): Promise<void> {
   if (!link?.session) return  // it left, or was removed, while this poll waited its turn
   const hadGap = link.hasGap
   const asked = answerQuestion  // a reply this poll brings can only be to a question open now
@@ -290,21 +307,22 @@ async function tick($: EngineInterface): Promise<void> {
       offlineSince = now
       if (!(await link?.ensureApp())) await setBand($, { problem: OPEN_APP })
     }
-    await setBand($, { isOffline: now - offlineSince >= OFFLINE_AFTER_MS })
+    const isOffline = now - offlineSince >= OFFLINE_AFTER_MS
+    await writeBand($, shown => ({ ...shown, isOffline }), isFast)
     return
   }
   offlineSince = null
-  await follow($, true)
+  if (!isFast) await follow($, true)
   const self = link?.session?.sessionId ?? ''
   if (reply.work?.kind === 'request') note = null
-  await update($, band, now => ({
+  await writeBand($, now => ({
     isOffline: false, status: bandStatus(reply.status, self),
     ...(note && { problem: note }), ...(now?.context && { context: now.context }),
-  }))
-  // That write redraws each surface that shows the band; one that asked for none for a while
-  // lost it, and is asked again.
+  }), isFast)
+  // The once-a-second write redraws each surface that shows the band; one that asked for none
+  // for a while lost it, and is asked again.
   const at = await $.clock.now()
-  if (at - drawnAt >= UNDRAWN_MS) {
+  if (!isFast && at - drawnAt >= UNDRAWN_MS) {
     drawnAt = at
     redrawBand($)
   }

@@ -35,7 +35,7 @@ flowchart LR
   Codex -- stdio --> CodexProc
   CodexProc -- signalling --> OpenAI
   Audio -- "WebRTC audio + data channel" --> OpenAI
-  Mod -- "HTTP/1.1, 1 poll per second" --> Server
+  Mod -- "HTTP/1.1, 1 poll per second, 5 for the target" --> Server
   Mod -- "prompt.submit" --> Claude
 ```
 
@@ -140,8 +140,10 @@ reading into the menu's row and tooltip.
 
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
 desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
-and joins again when that title changes, polls it once a second, submits each voice request to
-the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
+and joins again when that title changes, polls it once a second (the target five times a second,
+call on or off, so a summary ask reaches it sooner; the title is still read once a second, and a
+poll in between writes the band only when what it draws changed), submits each voice request to the session
+as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
 origin. It posts every other main-loop turn to the app as synced lines (`POST /v1/sync`; a
 background turn inside the follow-up window posts its answer as an update instead): the
@@ -164,11 +166,14 @@ buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries 
 `· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own.
 A surface that has drawn no band for 3 s while the session is joined is asked for it again, and
 `/live` in a joined session asks every surface for it. Start makes the session the target and
-starts the call; the line the app opens then asks the target for its summary when the voice would
-lack part of the session (it has none, a turn did not arrive, the lines since the summary no
-longer all fit the seed, or the mod does not sync), unless the pause holds it back
-(`Bridge.pauseHoldsBackSummary`): the pause setting is on or the session is *paused*, and the session
-has a summary or **Load a session's context on its first call** is off. The mod writes it (none for a session with no prompt yet; the last one again, with
+starts the call. The target is asked for its summary when the voice would lack part of the
+session (it has none, a turn did not arrive, the lines since the summary no longer all fit the
+seed, or the mod does not sync), unless the pause holds it back (`Bridge.pauseHoldsBackSummary`):
+the pause setting is on or the session is *paused*, and the session has a summary or **Load a
+session's context on its first call** is off. A mod that joined with `writesSummaries` is asked at
+once, when the call starts and when the target changes during the call (from the menu, the band
+or the registry after a drop); an older mod is asked when a line opens, as before, so Start spends
+no fork on the session's own model before anyone speaks. The mod writes it (none for a session with no prompt yet; the last one again, with
 no model call, until any main-loop turn completes, or `/clear`), with a
 short note in the band while it goes. Talk here shows only while the call talks to another session,
 and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
@@ -268,9 +273,26 @@ when the line is quiet and none counts (`timeoutsChanged`); one already counting
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
-its context when the voice would lack part of the session (see the mod's Start above) and the pause does not hold it back (the same rule); the line does not wait for
-it, and a summary that comes while the line connects is added once it is connected, unless the
-line was seeded with the same one.
+its context when the voice would lack part of the session (see the mod's Start above) and the
+pause does not hold it back (the same rule); an ask already open is joined, not repeated.
+
+**The wait.** A line, whether speech or a result opened it, waits for its session's summary
+(`SummaryWait`, decided in `Bridge.waitForSummary`) while that session has an open, current ask
+(asked at Start, at a target change during the call, by Load context or by this line), its mod said
+`writesSummaries`, and no wait of that session ended this call without a summary. The wait sits
+after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
+`connecting`, which arms no silence timer, nothing leaves the Mac, and the page queues what is said
+and plays it once the line connects. It ends at the post that answers the open ask, whatever it
+carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit,
+10 seconds from the ask, when the session drops or a gap makes the ask stale, or when the line is
+cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
+one, and a reconnect waits again for the same ask. An answer with no summary, or the limit, ends
+that session's waits for the rest of the call, so a summary that keeps failing holds one line, not
+every line; the next Start waits again. That is no bound per call: a mod that answers each ask with
+text, however late, or whose gap makes each ask stale, is asked again by the next line, so every
+line of the call can wait, each up to the limit from its own ask. A summary that comes after the
+wait, or while a line that does not wait connects, is added once the line is connected, unless
+the line was seeded with the same one; with no line open, it is in the next seed.
 
 ```mermaid
 sequenceDiagram

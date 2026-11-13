@@ -7,6 +7,9 @@ public enum Badge: Sendable, Equatable {
   case working
   /// A session waits for the owner's approval: a pulsing diamond.
   case approval
+  /// The target's summary is on its way while the call is on: a three-quarter ring turning once
+  /// a second.
+  case loadingContext
   /// Results wait until the owner next speaks: a dot.
   case unheard
   /// The call cannot start or just stopped: the deck breaks at mid-span.
@@ -46,9 +49,10 @@ public struct StatusPresentation: Sendable, Equatable {
   /// What joins a Claude Code session.
   public static let joinCommand = "/live"
 
-  /// A problem outranks everything; then a session waiting for approval, results the owner has
-  /// not heard, and a session at work during a call.
-  public init(_ s: StatusReply) {
+  /// A problem outranks everything; then a session waiting for approval, the target's summary on
+  /// its way during a call (`summariesInFlight`, `Bridge.summariesInFlight`), results the owner
+  /// has not heard, and a session at work during a call.
+  public init(_ s: StatusReply, summariesInFlight: Set<SessionID> = []) {
     let activities = Set(s.sessions.map(\.activity))
     bars = s.call
     problem = s.problem
@@ -56,6 +60,11 @@ public struct StatusPresentation: Sendable, Equatable {
     badge =
       if s.problem != nil { .problem } else if activities.contains(.approval) {
         .approval
+      } else if s.call != .off,
+        let target = s.sessions.first(where: \.isTarget)?.sessionId,
+        summariesInFlight.contains(target)
+      {
+        .loadingContext
       } else if s.unheard > 0 { .unheard } else if activities.contains(.working) && s.call != .off {
         .working
       } else { .none }
@@ -114,6 +123,7 @@ public struct StatusPresentation: Sendable, Equatable {
       case .none: nil
       case .working: "Claude working"
       case .approval: "approval needed"
+      case .loadingContext: "loading context"
       case .unheard: "\(unheard) unheard"
       case .problem: problem
       }

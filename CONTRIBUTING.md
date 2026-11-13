@@ -52,9 +52,9 @@ redactor), with their tests in `app/Tests/BridgeCoreTests`.
 
 The Claude Code adapter is the mod in `plugin/`: `hooks/register.tsx` wires it to Claude Code's
 mod API (the `/live` command, `prompt.submit`, the band), `hooks/link.ts` talks to the app and
-runs the one-second poll, `hooks/prompt.ts` and `hooks/turns.ts` decide which turns answer a
-voice request and what each posts back, and `hooks/title.ts` reads the session's title from
-Claude Code's session registry. An adapter for another agent speaks the same wire: it joins, polls
+runs the poll (once a second, five times a second for the target), `hooks/prompt.ts` and
+`hooks/turns.ts` decide which turns answer a voice request and what each posts back, and
+`hooks/title.ts` reads the session's title from Claude Code's session registry. An adapter for another agent speaks the same wire: it joins, polls
 `GET /v1/next` and posts its answers, activity and context, on the routes listed under
 [the wire](docs/architecture/overview.md#the-wire).
 `app/Tests/Smoke/fake-session.mjs`, a plain Node script that plays a session for the smoke test,
@@ -209,8 +209,8 @@ Every build, not only a debug one, logs a line at debug level in the category `s
 summary answered within two minutes of its ask: `askedFor`, the milliseconds the ask took;
 `stale`, whether the answer was stale (asked before a gap or a forget, or posted for an ask other
 than the open one, so it is ignored); `hadSummary`, whether it had text; `model`, the model's name
-(`custom` for an id you typed, `fork` for a summary the session's own fork wrote); then, when the
-post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
+(`custom` for an id you typed, `fork` for a summary the session's own fork wrote); `waited`, the
+milliseconds a line waited for it, when one did; then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
 `outputTokens`. It holds no summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
 
 ### Reading debug mode's numbers

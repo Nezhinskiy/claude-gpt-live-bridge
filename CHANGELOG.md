@@ -52,6 +52,9 @@ All notable changes to this project are listed here. The format follows
 - While Claude works, the menu bar icon shows dots turning in depth, three and then four, which
   gather into one between turns, for thinking, in place of a turning ring, which read as loading;
   the session's row in the menu shows an ellipsis in place of turning arrows.
+- During a call, while the target's summary is on its way, the menu bar icon shows a
+  three-quarter ring turning once a second, still when macOS is set to reduce motion. A problem
+  or a waiting approval shows instead of it; it shows instead of unheard results or Claude working.
 - While the call is stopped, the menu bar icon no longer shows that a session's Claude is working;
   the session's row in the menu still says so. A waiting approval still shows.
 - Summaries are written by Haiku 5.5 by default, on an update too, in place of the session's own
@@ -61,6 +64,22 @@ All notable changes to this project are listed here. The format follows
   turn of a resumed or new Claude Code process to end ([BR-003](docs/bugs/BR-003.md), for an app
   and a mod of this release). Where Claude Code's provider does not offer Haiku 5.5, the session gets no
   summary ([known limitations](README.md#known-limitations)).
+- A line no longer reaches the voice before its context: for a session on a mod of this release,
+  the line waits for the summary in flight before it connects, while what you say is recorded and
+  queued on the Mac, then opens with the summary in its seed and plays what you said. It opens
+  without one 10 seconds after the ask, or as soon as the mod answers with none; either ends the
+  waits for that session until the next Start. Such a session is asked at Start and when the
+  target changes during the call, so the summary is often in before you speak. A session on an
+  older mod is asked when its line opens and is not waited for, as before.
+- The menu's **Load context** reads **Loading context…**, disabled, while any summary of the target
+  is on its way from a mod of this release, whatever asked for it (Start, a new target, a line or
+  a press), not only after a press; it waits until the summary arrives or the mod's 60 seconds from
+  the ask pass. For a session on an older mod, a press no longer shows **Loading context…**. A summary that arrives shows **Context loaded** for a
+  moment, whatever asked for it; an empty answer goes back to **Load context** without it.
+- The target session polls the app five times a second, call on or off, and the others still once
+  a second, so a summary ask reaches it up to 0.8 s sooner; its title is still read once a second.
+- A session's band draws a call phase it does not know, from a later app, as **Connecting**, where
+  it could not draw the band before.
 - The mod answers every summary ask from this app, with an empty summary when it has none, and
   each ask carries a number that its answer repeats, so a summary written before a gap the app
   has heard of is not taken for a fresh one. One that reaches the app before the mod's next join

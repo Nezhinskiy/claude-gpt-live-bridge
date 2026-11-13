@@ -8,61 +8,47 @@ struct ContextLoadsTests {
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
   let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 
-  @Test func aPressIsPendingUntilItsContextArrives() {
+  /// Whatever asked for it, Start, a target change, a line or a press: Load context waits.
+  @Test func anyAskInFlightShowsLoading() {
     var loads = ContextLoads()
-    #expect(loads.state(of: a, at: t0) == .ready)
-    loads.pressed(a, at: t0)
-    #expect(loads.state(of: a, at: t0 + 30) == .loading)
-    #expect(loads.state(of: b, at: t0 + 30) == .ready)  // per session
-    loads.arrived(a, at: t0 + 30)
-    #expect(loads.state(of: a, at: t0 + 32.9) == .loaded)
-    #expect(loads.state(of: a, at: t0 + 33) == .ready)
+    #expect(loads.state(of: a, inFlight: [a], at: t0) == .loading)
+    #expect(!loads.state(of: a, inFlight: [a], at: t0).isEnabled)
+    #expect(loads.state(of: b, inFlight: [a], at: t0) == .ready)  // per session
+    loads.arrived(a, at: t0, wrote: true)
+    #expect(loads.state(of: a, inFlight: [a], at: t0) == .loading)  // a newer ask, on its way
   }
 
-  @Test func aPressGivesUpAfterSixtySeconds() {
+  @Test func aSummaryShowsAsLoadedForThreeSeconds() {
     var loads = ContextLoads()
-    loads.pressed(a, at: t0)
-    #expect(loads.state(of: a, at: t0 + 59.9) == .loading)
-    #expect(loads.state(of: a, at: t0 + 60) == .ready)
-    loads.arrived(a, at: t0 + 61)  // too late to count as the press's
-    #expect(loads.state(of: a, at: t0 + 61) == .ready)
+    loads.arrived(a, at: t0, wrote: true)
+    #expect(loads.state(of: a, inFlight: [], at: t0 + 2.9) == .loaded)
+    #expect(loads.state(of: a, inFlight: [], at: t0 + 3) == .ready)
   }
 
-  /// An empty answer ends the press as a timeout would: nothing was loaded.
+  /// An empty answer is no summary: nothing was loaded.
   @Test func anEmptyReplyGoesBackToLoadContext() {
     var loads = ContextLoads()
-    loads.pressed(a, at: t0)
     loads.arrived(a, at: t0 + 5, wrote: false)
-    #expect(loads.state(of: a, at: t0 + 5) == .ready)
-  }
-
-  @Test func aContextNobodyPressedForShowsNothing() {
-    var loads = ContextLoads()
-    loads.arrived(a, at: t0)  // as when automatic context asks a new target for it
-    #expect(loads.state(of: a, at: t0) == .ready)
+    #expect(loads.state(of: a, inFlight: [], at: t0 + 5) == .ready)
   }
 
   @Test func aSessionThatLeftIsForgotten() {
     var loads = ContextLoads()
-    loads.pressed(a, at: t0)
-    loads.pressed(b, at: t0)
+    loads.arrived(a, at: t0, wrote: true)
+    loads.arrived(b, at: t0, wrote: true)
     loads.keep(only: [b])
-    #expect(loads.state(of: a, at: t0) == .ready)
-    #expect(loads.state(of: b, at: t0) == .loading)
-    loads.arrived(a, at: t0 + 1)
-    #expect(loads.state(of: a, at: t0 + 1) == .ready)
+    #expect(loads.state(of: a, inFlight: [], at: t0) == .ready)
+    #expect(loads.state(of: b, inFlight: [], at: t0) == .loaded)
   }
 
-  @Test func theNextChangeIsTheEarliestDeadline() {
+  @Test func theNextChangeIsTheEarliestEndOfLoaded() {
     var loads = ContextLoads()
     #expect(loads.nextChange(after: t0) == nil)
-    loads.pressed(a, at: t0)
-    loads.pressed(b, at: t0 + 10)
-    #expect(loads.nextChange(after: t0) == t0 + 60)
-    loads.arrived(b, at: t0 + 20)
-    #expect(loads.nextChange(after: t0 + 20) == t0 + 23)
-    #expect(loads.nextChange(after: t0 + 23) == t0 + 60)
-    #expect(loads.nextChange(after: t0 + 60) == nil)
+    loads.arrived(a, at: t0, wrote: true)
+    loads.arrived(b, at: t0 + 1, wrote: true)
+    #expect(loads.nextChange(after: t0) == t0 + 3)
+    #expect(loads.nextChange(after: t0 + 3) == t0 + 4)
+    #expect(loads.nextChange(after: t0 + 4) == nil)
   }
 }
 

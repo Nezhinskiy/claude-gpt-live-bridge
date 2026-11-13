@@ -244,3 +244,16 @@ test('anUnmutedLiveCallDrawsNoMutedMarker', async ($, on) => {
     await band.unmount()
   }
 })
+
+// A later app may add a phase; this band draws it as connecting instead of failing to draw.
+test('anUnknownPhaseDrawsAsConnecting', async ($, on) => {
+  const world = await joined($, on)
+  world.status = { ...world.status, call: 'waiting' as StatusReply['call'] }
+  await world.clock.advance(1000)
+  for (const surface of SURFACES) {
+    const band = await $.ui.mount({ ...BAND, surface })
+    expect(await band.find({ type: 'Text', text: 'Connecting' })).toBeDefined()
+    expect((await band.find({ type: 'Text', text: '●' }))?.props.color).toBe('warning')
+    await band.unmount()
+  }
+})

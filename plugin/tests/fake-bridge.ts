@@ -126,6 +126,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     read: [] as string[],
     /** The version the mod's own plugin.json names, or null when it cannot be read. */
     modVersion: null as string | null,
+    /** How long the app takes over a poll, on the mocked clock. */
+    nextMs: 0,
     /** While set, the app's reply to a poll is held until it resolves (built before, as the app does). */
     holdNext: null as Promise<void> | null,
     /** Called once a poll is being held. */
@@ -202,7 +204,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     world.calls.push({ route, body })
     if (route === 'join' && body.owner === true) world.removed.delete(body.sessionId)
     if (route === 'join') world.joined.add(body.sessionId)
-    if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
+    if (route === 'join' && body.replaces !== undefined) {
+      world.joined.delete(body.replaces)
+      // The session goes on under its new id, the target still if it was.
+      const sessions = world.status.sessions.map(row => (row.sessionId === body.replaces ? { ...row, sessionId: body.sessionId } : row))
+      world.status = { ...world.status, sessions }
+    }
     if (route === 'leave') world.joined.delete(body.sessionId)
     if (route === 'leave') world.timeline.push('leave')
     if (route === 'answer' && world.answerStatus !== 200) {
@@ -239,6 +246,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
         ? { status: world.status, ...(world.work.length > 0 && { work: world.work.shift() }) }
         : undefined
     const text = JSON.stringify(reply ?? { error: 'unknown session' })
+    if (route === 'next' && world.nextMs > 0) await world.clock.sleep(world.nextMs)
     if (route === 'next' && world.holdNext !== null) {
       world.onNextHeld()
       await world.holdNext

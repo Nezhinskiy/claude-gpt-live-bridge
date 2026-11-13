@@ -25,12 +25,12 @@ async function joined(...[$, on]: Parameters<TestBody>) {
 }
 
 /**
- * The app asks for the session's context, naming a model or, as an older app, none; the poll that
- * brings the ask is the one that runs it.
+ * The app asks for the session's context, naming a model or, as an older app, none; the target's
+ * next poll, 200 ms on, brings the ask and is the one that runs it.
  */
 async function appAsks(world: ReturnType<typeof fakeWorld>, ask: { model?: string; fallbackModel?: string; ask?: number } = {}) {
   world.work.push({ kind: 'context', ...ask })
-  await world.clock.advance(1000)
+  await world.clock.advance(200)
 }
 
 /** A typed turn that ends with `answer`. */
@@ -170,7 +170,7 @@ test('twoAsksAtOnceShareOneSummary', async ($, on) => {
   world.forkMs = 5000
   await appAsks(world)
   await appAsks(world)
-  await world.clock.advance(4000)
+  await world.clock.advance(4800)  // the first summary is done 5 s after its ask
   expect(world.take('context')).toEqual([SUMMARY])
   expect(world.forks).toBe(1)
 })

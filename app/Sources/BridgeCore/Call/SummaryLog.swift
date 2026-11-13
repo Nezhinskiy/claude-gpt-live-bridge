@@ -11,22 +11,26 @@ public struct SummaryTiming: Sendable, Equatable {
   /// The id of the model that wrote it; nil when the summary came from a fork.
   public var model: String?
   public var stats: SummaryStats?
+  /// Seconds a line waited for it (`SummaryWait`); nil when no line waited.
+  public var waited: TimeInterval?
 
   public init(
-    askedFor: TimeInterval, stale: Bool, hadSummary: Bool, model: String?, stats: SummaryStats?
+    askedFor: TimeInterval, stale: Bool, hadSummary: Bool, model: String?, stats: SummaryStats?,
+    waited: TimeInterval? = nil
   ) {
     self.askedFor = askedFor
     self.stale = stale
     self.hadSummary = hadSummary
     self.model = model
     self.stats = stats
+    self.waited = waited
   }
 }
 
 public enum SummaryLog {
-  /// `key=value` pairs, durations in ms, then the post's `stats` if it sent them. It holds numbers
-  /// and a listed model's name only: a model id the owner typed can be an ARN with an account
-  /// number, so it is logged as `custom`.
+  /// `key=value` pairs, durations in ms, how long a line waited if one did, then the post's
+  /// `stats` if it sent them. It holds numbers and a listed model's name only: a model id the
+  /// owner typed can be an ARN with an account number, so it is logged as `custom`.
   public static func line(_ timing: SummaryTiming) -> String {
     let model: String
     if let id = timing.model {
@@ -41,10 +45,13 @@ public enum SummaryLog {
         "inputTokens=\($0.inputTokens)", "outputTokens=\($0.outputTokens)",
       ]
     }
+    let waited = timing.waited.map { ["waited=\(Self.ms($0))ms"] }
     return
       ([
-        "askedFor=\(Int((timing.askedFor * 1000).rounded()))ms", "stale=\(timing.stale)",
+        "askedFor=\(Self.ms(timing.askedFor))ms", "stale=\(timing.stale)",
         "hadSummary=\(timing.hadSummary)", "model=\(model)",
-      ] + (stats ?? [])).joined(separator: " ")
+      ] + (waited ?? []) + (stats ?? [])).joined(separator: " ")
   }
+
+  private static func ms(_ seconds: TimeInterval) -> Int { Int((seconds * 1000).rounded()) }
 }

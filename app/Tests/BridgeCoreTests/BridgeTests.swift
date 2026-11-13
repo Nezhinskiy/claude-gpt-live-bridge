@@ -622,7 +622,7 @@ struct BridgeTests {
     #expect(await bridge.status.call == .live)
     let closes = await voice.closes
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.closes == closes)
     #expect(await bridge.status.call == .live)
     #expect(await audio.calls.filter { $0 == "applyAnswer" }.count == 1)
@@ -683,6 +683,47 @@ struct BridgeTests {
     await bridge.loadContext()
     #expect(try await registry.poll(b) == .context())
     #expect(try await registry.poll(a) == nil)
+  }
+
+  /// Whatever made the ask, here Start, the summary is on its way until its answer.
+  @Test func anyAskIsInFlightUntilItsAnswer() async throws {
+    try await startWriting()
+    #expect(await bridge.current.summariesInFlight == [a])
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// An older mod posts nothing when it has nothing to summarise, so the menu does not wait for it.
+  @Test func anAskToAnOlderModIsNotInFlight() async throws {
+    await live()
+    #expect(try await registry.poll(a) == .context())
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// The mod answers within its budget or not at all, so the menu stops waiting there.
+  @Test func anAskIsNotInFlightPastTheModsBudget() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await pass(59, polling: a)
+    #expect(await bridge.current.summariesInFlight == [a])
+    try await pass(1, polling: a)
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// Its summary would be ignored, so the menu does not wait for it.
+  @Test func aStaleAskIsNotInFlight() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    await bridge.newConversation()
+    #expect(await bridge.current.summariesInFlight.isEmpty)
+  }
+
+  /// The menu shows the press at once: the bridge publishes the ask it made.
+  @Test func aPressPublishesItsAsk() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    var updates = bridge.updates.makeAsyncIterator()
+    await bridge.loadContext()
+    #expect(await updates.next()?.summariesInFlight == [a])
   }
 
   /// A session's summary is announced to the menu, which stops waiting for it; one from a
@@ -1012,7 +1053,7 @@ struct BridgeTests {
     await bridge.perform(.stop)
     let opens = await voice.opens.count
     await audio.releaseSound()
-    try await answering.value
+    try await settle(answering)
     #expect(await bridge.status.call == .off)
     try await Task.sleep(for: .milliseconds(100))  // a line opened late would be there by now
     #expect(await voice.opens.count == opens)
@@ -1307,7 +1348,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await bridge.status.call == .off)
     #expect(await bridge.status.problem?.contains("No.") == true)
   }
@@ -1637,6 +1678,250 @@ struct BridgeTests {
   /// The same app data after the app restarted: a fresh bridge and registry.
   func restart() throws -> BridgeTests { try BridgeTests(dir: dir, time: time) }
 
+  // MARK: The line waits for its context
+
+  /// Alpha joined on a mod that writes summaries, and the call started, which asked it at once.
+  func startWriting() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.perform(.start)
+  }
+
+  /// Speech opens the line, which waits for the summary asked for at `asked`.
+  func speakAndWait(asked: Date) async -> Task<Void, Never> {
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { time.deadlines.contains(asked + SummaryWait.limit) })
+    return opening
+  }
+
+  /// The clock `seconds` on, one at a time, `id` polling as a live mod does.
+  func pass(_ seconds: Int, polling id: SessionID) async throws {
+    for _ in 0..<seconds {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(id)
+    }
+  }
+
+  @Test func startAsksAtOnceForAWritingMod() async throws {
+    try await startWriting()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+  }
+
+  /// An older mod forks on the session's own model, so Start spends nothing on it; its line asks
+  /// as before and does not wait.
+  @Test func anOlderModIsAskedWithItsLineAndNotWaitedFor() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    #expect(try await registry.poll(a) == nil)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.count == 1)
+    #expect(try await registry.poll(a) == .context())
+  }
+
+  @Test func theLineOpensAfterTheSummaryWithItInTheSeed() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    #expect(await voice.opens.isEmpty)
+    #expect(await bridge.status.call == .connecting)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await settle(opening)
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  @Test func theLimitOpensTheLineWithoutIt() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryWait.limit) - 1, polling: a)
+    #expect(await voice.opens.isEmpty)
+    try await pass(1, polling: a)
+    try await settle(opening)
+    #expect(await voice.opens == [[]])
+  }
+
+  /// A result that would open the line waits for the summary as speech does.
+  @Test func aResultWaitsLikeSpeech() async throws {
+    try await startWriting()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await sync(a, "Fix the build.")
+    let asked = time.now
+    await bridge.loadContext()
+    try await answer(request(1), from: a)
+    #expect(await eventually { time.deadlines.contains(asked + SummaryWait.limit) })
+    #expect(await voice.opens.isEmpty)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Newer work.", ask: 2))
+    #expect(await eventually { await voice.opens.count == 1 })
+    #expect(await voice.opens.first?.first?.text == "[CONTEXT] Alpha: Newer work.")
+  }
+
+  /// The answer that lands after the waiting line looked, before it sleeps, still opens it.
+  @Test func anAnswerDuringTheLookOpensTheLine() async throws {
+    try await startWriting()
+    await bridge.whileLooking { [self] in
+      let answer = ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1)
+      _ = try? await post("/v1/context", answer)
+    }
+    try await settle(Task { await bridge.audioEvent(.speechStarted) })
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  @Test func stopDuringTheWaitOpensNothing() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    await bridge.perform(.stop)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await voice.opens.isEmpty)
+    #expect(await bridge.status.call == .off)
+  }
+
+  /// The waiting line closes, the new target is asked at once, and the old summary is stored
+  /// when it lands.
+  @Test func aTargetChangeEndsTheWaitAndAsksTheNew() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let asked = time.now
+    await bridge.perform(.start)
+    let opening = await speakAndWait(asked: asked)
+    await bridge.setTarget(b)
+    try await settle(opening)
+    #expect(await bridge.status.call == .listening)
+    #expect(await voice.opens.isEmpty)
+    #expect(try await registry.poll(b) == .context(model: SummaryModel.default, ask: 2))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(try saved()[a].context == summary)
+  }
+
+  /// The registry makes another session the target when the target stops polling: that is a
+  /// target change too.
+  @Test func aRetargetAfterADropAsksTheNewTarget() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let joined = time.now
+    await bridge.perform(.start)
+    time.advance(by: .milliseconds(4_900))
+    #expect(await eventually { time.deadlines.contains { $0 > joined + 5 } })  // swept, asleep
+    _ = try await registry.poll(b)
+    time.advance(by: .seconds(1))  // Alpha has not polled for 5 s
+    #expect(
+      try await eventually {
+        try await registry.poll(b) == .context(model: SummaryModel.default, ask: 2)
+      })
+    #expect(await registry.target == b)
+  }
+
+  /// The line reopens over the new transport and waits again, for the same ask.
+  @Test func aReconnectDuringTheWaitWaitsForTheSameAsk() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    await bridge.reconnect()
+    try await settle(opening)
+    #expect(await eventually { await audio.offers.count == 2 })
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+    #expect(await voice.opens.isEmpty)
+    #expect(await bridge.status.call == .connecting)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await eventually { await voice.opens.count == 1 })
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  @Test func aLateSummaryReachesTheOpenLine() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryWait.limit), polling: a)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await voice.added == [summary])
+  }
+
+  /// The target leaving ends the wait with the line, which the new target opens again.
+  @Test func aDroppedSessionEndsTheWait() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta")
+    let asked = time.now
+    await bridge.perform(.start)
+    let opening = await speakAndWait(asked: asked)
+    try await post("/v1/leave", LeaveBody(sessionId: a))
+    try await settle(opening)
+    #expect(await voice.opens.isEmpty)
+    #expect(await bridge.status.call == .listening)
+  }
+
+  /// A summary written before a gap is ignored, and the line still waits for the fresh one.
+  @Test func aPostForAnOlderAskDoesNotEndTheWait() async throws {
+    try await startWriting()
+    try await join(a, "Alpha", missed: true, writesSummaries: true)
+    let asked = time.now
+    let opening = await speakAndWait(asked: asked)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "From before.", ask: 1))
+    try await Task.sleep(for: .milliseconds(100))  // a line opened by it would be there by now
+    #expect(await voice.opens.isEmpty)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
+    try await settle(opening)
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  /// The line closes and speech opens it again: after an answer with no summary, the line asks
+  /// again and does not wait.
+  @Test func anEmptyAnswerIsNotWaitedForAgainThisCall() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+    try await settle(opening)
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.opens.count == 2 })
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
+  }
+
+  /// A late answer with no summary closes the ask the limit gave up on; the next line asks again
+  /// and does not wait.
+  @Test func theLimitIsNotWaitedForAgainThisCall() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryWait.limit), polling: a)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.opens.count == 2 })
+  }
+
+  @Test func aNewCallWaitsAgainForASessionThatFailed() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+    try await settle(opening)
+    await bridge.perform(.stop)
+    let again = time.now
+    await bridge.perform(.start)
+    let reopening = await speakAndWait(asked: again)
+    #expect(await voice.opens.count == 1)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
+    try await settle(reopening)
+    #expect(await voice.opens.last?.first?.text == summary)
+  }
+
+  /// The log says how long the line waited for the summary it got.
+  @Test func aSummaryReportsHowLongTheLineWaited() async throws {
+    let asked = time.now
+    try await startWriting()
+    try await pass(2, polling: a)
+    let opening = await speakAndWait(asked: asked)
+    try await pass(3, polling: a)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await settle(opening)
+    #expect(timings.withLock { $0.last?.waited } == 3)
+  }
+
   // MARK: Context when a line opens
 
   let summary = "[CONTEXT] Alpha: Alpha's work."
@@ -1903,7 +2188,7 @@ struct BridgeTests {
     try await post("/v1/context", context())
     #expect(await voice.added.isEmpty)
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added == [summary])
   }
 
@@ -1923,7 +2208,7 @@ struct BridgeTests {
     #expect(await eventually { await voices.waiting == 1 })
     try await test.post("/v1/context", test.context())
     await voices.finishLaunch()
-    await opening.value
+    try await settle(opening)
     let second = try #require(await voices.made.last)
     #expect(await second.opens.last?.map(\.text).contains(test.summary) == true)
     #expect(await second.added.isEmpty)
@@ -1939,7 +2224,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added.isEmpty)
   }
 
@@ -2397,7 +2682,7 @@ struct BridgeTests {
     try await test.post(
       "/v1/join", JoinBody(sessionId: new, title: "Alpha", replaces: test.a, syncs: true))
     await test.voice.releaseOpen()
-    await opened.value
+    try await settle(opened)
     #expect(await eventually { await test.bridge.status.call == .live })
     #expect(await test.voice.added.contains { $0.contains("Held summary") })
   }
@@ -2907,7 +3192,7 @@ struct BridgeTests {
     let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
     try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
     await audio.releaseOffer()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
   }
 
@@ -2947,7 +3232,7 @@ struct BridgeTests {
     #expect(await eventually { await voices.waiting == 1 })
     try await test.sync(test.a, "Fix the build.")
     await voices.finishLaunch()
-    await opening.value
+    try await settle(opening)
     let second = try #require(await voices.made.last)
     #expect(await second.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
     #expect(await second.added.isEmpty)
@@ -2962,7 +3247,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     try await sync(a, "Fix the build.")
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added == ["[TYPED] Alpha: Fix the build."])
     #expect(await voice.opens.last?.isEmpty == true)
   }
@@ -3460,7 +3745,7 @@ struct BridgeTests {
     try await sync(a, "Rename the folder.")
     await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await bridge.status.call == .off)
     await live()
     #expect(await seeded("[TYPED] Alpha: Rename the folder.") == 1)

@@ -221,7 +221,7 @@ A new pure module, `plugin/hooks/transcript.ts`, builds the text from `$.session
 token rarely covers less than a character, so 120,000 characters stay under the smallest window in
 play (200,000 tokens for `haiku` on Bedrock, Vertex or Foundry, per the research note). A custom
 model with a smaller window, or an emoji-only transcript, ends in `api-error` and the fallback. The
-number is a first guess for the measurement to check.
+measurement found that it fits ([The time limit](#the-time-limit)).
 
 **What leaving the fork costs.** A fork reads the session's prompt cache; `complete` shares nothing
 with it and pays for its whole input every time. No cache mark is set: trimming from the tail shifts
@@ -304,16 +304,36 @@ and codex first sees the offer at `voice.open`.
 
 ### The time limit
 
-One limit, counted from the ask, so a line opened late in a summary's run waits only for the rest of
-it. It comes from the [measurement](#the-measurement-one-off-asks-first) and is not a number yet: twice
-the slowest of the three runs of the default model on the session measured, at least 10 s, at most 30 s.
+**10 s**, counted from the ask, so a line opened late in a summary's run waits only for the rest of
+it. The rule: twice the slowest of the three runs of the default model on the session measured, at
+least 10 s, at most 30 s.
 
-The research note's own estimate for Sonnet low at 100k input is 6 to 8 s, but the same source
-measures the average end-to-end time of a single request at low effort as **21.4 s for Sonnet 5.5
-and 23.8 s for Haiku 5.5**, near today's felt 20 s, and Haiku's first token at 100k input as 15.5 s
-against Sonnet's 3.0 s. Those are a third party's numbers for its own prompts, unverified on the
-mod's path. If the default's run on the mod's path is over the cap, the numbers go back to the owner
-before the wait is built.
+[The measurement](#the-measurement-one-off-asks-first) ran on 2026-11-13 on the installed app built
+from `dev` at `e790735`, with the mod current that day and Haiku 5.5 chosen, on three
+`--fork-session` copies of real long sessions, each answered on a resumed process before any turn
+ran. The first ask came from a line Start opened (**Load a session's context on its first call**),
+the other two from Load context presses. The app's `summary` log lines:
+
+| `askedFor` | `duration` | `transcriptChars` | `inputTokens` | `outputTokens` |
+|---|---|---|---|---|
+| 3,204 ms | 2,442 ms | 26,804 | 10,722 | 391 |
+| 1,945 ms | 1,664 ms | 93,732 | 38,425 | 192 |
+| 2,854 ms | 2,595 ms | 100,559 | 42,319 | 379 |
+
+Each was `stale=false`, `hadSummary=true`, `model="Haiku 5.5"`. The slowest ask took 3.2 s, so twice
+that is 6.4 s and the floor sets the limit at 10 s.
+
+- **120,000 characters fit.** The largest transcript was 100,559 characters, 42,319 input tokens;
+  none reached the trim. At that rate 120,000 characters are about 50,000 tokens.
+- **A resumed session is summarised before its first turn.** Each summary arrived on a resumed
+  process before any turn ran, so `$.session.messages` returns the history then.
+- **The refusal probe is still open.** A custom id that does not exist was to show what a refusal
+  comes back as. Setting it by editing `settings.json` did not take: the Settings picker rewrote
+  the value. It runs once **Custom…** (Wave F) is installed.
+
+The research note's own estimate for Sonnet low at 100k input was 6 to 8 s, and a third party's
+average for a single low-effort request 21.4 s for Sonnet 5.5 and 23.8 s for Haiku 5.5; on the
+mod's path Haiku answered in 3.2 s at most.
 
 ### Polling every 0.2 s
 
@@ -396,7 +416,8 @@ text out of it.
   make Settings accept a value that does not work. The fallback then writes the summary; no
   permission or data is reached. It is not a control.
 - **A joined process that never answers an ask** can hold a line's speech on the Mac up to the limit,
-  once per call (rule 3).
+  once per call for that session id (rule 3). One that answers each ask late, or marks a gap during
+  each wait, can hold every line of the call, each up to the limit from its ask.
 
 SECURITY.md's list of what such a process can do gains the last two. A check sends only "Reply with
 OK." and the model's id.
