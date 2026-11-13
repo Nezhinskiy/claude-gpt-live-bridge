@@ -59,7 +59,8 @@ struct SummaryAsks: Sendable {
   /// until the limit.
   private var spent: Set<SessionID> = []
   /// The line's latest wait, for the log: the session, its ask's number, when the wait began, and
-  /// when it ended if the answer did not end it.
+  /// when it ended if the answer did not end it. Kept across a reconnect, not across a new call or
+  /// a target change.
   private var wait: (session: SessionID, number: Int, began: Date, ended: Date?)?
   /// When each session's last summary with text was taken.
   private var lastLoaded: [SessionID: Date] = [:]
@@ -111,8 +112,14 @@ struct SummaryAsks: Sendable {
   /// The line stopped waiting before the answer came.
   mutating func endWait(at now: Date) { if wait?.ended == nil { wait?.ended = now } }
 
-  /// The call started: every session may be waited for again.
-  mutating func newCall() { spent = [] }
+  /// The call started: every session may be waited for again, and no earlier wait is logged.
+  mutating func newCall() {
+    spent = []
+    wait = nil
+  }
+
+  /// The call's target changed: the next line's wait starts again, for the log.
+  mutating func targetChanged() { wait = nil }
 
   /// A summary post from `id`, with the ask's `number` if the mod echoes one; `wrote` is false for
   /// an empty one. A post for another ask leaves the open ask open; any other closes it. An empty

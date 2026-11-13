@@ -754,6 +754,7 @@ public actor Bridge: Router {
     }
     if machine.phase != .off, target != callTarget {
       callTarget = target
+      summaries.targetChanged()
       await askAhead(of: target)
     }
     guard isLineOpen, lineKnowsSession, target != lineSession else { return }

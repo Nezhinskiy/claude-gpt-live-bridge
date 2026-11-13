@@ -231,6 +231,34 @@ struct SummaryAsksTests {
         == .taken(next, waited: 1))
   }
 
+  /// After Stop and Start, the log's `waited` counts only the new call's line.
+  @Test func aNewCallCountsOnlyItsOwnWait() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    let ask = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
+    _ = asks.wait(a, in: continuity, at: t0)
+    asks.endWait(at: t0 + 1)
+    asks.newCall()
+    _ = asks.wait(a, in: continuity, at: t0 + 3)
+    #expect(
+      asks.answer(a, number: 1, wrote: true, in: &continuity, at: t0 + 5)
+        == .taken(ask, waited: 2))
+  }
+
+  /// After a target change, back and forth, the log's `waited` counts only the latest line's.
+  @Test func aTargetChangeCountsOnlyTheNextWait() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    let ask = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
+    _ = asks.wait(a, in: continuity, at: t0)
+    asks.endWait(at: t0 + 1)
+    asks.targetChanged()
+    _ = asks.wait(a, in: continuity, at: t0 + 3)
+    #expect(
+      asks.answer(a, number: 1, wrote: true, in: &continuity, at: t0 + 5)
+        == .taken(ask, waited: 2))
+  }
+
   // MARK: What the menu shows
 
   /// Whatever asked for it, the summary is on its way until its answer, per session.

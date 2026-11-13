@@ -1969,6 +1969,28 @@ struct BridgeTests {
     #expect(timings.withLock { $0.last?.waited } == 3)
   }
 
+  /// A target change back and forth ends the first wait for the log too: `waited` counts only the
+  /// line that got the summary.
+  @Test func aTargetChangeStartsTheLoggedWaitAgain() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let asked = time.now
+    await bridge.perform(.start)
+    let opening = await speakAndWait(asked: asked)
+    try await pass(2, polling: a)
+    await bridge.setTarget(b)
+    try await settle(opening)
+    await bridge.setTarget(a)
+    let deadline = asked + SummaryAsks.Policy.waitLimit
+    let asleep = time.deadlines.count { $0 == deadline }  // the first line's, woken or not
+    let reopening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { time.deadlines.count { $0 == deadline } > asleep })
+    try await pass(2, polling: a)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await settle(reopening)
+    #expect(timings.withLock { $0.last?.waited } == 2)
+  }
+
   // MARK: Context when a line opens
 
   let summary = "[CONTEXT] Alpha: Alpha's work."
