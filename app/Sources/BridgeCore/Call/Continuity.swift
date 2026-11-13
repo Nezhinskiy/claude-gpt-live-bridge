@@ -76,8 +76,8 @@ public struct Conversation: Codable, Sendable, Equatable {
   private var linesSinceContext: Int?
   /// The decision on the turn whose lines were last offered (`Continuity.admits`).
   var turn: TurnDecision?
-  /// The summary asked for and not yet arrived.
-  private var summaryAsk: SummaryAsk?
+  /// The summary asked for and not yet arrived, open or not (`SummaryAsks`).
+  fileprivate(set) var summaryAsk: SummaryAsk?
 
   struct TurnDecision: Codable, Sendable, Equatable {
     var id: String
@@ -213,8 +213,8 @@ public struct Continuity: Codable, Sendable, Equatable {
 
   private(set) var conversations: [String: Conversation] = [:]
   /// The number the last numbered ask took, for every session, so a forget or an eviction never
-  /// brings an old number back.
-  private var asksMade: Int?
+  /// brings an old number back (`SummaryAsks.ask`).
+  var asksMade: Int?
 
   public init() {}
 
@@ -249,6 +249,14 @@ public struct Continuity: Codable, Sendable, Equatable {
   /// The ask of `id` still open at `now`, without taking it.
   func openSummaryAsk(of id: SessionID, at now: Date) -> Conversation.SummaryAsk? {
     self[id].openSummaryAsk(at: now)
+  }
+
+  /// Changes the session's summary ask as stored; `SummaryAsks` holds what it means.
+  @discardableResult
+  mutating func changeSummaryAsk<Result>(
+    of id: SessionID, _ change: (inout Conversation.SummaryAsk?) -> Result
+  ) -> Result {
+    use(id) { change(&$0.summaryAsk) }
   }
 
   /// A summary from `id` arrived. False: it was asked for before the latest gap or forget, so it
