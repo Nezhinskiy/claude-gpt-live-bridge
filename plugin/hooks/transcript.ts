@@ -16,13 +16,22 @@ export const FIRST_CAP = 4_000
 const REMINDER = /<system-reminder>[\s\S]*?<\/system-reminder>/g
 const SPEAKER = { user: 'User', assistant: 'Claude' } as const
 
-/** `text` whole when it fits `cap`, else its start and end around a marker, at most `cap` long. */
+/** Whether `i` falls between the two halves of a surrogate pair: a cut there would split it. */
+const insidePair = (text: string, i: number) => text.charCodeAt(i) >= 0xdc00 && text.charCodeAt(i) <= 0xdfff
+
+/**
+ * `text` whole when it fits `cap`, else its start and end around a marker, at most `cap` UTF-16
+ * units long (the unit the budget counts); a cut that would split a surrogate pair leaves it out.
+ */
 function cut(text: string, cap: number): string {
   if (text.length <= cap) return text
   const marker = (left: number) => `\n[… ${left} characters left out …]\n`
   const keep = cap - marker(text.length).length
-  const start = Math.ceil(keep / 2)
-  return text.slice(0, start) + marker(text.length - keep) + text.slice(text.length - (keep - start))
+  let start = Math.ceil(keep / 2)
+  let end = text.length - (keep - start)
+  if (insidePair(text, start)) start -= 1
+  if (insidePair(text, end)) end += 1
+  return text.slice(0, start) + marker(end - start) + text.slice(end)
 }
 
 /** A message's words: its text without reminders, a tool use as its name; '' when it has none. */

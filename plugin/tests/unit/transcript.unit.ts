@@ -59,3 +59,12 @@ test('theGoalThenTheNewestUntilTheBudget', () => {
   assert.equal(left + shown, middle.length)
   assert.ok(left > 0)
 })
+
+test('aCutNeverSplitsAnEmoji', () => {
+  // Every second unit of the emoji is the low half of a pair, so some lengths put one at each cut.
+  for (let extra = 1; extra <= 4; extra += 1) {
+    const long = `${'a'.repeat(extra)}${'😀'.repeat(MESSAGE_CAP / 2)}`
+    // In unicode mode only a lone half of a pair is a code point of category Cs.
+    assert.doesNotMatch(transcriptText([user('Tidy the project'), claude(long)]), /\p{Cs}/u, `extra ${extra}`)
+  }
+})
