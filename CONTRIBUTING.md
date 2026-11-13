@@ -209,8 +209,8 @@ Every build, not only a debug one, logs a line at debug level in the category `s
 summary answered within two minutes of its ask: `askedFor`, the milliseconds the ask took;
 `stale`, whether the answer was stale (asked before a gap or a forget, or posted for an ask other
 than the open one, so it is ignored); `hadSummary`, whether it had text; `model`, the model's name
-(`custom` for an id you typed, `fork` for a summary the session's own fork wrote); then, when the
-post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
+(`custom` for an id you typed, `fork` for a summary the session's own fork wrote); `waited`, the
+milliseconds a line waited for it, when one did; then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
 `outputTokens`. It holds no summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
 
 ### Reading debug mode's numbers

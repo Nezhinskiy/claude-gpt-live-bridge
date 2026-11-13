@@ -396,7 +396,8 @@ text out of it.
   make Settings accept a value that does not work. The fallback then writes the summary; no
   permission or data is reached. It is not a control.
 - **A joined process that never answers an ask** can hold a line's speech on the Mac up to the limit,
-  once per call (rule 3).
+  once per call for that session id (rule 3). One that answers each ask late, or marks a gap during
+  each wait, can hold every line of the call, each up to the limit from its ask.
 
 SECURITY.md's list of what such a process can do gains the last two. A check sends only "Reply with
 OK." and the model's id.

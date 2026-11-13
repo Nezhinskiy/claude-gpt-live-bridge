@@ -87,13 +87,18 @@ voices.
     (`[CLAUDE]`). They are saved and seed later calls the same way, and go to the open line when
     that session is the target. The app takes the label on the process's word;
   - join a session as one that missed a turn, or that does not sync, which makes the next line
-    that session opens ask it for a fresh summary (while the pause setting is on or the
-    session is marked paused, only one with no summary yet, below), and so makes it write one;
+    that session opens ask it for a fresh summary, and for a session whose mod writes summaries
+    also the next Start or target change to it during a call, before a line to it opens (while
+    the pause setting is on or the session is marked paused, only one with no summary yet,
+    below), and so makes it write one;
   - join with `writesSummaries`, make itself the target and never answer the summary ask, which
     holds what you say on the Mac, unsent, for up to 30 seconds from the ask while the line waits
     for that summary. The line then opens without it, and no later line of that call waits for
     that session id; joining again under a new id and making itself the target holds the next line
-    the same way;
+    the same way. That bound is for a process that never answers, not one per call: one that
+    answers each ask, with any text, just before the limit, or that ends each wait by joining again
+    as one that missed a turn, is asked again by the next line, so it can hold every line of the
+    call, each for up to 30 seconds from that line's ask;
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation;
   - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as
@@ -237,8 +242,10 @@ those shapes goes to OpenAI as typed, personal text included.
   does for a session marked paused after the setting is off again, with one exception. With **Load
   a session's context on its first call** on, which is the default unless the pause was on when you
   updated to it, a line that opens for a session with no summary asks for one, under the pause or
-  the mark. The pause does not hold that summary back: it is written from the session's transcript,
-  paused text included, goes to OpenAI, and clears the *paused* mark. A current mod with a current
+  the mark, and for a session whose mod writes summaries so do Start and a target change to it
+  during the call, before a line to it opens. The pause does not hold that summary back: it is
+  written from the session's transcript, paused text included, goes to OpenAI, and clears the
+  *paused* mark, so a Start and a Stop with nothing said can clear it. A current mod with a current
   app leaves tool results, thinking and system reminders out of what the summary model reads, but
   text that quotes them stays, as does anything pasted and every text block of a user message,
   which holds the output of a `!` command typed in the session if Claude Code stores it as user
@@ -307,7 +314,8 @@ those shapes goes to OpenAI as typed, personal text included.
   you join it again, since the mod's own joins are refused (`410`). **New conversation** and × keep
   the *paused* mark, so with **Load a session's context on its first call** off the next line asks
   for no summary of that transcript. With it on, or with the pause setting off and no pause mark, a session with no summary
-  does get one from the next line, written from the session's transcript (the reduction above),
+  does get one from the next line, or, if its mod writes summaries, from the next Start or target
+  change to it during a call, written from the session's transcript (the reduction above),
   any paused text included.
 - **A result from another session** is still spoken in whatever line is open, and the voice's
   reply to it stays in that line's conversation, so one session's text can still reach the

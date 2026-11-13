@@ -278,7 +278,7 @@ pause does not hold it back (the same rule); an ask already open is joined, not 
 
 **The wait.** A line, whether speech or a result opened it, waits for its session's summary
 (`SummaryWait`, decided in `Bridge.waitForSummary`) while that session has an open, current ask
-(asked at Start, at a target change, by Load context or by this line), its mod said
+(asked at Start, at a target change during the call, by Load context or by this line), its mod said
 `writesSummaries`, and no wait of that session ended this call without a summary. The wait sits
 after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
 `connecting`, which arms no silence timer, nothing leaves the Mac, and the page queues what is said
@@ -288,9 +288,11 @@ carries (a post for an older ask, which `Bridge.context` ignores, does not end i
 cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
 one, and a reconnect waits again for the same ask. An answer with no summary, or the limit, ends
 that session's waits for the rest of the call, so a summary that keeps failing holds one line, not
-every line; the next Start waits again. A summary that comes after the wait, or while a line that
-does not wait connects, is added once the line is connected, unless the line was seeded with the
-same one; with no line open, it is in the next seed.
+every line; the next Start waits again. That is no bound per call: a mod that answers each ask with
+text, however late, or whose gap makes each ask stale, is asked again by the next line, so every
+line of the call can wait, each up to the limit from its own ask. A summary that comes after the
+wait, or while a line that does not wait connects, is added once the line is connected, unless
+the line was seeded with the same one; with no line open, it is in the next seed.
 
 ```mermaid
 sequenceDiagram

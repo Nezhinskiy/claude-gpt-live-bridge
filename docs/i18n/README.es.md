@@ -277,9 +277,11 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
   de ella (mira **Load context** abajo), pero con **Pause sync** activado o tras una pausa solo si aún no tiene ninguno
   ([detalles](../../docs/architecture/overview.md#components)). Con un mod de esta versión, el resumen
-  se pide al pulsar Start y al cambiar el destino, y la línea lo espera antes de conectar, como mucho
-  30 segundos desde la petición: lo que digas mientras tanto se guarda en el Mac y llega a la voz al
-  abrirse la línea. Mientras la llamada habla con otra sesión,
+  se pide al pulsar Start y al cambiar el destino durante la llamada, y la línea lo espera antes de
+  conectar, como mucho 30 segundos desde la petición: lo que digas mientras tanto se guarda en el Mac
+  y llega a la voz al abrirse la línea. Stop o un cambio de destino durante la espera descartan lo
+  guardado, y también una reconexión tras cambiar **Connect over TCP**, que guarda como mucho los
+  últimos 2 segundos para la línea que vuelve a abrirse. Mientras la llamada habla con otra sesión,
   la banda muestra **Talk here**. Si la banda no aparece en una sesión unida, `/live` la
   recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para

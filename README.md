@@ -295,9 +295,11 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   with the session's conversation, and loads a summary of the session as well when the voice would
   lack part of it (see **Load context** below), but while **Pause sync** is on or after a
   pause only when it has none yet ([details](docs/architecture/overview.md#components)). With a mod of this
-  release the summary is asked for at Start and when the target changes, and the line waits for it
-  before it connects, at most 30 seconds from the ask: what you say meanwhile is held on the Mac and
-  played to the voice once the line opens. While the call talks to another
+  release the summary is asked for at Start and when the target changes during the call, and the
+  line waits for it before it connects, at most 30 seconds from the ask: what you say meanwhile is
+  held on the Mac and played to the voice once the line opens. Stop or a target change during the
+  wait drops what was held, and so does a reconnect after **Connect over TCP** changes, which keeps
+  at most the last 2 seconds for the line that opens again. While the call talks to another
   session, the band shows **Talk here**. If the band is not there in a joined session, `/live`
   brings it back.
 - **The menu bar menu** has the call, the joined sessions (click one to make it the target),

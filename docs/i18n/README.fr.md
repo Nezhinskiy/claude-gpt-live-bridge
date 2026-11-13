@@ -291,9 +291,11 @@ parlez.
   reçoit la conversation de la session, et charge en plus un résumé quand il manquerait à la voix
   une partie d'elle (voir **Load context** ci-dessous), mais avec **Pause sync** activé ou
   après une pause seulement si elle n'en a pas encore ([détails](../../docs/architecture/overview.md#components)). Avec un mod de cette version, le
-  résumé est demandé au Start et au changement de cible, et la ligne l'attend avant de se connecter,
-  30 secondes au plus depuis la demande : ce que vous dites entre-temps est gardé sur le Mac et joué
-  à la voix quand la ligne s'ouvre. Tant que l'appel parle à
+  résumé est demandé au Start et au changement de cible pendant l'appel, et la ligne l'attend avant
+  de se connecter, 30 secondes au plus depuis la demande : ce que vous dites entre-temps est gardé
+  sur le Mac et joué à la voix quand la ligne s'ouvre. Stop ou un changement de cible pendant
+  l'attente jette ce qui était gardé, de même qu'une reconnexion après un changement de **Connect
+  over TCP**, qui garde au plus les 2 dernières secondes pour la ligne rouverte. Tant que l'appel parle à
   une autre session, la bande affiche **Talk here**. Si la bande n'apparaît pas dans une session
   rejointe, `/live` la fait revenir.
 - **Le menu de la barre des menus** contient l'appel, les sessions rejointes (cliquez sur l'une
