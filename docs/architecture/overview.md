@@ -224,8 +224,8 @@ choice was made.
 - **The fallback:** when the model asked is not the default, the ask also names the default
   (`fallbackModel`, `Bridge.askForContext`). The mod (`summarize` in `plugin/hooks/context.ts`)
   tries the model once, then the fallback once with the same transcript, unless the first ran out
-  of time or the send went stale meanwhile. When the default fails, or there is no fallback, no
-  model writes the summary, and the mod answers with an empty one that names each failure
+  of time or the send went stale meanwhile. When every model tried fails (the default, whether it
+  was asked or was the fallback), no model writes the summary, and the mod answers with an empty one that names each failure
   (`ContextBody.failures`).
 - **Always low effort:** `effort: 'low'` is a constant in the mod, not on the wire. The model gets
   no tools and at most 4,096 output tokens.
@@ -267,7 +267,7 @@ asked; a session with no prompt yet, or with no text, gets an empty summary that
 
 The app asks a session for its summary when the voice would lack part of the session
 (`Bridge.needsContext`: it has none, a turn did not arrive, the lines since the summary no longer
-all fit the seed, or the mod does not sync), unless the pause holds it back
+all fit the seed, the session is *paused*, or the mod does not sync), unless the pause holds it back
 (`Bridge.pauseHoldsBackSummary`: the pause setting is on or the session is *paused*, and the
 session has a summary or **Load a session's context on its first call** is off) or the session is
 held off after a failure (below). It asks:
@@ -306,7 +306,9 @@ The mod's side is `SummarySends` (`plugin/hooks/summaries.ts`). It keeps the las
 wrote and gives it again, with no model call, to an ask naming the same model, until a main-loop
 turn completes, a gap (a turn did not reach the app) or `/clear`. An ask with the number of the send
 on its way joins it and gets what that send writes. A gap or `/clear` crosses the send on its way:
-it tries no fallback, and its post is one the app ignores as stale.
+it tries no fallback. After a gap its post is one the app ignores as stale, since the join that
+says the gap marks the ask stale; after `/clear` the app takes it, as `/clear` carries the open
+ask and the voice's conversation to the new id.
 
 ### The wait
 
