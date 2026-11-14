@@ -254,7 +254,8 @@ public actor Bridge: Router {
   /// mod writes summaries, else the most recently joined one whose mod does. The result is taken
   /// only from that session, under the check's id; 20 s without one, or the session's drop, is
   /// `noAnswer`. It takes the poller's word: a process that polls as that session before its mod
-  /// does can say any model works (SECURITY.md).
+  /// does can say any model works (SECURITY.md). One check runs at a time: Settings disables its
+  /// button while one does, and a check started during another would leave the first unanswered.
   public func checkModel(_ model: String) async -> ModelCheckResult {
     guard let session = await registry.sessionThatChecks() else { return .noSession }
     let id = UUID().uuidString
