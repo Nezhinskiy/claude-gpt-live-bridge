@@ -28,11 +28,11 @@ async function joined(...[$, on]: Parameters<TestBody>) {
 
 /**
  * The app asks for the session's context, naming a model or, as an older app, none; the target's
- * next poll, 200 ms on, brings the ask and is the one that runs it.
+ * next poll, at most a second on with the call off, brings the ask and is the one that runs it.
  */
 async function appAsks(world: ReturnType<typeof fakeWorld>, ask: { model?: string; fallbackModel?: string; ask?: number } = {}) {
   world.work.push({ kind: 'context', ...ask })
-  await world.clock.advance(200)
+  await world.clock.advance(1000)
 }
 
 /** A typed turn that ends with `answer`. */
@@ -396,7 +396,7 @@ const CHECK = { id: '00000000-0000-0000-0000-00000000000c', model: 'claude-examp
 
 async function appChecks(world: ReturnType<typeof fakeWorld>) {
   world.work.push({ kind: 'checkModel', ...CHECK })
-  await world.clock.advance(200)
+  await world.clock.advance(1000)
 }
 
 test('aCheckSendsOneShortRequest', async ($, on) => {
