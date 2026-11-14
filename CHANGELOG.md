@@ -4,6 +4,15 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- The target session polls the app five times a second only while the call is on; with the call
+  off it polls once a second, as the others do, so a session with no call wakes the app and itself
+  a fifth as often. With the call off, Start's ask for a summary reaches the mod up to 0.8 s later
+  than in 0.6.0, well within the line's 10 seconds of waiting for it.
+
 ## [0.6.0]
 
 ### Added
