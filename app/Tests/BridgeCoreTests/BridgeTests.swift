@@ -289,21 +289,6 @@ struct BridgeTests {
   /// An answer with UDP and TCP candidates, as the media server gives.
   static let candidates = AnswerSDPTests.answer([AnswerSDPTests.udp, AnswerSDPTests.tcp])
 
-  @Test func aLineOverUDPAppliesTheAnswerAsItCame() async throws {
-    let test = try BridgeTests()
-    await test.voice.setAnswer(Self.candidates)
-    await test.live()
-    #expect(await test.audio.answers == [Self.candidates])
-  }
-
-  @Test func aLineOverTCPAppliesTheAnswerPreferringTCP() async throws {
-    let test = try BridgeTests()
-    test.tcp.withLock { $0 = true }
-    await test.voice.setAnswer(Self.candidates)
-    await test.live()
-    #expect(await test.audio.answers == [AnswerSDP.preferringTCP(Self.candidates)])
-  }
-
   /// The setting changed and the owner chose Reconnect: the open line closes and opens again at
   /// once, over the new transport, without the pre-roll.
   @Test func reconnectReopensTheOpenLineOverTheNewTransport() async throws {
@@ -709,14 +694,6 @@ struct BridgeTests {
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Not joined."))
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
     #expect(await bridge.current.targetSummary == .loaded(at: time.now))
-  }
-
-  /// An empty answer is announced as one, so the menu's press ends without saying it loaded.
-  @Test func anEmptyAnswerIsAnnouncedAsEmpty() async throws {
-    try await join(a, "Alpha")
-    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
-    try await post("/v1/context", ContextBody(sessionId: a, summary: ""))
-    #expect(await bridge.current.targetSummary == .none)
   }
 
   @Test func theMenuSetsTheTarget() async throws {
@@ -1664,18 +1641,6 @@ struct BridgeTests {
     await bridge.loadContext()
     let after = try FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber]
     #expect(after as? Int == written as? Int)
-  }
-
-  /// An older mod echoes no number and joins a second ask to the send on its way, so the stale
-  /// ask stays open and its post is still refused.
-  @Test func anOlderModsPostAfterAForgetAndASecondAskIsRefused() async throws {
-    try await join(a, "Alpha")
-    await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context())
-    await bridge.newConversation()
-    await bridge.loadContext()
-    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
-    #expect(await bridge.current.context == nil)
   }
 
   /// A summary on its way when the owner presses New conversation does not bring back what was

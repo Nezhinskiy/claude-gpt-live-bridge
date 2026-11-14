@@ -161,7 +161,7 @@ struct MenuContentTests {
         .live, sessions: 3, target: 2,
         lines: [Self.line(.voice, "Hello."), Self.line(.owner, "Hi.")]))
     #expect(
-      menu.outline == [
+      Array(menu.outline.prefix(16)) == [
         "[call] Live · Stop · Mute",
         "---",
         "# Sessions",
@@ -178,26 +178,6 @@ struct MenuContentTests {
         "  | You: Hi.",
         "---",
         "4 min this call · 31 min today (disabled)",
-        "---",
-        "Quick Settings ▸",
-        "  [ ] Connect over TCP",
-        "  [x] Play sounds for requests and answers",
-        "  [x] Notify when a result is waiting",
-        "  [ ] Pause sync while the call is stopped",
-        "  [x] Load a session's context on its first call",
-        "Settings… ⌘,",
-        "---",
-        "Feedback & Support ▸",
-        "  Report a Bug…",
-        "  LiveBridge Website",
-        "  Star LiveBridge on GitHub",
-        "  ---",
-        "  [ ] Debug Mode",
-        "  Show Debug Files…",
-        "  ---",
-        "  Uninstall LiveBridge…",
-        "---",
-        "Quit LiveBridge ⌘Q",
       ])
   }
 

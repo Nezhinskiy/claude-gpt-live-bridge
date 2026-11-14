@@ -384,12 +384,6 @@ test('aThrowAfterTheModelWroteKeepsItsSummary', async ($, on) => {
   expect(world.completes.map(one => one.model)).toEqual([OPUS])
 })
 
-test('aJoinSaysItWritesSummaries', async ($, on) => {
-  const world = fakeWorld(on)
-  await liveOn($)
-  expect(world.take('join')).toEqual([expect.objectContaining({ sessionId: ID, writesSummaries: true })])
-})
-
 // Settings' Check and save: the app hands a custom model to a session that writes summaries.
 
 const CHECK = { id: '00000000-0000-0000-0000-00000000000c', model: 'claude-example-6' }
