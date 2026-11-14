@@ -31,6 +31,13 @@ All notable changes to this project are listed here. The format follows
   again. `/clear` during a call no longer asks the session ahead as if the target had changed, nor
   lets a line wait for the summary again when the call had spent that wait, and **Context loaded**
   survives it.
+- A session whose transcript the mod cannot turn into text now reports the summary as failed with
+  **transcript-unreadable**, before any model is asked, and logs the error in the session, instead
+  of failing with no reason.
+- A summary still being written when you run `/clear` is stale, as one a gap crossed is: the band
+  no longer says **Context sent** for it, and an older app no longer gets the old conversation's.
+- A summary that went stale while its first model failed (a gap, or `/clear`) no longer asks the
+  fallback model for one nobody will use.
 
 ## [0.6.0]
 

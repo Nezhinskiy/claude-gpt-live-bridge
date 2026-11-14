@@ -110,9 +110,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     completes: [] as { model: string; system?: string; prompt: string; effort?: string; maxTokens?: number; timeoutMs?: number }[],
     /**
      * How a model fails, by id: the engine refuses it (`complete` rejects), an API error, a reply
-     * with no text, or held until its `timeoutMs` runs out. Any other model writes `summary`.
+     * with no text, held until its `timeoutMs` runs out, or `summary` with no `usage`, which the
+     * engine's type promises. Any other model writes `summary`.
      */
-    completeFails: {} as Record<string, 'refused' | 'api-error' | 'empty-reply' | 'held'>,
+    completeFails: {} as Record<string, 'refused' | 'api-error' | 'empty-reply' | 'held' | 'no-usage'>,
     /** How long a model takes over a summary, on the mocked clock. */
     completeMs: 0,
     joined: new Set<string>(),
@@ -301,6 +302,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     if (fails === 'api-error') {
       return { value: { isAnswered: false, reason: 'api-error', status: 529, error: 'overloaded', usage: none } } as const
     }
+    if (fails === 'no-usage') return { value: { isAnswered: true, text: world.summary } } as never
     if (fails === 'empty-reply') return { value: { isAnswered: false, reason: 'empty-reply', usage: { ...none, input_tokens: 13105 } } } as const
     return { value: { isAnswered: true, text: world.summary, usage: { ...none, input_tokens: 13105, output_tokens: 412 } } } as const
   })
