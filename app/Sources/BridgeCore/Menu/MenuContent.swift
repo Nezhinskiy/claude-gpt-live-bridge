@@ -48,7 +48,8 @@ public struct MenuContent: Sendable, Equatable {
       .loadContextOnFirstCall,
     ]
 
-    /// The menu's words for it, Settings' own but for Debug Mode's title case.
+    /// Its words in the menu and in Settings, which reads them; Settings writes debug mode's in
+    /// sentence case.
     public var title: String {
       switch self {
       case .connectsOverTCP: "Connect over TCP"
@@ -204,7 +205,7 @@ public struct MenuContent: Sendable, Equatable {
       .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
       .separator,
       .toggle(.debugMode, isOn: settings.debugMode),
-      .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+      .command(.showDebugFiles, title: "Show Debug Files", isEnabled: true),
       .separator,
       .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: isInstalledCopy),
     ]

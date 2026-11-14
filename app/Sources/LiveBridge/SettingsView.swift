@@ -86,7 +86,7 @@ struct SettingsView: View {
         .font(.caption).foregroundStyle(.secondary)
       }
       Section("Sounds") {
-        Toggle("Play sounds for requests and answers", isOn: setting(\.confirmHandoffs))
+        Toggle(MenuContent.Switch.confirmHandoffs.title, isOn: setting(\.confirmHandoffs))
         Text(
           "The voice sometimes says it is looking without sending the request. An answer has "
             + "its own sound; with no request sound, nothing was queued, so say it again."
@@ -131,7 +131,7 @@ struct SettingsView: View {
         )
         .font(.caption).foregroundStyle(.secondary)
         Toggle(
-          "Connect over TCP",
+          MenuContent.Switch.connectsOverTCP.title,
           isOn: Binding {
             model.settings.current.connectsOverTCP
           } set: {
@@ -153,7 +153,8 @@ struct SettingsView: View {
   private var contextTab: some View {
     Form {
       Section("Sync") {
-        Toggle("Pause sync while the call is stopped", isOn: setting(\.pauseSyncWhileStopped))
+        Toggle(
+          MenuContent.Switch.pauseSyncWhileStopped.title, isOn: setting(\.pauseSyncWhileStopped))
         Text(
           "What you type while the call is off stays out of the voice's conversation, and context "
             + "loads only from the menu, unless the next setting loads a summary, which carries "
@@ -161,7 +162,7 @@ struct SettingsView: View {
         )
         .font(.caption).foregroundStyle(.secondary)
         Toggle(
-          "Load a session's context on its first call", isOn: setting(\.loadContextOnFirstCall))
+          MenuContent.Switch.loadContextOnFirstCall.title, isOn: setting(\.loadContextOnFirstCall))
         Text(
           "Start or a line for a session with no summary yet asks for one, even while sync is paused. It "
             + "is written from the transcript, paused text included, and goes to OpenAI. A mod of "
@@ -259,7 +260,7 @@ struct SettingsView: View {
     Form {
       Section("Notifications") {
         Toggle(
-          "Notify when a result is waiting",
+          MenuContent.Switch.notifyResults.title,
           isOn: Binding {
             model.settings.current.notifyResults
           } set: {

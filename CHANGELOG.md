@@ -13,6 +13,8 @@ All notable changes to this project are listed here. The format follows
   a fifth as often. With the call off, Start's ask for a summary, a **Load context** press and a
   model check reach the mod up to 0.8 s later than in 0.6.0, well within the line's 10 seconds of
   waiting for a summary.
+- **Show Debug Files** in the menu's **Feedback & Support** has no ellipsis any more, as in
+  Settings: it opens the folder and asks nothing more.
 
 ### Fixed
 

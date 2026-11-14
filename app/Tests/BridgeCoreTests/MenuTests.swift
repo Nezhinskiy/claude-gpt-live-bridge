@@ -120,7 +120,7 @@ struct MenuContentTests {
         "  Star LiveBridge on GitHub",
         "  ---",
         "  [ ] Debug Mode",
-        "  Show Debug Files…",
+        "  Show Debug Files",
         "  ---",
         "  Uninstall LiveBridge…",
         "---",
@@ -330,7 +330,7 @@ struct MenuContentTests {
           .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
           .separator,
           .toggle(.debugMode, isOn: on),
-          .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+          .command(.showDebugFiles, title: "Show Debug Files", isEnabled: true),
           .separator,
           .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: true),
         ])
