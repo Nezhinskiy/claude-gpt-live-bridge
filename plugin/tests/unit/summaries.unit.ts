@@ -93,6 +93,18 @@ test('aSummaryWrittenAcrossATurnIsNotKept', async () => {
   assert.equal(world.writes, 2)
 })
 
+test('aTurnEndingDuringAWriteDoesNotCrossIt', async () => {
+  // The app got the turn's lines, so the send is not stale; its summary is only not kept.
+  const world = session()
+  world.hold()
+  const first = world.ask()
+  await settle()
+  world.sends.end('turn')
+  world.release()
+  await first
+  assert.deepEqual([world.posts, world.failed], [[{ summary: SUMMARY }], 0])
+})
+
 test('onlyTheModelThatWroteTheKeptSummaryGetsIt', async () => {
   const world = session()
   await world.ask(NAMED)
