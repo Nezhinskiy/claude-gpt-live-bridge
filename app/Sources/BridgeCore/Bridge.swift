@@ -30,7 +30,7 @@ public actor Bridge: Router {
   /// Settings' summary model, read at each ask.
   private let summaryModel: @Sendable () -> String
   /// What came of the last summary asked for with a model.
-  public private(set) var lastSummary: SummaryReport?
+  private var lastSummary: SummaryReport?
   /// Settings' model check in flight: its id, the session it went to, who waits on it, and the task
   /// that hands it over and ends it after `checkSeconds`.
   private var modelCheck:

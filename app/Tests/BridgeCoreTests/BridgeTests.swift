@@ -1486,12 +1486,12 @@ struct BridgeTests {
       "/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", failures: refused))
     let report = SummaryReport(
       asked: "claude-opus-5-5", fallback: "claude-haiku-5-5", failures: refused, wrote: true)
-    #expect(await bridge.lastSummary == report)
+    #expect(await bridge.current.lastSummary == report)
     try await join(b, "Beta")
     await bridge.setTarget(b)
     await bridge.loadContext()
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
-    #expect(await bridge.lastSummary == report)
+    #expect(await bridge.current.lastSummary == report)
   }
 
   /// Settings' line stays until a model is tried again: an answer no model was asked for leaves it.
@@ -1505,10 +1505,10 @@ struct BridgeTests {
     ]
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", failures: failed, ask: 1))
     let line = "The voice got no new summary: Opus 5.5 was refused, then Haiku 5.5 ran out of time."
-    #expect(await bridge.lastSummary?.line == line)
+    #expect(await bridge.current.lastSummary?.line == line)
     await bridge.loadContext()
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 2))
-    #expect(await bridge.lastSummary?.line == line)
+    #expect(await bridge.current.lastSummary?.line == line)
   }
 
   /// A reason from a later mod, or a number that is not whole, does not lose the summary; the
@@ -1525,7 +1525,8 @@ struct BridgeTests {
     _ = await bridge.handle(
       HTTPRequest(method: "POST", path: "/v1/context", query: [:], body: Data(body.utf8)))
     #expect(await bridge.current.context == summary)
-    #expect(await bridge.lastSummary?.line == "The last summary used Haiku 5.5: Opus 5.5 failed.")
+    #expect(
+      await bridge.current.lastSummary?.line == "The last summary used Haiku 5.5: Opus 5.5 failed.")
   }
 
   /// The log names the model asked for, or the fallback when that one failed, with the post's numbers.
@@ -1594,7 +1595,7 @@ struct BridgeTests {
     #expect(await bridge.current.context == nil)
     #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)?.number == 2)
     #expect(timings.withLock { $0.last?.stale } == true)
-    #expect(await bridge.lastSummary == nil)
+    #expect(await bridge.current.lastSummary == nil)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
     #expect(await bridge.current.context == summary)
   }
