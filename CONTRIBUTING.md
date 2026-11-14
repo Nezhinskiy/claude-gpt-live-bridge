@@ -54,7 +54,9 @@ redactor), with their tests in `app/Tests/BridgeCoreTests`.
 The Claude Code adapter is the mod in `plugin/`: `hooks/register.tsx` wires it to Claude Code's
 mod API (the `/live` command, `prompt.submit`, the band), `hooks/link.ts` talks to the app and
 runs the poll (at [the rate the overview gives](docs/architecture/overview.md#components)), `hooks/prompt.ts` and
-`hooks/turns.ts` decide which turns answer a voice request and what each posts back, and
+`hooks/turns.ts` decide which turns answer a voice request and what each posts back,
+`hooks/summaries.ts` runs the summary sends (the summary it keeps, the send in flight, the asks that
+join it and what crosses it; [the summary](docs/architecture/overview.md#a-numbered-ask)), and
 `hooks/title.ts` reads the session's title from Claude Code's session registry. An adapter for another agent speaks the same wire: it joins, polls
 `GET /v1/next` and posts its answers, activity and context, on the routes listed under
 [the wire](docs/architecture/overview.md#the-wire).

@@ -190,6 +190,10 @@ channel's `session.started` (`app/Sources/LiveBridge/Resources/audio/audio.js:19
 after the open began (median 1.06 s, [ADR 0001](../adr/0001-platform-findings.md) (d)). The
 backend session exists from codex's POST, before that.
 
+Noted on 2026-11-14: 0.6.0 removed `CallMachine.firstWordSeconds`; the first-word wait and the
+silence are now `CallMachine.Timeouts` from Settings, 5 s and 20 s by default, and the line
+numbers above are of the code read on 2026-11-05.
+
 **What a silent reopened line is billed** (**inferred**). The session lives about 1 s connecting
 plus 5 s, so about 6 s.
 
@@ -245,6 +249,10 @@ Checked and correct: the 20 s, 90 s, 2 min and 5 s figures in every README and t
 only while `sending` is set. The app's own help text said "a ChatGPT plan that includes realtime
 voice" (`app/Sources/BridgeCore/Codex/CodexHelp.swift`); it is not a doc, but row 4 applied to it
 too, and it changed with the row.
+
+Noted on 2026-11-14: 0.6.0 removed `silenceSeconds`, `noiseCapSeconds` and `firstWordSeconds`
+from `CallMachine`; those figures are now `CallMachine.Timeouts`' defaults, which Settings offers
+(`silence` 20 s, `noise` 90 s, `firstWord` 5 s), and `resultWindowSeconds` stays a constant.
 
 **Mute (0.4.0).** A muted line that stays open is billed like silence (first note §1, "muting
 does not close the session"). Whatever Mute does, its docs should say whether the line stays open

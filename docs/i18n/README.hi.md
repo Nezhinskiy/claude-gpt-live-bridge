@@ -207,7 +207,7 @@ network पर devices खोज सकता है। voice line को यह
 ### अनइंस्टॉल करना
 
 `/Applications` वाली copy में menu का **Feedback & Support ▸ Uninstall LiveBridge…** पहले
-पूछता है और app को Trash में ले जाता है; अगर न ले जा सके, तो यह बताता है और कुछ और नहीं बदलता, और अगर macOS उसे वह login item वापस लगाने नहीं देता जिसे उसने पहले हटाया था, तो यह भी बताता है, और **Open at login** को फिर से चालू कैसे करें, यह भी। फिर खुली call खत्म होती है और हर session LiveBridge छोड़ देता है, जैसे menu के × से,
+पूछता है और app को Trash में ले जाता है; अगर न ले जा सके, तो यह बताता है, app को वहीं रहने देता है और पहले हटाया गया login item, अगर कोई था, वापस लगा देता है, और अगर macOS उसे वह login item वापस लगाने नहीं देता, तो यह भी बताता है, और **Open at login** को फिर से चालू कैसे करें, यह भी। फिर खुली call खत्म होती है और हर session LiveBridge छोड़ देता है, जैसे menu के × से,
 इसलिए उसमें `/live` LiveBridge को फिर से खोलने के बजाय बंद हो जाता है; LiveBridge login item और
 microphone permission हटाकर बंद हो जाता है, और उसके बंद होने के बाद उसकी files (नीचे दी गई)
 Trash के एक folder में चली जाती हैं, जब तक आप उसे खाली न करें। Claude Code का mod बना
@@ -265,9 +265,9 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है उसे
   session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
   हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद सिर्फ़ तब जब उसका सारांश अभी न हो
-  ([विवरण](../../docs/architecture/overview.md#components))। इस release के mod के साथ सारांश Start पर और
-  call के दौरान target बदलने पर माँगा जाता है, और line जुड़ने से पहले उसका इंतज़ार करती है, माँगने से
-  अधिकतम 10 सेकंड: इस बीच आप जो कहते हैं वह Mac पर रखा जाता है और line खुलने पर voice तक पहुँचता
+  ([विवरण](../../docs/architecture/overview.md#when-the-app-asks))। इस release के mod के साथ सारांश Start पर और
+  call के दौरान target बदलने पर माँगा जाता है, और line जुड़ने से पहले उसका इंतज़ार करती है,
+  ज़्यादा से ज़्यादा [इंतज़ार की सीमा](../../docs/architecture/overview.md#its-time) तक: इस बीच आप जो कहते हैं वह Mac पर रखा जाता है और line खुलने पर voice तक पहुँचता
   है। इंतज़ार के दौरान Stop या target बदलना रखी हुई बात को हटा देता है, और **Connect over TCP**
   बदलने के बाद का reconnect भी, जो दोबारा खुलने वाली line के लिए ज़्यादा से ज़्यादा
   आख़िरी 2 सेकंड रखता है। जब call किसी दूसरे session से बात कर रही हो,
@@ -279,7 +279,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   **Quick Settings** (**Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause sync while the call is stopped** और **Load a session's context on its first call** के checkmark items),
   **Settings…**, **Feedback & Support** (**Report a Bug…** repository का bug report form खोलता है,
   **LiveBridge Website** getlivebridge.com खोलता है, **Star LiveBridge on GitHub** repository का page
-  खोलता है, फिर **Debug Mode** और **Show Debug Files…**, [debug mode](#सेटिंग्स) का switch और
+  खोलता है, फिर **Debug Mode** और **Show Debug Files**, [debug mode](#सेटिंग्स) का switch और
   folder, और **Uninstall LiveBridge…** ([अनइंस्टॉल करना](#अनइंस्टॉल-करना))) और **Quit LiveBridge** होते हैं। जब menu में सिर्फ़ call दिखती है, तब भी Quick Settings
   वहाँ होता है। call के दौरान **Conversation** आपके और voice के शब्द
   वैसे-वैसे दिखाता है जैसे-जैसे codex उन्हें transcribe करता है, इसलिए आपके शब्द बोलने के थोड़ी देर बाद, और
@@ -301,7 +301,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   जाती है), session paused रहा है और उसका सारांश है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
   date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर कोई line खुली न हो, अगली line सारांश load करेगी और बाकी कुछ नहीं छूटा है, तो यह
   **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। जब target का सारांश
-  रास्ते में हो, उसे किसी ने भी माँगा हो, item **Loading context…** दिखाता है और बंद रहता है, ज़्यादा से ज़्यादा उन 60 सेकंड तक जो mod उसे देता है (पुराने mod पर वह **Load context** ही रहता है); आया हुआ
+  रास्ते में हो, उसे किसी ने भी माँगा हो, item **Loading context…** दिखाता है और बंद रहता है, ज़्यादा से ज़्यादा उतने समय तक जितना mod उसे देता है ([कितना](../../docs/architecture/overview.md#its-time); पुराने mod पर वह **Load context** ही रहता है); आया हुआ
   सारांश कुछ पल **Context loaded** दिखाता है, और खाली जवाब वापस **Load context** पर ले आता है। सारांश पर कोई तारीख
   नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है ([BR-002](../../docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session
