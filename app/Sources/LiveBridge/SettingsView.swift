@@ -26,9 +26,9 @@ enum SettingsTab: CaseIterable {
   }
 }
 
-/// One tab of LiveBridge's Settings. **General**: notifications, Open at login and updates.
+/// One tab of LiveBridge's Settings. **General**: notifications, Open at login, updates and debug mode.
 /// **Voice**: the voice, its prompt and the sounds. **Line**: the line's timers and how it connects.
-/// **Context**: sync. The settings are read from and written to `AppModel.settings`, their one copy.
+/// **Context**: sync and the summary model. The settings are read from and written to `AppModel.settings`, their one copy.
 struct SettingsView: View {
   @Bindable var model: AppModel
   let tab: SettingsTab
@@ -163,7 +163,7 @@ struct SettingsView: View {
         Toggle(
           "Load a session's context on its first call", isOn: setting(\.loadContextOnFirstCall))
         Text(
-          "A line for a session with no summary yet asks for one, even while sync is paused. It "
+          "Start or a line for a session with no summary yet asks for one, even while sync is paused. It "
             + "is written from the transcript, paused text included, and goes to OpenAI. A mod of "
             + "this version leaves out tool output, thinking and reminders, but not text that "
             + "quotes them."

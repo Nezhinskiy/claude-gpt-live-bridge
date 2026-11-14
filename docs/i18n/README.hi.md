@@ -373,7 +373,7 @@ menu का **Quick Settings** इसके पाँच switches रखता �
 - **Pause sync while the call is stopped** (डिफ़ॉल्ट रूप से बंद): डिफ़ॉल्ट रूप से, जुड़े हुए session
   में आप जो टाइप करते हैं और उस पर Claude का अंतिम जवाब, call रुकी होने पर भी voice के साथ उस
   session की conversation में रखे जाते हैं, और अगली line खुलने पर voice के पास होते हैं। line खुलने
-  तक Mac से कुछ बाहर नहीं जाता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू
+  तक इसमें से कुछ भी OpenAI तक नहीं पहुँचता। जिस text को आप OpenAI तक नहीं पहुँचाना चाहते, उसके लिए setting चालू
   करें, अगर session का सारांश शायद अभी न हो तो अगली setting बंद करें, Stop दबाएँ, फिर टाइप करें: call रुकी होने पर आप जो टाइप करते हैं वह दर्ज नहीं होता, और
   session paused चिह्नित हो जाता है। यह चालू रहते कोई line अपने-आप सारांश load नहीं करती, और pause
   के बाद भी नहीं, सिवाय ऐसे session के जिसका सारांश नहीं है (अगली setting); बाकी समय यह सिर्फ़ **Load context**
@@ -383,7 +383,8 @@ menu का **Quick Settings** इसके पाँच switches रखता �
   जाता। यह पहले से दर्ज किसी चीज़ को नहीं हटाता, और Claude के बाद के जवाब paused text दोहरा सकते
   हैं; यह क्या करता है और क्या नहीं, यह [SECURITY.md](../../SECURITY.md#residual-risk-by-design) में है।
 - **Load a session's context on its first call** (डिफ़ॉल्ट रूप से चालू; update के समय **Pause sync** चालू था तो बंद): जिस session का
-  सारांश voice के पास नहीं है, उसके लिए खुलने वाली line सारांश माँगती है, चाहे **Pause sync** चालू हो या
+  सारांश voice के पास नहीं है, उसके लिए Start, call के दौरान target बदलना या खुलने वाली line सारांश
+  माँगती है, चाहे **Pause sync** चालू हो या
   session paused हो, पुरानी chat और **New conversation** के बाद की chat समेत। वह सारांश transcript से
   लिखा जाता है, इसलिए उसमें वह आता है जिसे आपने pause किया था, और वह OpenAI को जाता है। session का सारांश
   बन जाने के बाद जो आगे होता है उस पर pause लागू होता है। यह बंद हो तो pause में सिर्फ़ **Load context** सारांश
@@ -626,6 +627,11 @@ Uninstall करने से वे सब हट जाती हैं; menu 
   भी नहीं मिलता, voice को सारांश नहीं मिलता, जो Settings बताती है। इस setting से पहले session का अपना model
   उसे लिखता था, जो हर उस जगह काम करता है जहाँ session करता है। pinned id का इन providers पर resolve होना
   Claude Code के documentation से लिया गया है और चलाकर नहीं देखा गया।
+- विफल हुआ सारांश याद नहीं रखा जाता: जब तक session को अब भी सारांश चाहिए, Start, target बदलना और
+  खुलने वाली हर line उसे फिर माँगती है, और mod वही transcript, अधिकतम 120,000 अक्षर, फिर भेजता है,
+  जो हर बार billed हो सकता है, चाहे जवाब खाली लौटे या बहुत देर से। अगर session के band पर
+  **Context failed** बना रहे, तो **Summary model** को वापस Haiku 5.5 पर करें, या **Pause sync** चालू
+  करें और **Load a session's context on its first call** बंद रहने दें।
 - जो session अब भी इस release से पहले के mod पर है, वह restart होने तक sync नहीं होता: वह turns छूटे
   session की तरह सारांश load करता है, और कोई pause उसकी पंक्तियों को अस्वीकार नहीं करता ([और क्या
   अलग है](../../CHANGELOG.md))।

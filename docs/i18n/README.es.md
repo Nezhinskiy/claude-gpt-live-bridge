@@ -392,7 +392,7 @@ depuración:
 - **Pause sync while the call is stopped** (desactivado por defecto): por defecto, lo que escribes
   en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
   la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
-  sale del Mac hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI, activa
+  de ello llega a OpenAI hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI, activa
   el ajuste, desactiva el siguiente si la sesión puede no tener resumen aún, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
   registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
   resumen por sí sola, ni tampoco después de una pausa, salvo para una sesión sin resumen (el ajuste
@@ -401,9 +401,9 @@ depuración:
   de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
   [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
 - **Load a session's context on its first call** (activado por defecto; desactivado si **Pause sync** estaba activado al actualizar):
-  una línea que se abre para una sesión de la que la voz no tiene resumen lo pide aunque **Pause
-  sync** esté activado o la sesión esté en pausa, también en un chat antiguo o tras **New
-  conversation**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste, y va a
+  Start, un cambio de destino durante la llamada o una línea que se abre, para una sesión de la que
+  la voz no tiene resumen, lo pide aunque **Pause sync** esté activado o la sesión esté en pausa,
+  también en un chat antiguo o tras **New conversation**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste, y va a
   OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
   Desactivado, bajo la pausa solo **Load context** carga un resumen.
 - **Summary model** (Haiku 5.5 por defecto, también al actualizar; o Sonnet 5.5, Opus 5.5 o **Custom…**): el
@@ -658,6 +658,12 @@ sesión.
   este ajuste lo escribía el modelo propio de la sesión, que funciona dondequiera que funcione la
   sesión. Que un id fijo se resuelva en esos proveedores viene de la documentación de Claude Code y
   no se ha probado.
+- Un resumen que falla no se recuerda: mientras la sesión aún necesita uno, Start, un cambio de
+  destino y cada línea que se abre lo vuelven a pedir, y el mod envía otra vez la misma
+  transcripción, hasta 120 000 caracteres, que puede facturarse cada vez aunque la respuesta llegue
+  vacía o demasiado tarde. Si **Context failed** sigue en la banda de la sesión, vuelve a poner
+  **Summary model** en Haiku 5.5, o activa **Pause sync** y deja desactivado
+  **Load a session's context on its first call**.
 - Una sesión que sigue con un mod anterior a esta versión, hasta que se reinicie, no se sincroniza:
   carga un resumen como una sesión a la que le faltan turnos, y ninguna pausa rechaza sus líneas
   ([qué más cambia](../../CHANGELOG.md)).

@@ -404,8 +404,8 @@ the switch here asks.
 
 - **Pause sync while the call is stopped** (off by default): by default, what you type in a joined
   session and Claude's final answer to it are kept in that session's conversation with the voice
-  even while the call is stopped, and the voice has them when the next line opens. Nothing leaves
-  the Mac until a line opens. For text you do not want to reach OpenAI, turn this on, turn off the next
+  even while the call is stopped, and the voice has them when the next line opens. None of it
+  reaches OpenAI until a line opens. For text you do not want to reach OpenAI, turn this on, turn off the next
   setting if the session may have no summary yet, press Stop, then type: nothing you type while the call is stopped is recorded, and the session is marked as
   paused. While it is on, no line loads a summary by itself, and neither does one after a pause,
   except for a session with no summary (the next setting); otherwise only **Load context** does. That
@@ -413,9 +413,9 @@ the switch here asks.
   answer, with nothing of it recorded or said. It removes nothing already recorded, and Claude's
   later answers may repeat paused text; [SECURITY.md](SECURITY.md#residual-risk-by-design) says what
   it does and does not do.
-- **Load a session's context on its first call** (on by default; off if **Pause sync** was on when you updated to it): a line that
-  opens for a session the voice has no summary for asks for one even while **Pause sync** is on or
-  the session is paused, an old chat or a chat after **New conversation** included. That summary
+- **Load a session's context on its first call** (on by default; off if **Pause sync** was on when you updated to it): Start, a
+  change of target during the call, or a line that opens, for a session the voice has no summary
+  for, asks for one even while **Pause sync** is on or the session is paused, an old chat or a chat after **New conversation** included. That summary
   is written from the transcript, so it carries what you paused, and it goes to OpenAI. Once
   a session has a summary, the pause governs what follows. With this off, only **Load context**
   loads a summary under the pause.
@@ -656,6 +656,11 @@ can become a request that Claude runs under the session's own permission mode.
   says. Before this setting the session's own model wrote it, which works wherever the session
   does. That a pinned id resolves on those providers comes from Claude Code's documentation and
   was not run.
+- A summary that fails is not remembered: while the session still needs one, Start, a change of
+  target and every line that opens ask again, and the mod sends the same transcript again, up to
+  120,000 characters, which a reply that came back empty or too late may bill each time. If
+  **Context failed** stays on the session's band, set **Summary model** back to Haiku 5.5, or turn
+  on **Pause sync** and leave **Load a session's context on its first call** off.
 - A session still on a mod from before this release, until it restarts, is not synced: it loads a
   summary as a session with missing turns does, and no pause refuses its lines ([what else
   differs](CHANGELOG.md)).

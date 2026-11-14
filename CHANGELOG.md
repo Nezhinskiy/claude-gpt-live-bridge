@@ -49,7 +49,7 @@ All notable changes to this project are listed here. The format follows
 
 - The Settings window has four tabs in its toolbar: **General** (notifications, Open at login,
   updates and debug mode), **Voice** (the voice, the prompt and the sounds), **Line** (the line's
-  timers and Connect over TCP) and **Context** (sync).
+  timers and Connect over TCP) and **Context** (sync and the summary model).
 - **Star LiveBridge on GitHub** moved from the menu's foot into **Feedback & Support**.
 
 - While Claude works, the menu bar icon shows dots turning in depth, three and then four, which

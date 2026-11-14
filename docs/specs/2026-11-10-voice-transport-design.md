@@ -1,6 +1,6 @@
 # Connect the voice over TCP
 
-Status: in progress, 2026-11-10; revised that day after the review
+Status: delivered in 0.6.0; written 2026-11-10, revised that day after the review
 (`docs/reviews/2026-11-10-voice-transport-review.md` on branch `review/pr79-voice-transport`).
 
 ## Why

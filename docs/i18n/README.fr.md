@@ -413,7 +413,7 @@ se connecte :
 - **Pause sync while the call is stopped** (désactivé par défaut) : par défaut, ce que vous tapez
   dans une session rejointe et la réponse finale de Claude sont gardés dans la conversation de cette
   session avec la voix même quand l'appel est arrêté, et la voix les a quand la ligne suivante
-  s'ouvre. Rien ne quitte le Mac avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
+  s'ouvre. Rien de tout cela n'arrive chez OpenAI avant l'ouverture d'une ligne. Pour un texte que vous ne voulez pas
   voir arriver chez OpenAI, activez le réglage, désactivez le suivant si la session n'a peut-être pas encore de résumé, appuyez sur Stop, puis tapez : rien de ce que vous
   tapez appel arrêté n'est enregistré, et la session est marquée en pause. Tant qu'il est activé,
   aucune ligne ne charge de résumé d'elle-même, ni après une pause, sauf pour une session sans résumé (le réglage suivant) ; sinon seul
@@ -423,8 +423,8 @@ se connecte :
   enregistré, et les réponses ultérieures de Claude peuvent répéter le texte mis en pause ; ce qu'il
   fait et ne fait pas est dans [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
 - **Load a session's context on its first call** (activé par défaut ; désactivé si **Pause sync** était activé lors de la mise à jour) :
-  une ligne qui s'ouvre pour une session dont la voix n'a pas de résumé en demande un même si
-  **Pause sync** est activé ou si la session est en pause, y compris pour une ancienne discussion
+  Start, un changement de cible pendant l'appel ou une ligne qui s'ouvre, pour une session dont la
+  voix n'a pas de résumé, en demande un même si **Pause sync** est activé ou si la session est en pause, y compris pour une ancienne discussion
   ou après **New conversation**. Ce résumé est écrit à partir de la transcription, donc il porte ce
   que vous avez mis en pause, et il part chez OpenAI. Une fois qu'une session a un résumé,
   la pause régit ce qui suit. Désactivé, sous la pause seul **Load context** charge un résumé.
@@ -692,6 +692,12 @@ session.
   Settings indique. Avant ce réglage, le modèle de la session l'écrivait, ce qui marche partout où
   la session marche. Qu'un id fixé soit résolu chez ces fournisseurs vient de la documentation de
   Claude Code et n'a pas été essayé.
+- Un résumé qui échoue n'est pas retenu : tant que la session en a encore besoin, Start, un
+  changement de cible et chaque ligne qui s'ouvre en redemandent un, et le mod renvoie la même
+  transcription, jusqu'à 120 000 caractères, ce qui peut être facturé à chaque fois même si la
+  réponse revient vide ou trop tard. Si **Context failed** reste sur la bande de la session,
+  remettez **Summary model** sur Haiku 5.5, ou activez **Pause sync** et laissez
+  **Load a session's context on its first call** désactivé.
 - Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
   synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, et aucune
   pause ne refuse ses lignes ([ce qui change d'autre](../../CHANGELOG.md)).
