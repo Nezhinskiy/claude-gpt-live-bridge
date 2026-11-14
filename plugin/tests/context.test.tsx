@@ -285,6 +285,18 @@ test('aSendAGapCrossedTriesNoFallback', async ($, on) => {
   ])
 })
 
+test('aTurnCompletedOnTheWayDoesNotCrossTheSend', async ($, on) => {
+  // A turn the app took only ends the kept summary's use; the send goes on to the fallback.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  world.completeFails = { [OPUS]: 'api-error' }
+  await appAsks(world, { ...NAMED, ask: 1 })
+  await typedTurn($, 't1', 'Done.')
+  await world.clock.advance(10_000)
+  expect(world.completes.map(one => one.model)).toEqual([OPUS, HAIKU])
+  expect(world.take('context')).toEqual([expect.objectContaining({ summary: world.summary, ask: 1 })])
+})
+
 test('theDeadlinePostsTimedOut', async ($, on) => {
   // The first model fails late; the fallback gets only what is left of the minute, then the ask is answered.
   const world = await joined($, on)
