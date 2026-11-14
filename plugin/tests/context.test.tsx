@@ -29,10 +29,12 @@ async function joined(...[$, on]: Parameters<TestBody>) {
 /**
  * The app asks for the session's context, naming a model or, as an older app, none; the target's
  * next poll, at most a second on with the call off, brings the ask and is the one that runs it.
+ * Resolves to when that poll took it, which a test times the minute from.
  */
 async function appAsks(world: ReturnType<typeof fakeWorld>, ask: { model?: string; fallbackModel?: string; ask?: number } = {}) {
   world.work.push({ kind: 'context', ...ask })
   await world.clock.advance(1000)
+  return world.workTakenAt
 }
 
 /** A typed turn that ends with `answer`. */
@@ -220,11 +222,11 @@ test('aFailedModelFallsBackOnce', async ($, on) => {
 test('aTimeOutDoesNotFallBack', async ($, on) => {
   const world = await joined($, on)
   world.completeFails = { [OPUS]: 'held' }
-  await appAsks(world, NAMED)
+  const taken = await appAsks(world, NAMED)
   // The app holds its reply to the poll, so the clock crosses the minute with one held poll.
   let release = () => {}
   world.holdNext = new Promise<void>(resolve => { release = resolve })
-  await world.clock.advance(MINUTE)
+  await world.clock.set(taken + MINUTE)
   release()
   world.holdNext = null
   expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '', failures: [{ reason: 'timed-out' }] }])
@@ -288,10 +290,10 @@ test('theDeadlinePostsTimedOut', async ($, on) => {
   const world = await joined($, on)
   world.completeMs = 50_000
   world.completeFails = { [OPUS]: 'api-error', [HAIKU]: 'held' }
-  await appAsks(world, NAMED)
+  const taken = await appAsks(world, NAMED)
   let release = () => {}
   world.holdNext = new Promise<void>(resolve => { release = resolve })
-  await world.clock.advance(MINUTE - 1)
+  await world.clock.set(taken + MINUTE - 1)
   expect(world.take('context')).toEqual([])
   await world.clock.advance(1)
   release()

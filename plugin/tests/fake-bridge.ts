@@ -121,6 +121,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     removed: new Set<string>(),
     status: { call: 'off', sessions: [], minutesToday: 0, unheard: 0, isMuted: false } as StatusReply,
     work: [] as Work[],
+    /** When a poll last took a piece of `work`, on the mocked clock. */
+    workTakenAt: 0,
     calls: [] as Call[],
     submitted: [] as string[],
     launches: [] as (readonly string[])[],
@@ -245,7 +247,7 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     const reply = route !== 'next'
       ? {}
       : world.joined.has(new URL(e.url).searchParams.get('sessionId') ?? '')
-        ? { status: world.status, ...(world.work.length > 0 && { work: world.work.shift() }) }
+        ? { status: world.status, ...(world.work.length > 0 && { work: takeWork() }) }
         : undefined
     const text = JSON.stringify(reply ?? { error: 'unknown session' })
     if (route === 'next' && world.nextMs > 0) await world.clock.sleep(world.nextMs)
@@ -256,6 +258,10 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     }
     return { value: { status: reply ? 200 : 404, ok: reply !== undefined, headers: {}, text } }
   })
+  const takeWork = () => {
+    world.workTakenAt = world.clock.now()
+    return world.work.shift()
+  }
   on('prompt.submit', (_, e) => {
     if (world.isSubmitRefused) throw new Error('the session is closing')
     if (world.isPromptDropped) return { drop: 'a hook refused the prompt' }
