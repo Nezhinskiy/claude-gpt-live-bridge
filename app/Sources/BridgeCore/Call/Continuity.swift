@@ -190,10 +190,9 @@ public struct Continuity: Codable, Sendable, Equatable {
   }
 
   /// Changes the session's summary ask as stored; `SummaryAsks` holds what it means.
-  @discardableResult
-  mutating func changeSummaryAsk<Result>(
-    of id: SessionID, _ change: (inout Conversation.SummaryAsk?) -> Result
-  ) -> Result {
+  mutating func changeSummaryAsk(
+    of id: SessionID, _ change: (inout Conversation.SummaryAsk?) -> Void
+  ) {
     use(id) { change(&$0.summaryAsk) }
   }
 

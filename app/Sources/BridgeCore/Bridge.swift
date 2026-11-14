@@ -96,9 +96,9 @@ public actor Bridge: Router {
     pausesSync: @escaping @Sendable () -> Bool = { false },
     timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
-    connectsOverTCP: @escaping @Sendable () -> Bool = { false },
-    summaryModel: @escaping @Sendable () -> String = { SummaryModel.default },
-    reportsSummary: @escaping @Sendable (SummaryTiming) -> Void = { _ in }, appVersion: AppVersion?
+    connectsOverTCP: @escaping @Sendable () -> Bool,
+    summaryModel: @escaping @Sendable () -> String,
+    reportsSummary: @escaping @Sendable (SummaryTiming) -> Void, appVersion: AppVersion?
   ) {
     self.reportsSummary = reportsSummary
     self.summaryModel = summaryModel
