@@ -144,7 +144,7 @@ and joins again when that title changes, polls it once a second (the target five
 while its last poll said the call is on, so a summary ask during a call reaches it sooner; with the
 call off it polls once a second too and learns that a call began only from its next poll, so
 Start's ask reaches it up to 0.8 s later than in 0.6.0, well within the line's 10-second wait for
-the summary ([handoff](#handoff)), and so does a model check; the title is still read once a second, and a
+the summary ([handoff](#handoff)), and so do a **Load context** press and a model check; the title is still read once a second, and a
 poll in between writes the band only when what it draws changed), submits each voice request to the session
 as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`

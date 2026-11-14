@@ -1,6 +1,5 @@
 // The mod's side of the bridge: HTTP over the app's Unix socket, the app's launch, the poll
-// loop (five times a second for the target during a call, once a second otherwise, as the
-// architecture overview says) and the queue that runs the session's link work one piece at a time.
+// loop (its rate is in the architecture overview's Components) and the queue that runs the session's link work one piece at a time.
 // Each call answers what happened and never throws.
 import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-code'
 
