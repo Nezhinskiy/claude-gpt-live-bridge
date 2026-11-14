@@ -659,8 +659,8 @@ can become a request that Claude runs under the session's own permission mode.
 - A summary that fails is not remembered: while the session still needs one, Start, a change of
   target and every line that opens ask again, and the mod sends the same transcript again, up to
   120,000 characters, which a reply that came back empty or too late may bill each time. If
-  **Context failed** stays on the session's band, set **Summary model** back to Haiku 5.5, or turn
-  on **Pause sync** and leave **Load a session's context on its first call** off.
+  **Context failed** stays on the session's band, turn on **Pause sync** and leave **Load a
+  session's context on its first call** off.
 - A session still on a mod from before this release, until it restarts, is not synced: it loads a
   summary as a session with missing turns does, and no pause refuses its lines ([what else
   differs](CHANGELOG.md)).

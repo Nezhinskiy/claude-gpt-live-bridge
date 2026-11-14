@@ -696,7 +696,7 @@ session.
   changement de cible et chaque ligne qui s'ouvre en redemandent un, et le mod renvoie la même
   transcription, jusqu'à 120 000 caractères, ce qui peut être facturé à chaque fois même si la
   réponse revient vide ou trop tard. Si **Context failed** reste sur la bande de la session,
-  remettez **Summary model** sur Haiku 5.5, ou activez **Pause sync** et laissez
+  activez **Pause sync** et laissez
   **Load a session's context on its first call** désactivé.
 - Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
   synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, et aucune

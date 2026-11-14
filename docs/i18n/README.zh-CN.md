@@ -322,7 +322,7 @@ conversation**，或用 × 移除它时，该会话的这些行就会被删除�
 - 达到你的 ChatGPT 套餐的用量限额时，语音会停止，直到限额重置。菜单和状态条会说明这一点，使用 codex 的原句，并在 codex 给出时附上重置时间；通话随之结束，这样说话就不会再打开注定失败的线路。Claude Code 继续工作，答复继续等待，Start 会再试一次。应用只能靠 codex 的措辞或服务的错误代码识别限额，因为没有别的信号（[详情](../../docs/research/2026-11-05-gpt-live-limits.md)）。它无法识别的拒绝，例如没有说明原因就断开的线路（“The voice session closed (transport_closed).”），通话会保持开启，你接下来说的话会再次尝试；在限额重置之前请按 **Stop**。
 - 不是在输入框中键入的提示（host 的消息、定时任务、其他代理，大概还有 Remote Control），不会作为你的话记录到语音的对话中，但 Claude 对它的答复会被记录，而且在暂停下它不会拒绝正在运行的一轮（哪些提示算作你的，见 [SECURITY.md](../../SECURITY.md#what-session-text-can-do)）。
 - 若 Claude Code 的提供方（Bedrock、Vertex 或 Foundry）不提供 **Summary model** 中选择的模型，或组织不允许使用它，该模型会失败并由 Haiku 5.5 撰写摘要；若连 Haiku 5.5 也不提供，语音就得不到摘要，Settings 会说明。在此设置之前，摘要由会话自己的模型撰写，只要会话能用就能用。固定 id 能在这些提供方上解析，这一点来自 Claude Code 的文档，未经实际运行。
-- 失败的摘要不会被记住：只要会话仍需要摘要，按下 Start、切换目标以及每次打开线路都会再次请求，模组会再次发送同一份会话记录，最多 120,000 个字符，即使回复为空或来得太晚，每次也可能计费。若会话的状态条上一直显示 **Context failed**，请把 **Summary model** 改回 Haiku 5.5，或开启 **Pause sync** 并保持 **Load a session's context on its first call** 关闭。
+- 失败的摘要不会被记住：只要会话仍需要摘要，按下 Start、切换目标以及每次打开线路都会再次请求，模组会再次发送同一份会话记录，最多 120,000 个字符，即使回复为空或来得太晚，每次也可能计费。若会话的状态条上一直显示 **Context failed**，请开启 **Pause sync** 并保持 **Load a session's context on its first call** 关闭。
 - 仍在使用此版本之前模组的会话，在重启之前不会同步：它会像缺少轮次的会话那样加载摘要，暂停也不会拒绝它的行（[其他差异](../../CHANGELOG.md)）。
 - 在模组加载之前就已打开的 Claude Code 会话，可能需要重新打开，`/live` 才能在其中使用。
 - 在 Claude 桌面应用中，如果在其 Claude Code 进程尚未启动的会话（新建的会话，或刚重新打开的会话）里输入 `/live`，

@@ -190,7 +190,7 @@ that both test suites parse.
 
 | Route | Body or reply |
 |---|---|
-| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`, `modVersion` from the mod's plugin.json, `syncs` (the mod posts sync lines), `missed` (a turn did not arrive) and `writesSummaries` (the mod writes summaries with the model the app names); an upsert that also refreshes liveness |
+| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`, `owner` (the owner typed `/live`, so the join brings back a session the owner removed), `modVersion` from the mod's plugin.json, `syncs` (the mod posts sync lines), `missed` (a turn did not arrive) and `writesSummaries` (the mod writes summaries with the model the app names); an upsert that also refreshes liveness |
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question (`forRequest` names the request the turn's answer now belongs to), a context ask, or a model check (`checkModel`: `id`, `model`), sent only to a session whose join said `writesSummaries` |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |

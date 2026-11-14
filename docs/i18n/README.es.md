@@ -661,8 +661,8 @@ sesión.
 - Un resumen que falla no se recuerda: mientras la sesión aún necesita uno, Start, un cambio de
   destino y cada línea que se abre lo vuelven a pedir, y el mod envía otra vez la misma
   transcripción, hasta 120 000 caracteres, que puede facturarse cada vez aunque la respuesta llegue
-  vacía o demasiado tarde. Si **Context failed** sigue en la banda de la sesión, vuelve a poner
-  **Summary model** en Haiku 5.5, o activa **Pause sync** y deja desactivado
+  vacía o demasiado tarde. Si **Context failed** sigue en la banda de la sesión, activa
+  **Pause sync** y deja desactivado
   **Load a session's context on its first call**.
 - Una sesión que sigue con un mod anterior a esta versión, hasta que se reinicie, no se sincroniza:
   carga un resumen como una sesión a la que le faltan turnos, y ninguna pausa rechaza sus líneas

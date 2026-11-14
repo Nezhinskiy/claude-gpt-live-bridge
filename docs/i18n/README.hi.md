@@ -630,7 +630,7 @@ Uninstall करने से वे सब हट जाती हैं; menu 
 - विफल हुआ सारांश याद नहीं रखा जाता: जब तक session को अब भी सारांश चाहिए, Start, target बदलना और
   खुलने वाली हर line उसे फिर माँगती है, और mod वही transcript, अधिकतम 120,000 अक्षर, फिर भेजता है,
   जो हर बार billed हो सकता है, चाहे जवाब खाली लौटे या बहुत देर से। अगर session के band पर
-  **Context failed** बना रहे, तो **Summary model** को वापस Haiku 5.5 पर करें, या **Pause sync** चालू
+  **Context failed** बना रहे, तो **Pause sync** चालू
   करें और **Load a session's context on its first call** बंद रहने दें।
 - जो session अब भी इस release से पहले के mod पर है, वह restart होने तक sync नहीं होता: वह turns छूटे
   session की तरह सारांश load करता है, और कोई pause उसकी पंक्तियों को अस्वीकार नहीं करता ([और क्या
