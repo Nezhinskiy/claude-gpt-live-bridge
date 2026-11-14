@@ -7,7 +7,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { Summary } from './summaries.ts'
 import { transcriptText } from './transcript.ts'
-import type { SummaryFailure, SummaryStats } from './wire.ts'
+import { MODEL_CHECK_TIMEOUT_MS, type SummaryFailure, type SummaryStats } from './wire.ts'
 
 /** Asks for what the app keeps (`Bridge.maxContext` in BridgeCore); the app enforces it. */
 const PROMPT =
@@ -97,7 +97,8 @@ function failureOf(reply: Completion | null): SummaryFailure {
  * counts against a lower one. Any text means it works; otherwise why it did not, as for a summary.
  */
 export async function checkModel($: EngineInterface, model: string): Promise<SummaryFailure | null> {
-  const reply = await $.model.complete({ model, prompt: 'Reply with OK.', effort: 'low', timeoutMs: 15_000 })
+  const reply = await $.model
+    .complete({ model, prompt: 'Reply with OK.', effort: 'low', timeoutMs: MODEL_CHECK_TIMEOUT_MS })
     .catch(() => null)
   return reply?.isAnswered && reply.text.trim() !== '' ? null : failureOf(reply)
 }

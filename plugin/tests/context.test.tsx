@@ -7,7 +7,7 @@ import type { Engine, TestBody } from 'claude-code/testing'
 
 import { voicePrompt } from '../hooks/prompt.ts'
 import { transcriptText } from '../hooks/transcript.ts'
-import type { VoiceRequest } from '../hooks/wire.ts'
+import { MODEL_CHECK_TIMEOUT_MS, type VoiceRequest } from '../hooks/wire.ts'
 import { BAND, fakeWorld, framed, ID, liveOn } from './fake-bridge.ts'
 
 const DONE = { durationMs: 1, isAborted: false, reason: 'answer' } as const
@@ -397,7 +397,7 @@ test('aCheckSendsOneShortRequest', async ($, on) => {
   const world = await joined($, on)
   await appChecks(world)
   expect(world.completes).toEqual([
-    { model: CHECK.model, prompt: 'Reply with OK.', effort: 'low', timeoutMs: 15_000, system: undefined, maxTokens: undefined },
+    { model: CHECK.model, prompt: 'Reply with OK.', effort: 'low', timeoutMs: MODEL_CHECK_TIMEOUT_MS, system: undefined, maxTokens: undefined },
   ])
   expect(world.forks).toBe(0)
 })

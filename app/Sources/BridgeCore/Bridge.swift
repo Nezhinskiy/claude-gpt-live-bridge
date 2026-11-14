@@ -38,6 +38,7 @@ public actor Bridge: Router {
       id: String, session: SessionID, done: CheckedContinuation<ModelCheckResult, Never>,
       timer: Task<Void, Never>
     )?
+  /// Outlasts the mod's own limit on the check (`wire/summary-budget.json`).
   private static let checkSeconds = 20
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.

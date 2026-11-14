@@ -1,1 +1,1 @@
-{ "summaryBudgetMs": 60000 }
+{ "summaryBudgetMs": 60000, "modelCheckMs": 15000 }

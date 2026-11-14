@@ -26,6 +26,12 @@ export function socketPath(home: string, fixedHome: string | undefined): string 
  */
 export const CONTEXT_TIMEOUT_MS = 60_000;
 
+/**
+ * How long Settings' check of a model may take. The app waits longer before it says no answer,
+ * tested against `wire/summary-budget.json`.
+ */
+export const MODEL_CHECK_TIMEOUT_MS = 15_000;
+
 export type SessionId = string;
 export type RequestId = string;
 

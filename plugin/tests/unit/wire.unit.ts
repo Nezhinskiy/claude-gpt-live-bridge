@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 import { TurnTracker } from '../../hooks/turns.ts'
-import { CONTEXT_TIMEOUT_MS, socketPath } from '../../hooks/wire.ts'
+import { CONTEXT_TIMEOUT_MS, MODEL_CHECK_TIMEOUT_MS, socketPath } from '../../hooks/wire.ts'
 import type * as Wire from '../../hooks/wire.ts'
 
 // A field-by-field description of each wire type. `fields<T>` takes exactly the keys of T, so
@@ -154,4 +154,10 @@ test('socketFollowsTheHomeFoundationUses', () => {
 test('theSummaryBudgetIsTheApps', () => {
   const budget = JSON.parse(readFileSync(`${import.meta.dirname}/../../../wire/summary-budget.json`, 'utf8'))
   assert.equal(CONTEXT_TIMEOUT_MS, budget.summaryBudgetMs)
+})
+
+/** The app gives a model check up later than the mod does: this file ties the mod's limit. */
+test('theModelCheckLimitIsTheFiles', () => {
+  const budget = JSON.parse(readFileSync(`${import.meta.dirname}/../../../wire/summary-budget.json`, 'utf8'))
+  assert.equal(MODEL_CHECK_TIMEOUT_MS, budget.modelCheckMs)
 })
