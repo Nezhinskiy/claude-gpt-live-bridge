@@ -17,9 +17,6 @@ public struct Conversation: Codable, Sendable, Equatable {
   /// codex's limits on `initialItems`; tokens are estimated at 4 UTF-8 bytes each, as codex counts.
   public static let maxItems = 128
   public static let maxTokens = 8_192
-  /// How long an ask can still be answered: twice what the mod allows a summary, which may never
-  /// come (a failure, or a session with nothing to summarise).
-  static let askLife = 2 * ContextLoads.timeout
 
   public struct Line: Codable, Sendable, Equatable {
     /// `claude`: a line the session sent the voice (a result, question, update or approval
@@ -73,8 +70,8 @@ public struct Conversation: Codable, Sendable, Equatable {
   private var linesSinceContext: Int?
   /// The decision on the turn whose lines were last offered (`Continuity.admits`).
   var turn: TurnDecision?
-  /// The summary asked for and not yet arrived.
-  private var summaryAsk: SummaryAsk?
+  /// The summary asked for and not yet arrived, open or not (`SummaryAsks`).
+  fileprivate(set) var summaryAsk: SummaryAsk?
 
   struct TurnDecision: Codable, Sendable, Equatable {
     var id: String
@@ -85,6 +82,12 @@ public struct Conversation: Codable, Sendable, Equatable {
     var at: Date
     /// A gap or a forget came after the ask, so its summary cannot cover the conversation.
     var isStale = false
+    /// The model the ask named and its fallback; nil on an ask to a mod that forks.
+    var model: String?
+    var fallbackModel: String?
+    /// The ask's number, which a current mod's answer echoes; nil on an ask that names no model,
+    /// and in an older file.
+    var number: Int?
   }
 
   public init() {}
@@ -122,22 +125,6 @@ public struct Conversation: Codable, Sendable, Equatable {
   mutating func markMissed(asPaused: Bool) {
     if outOfSync != .paused { outOfSync = asPaused ? .paused : .missed }
     summaryAsk?.isStale = true
-  }
-
-  /// A summary was asked for. An ask still open stays as it is: the mod joins a second ask to the
-  /// summary on its way, which is the first ask's.
-  mutating func noteSummaryAsk(at now: Date) {
-    if openAsk(at: now) == nil { summaryAsk = SummaryAsk(at: now) }
-  }
-
-  /// A summary arrived and answers the open ask. False: it was asked for before a gap or a forget.
-  mutating func takeSummaryAsk(at now: Date) -> Bool {
-    defer { summaryAsk = nil }
-    return openAsk(at: now)?.isStale != true
-  }
-
-  private func openAsk(at now: Date) -> SummaryAsk? {
-    summaryAsk.flatMap { now < $0.at + Self.askLife ? $0 : nil }
   }
 
   /// What forgetting leaves: a pause, the turn's decision, and an ask that can no longer cover
@@ -182,6 +169,9 @@ public struct Continuity: Codable, Sendable, Equatable {
   public static let keptConversations = 20
 
   private(set) var conversations: [String: Conversation] = [:]
+  /// The number the last numbered ask took, for every session, so a forget or an eviction never
+  /// brings an old number back (`SummaryAsks.ask`).
+  var asksMade: Int?
 
   public init() {}
 
@@ -199,16 +189,12 @@ public struct Continuity: Codable, Sendable, Equatable {
     use(id) { $0.setContext(line) }
   }
 
-  /// The app asked `id` for a summary.
-  public mutating func noteSummaryAsk(of id: SessionID, at now: Date) {
-    use(id) { $0.noteSummaryAsk(at: now) }
-  }
-
-  /// A summary from `id` arrived. False: it was asked for before the latest gap or forget, so it
-  /// covers less than the conversation lacks and must not be taken. One nobody asked for (an older
-  /// mod's `/live context`) cannot be dated, and is taken.
-  public mutating func takeSummaryAsk(of id: SessionID, at now: Date) -> Bool {
-    use(id) { $0.takeSummaryAsk(at: now) }
+  /// Changes the session's summary ask as stored; `SummaryAsks` holds what it means.
+  @discardableResult
+  mutating func changeSummaryAsk<Result>(
+    of id: SessionID, _ change: (inout Conversation.SummaryAsk?) -> Result
+  ) -> Result {
+    use(id) { change(&$0.summaryAsk) }
   }
 
   /// Whether a line of `turn` goes in. A turn's first line decides, and later lines keep that

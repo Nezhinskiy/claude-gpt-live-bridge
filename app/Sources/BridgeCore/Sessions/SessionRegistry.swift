@@ -66,6 +66,8 @@ public actor SessionRegistry {
     /// The mod's last join said it posts sync lines; one that does not leaves the session
     /// needing a summary at every line.
     var syncs = false
+    /// The mod's last join said it writes with the model an ask names and answers every ask.
+    var writesSummaries = false
     var lastPoll: Date
     var activity = SessionActivity.idle
     var queued: [VoiceRequest] = []
@@ -77,7 +79,10 @@ public actor SessionRegistry {
     var isAsking = false
     /// The owner's reply to that question, until the session polls it.
     var reply: VoiceRequest?
-    var wantsContext = false
+    /// The context ask the next poll hands over.
+    var wantsContext: Work?
+    /// The model check the next poll hands over, before a context ask.
+    var wantsCheck: Work?
 
     var hasOpenRequest: Bool { inFlight != nil || !queued.isEmpty }
   }
@@ -122,6 +127,7 @@ public actor SessionRegistry {
     session.title = String(body.title.prefix(Self.maxTitle))
     session.modVersion = body.modVersion.flatMap { AppVersion($0) }
     session.syncs = body.syncs == true
+    session.writesSummaries = body.writesSummaries == true
     session.lastPoll = time.now
     sessions[body.sessionId] = session
     if target == nil { retarget(body.sessionId) }
@@ -180,9 +186,12 @@ public actor SessionRegistry {
         session.inFlight = (request.id, request.brief, now, false)
         return .request(request)
       }
-      guard session.wantsContext else { return nil }
-      session.wantsContext = false
-      return .context
+      if let check = session.wantsCheck {
+        session.wantsCheck = nil
+        return check
+      }
+      defer { session.wantsContext = nil }
+      return session.wantsContext
     }
   }
 
@@ -196,8 +205,35 @@ public actor SessionRegistry {
   /// predates sync.
   public func syncs(_ id: SessionID) -> Bool { sessions[id]?.syncs ?? false }
 
-  /// Asks the session for its context summary at its next poll.
-  public func requestContext(for id: SessionID) { sessions[id]?.wantsContext = true }
+  /// Whether the session's mod writes with the model an ask names; false for one that forks.
+  public func writesSummaries(_ id: SessionID) -> Bool { sessions[id]?.writesSummaries ?? false }
+
+  /// Asks the session for its context summary at its next poll, with `model` and `fallbackModel`
+  /// if they are named, and the ask's number.
+  public func requestContext(
+    for id: SessionID, model: String? = nil, fallbackModel: String? = nil, ask: Int? = nil
+  ) {
+    sessions[id]?.wantsContext = .context(model: model, fallbackModel: fallbackModel, ask: ask)
+  }
+
+  /// The session a model check goes to: the target if its mod writes summaries, else the most
+  /// recently joined one whose mod does; nil when none does.
+  public func sessionThatChecks() -> SessionID? {
+    if let target, writesSummaries(target) { return target }
+    return ordered().last { $0.value.writesSummaries }?.key
+  }
+
+  /// Hands the session check `check` of `model` at its next poll.
+  public func requestCheck(for id: SessionID, check: String, model: String) {
+    sessions[id]?.wantsCheck = .checkModel(id: check, model: model)
+  }
+
+  /// Takes check `check` back from whichever session has not polled it yet.
+  public func withdrawCheck(_ check: String) {
+    for (id, session) in sessions {
+      if case .checkModel(check, _) = session.wantsCheck { sessions[id]?.wantsCheck = nil }
+    }
+  }
 
   /// The turn of `request` refused what the owner typed into it, so its answer may repeat that
   /// text: it stays out. Closed already, the turn is a background one, whose answer would be an

@@ -99,6 +99,22 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     forks: 0,
     /** How long the session's model takes over a summary, on the mocked clock. */
     forkMs: 0,
+    /** The session's messages, as `$.session.messages({ as: 'api' })` gives them. */
+    messages: [
+      { role: 'user', content: [{ type: 'text', text: 'Tidy the example project.' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'Tidied: the helper is renamed.' }] },
+    ] as { role: 'user' | 'assistant'; content: { type: string; text?: string; name?: string }[] }[],
+    /** Reading the session's messages fails. */
+    isTranscriptBroken: false,
+    /** What `$.model.complete` was asked, in order. */
+    completes: [] as { model: string; system?: string; prompt: string; effort?: string; maxTokens?: number; timeoutMs?: number }[],
+    /**
+     * How a model fails, by id: the engine refuses it (`complete` rejects), an API error, a reply
+     * with no text, or held until its `timeoutMs` runs out. Any other model writes `summary`.
+     */
+    completeFails: {} as Record<string, 'refused' | 'api-error' | 'empty-reply' | 'held'>,
+    /** How long a model takes over a summary, on the mocked clock. */
+    completeMs: 0,
     joined: new Set<string>(),
     /** Sessions the owner removed in the menu; only the owner's join (`/live`) clears the mark. */
     removed: new Set<string>(),
@@ -110,6 +126,9 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     read: [] as string[],
     /** The version the mod's own plugin.json names, or null when it cannot be read. */
     modVersion: null as string | null,
+    /** How long the app takes over a poll, and over a join, on the mocked clock. */
+    nextMs: 0,
+    joinMs: 0,
     /** While set, the app's reply to a poll is held until it resolves (built before, as the app does). */
     holdNext: null as Promise<void> | null,
     /** Called once a poll is being held. */
@@ -186,7 +205,12 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     world.calls.push({ route, body })
     if (route === 'join' && body.owner === true) world.removed.delete(body.sessionId)
     if (route === 'join') world.joined.add(body.sessionId)
-    if (route === 'join' && body.replaces !== undefined) world.joined.delete(body.replaces)
+    if (route === 'join' && body.replaces !== undefined) {
+      world.joined.delete(body.replaces)
+      // The session goes on under its new id, the target still if it was.
+      const sessions = world.status.sessions.map(row => (row.sessionId === body.replaces ? { ...row, sessionId: body.sessionId } : row))
+      world.status = { ...world.status, sessions }
+    }
     if (route === 'leave') world.joined.delete(body.sessionId)
     if (route === 'leave') world.timeline.push('leave')
     if (route === 'answer' && world.answerStatus !== 200) {
@@ -223,6 +247,8 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
         ? { status: world.status, ...(world.work.length > 0 && { work: world.work.shift() }) }
         : undefined
     const text = JSON.stringify(reply ?? { error: 'unknown session' })
+    if (route === 'next' && world.nextMs > 0) await world.clock.sleep(world.nextMs)
+    if (route === 'join' && world.joinMs > 0) await world.clock.sleep(world.joinMs)
     if (route === 'next' && world.holdNext !== null) {
       world.onNextHeld()
       await world.holdNext
@@ -256,6 +282,27 @@ export function fakeWorld(on: On, store: Record<string, unknown> = {}, env: Reco
     }
     if (world.forkFails === 'nothing-to-fork') return { value: { isAnswered: false, reason: 'nothing-to-fork' } } as const
     return { value: { isAnswered: true, text: world.summary, usage } } as const
+  })
+  on('session.messages', () => {
+    if (world.isTranscriptBroken) throw new Error('the transcript could not be read')
+    return { value: world.messages }
+  })
+  on('model.complete', async (_, e) => {
+    const { model, system, prompt, effort, maxTokens, timeoutMs } = e
+    world.completes.push({ model, system, prompt, effort, maxTokens, timeoutMs })
+    const fails = world.completeFails[model]
+    const none = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
+    if (fails === 'refused') return { deny: `the model "${model}" is not available` }
+    if (fails === 'held') {
+      await world.clock.sleep(timeoutMs ?? 0)
+      return { value: { isAnswered: false, reason: 'aborted', usage: none } } as const
+    }
+    if (world.completeMs > 0) await world.clock.sleep(world.completeMs)
+    if (fails === 'api-error') {
+      return { value: { isAnswered: false, reason: 'api-error', status: 529, error: 'overloaded', usage: none } } as const
+    }
+    if (fails === 'empty-reply') return { value: { isAnswered: false, reason: 'empty-reply', usage: { ...none, input_tokens: 13105 } } } as const
+    return { value: { isAnswered: true, text: world.summary, usage: { ...none, input_tokens: 13105, output_tokens: 412 } } } as const
   })
   // AskUserQuestion's dialog is its own permission prompt; any other tool asks first.
   on('tool.check', (_, e) => ({ decision: e.tool === 'AskUserQuestion' ? 'allow' : 'ask' }))

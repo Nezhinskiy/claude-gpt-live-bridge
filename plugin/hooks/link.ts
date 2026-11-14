@@ -1,16 +1,20 @@
-// The mod's side of the bridge: HTTP over the app's Unix socket, the app's launch, the
-// one-second poll loop and the queue that runs the session's link work one piece at a time.
+// The mod's side of the bridge: HTTP over the app's Unix socket, the app's launch, the poll
+// loop (five times a second for the target, once a second otherwise) and the queue that runs
+// the session's link work one piece at a time.
 // Each call answers what happened and never throws.
 import type { HttpInit, HttpResponse, ProcessRunResult, Timer } from 'claude-code'
 
 import type { SyncLine } from './turns.ts'
 import type {
-  ActivityBody, AnswerBody, CallAction, JoinBody, LimitWindowBody, PollReply, SessionActivity,
+  ActivityBody, AnswerBody, CallAction, ContextBody, JoinBody, LimitWindowBody, ModelCheckBody,
+  PollReply, SessionActivity,
 } from './wire.ts'
 
 /** LiveBridge.app's bundle identifier. */
 export const BUNDLE_ID = 'com.getlivebridge.livebridge'
-const POLL_MS = 1000
+const POLL_MS = 200
+/** A session that is not the target polls on every fifth tick, once a second. */
+const TICKS_A_SECOND = 5
 /** What `next` and `answer` answer once the owner removed this session in the app (HTTP 410). */
 export const REMOVED = 'removed'
 
@@ -36,9 +40,14 @@ export class BridgeLink {
   /** What this session last joined as, kept so that it can join again after the app restarts. */
   #joined: JoinBody | null = null
   #isKnown = false
-  /** A turn did not reach the app, and no join has said so yet. */
-  #hasGap = false
+  /** Turns that did not reach the app, which no join the app took has said yet. */
+  #gaps = 0
   #timer: Timer | null = null
+  #ticks = 0
+  /** A once-a-second tick came while a poll ran, so the next tick that polls is it. */
+  #isSlowDue = false
+  /** The last poll's reply named this session the target. */
+  #isTarget = false
   #isPolling = false
   #queue: Promise<unknown> = Promise.resolve()
 
@@ -54,12 +63,12 @@ export class BridgeLink {
   }
 
   get hasGap(): boolean {
-    return this.#hasGap
+    return this.#gaps > 0
   }
 
   /** A turn did not reach the app: the next poll joins again with `missed`. */
   noteGap(): void {
-    this.#hasGap = true
+    this.#gaps += 1
     this.#isKnown = false
   }
 
@@ -79,12 +88,11 @@ export class BridgeLink {
     // owner's: it must not bring back a session the owner removed.
     const { replaces: _, owner: __, ...kept } = body
     this.#joined = kept
-    // A gap noted while this join is on its way is one it did not say: only the one it said clears.
-    const saysGap = this.#hasGap
-    this.#hasGap = false
-    const isTaken = (await this.#send('join', { ...body, ...(saysGap && { missed: true }) }))?.ok === true
-    if (!isTaken) this.#hasGap ||= saysGap
-    this.#isKnown = isTaken && !this.#hasGap
+    // Only the gaps it said clear, once the app took it: one noted while it is on its way stays.
+    const said = this.#gaps
+    const isTaken = (await this.#send('join', { ...body, ...(said > 0 && { missed: true }) }))?.ok === true
+    if (isTaken) this.#gaps -= said
+    this.#isKnown = isTaken && !this.hasGap
     if (isTaken) this.#ports.joined()
     return isTaken
   }
@@ -104,13 +112,18 @@ export class BridgeLink {
   /**
    * One poll: the app's status and any work for this session, or null while the app is out of
    * reach. A session the app does not know (it restarted) joins again first; one the owner
-   * removed is `REMOVED`.
+   * removed is `REMOVED`. Whether the reply names this session the target sets how often it polls.
    */
   async next(retry = true): Promise<PollReply | null | typeof REMOVED> {
+    this.#isTarget = false
     const joined = this.#joined
     if (joined === null || (!this.#isKnown && !(await this.join(joined)))) return null
     const reply = await this.#send(`next?sessionId=${encodeURIComponent(joined.sessionId)}`)
-    if (reply?.ok === true) return parse(reply.text)
+    if (reply?.ok === true) {
+      const polled = parse(reply.text)
+      this.#isTarget = polled?.status.sessions.some(row => row.isTarget && row.sessionId === joined.sessionId) === true
+      return polled
+    }
     if (reply?.status === 410) return REMOVED
     this.#isKnown = false
     return reply?.status === 404 && retry ? this.next(false) : null
@@ -139,9 +152,21 @@ export class BridgeLink {
     return (await this.#forSession('sync', line))?.ok === true
   }
 
-  /** Posts the session's summary; false when the app did not take it. */
-  async context(summary: string): Promise<boolean> {
-    return (await this.#forSession('context', { summary }))?.ok === true
+  /**
+   * Posts the session's summary, and what went wrong on the way; false when the app did not take
+   * it. A gap noted and not yet said goes first (the overview's `POST /v1/context`).
+   */
+  async context(body: Omit<ContextBody, 'sessionId'>): Promise<boolean> {
+    if (this.hasGap) {
+      await this.serial(async () => { if (this.hasGap && this.#joined !== null) await this.join(this.#joined) })
+      if (this.hasGap) return false
+    }
+    return (await this.#forSession('context', body))?.ok === true
+  }
+
+  /** Posts the result of the app's model check; the app's reply changes nothing. */
+  async modelCheck(body: Omit<ModelCheckBody, 'sessionId'>): Promise<void> {
+    await this.#forSession('model-check', body)
   }
 
   /** Posts Claude's usage windows; nothing for an empty list, and the app's reply changes nothing. */
@@ -174,12 +199,20 @@ export class BridgeLink {
     }
   }
 
-  /** Queues `tick` every second until `stop`, never two at once. */
-  start(tick: () => Promise<void>): void {
+  /**
+   * Queues `tick` every 200 ms while the last poll named this session the target, and once a
+   * second otherwise, until `stop`, never two at once. `isFast`: a tick between the once-a-second
+   * ones, which only the target polls on. A once-a-second tick that a slow poll held back is the
+   * next one that polls, so its work runs about once a second whatever a poll takes.
+   */
+  start(tick: (isFast: boolean) => Promise<void>): void {
     this.#timer ??= this.#ports.every(POLL_MS, () => {
-      if (this.#isPolling) return
+      if (++this.#ticks % TICKS_A_SECOND === 0) this.#isSlowDue = true
+      const isFast = !this.#isSlowDue
+      if (this.#isPolling || (isFast && !this.#isTarget)) return
+      this.#isSlowDue = false
       this.#isPolling = true
-      void this.serial(tick)
+      void this.serial(() => tick(isFast))
         .catch((error: unknown) => this.#ports.log(`voice poll failed: ${String(error)}`))
         .finally(() => { this.#isPolling = false })
     })
@@ -188,6 +221,8 @@ export class BridgeLink {
   stop(): void {
     this.#timer?.cancel()
     this.#timer = null
+    this.#ticks = 0
+    this.#isSlowDue = false
   }
 
   async #forSession(route: string, body: object) {

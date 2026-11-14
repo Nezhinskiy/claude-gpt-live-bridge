@@ -21,6 +21,24 @@ public actor Bridge: Router {
   private let pausesSync: @Sendable () -> Bool
   /// A session's first summary is loaded under the pause too (`Settings.loadContextOnFirstCall`).
   private let loadsContextOnFirstCall: @Sendable () -> Bool
+  /// Settings' timers for the line, read before each event.
+  private let timeouts: @Sendable () -> CallMachine.Timeouts
+  /// Settings' Connect over TCP, read as each line applies its answer.
+  private let connectsOverTCP: @Sendable () -> Bool
+  /// Told how long each summary ask took to be answered (`SummaryLog`).
+  private let reportsSummary: @Sendable (SummaryTiming) -> Void
+  /// Settings' summary model, read at each ask.
+  private let summaryModel: @Sendable () -> String
+  /// What came of the last summary asked for with a model.
+  public private(set) var lastSummary: SummaryReport?
+  /// Settings' model check in flight: its id, the session it went to, who waits on it, and the task
+  /// that hands it over and ends it after `checkSeconds`.
+  private var modelCheck:
+    (
+      id: String, session: SessionID, done: CheckedContinuation<ModelCheckResult, Never>,
+      timer: Task<Void, Never>
+    )?
+  private static let checkSeconds = 20
   private var machine = CallMachine()
   /// The running codex controller; its events count only while it is this one.
   private var realtime: (any RealtimeControlling)?
@@ -32,6 +50,8 @@ public actor Bridge: Router {
   private var timers: [CallTimer: Task<Void, Never>] = [:]
   /// Each session's conversation; the line carries the target's.
   private var continuity: Continuity
+  /// What the summary asks kept in `continuity` mean.
+  private var summaries = SummaryAsks()
   /// What the open line is still saying, which belongs to `lineSession`.
   private var growing = GrowingLines()
   /// The session whose conversation the line last opened with; its transcripts are kept there.
@@ -41,6 +61,11 @@ public actor Bridge: Router {
   /// when the attempt starts: the `changed()` that follows that decision could otherwise take the
   /// last line's session for this line's, and close it.
   private var lineKnowsSession = false
+  /// The line waiting for a summary, woken to look again at every change.
+  private var waiter: CheckedContinuation<Void, Never>?
+  /// The target the call was last at, which a target change asks ahead of its line; Start clears
+  /// it.
+  private var callTarget: SessionID?
   /// The context line the opening line was seeded with.
   private var seededContext: String?
   /// A summary for the opening line's session that came while it connected, added once the line
@@ -57,10 +82,6 @@ public actor Bridge: Router {
   private var changes = 0
   public nonisolated let updates: AsyncStream<BridgeUpdate>
   private let publish: AsyncStream<BridgeUpdate>.Continuation
-  /// The sessions whose summary was just taken (`POST /v1/context`), so the menu's Load context
-  /// stops waiting for it.
-  public nonisolated let contextArrivals: AsyncStream<SessionID>
-  private let announceContext: AsyncStream<SessionID>.Continuation
   /// The running app's version; sessions on an older mod are listed against it.
   private let appVersion: AppVersion?
 
@@ -73,14 +94,22 @@ public actor Bridge: Router {
     notifier: (any ResultNotifying)? = nil, notifies: @escaping @Sendable () -> Bool = { true },
     confirmsWithSound: @escaping @Sendable () -> Bool = { true },
     pausesSync: @escaping @Sendable () -> Bool = { false },
-    loadsContextOnFirstCall: @escaping @Sendable () -> Bool, appVersion: AppVersion?
+    timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
+    loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
+    connectsOverTCP: @escaping @Sendable () -> Bool = { false },
+    summaryModel: @escaping @Sendable () -> String = { SummaryModel.default },
+    reportsSummary: @escaping @Sendable (SummaryTiming) -> Void = { _ in }, appVersion: AppVersion?
   ) {
+    self.reportsSummary = reportsSummary
+    self.summaryModel = summaryModel
     self.appVersion = appVersion
     self.notifier = notifier
     self.notifies = notifies
     self.confirmsWithSound = confirmsWithSound
     self.pausesSync = pausesSync
+    self.timeouts = timeouts
     self.loadsContextOnFirstCall = loadsContextOnFirstCall
+    self.connectsOverTCP = connectsOverTCP
     self.registry = registry
     makeRealtime = realtime
     self.audio = audio
@@ -92,8 +121,6 @@ public actor Bridge: Router {
       (try? JSONDecoder().decode(Continuity.self, from: Data(contentsOf: continuityFile)))
       ?? Continuity()
     (updates, publish) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
-    (contextArrivals, announceContext) = AsyncStream.makeStream(
-      bufferingPolicy: .bufferingNewest(8))
     Task { [weak self] in
       while (try? await time.sleep(for: .seconds(1))) != nil, let bridge = self {
         await bridge.sweep()
@@ -111,7 +138,8 @@ public actor Bridge: Router {
     }
   }
 
-  /// What the app shows: the status, and what only the app needs.
+  /// What the app shows: the status, and what only the app needs. What was loaded is forgotten
+  /// for a session that left.
   public var current: BridgeUpdate {
     get async {
       let status = await status
@@ -121,11 +149,14 @@ public actor Bridge: Router {
       let contextNeed = if let target { await contextNeed(target) } else { ContextNeed.none }
       var olderMods: [String] = []
       if let appVersion { olderMods = await registry.labelsOnAnOlderMod(than: appVersion) }
+      summaries.keep(only: Set(status.sessions.map(\.sessionId)))
       return BridgeUpdate(
         status: status, problem: problem, minutesThisCall: minutes,
         conversation: shown.shownLines + growing.lines,
         labelsOnAnOlderMod: olderMods, contextNeed: contextNeed,
-        claudeLimits: claudeLimits)
+        claudeLimits: claudeLimits, lastSummary: lastSummary,
+        targetSummary: target.map { summaries.display(of: $0, in: continuity, at: time.now) }
+          ?? .none)
     }
   }
 
@@ -141,6 +172,7 @@ public actor Bridge: Router {
       guard machine.phase == .off, connecting == nil else { return }
       await attempt { await self.launch() }
     case .stop:
+      summaries.callStartedOrStopped()
       await send(.stop)
       await endCodex()
     case .mute: await send(.mute)
@@ -170,22 +202,94 @@ public actor Bridge: Router {
     }
     guard !Task.isCancelled else { return }
     callStart = time.now
+    summaries.callStartedOrStopped()
+    callTarget = nil  // so the call's first `changed()` asks the target ahead of its line
     await send(.start)
   }
 
   /// Whether any session has a request open, which an update installs only after.
   public var hasOpenRequests: Bool { get async { await registry.hasOpenRequests } }
 
-  /// Asks the target session for its context summary; it arrives as `POST /v1/context`.
+  /// Asks the target session for its context summary; it arrives as `POST /v1/context`. The
+  /// menu shows the ask in flight at once.
   public func loadContext() async {
     guard let target = await registry.target else { return }
     await askForContext(of: target)
+    await changed()
   }
 
+  /// At Start and at a target change during the call, a session whose mod writes summaries is
+  /// asked at once, if its line would ask (`needsContext`, unless the pause holds it back), so its
+  /// line waits less. One that forks is asked when its line opens, so Start spends nothing on the
+  /// session's own model before anyone speaks.
+  private func askAhead(of id: SessionID) async {
+    guard await registry.writesSummaries(id), !pauseHoldsBackSummary(of: id),
+      await needsContext(id)
+    else { return }
+    await askForContext(of: id)
+  }
+
+  /// A mod that writes summaries is told the model and, unless it is the default, the default to
+  /// fall back on; one that forks is asked as before. An ask that joins the open one goes to the
+  /// mod again with its number: the mod joins it to the send on its way, and a mod that has none
+  /// (it restarted, or the app lost its post) writes it, so a lost answer is asked for again.
   private func askForContext(of id: SessionID) async {
-    continuity.noteSummaryAsk(of: id, at: time.now)
-    save()
-    await registry.requestContext(for: id)
+    var model: String?
+    var fallback: String?
+    if await registry.writesSummaries(id) {
+      model = summaryModel()
+      fallback = model == SummaryModel.default ? nil : SummaryModel.default
+    }
+    let result = summaries.ask(id, in: &continuity, at: time.now, model: model, fallback: fallback)
+    if case .new = result { save() }
+    let ask = result.ask
+    await registry.requestContext(
+      for: id, model: ask.model, fallbackModel: ask.fallbackModel, ask: ask.number)
+  }
+
+  /// Settings' check of a custom summary model, run by a joined session's mod: the target if its
+  /// mod writes summaries, else the most recently joined one whose mod does. The result is taken
+  /// only from that session, under the check's id; 20 s without one, or the session's drop, is
+  /// `noAnswer`. A newer check ends the one before it. It takes the poller's word: a process
+  /// that polls as that session before its mod does can say any model works (SECURITY.md).
+  public func checkModel(_ model: String) async -> ModelCheckResult {
+    guard let session = await registry.sessionThatChecks() else { return .noSession }
+    let id = UUID().uuidString
+    return await withCheckedContinuation { done in
+      let older = endCheck(.noAnswer)
+      let timer = Task { [registry, time] in
+        if let older { await registry.withdrawCheck(older) }
+        // the check may have ended since, and its session may have a new id after /clear
+        guard let check = self.modelCheck, check.id == id else { return }
+        await registry.requestCheck(for: check.session, check: id, model: model)
+        guard (try? await time.sleep(for: .seconds(Self.checkSeconds))) != nil else { return }
+        await self.finishCheck(.noAnswer, of: id)
+      }
+      modelCheck = (id, session, done, timer)
+    }
+  }
+
+  /// Ends the check in flight with `result`, if it is check `id` or no id is given, and takes it
+  /// back from a session that has not polled it yet.
+  private func finishCheck(_ result: ModelCheckResult, of id: String? = nil) async {
+    guard let ended = endCheck(result, of: id) else { return }
+    await registry.withdrawCheck(ended)
+  }
+
+  /// Ends the check as `finishCheck` does but leaves it with its session; returns the ended id.
+  private func endCheck(_ result: ModelCheckResult, of id: String? = nil) -> String? {
+    guard let check = modelCheck, id == nil || id == check.id else { return nil }
+    modelCheck = nil
+    check.timer.cancel()
+    check.done.resume(returning: result)
+    return check.id
+  }
+
+  /// `POST /v1/model-check`: the result of the check in flight, from the session it went to.
+  private func modelChecked(_ body: ModelCheckBody) async throws {
+    _ = try await label(of: body.sessionId)
+    guard modelCheck?.session == body.sessionId else { return }
+    await finishCheck(ModelCheckResult(body), of: body.id)
   }
 
   /// The menu's choice of target; a session that left is ignored.
@@ -210,6 +314,17 @@ public actor Bridge: Router {
   public func remove(_ id: SessionID) async {
     if let delivery = await registry.remove(id) { await deliver(delivery) }
     await forgetConversation(of: id)  // ends in `changed()`, which closes a line it was on
+  }
+
+  /// Settings' Connect over TCP changed and the owner chose Reconnect: a line connecting or open
+  /// closes and opens again at once, over the new transport. With no line, the next one takes it.
+  public func reconnect() async {
+    await send(.reconnect)
+  }
+
+  /// Settings changed one of the line's timers: one turned on starts on a quiet open line.
+  public func timeoutsChanged() async {
+    await send(.timeoutsChanged)
   }
 
   /// Forgets the target's conversation; its next realtime session starts fresh.
@@ -254,6 +369,7 @@ public actor Bridge: Router {
         if let old = body.replaces, replaced {  // after /clear: the same session, a new id
           continuity.move(old, to: body.sessionId)
           machine.rename(old, to: body.sessionId)
+          if modelCheck?.session == old { modelCheck?.session = body.sessionId }
           if lineSession == old {
             lineSession = body.sessionId
             heldContext?.session = body.sessionId
@@ -278,6 +394,8 @@ public actor Bridge: Router {
       case ("POST", "/v1/activity"): await activity(try req.decodeBody(ActivityBody.self))
       case ("POST", "/v1/limits"): await limits(try req.decodeBody(LimitsBody.self))
       case ("POST", "/v1/context"): try await context(try req.decodeBody(ContextBody.self))
+      case ("POST", "/v1/model-check"):
+        try await modelChecked(try req.decodeBody(ModelCheckBody.self))
       case ("POST", "/v1/sync"): try await sync(try req.decodeBody(SyncBody.self))
       case ("POST", "/v1/target"):
         try await pickTarget(try req.decodeBody(TargetBody.self).sessionId)
@@ -296,6 +414,7 @@ public actor Bridge: Router {
 
   private func send(_ event: CallEvent) async {
     let before = machine.phase
+    machine.timeouts = timeouts()
     let effects = machine.handle(event)
     let now = time.now  // read before any await, so an interleaved event cannot shift it
     if before != .live, machine.phase == .live { await meter.opened(at: now) }
@@ -308,11 +427,13 @@ public actor Bridge: Router {
     switch effect {
     case .openRealtime: await startOpening(preroll: true)
     case .openRealtimeForResult: await startOpening(preroll: false, waits: false)
-    case .closeRealtime:
-      connecting?.cancel()
-      connecting = nil
-      await audio.closePeer()
-      await realtime?.close()
+    case .reopenRealtime(let preroll):
+      await closeLine()
+      // A Stop, a new target or another reconnect may have come during the close.
+      guard machine.phase == .connecting, connecting == nil else { return }
+      growing = GrowingLines()  // no final text comes for what the closed line said
+      await startOpening(preroll: preroll, waits: false)
+    case .closeRealtime: await closeLine()
     case .startLocalVAD:
       // a Mute meanwhile does not cancel a Start: the page records it, and listens muted
       if await mayTakeMicrophone(while: { $0.phase != .off }) { await audio.startListening() }
@@ -327,6 +448,9 @@ public actor Bridge: Router {
     case .addContext(let line): try? await realtime?.addContext(line.text)
     case .speak(let line): try? await realtime?.speak(line.text)
     case .armSilenceTimer(let seconds): arm(.silence, after: .seconds(seconds))
+    case .cancelSilenceTimer:
+      timers[.silence]?.cancel()
+      timers[.silence] = nil
     case .armResultWindow(let seconds): arm(.resultWindow, after: .seconds(seconds))
     case .armGrace(let milliseconds): arm(.grace, after: .milliseconds(milliseconds))
     case .chime:
@@ -336,6 +460,13 @@ public actor Bridge: Router {
     case .confirmAnswer: if confirmsWithSound() { await audio.confirmAnswer() }
     case .problem(let shown): problem = shown
     }
+  }
+
+  private func closeLine() async {
+    connecting?.cancel()
+    connecting = nil
+    await audio.closePeer()
+    await realtime?.close()
   }
 
   /// Asks macOS for the microphone, whose first-run prompt stays up until the owner answers it;
@@ -406,7 +537,8 @@ public actor Bridge: Router {
   }
 
   /// Whether the pause, the setting or a session's mark, stops the next line asking for a summary,
-  /// which is written from the whole transcript, paused text included. A session with no summary
+  /// which is written from the transcript, paused text included (a current mod leaves out tool
+  /// output, thinking and reminders, but not text that quotes them). A session with no summary
   /// has its first one asked for all the same, if the owner left `loadsContextOnFirstCall` on.
   private func pauseHoldsBackSummary(of id: SessionID) -> Bool {
     if loadsContextOnFirstCall(), continuity[id].context == nil { return false }
@@ -414,7 +546,8 @@ public actor Bridge: Router {
   }
 
   /// Opens the line with the target's conversation, and asks the target for its context when it
-  /// needs one and may have one; the line does not wait for it. Cancelled, it does nothing
+  /// needs one and may have one. While that session's summary is in flight the line waits, after
+  /// the offer and before the seed and the connect (`waitForSummary`). Cancelled, it does nothing
   /// more: whoever cancelled it closes what it opened. A line the voice closed itself
   /// (`CancellationError`) says why in its `closed` event.
   private func openLine(preroll: Bool) async {
@@ -429,6 +562,8 @@ public actor Bridge: Router {
     do {
       let voice = try await controller()
       let offer = try await audio.makeOffer(preroll: preroll)
+      await waitForSummary()
+      try Task.checkCancellation()
       // `lineSession` from here: `/clear` during the awaits gives the session a new id.
       let tasks =
         if let lineSession { await registry.openTasks(of: lineSession) } else { [String]() }
@@ -443,7 +578,7 @@ public actor Bridge: Router {
       machine.dropSynced()
       let answer = try await voice.open(offerSDP: offer, items: items)
       try Task.checkCancellation()
-      try await audio.applyAnswer(answer)
+      try await audio.applyAnswer(connectsOverTCP() ? AnswerSDP.preferringTCP(answer) : answer)
       try Task.checkCancellation()
       await send(.connected)
       if let held = heldContext, held.session == lineSession, held.text != seededContext,
@@ -459,6 +594,41 @@ public actor Bridge: Router {
       await realtime?.close()  // codex may have opened its side before the page failed
       await send(.connectFailed(Problem(error)))
     }
+  }
+
+  /// Holds the opening line while `SummaryAsks.wait` says to. Each change wakes it to look again;
+  /// nothing is awaited between its look and its sleep, so no change is missed. Nothing goes to the
+  /// voice meanwhile, as the line is not open and the page queues what is said.
+  private func waitForSummary() async {
+    while !Task.isCancelled, let id = lineSession,
+      let deadline = summaries.wait(id, in: continuity, at: time.now)
+    {
+      await sleep(until: deadline)
+    }
+    summaries.endWait(at: time.now)
+  }
+
+  /// Returns at `deadline`, at the next `changed()` or when the task is cancelled. A sleeper
+  /// wakes the one before it, which looks again, so a cancelled line never stays asleep.
+  private func sleep(until deadline: Date) async {
+    let timer = Task { [time] in
+      guard (try? await time.sleep(until: deadline)) != nil else { return }
+      self.wakeWaiter()
+    }
+    await withTaskCancellationHandler {
+      await withCheckedContinuation {
+        waiter?.resume()
+        waiter = $0
+      }
+    } onCancel: {
+      Task { await self.wakeWaiter() }
+    }
+    timer.cancel()
+  }
+
+  private func wakeWaiter() {
+    waiter?.resume()
+    waiter = nil
   }
 
   /// The running codex controller, or a new one. A launch runs to its end, outside the
@@ -552,9 +722,10 @@ public actor Bridge: Router {
   }
 
   /// A session that left can take no reply: its route ends, and neither its question nor its
-  /// approval notice is said. Both stay recorded.
+  /// approval notice is said. Both stay recorded. A model check it was running gets no answer.
   private func withdrawQuestionsOfDroppedSessions() async {
     for id in await registry.takeDropped() {
+      if modelCheck?.session == id { await finishCheck(.noAnswer) }
       machine.endQuestionRoute(of: id)
       await withdraw { $0.session == id && ($0.asks || $0.kind == .approval) }
     }
@@ -568,15 +739,21 @@ public actor Bridge: Router {
   }
 
   /// A new target closes a line opened with another session's conversation; the next speech
-  /// opens it with the target's. With no session left nobody is there to talk to, so the call
-  /// stops as Stop does, a Start still launching codex included, and says why, as Start with no
-  /// session does.
+  /// opens it with the target's. The call's first target, and each new one, from the menu, the
+  /// band or the registry after a drop, is asked ahead of its line (`askAhead`). With no session
+  /// left nobody is there to talk to, so the call stops as Stop does, a Start still launching
+  /// codex included, and says why, as Start with no session does.
   private func followTarget() async {
     guard machine.phase != .off || connecting != nil else { return }
     guard let target = await registry.target else {
       problem = .noSession
       await perform(.stop)
       return
+    }
+    if machine.phase != .off, target != callTarget {
+      callTarget = target
+      summaries.targetChanged()
+      await askAhead(of: target)
     }
     guard isLineOpen, lineKnowsSession, target != lineSession else { return }
     await send(.conversationChanged)
@@ -702,30 +879,51 @@ public actor Bridge: Router {
   }
 
   /// A session's summary, as one redacted line of at most `maxContext` characters, is shown as
-  /// it is and kept in the session's conversation. One asked for before the latest gap or forget
-  /// is ignored: it would clear a mark it does not cover, or bring back what was forgotten, and
-  /// the menu's press stays pending. An empty one keeps the stored line: the mod never sends one,
-  /// so this guards only against another socket peer, and it is not a control.
-  /// A live line about that session gets the summary at once, and one still connecting gets it
-  /// when connected; it does not hold the line open. A summary equal to the stored one is not
+  /// it is and kept in the session's conversation, unless `SummaryAsks.answer` ignores it: one
+  /// asked for before the latest gap or forget would clear a mark it does not cover, or bring back
+  /// what was forgotten. An empty one keeps the stored line and closes the ask: a mod that writes
+  /// summaries sends one when it has none. The answer to an ask that named a model is `lastSummary` when it wrote a summary or names a failure.
+  /// A line waiting for the summary (`waitForSummary`) is seeded with it; a live line about that
+  /// session gets it at once, and one still connecting gets it when connected; it does not hold
+  /// the line open. A summary equal to the stored one is not
   /// added again, but it is still the voice's picture as of now, so it clears out-of-sync.
   private func context(_ body: ContextBody) async throws {
     let id = body.sessionId
     let row = try await label(of: id)
-    guard continuity.takeSummaryAsk(of: id, at: time.now) else { return }
-    let line =
-      body.summary.allSatisfy(\.isWhitespace)
-      ? nil
-      : AnswerShaper.line(
-        .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
-    guard let line else {
-      announceContext.yield(id)
-      return
+    let now = time.now
+    let wrote = !body.summary.allSatisfy(\.isWhitespace)
+    let failures = body.failures ?? []
+    // The waiting line looks again at the `changed()` after every post, this one ignored or not.
+    let answer = summaries.answer(id, number: body.ask, wrote: wrote, in: &continuity, at: now)
+    switch answer {
+    case .taken(let ask, let waited), .stale(let ask, let waited):
+      save()  // the ask is closed, also for the app after a restart
+      let report = ask.model.map {
+        SummaryReport(asked: $0, fallback: ask.fallbackModel, failures: failures, wrote: wrote)
+      }
+      reportsSummary(
+        SummaryTiming(
+          askedFor: now.timeIntervalSince(ask.at), stale: !answer.isTaken, hadSummary: wrote,
+          model: report?.writer, stats: body.stats, waited: waited,
+          triedNoModel: report?.triedAModel == false))
+      // An answer that wrote nothing and names no failure leaves Settings' line as it was.
+      if answer.isTaken, let report, wrote || !failures.isEmpty { lastSummary = report }
+    case .otherAsk:
+      reportsSummary(
+        SummaryTiming(
+          askedFor: nil, stale: true, hadSummary: wrote, model: nil, stats: body.stats))
+    case .closedAsk, .unasked: break
     }
+    guard answer.isTaken else { return }
+    let line =
+      wrote
+      ? AnswerShaper.line(
+        .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
+      : nil
+    guard let line else { return }
     let isNew = line.text != continuity[id].context
     continuity.setContext(line.text, for: id)
     save()
-    announceContext.yield(id)
     guard isNew, lineSession == id else { return }
     switch machine.phase {
     case .live: try? await realtime?.addContext(line.text)
@@ -782,6 +980,7 @@ public actor Bridge: Router {
   /// Two changes can interleave across the awaits, so only the latest one publishes: an older
   /// one finishing last would show the status from before the newer change.
   @discardableResult private func changed() async -> StatusReply {
+    wakeWaiter()  // a waiting line looks again
     await withdrawQuestionsOfDroppedSessions()
     await followTarget()
     if !isLineOpen { growing = GrowingLines() }  // no final text comes for what a closed line said
@@ -828,4 +1027,9 @@ public struct BridgeUpdate: Sendable, Equatable {
   public let contextNeed: ContextNeed
   /// What Claude Code last said of Claude's usage windows; nil until a session has.
   public var claudeLimits: UsageLimits? = nil
+  /// What came of the last summary asked for with a model, for Settings.
+  public var lastSummary: SummaryReport? = nil
+  /// The target's summary: on its way, whatever asked for it (Start, a target change, Load context
+  /// or a line), or when the last one was taken (`SummaryAsks.display`).
+  public var targetSummary = SummaryDisplay.none
 }

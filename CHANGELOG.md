@@ -4,6 +4,105 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0]
+
+### Added
+
+- Settings sets how long the line stays open in quiet: **Silence before the line closes** (20
+  seconds by default), **Wait for a first word on a line a result opened** (5 seconds) and **Sound
+  without words before the line closes** (90 seconds), each from 0 to 300 seconds. 0 switches the
+  silence or the sound without words off, and a first-word wait of 0 waits as long as the silence,
+  so with all three at 0 quiet never closes the line, which stays open and billed. A timer turned
+  on starts at once on a quiet open line. The defaults are the old fixed values, so nothing changes
+  until you change them.
+- **Connect over TCP**, in Settings under Line, off by default: if the voice breaks up on a poor
+  connection, turn it on and the line prefers the media server's TCP route (port 443 in the answers
+  seen) to UDP, which can turn breakups into short pauses; it can still fall back to UDP. Changing
+  it while a line is open asks first, then opens the line again over the new transport, still
+  waiting for what it was waiting for.
+- The menu's **Quick Settings** submenu holds five of Settings' switches as checkmark items:
+  **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is
+  waiting**, **Pause sync while the call is stopped** and **Load a session's context on its first
+  call**. Each is the setting itself, so a change in the menu or in Settings shows at once in the
+  other, and Connect over TCP asks before reconnecting an open line, as in Settings.
+- The menu's **Feedback & Support** submenu holds **Report a Bug…** (the repository's bug report
+  form), **LiveBridge Website** and **Star LiveBridge on GitHub**.
+- **Debug mode**, in Settings under General and as **Debug Mode** in **Feedback & Support**, off by
+  default, in every build: during a call it writes a row a second of the voice's network numbers,
+  one CSV per call, under `debug/call-stats` in LiveBridge's data folder; no audio, no transcript,
+  no session names, and nothing leaves the Mac. **Show Debug Files** opens the folder. The
+  numbers include which transport the line took (`onTcp`).
+- **Uninstall LiveBridge…**, in **Feedback & Support** of the copy in `/Applications`, asks, then
+  moves the app to the Trash, or says why it cannot and changes nothing; then every session leaves
+  LiveBridge, so `/live` turns off, LiveBridge removes its login item and microphone permission and
+  quits, and the files it keeps go to the Trash. It copies the command that removes the Claude Code
+  mod for you to run.
+- **Summary model**, in Settings under Context: Haiku 5.5 (the default), Sonnet 5.5 or Opus 5.5
+  writes the summary the voice gets as context, always at low effort, on your Claude usage. If
+  another model fails, Haiku 5.5 writes it instead, unless that model ran out of time, and a line
+  under the setting says so; if no model writes one, it says why, or that the session's transcript
+  could not be read. When a summary fails, the session's band says **Context failed**.
+  **Custom…** takes a model id, refusing text that cannot be one (with a space, say, or over 128
+  characters), which a joined session checks with one short request before it is saved.
+
+### Changed
+
+- The Settings window has four tabs in its toolbar: **General** (notifications, Open at login,
+  updates and debug mode), **Voice** (the voice, the prompt and the sounds), **Line** (the line's
+  timers and Connect over TCP) and **Context** (sync and the summary model).
+- **Star LiveBridge on GitHub** moved from the menu's foot into **Feedback & Support**.
+
+- While Claude works, the menu bar icon shows dots turning in depth, three and then four, which
+  gather into one between turns, for thinking, in place of a turning ring, which read as loading;
+  the session's row in the menu shows an ellipsis in place of turning arrows.
+- During a call, while the target's summary is on its way, the menu bar icon shows a
+  three-quarter ring turning once a second, still when macOS is set to reduce motion. A problem
+  or a waiting approval shows instead of it; it shows instead of unheard results or Claude working.
+- While the call is stopped, the menu bar icon no longer shows that a session's Claude is working;
+  the session's row in the menu still says so. A waiting approval still shows.
+- Summaries are written by Haiku 5.5 by default, on an update too, in place of the session's own
+  model at the session's own effort. The model reads the session's transcript with tool output,
+  thinking and system reminders left out, but not text that quotes them, cut to 120,000
+  characters. Unlike the fork, it does not wait for a
+  turn of a resumed or new Claude Code process to end ([BR-003](docs/bugs/BR-003.md), for an app
+  and a mod of this release). Where Claude Code's provider does not offer Haiku 5.5, the session gets no
+  summary ([known limitations](README.md#known-limitations)).
+- A line no longer reaches the voice before its context: for a session on a mod of this release,
+  the line waits for the summary in flight before it connects, while what you say is recorded and
+  queued on the Mac, then opens with the summary in its seed and plays what you said. It opens
+  without one 10 seconds after the ask, or as soon as the mod answers with none; an answer with none,
+  or a line that waits the 10 seconds, ends that session's waits until the next Start
+  ([the wait](docs/architecture/overview.md#silent-hang-up)). Such a session is asked at
+  Start and when the target changes during the call, so the summary is often in before you speak;
+  a line that opens while that ask is on its way joins it, and the mod writes one summary for both,
+  or writes it again if it lost it (it restarted, or the app did). A failing summary is reported
+  once for each write, and the next line that needs it asks, and may report, again. A session on
+  an older mod is asked when its line opens and is not waited for, as before.
+- The menu's **Load context** reads **Loading context…**, disabled, while any summary of the target
+  is on its way from a mod of this release, whatever asked for it (Start, a new target, a line or
+  a press), not only after a press; it waits until the summary arrives or the mod's 60 seconds from
+  the ask pass. For a session on an older mod, a press no longer shows **Loading context…**. A summary that arrives shows **Context loaded** for a
+  moment, whatever asked for it; an empty answer goes back to **Load context** without it.
+- The target session polls the app five times a second, call on or off, and the others still once
+  a second, so a summary ask reaches it up to 0.8 s sooner; its title is still read once a second.
+- A session's band draws a call phase it does not know, from a later app, as **Connecting**, where
+  it could not draw the band before.
+- The mod answers every summary ask from this app, with an empty summary when it has none, and
+  each ask carries a number that its answer repeats, so a summary written before a gap the app
+  has heard of is not taken for a fresh one, nor one written across a gap the mod noted and had
+  not yet reported ([the wire](docs/architecture/overview.md#the-wire)). An older app or mod sends no number and still guesses ([BR-002](docs/bugs/BR-002.md)).
+
+### Deprecated
+
+- The mod's fork of the session's own model, kept only for an app that names no summary model. It
+  is removed in the first mod release after the app that names one has been the oldest supported
+  app for one release.
+
+### Fixed
+
+- The Settings window no longer runs past the bottom of a small screen: it is never taller than
+  the screen above the Dock and below the menu bar, and a tab taller than that scrolls.
+
 ## [0.5.0]
 
 ### Added

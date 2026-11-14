@@ -79,9 +79,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   /// What the model says the menu holds now.
   private var content: MenuContent {
     MenuContent(
-      update: model.update, problem: model.problem, contextLoad: model.contextLoad,
-      available: model.available?.version, codexLimits: model.codexLimits(at: Date()),
-      claudeLimits: model.update?.claudeLimits)
+      settings: model.settings.current, update: model.update, problem: model.problem,
+      contextLoad: model.contextLoad, available: model.available?.version,
+      codexLimits: model.codexLimits(at: Date()), claudeLimits: model.update?.claudeLimits,
+      isInstalledCopy: model.isInstalledCopy)
   }
 
   /// Renders the model's current content, and again whenever it changes. Only the content is
@@ -145,6 +146,17 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         item.isEnabled = isEnabled
         return item
 
+      case .toggle(let toggle, let isOn):
+        let item = native("toggle|\(toggle)", used: &used) {
+          let item = NSMenuItem(
+            title: toggle.title, action: #selector(StatusMenu.toggle(_:)), keyEquivalent: "")
+          item.target = self
+          item.representedObject = toggle
+          return item
+        }
+        item.state = isOn ? .on : .off
+        return item
+
       case .submenu(let title, let isEnabled, let items):
         let key = "sub|\(title)"
         let item = native(key, used: &used) {
@@ -156,6 +168,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         } else {
           let submenu = submenus[key] ?? configure(NSMenu(title: title))
           submenus[key] = submenu
+          submenu.showsStateColumn = items.contains {
+            if case .toggle = $0 { true } else { false }
+          }
           fill(submenu, path: key, with: items, used: &used)
           if item.submenu !== submenu { item.submenu = submenu }
         }
@@ -222,6 +237,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
       case .loadContext: #selector(loadContext)
       case .newConversation: #selector(newConversation)
       case .starOnGitHub: #selector(starOnGitHub)
+      case .reportBug: #selector(reportBug)
+      case .website: #selector(openWebsite)
+      case .showDebugFiles: #selector(showDebugFiles)
+      case .uninstall: #selector(uninstall)
       case .settings: #selector(showSettings)
       case .quit: #selector(quit)
       case .installUpdate: #selector(installUpdate(_:))
@@ -235,7 +254,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   @discardableResult private func configure(_ menu: NSMenu) -> NSMenu {
     menu.delegate = self
     menu.autoenablesItems = false  // the content says which items are enabled
-    menu.showsStateColumn = false  // no item has a state, so titles start where the rows' do
+    // No state column, so titles start where the rows' do; a submenu of switches shows it.
+    menu.showsStateColumn = false
     return menu
   }
 
@@ -254,6 +274,23 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   @objc private func showSettings() { later { [model] in model.showSettings() } }
 
   @objc private func starOnGitHub() { NSWorkspace.shared.open(Release.repositoryPage) }
+
+  /// Flips a switch (Quick Settings' or Debug Mode) through the setter its Settings control
+  /// calls, once the menu has closed: Connect over TCP may ask first, and an alert inside menu
+  /// tracking hangs.
+  @objc private func toggle(_ sender: NSMenuItem) {
+    guard let toggle = sender.representedObject as? MenuContent.Switch else { return }
+    let wasOn = sender.state == .on
+    later { [model] in model.set(toggle, on: !wasOn) }
+  }
+
+  @objc private func reportBug() { NSWorkspace.shared.open(Release.bugReportForm) }
+
+  @objc private func openWebsite() { NSWorkspace.shared.open(Release.website) }
+
+  @objc private func showDebugFiles() { model.showDebugFiles() }
+
+  @objc private func uninstall() { later { [model] in model.uninstall() } }
 
   @objc private func quit() { NSApp.terminate(nil) }
 

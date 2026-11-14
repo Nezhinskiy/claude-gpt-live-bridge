@@ -95,6 +95,11 @@ final class AppModel {
   /// app does not start, and the window keeps no change.
   @ObservationIgnored let settings: SettingsStore
   @ObservationIgnored private var settingsWindow: SettingsWindow?
+  /// The Settings tab shown; the window opens on the one last shown.
+  var settingsTab = SettingsTab.general
+  /// How many times the Settings window has opened; the window is kept, and so is its forms'
+  /// state, which an opening resets to what is in force.
+  var settingsOpenings = 0
   @ObservationIgnored private var codexCwd: URL?
   /// When codex's usage is read, and the last reading.
   private(set) var limitsPoll = LimitsPoll()
@@ -103,7 +108,6 @@ final class AppModel {
   @ObservationIgnored private var level = 0.0
   @ObservationIgnored private var bridge: Bridge?
   @ObservationIgnored private var server: UnixHTTPServer?
-  @ObservationIgnored private var loads = ContextLoads()
   @ObservationIgnored private var loadsTimer: Task<Void, Never>?
   @ObservationIgnored private let audio = AudioHost(fakeMic: AppModel.fakeMic)
   /// The running app's `CFBundleShortVersionString`.
@@ -127,6 +131,7 @@ final class AppModel {
   @ObservationIgnored private var updateState: UpdateStateStore?
   @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
   private static let log = Logger(subsystem: Paths.bundleID, category: "call")
+  private nonisolated static let summaryLog = Logger(subsystem: Paths.bundleID, category: "summary")
 
   var problem: Problem? { appProblem ?? update?.problem }
 
@@ -150,6 +155,7 @@ final class AppModel {
     let data = Result { try Paths.dataDir() }
     let settings = SettingsStore(file: try? data.get().appending(path: "settings.json"))
     self.settings = settings
+    audio.recordsCallStats = settings.current.debugMode
     do {
       let data = try data.get()
       let cwd = data.appending(path: "codex-cwd")
@@ -165,8 +171,13 @@ final class AppModel {
         notifies: { settings.current.notifyResults },
         confirmsWithSound: { settings.current.confirmHandoffs },
         pausesSync: { settings.current.pauseSyncWhileStopped },
+        timeouts: { settings.current.timeouts },
         loadsContextOnFirstCall: { settings.current.loadContextOnFirstCall },
-        appVersion: appVersion)
+        connectsOverTCP: { settings.current.connectsOverTCP },
+        summaryModel: { settings.current.summaryModel },
+        reportsSummary: { timing in
+          Self.summaryLog.debug("\(SummaryLog.line(timing), privacy: .public)")
+        }, appVersion: appVersion)
       let server = try UnixHTTPServer(socketPath: try Paths.socketPath(), router: bridge)
       self.bridge = bridge
       self.server = server
@@ -185,9 +196,6 @@ final class AppModel {
       }
       Task { [weak self] in
         for await update in bridge.updates { self?.show(update) }
-      }
-      Task { [weak self] in
-        for await id in bridge.contextArrivals { self?.contextArrived(id) }
       }
       // A relaunch after an update starts while the old instance may still hold the socket.
       Task { [weak self] in
@@ -312,6 +320,7 @@ final class AppModel {
   /// A notice's Install: opens Settings on the update and installs `version`, checking first
   /// when this run has not found it (a notice from before a relaunch).
   func installUpdate(_ version: AppVersion) {
+    settingsTab = .general
     showSettings()
     if available?.version == version { return installUpdate() }
     guard let updater else { return }
@@ -339,7 +348,8 @@ final class AppModel {
     window.show()
   }
 
-  /// Settings' notifications; macOS asks for permission when they are turned on, not at launch.
+  /// Notify when a result is waiting, from Settings or Quick Settings; macOS asks for permission
+  /// when they are turned on, not at launch.
   func setNotifyResults(_ on: Bool) {
     settings.update { $0.notifyResults = on }
     Task {
@@ -347,6 +357,109 @@ final class AppModel {
       await refreshNotificationStatus()
     }
   }
+
+  /// Connect over TCP, from Settings or Quick Settings. A line connecting or open is reconnected
+  /// over the new transport once the owner confirms it, and the bridge reconnects only a line
+  /// still open by then; with none, the next line takes it. False when the owner cancelled, and nothing changed.
+  func setConnectsOverTCP(_ on: Bool) -> Bool {
+    let lineIsOpen = status.map { [.connecting, .live].contains($0.call) } ?? false
+    if lineIsOpen, !Confirm.ask(.reconnect(overTCP: on)) { return false }
+    settings.update { $0.connectsOverTCP = on }
+    if lineIsOpen { Task { await bridge?.reconnect() } }
+    return true
+  }
+
+  /// A menu switch, through the setter its Settings control calls, so the confirmation, the
+  /// permission request, the reconnect and the recorder stay in one place.
+  func set(_ toggle: MenuContent.Switch, on: Bool) {
+    switch toggle {
+    case .connectsOverTCP: _ = setConnectsOverTCP(on)
+    case .notifyResults: setNotifyResults(on)
+    case .confirmHandoffs: settings.update { $0.confirmHandoffs = on }
+    case .pauseSyncWhileStopped: settings.update { $0.pauseSyncWhileStopped = on }
+    case .loadContextOnFirstCall: settings.update { $0.loadContextOnFirstCall = on }
+    case .debugMode: setDebugMode(on)
+    }
+  }
+
+  /// Debug mode, from Settings or the menu: turned on, a line open now records from this moment;
+  /// turned off, its file closes at once.
+  func setDebugMode(_ on: Bool) {
+    settings.update { $0.debugMode = on }
+    audio.recordsCallStats = on
+  }
+
+  /// Settings' Show Debug Files and the menu's: debug mode's folder in the Finder, made if missing.
+  func showDebugFiles() {
+    guard let folder = try? CallStats.directory() else { return }
+    NSWorkspace.shared.open(folder)
+  }
+
+  /// The menu's Uninstall LiveBridge, in the copy in `/Applications`: once confirmed, the app
+  /// removes its login item and moves itself to the Trash first; if it cannot move, the login
+  /// item comes back and it says so, changing nothing else. Then it ends a call and removes every
+  /// joined session, as the menu's × does, so its mod turns off instead of opening LiveBridge
+  /// again; removes the microphone permission, copies the mod's uninstall command, and quits,
+  /// leaving `UninstallScript` to move the files it keeps to the Trash once the process is gone.
+  func uninstall() {
+    guard isInstalledCopy, Confirm.ask(.uninstall) else { return }
+    // The login item goes while the bundle it names is still in place, and comes back if the
+    // bundle cannot move.
+    let wasAtLogin = LoginItem.isEnabled
+    try? LoginItem.set(false)
+    do {
+      try FileManager.default.trashItem(at: Bundle.main.bundleURL, resultingItemURL: nil)
+    } catch {
+      if wasAtLogin { try? LoginItem.set(true) }
+      let alert = NSAlert()
+      alert.messageText = "LiveBridge could not move itself to the Trash"
+      alert.informativeText =
+        "\(error.localizedDescription) Nothing was changed. The README's Uninstall section "
+        + "shows how to remove LiveBridge by hand."
+      NSApp.activate()
+      alert.runModal()
+      return
+    }
+    let bridge = bridge
+    let sessions = status?.sessions.map(\.sessionId) ?? []
+    Task {
+      await bridge?.perform(.stop)
+      for id in sessions { await bridge?.remove(id) }
+      // A joined mod polls once a second; its next poll is told the session was removed.
+      try? await Task.sleep(for: .seconds(2))
+      let reset = Process()
+      reset.executableURL = URL(filePath: "/usr/bin/tccutil")
+      reset.arguments = ["reset", "Microphone", Paths.bundleID]
+      try? reset.run()
+      reset.waitUntilExit()
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(Confirmation.modUninstallCommand, forType: .string)
+      let manager = FileManager.default
+      let library = manager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+      let trash = manager.urls(for: .trashDirectory, in: .userDomainMask)[0]
+      let stamp = DateFormatter()
+      stamp.locale = Locale(identifier: "en_US_POSIX")
+      stamp.dateFormat = "yyyy-MM-dd HH.mm.ss"  // no colon: the Finder shows one as a slash
+      let move = Process()
+      move.executableURL = URL(filePath: "/bin/sh")
+      move.arguments = UninstallScript.arguments(
+        pid: ProcessInfo.processInfo.processIdentifier,
+        trash: trash.appending(path: "LiveBridge files \(stamp.string(from: Date()))").path,
+        paths: Paths.uninstalled(library: library).map(\.path))
+      move.standardInput = FileHandle.nullDevice
+      move.standardOutput = FileHandle.nullDevice
+      move.standardError = FileHandle.nullDevice
+      try? move.run()
+      NSApp.terminate(nil)
+    }
+  }
+
+  /// One of Settings' timers for the line, kept in range; one turned on starts on a quiet open line.
+  func setTimeout(_ key: WritableKeyPath<BridgeCore.Settings, Int>, _ seconds: Int) {
+    settings.update { $0[keyPath: key] = CallMachine.Timeouts.clamped(seconds) }
+    Task { await bridge?.timeoutsChanged() }
+  }
+
   func setTarget(_ id: SessionID) { Task { await bridge?.setTarget(id) } }
 
   /// The session row's ×, once the owner confirms it; the menu has closed by then.
@@ -355,12 +468,16 @@ final class AppModel {
     Task { await bridge?.remove(row.id) }
   }
 
-  /// Asks the target for its summary; the item waits until it arrives, 60 s pass or the
-  /// session leaves.
+  /// Settings' Check and save: a joined session checks `model`, which is stored only if it works.
+  func checkSummaryModel(_ model: String) async -> ModelCheckResult {
+    guard let bridge else { return .noSession }
+    return await settings.save(summaryModel: model) { await bridge.checkModel($0) }
+  }
+
+  /// Asks the target for its summary; the item shows it loading while the bridge has it in
+  /// flight.
   func loadContext() {
-    guard contextLoad.isEnabled, let target = targetRow else { return }
-    loads.pressed(target.sessionId, at: Date())
-    refreshLoads()
+    guard contextLoad.isEnabled, targetRow != nil else { return }
     Task { await bridge?.loadContext() }
   }
 
@@ -374,19 +491,15 @@ final class AppModel {
 
   private var targetRow: SessionRow? { status?.sessions.first(where: \.isTarget) }
 
-  private func contextArrived(_ id: SessionID) {
-    loads.arrived(id, at: Date())
-    refreshLoads()
-  }
-
   /// Shows the target's Load context state, and comes back when a state ends by itself.
   private func refreshLoads() {
     let now = Date()
-    let state = targetRow.map { loads.state(of: $0.sessionId, at: now) } ?? .ready
+    let shown = update?.targetSummary ?? .none
+    let state = ContextLoads.state(shown, at: now)
     if state != contextLoad { contextLoad = state }
     loadsTimer?.cancel()
     loadsTimer = nil
-    guard let next = loads.nextChange(after: now) else { return }
+    guard let next = ContextLoads.nextChange(shown, after: now) else { return }
     loadsTimer = Task { [weak self] in
       try? await Task.sleep(for: .seconds(next.timeIntervalSince(now)))
       guard !Task.isCancelled else { return }
@@ -408,10 +521,10 @@ final class AppModel {
     }
     if next.call != .live { level = 0 }
     let statusChanged = next != status
+    let summaryChanged = update.targetSummary != self.update?.targetSummary
     if update != self.update { self.update = update }
-    if statusChanged {
-      presentation = StatusPresentation(next)
-      loads.keep(only: Set(next.sessions.map(\.sessionId)))
+    if statusChanged || summaryChanged {
+      presentation = StatusPresentation(next, targetSummary: update.targetSummary)
       refreshLoads()
     }
     glyph.show(next.call, badge: presentation?.badge ?? .none, level: level)

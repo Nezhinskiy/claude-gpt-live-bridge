@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "types": ["node"] },
-  "include": ["hooks/wire.ts", "hooks/prompt.ts", "hooks/turns.ts", "hooks/title.ts", "tests/unit"],
+  "include": ["hooks/wire.ts", "hooks/prompt.ts", "hooks/turns.ts", "hooks/title.ts", "hooks/transcript.ts","tests/unit"],
   "exclude": []
 }

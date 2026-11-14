@@ -1,8 +1,10 @@
 import AppKit
 import BridgeCore
 
-/// A native alert before the menu's items erase a conversation. The menu has closed by then
-/// (`StatusMenu.closeThen`); the alert is app-modal and stands above other apps' windows.
+/// A native alert before an action the owner may not mean: the menu's items that erase a
+/// conversation (the menu has closed by then, `StatusMenu.closeThen`), and the reconnect of an
+/// open voice line that Connect over TCP asks, from Settings or the menu's Quick Settings. The
+/// alert is app-modal and stands above other apps' windows.
 @MainActor
 enum Confirm {
   /// True only when the owner clicks the destructive button. Cancel is the default button, as

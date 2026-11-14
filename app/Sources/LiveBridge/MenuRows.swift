@@ -189,7 +189,7 @@ struct SessionRowView: View {
   private static func symbol(of activity: SessionActivity) -> String {
     switch activity {
     case .idle: "moon.zzz"
-    case .working: "arrow.triangle.2.circlepath"
+    case .working: "ellipsis"
     case .approval: "exclamationmark.circle"
     }
   }

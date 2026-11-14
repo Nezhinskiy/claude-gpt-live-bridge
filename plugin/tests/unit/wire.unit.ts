@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 import { TurnTracker } from '../../hooks/turns.ts'
-import { socketPath } from '../../hooks/wire.ts'
+import { CONTEXT_TIMEOUT_MS, socketPath } from '../../hooks/wire.ts'
 import type * as Wire from '../../hooks/wire.ts'
 
 // A field-by-field description of each wire type. `fields<T>` takes exactly the keys of T, so
@@ -40,9 +40,14 @@ const WORK: Shape = {
     fields<Extract<Wire.Work, { kind: 'reply' }>>({
       kind: { oneOf: ['reply'] }, id: S, brief: S, transcript: { list: UTTERANCE }, forRequest: optional(S),
     }),
-    fields<Extract<Wire.Work, { kind: 'context' }>>({ kind: { oneOf: ['context'] } }),
+    fields<Extract<Wire.Work, { kind: 'context' }>>({
+      kind: { oneOf: ['context'] }, model: optional(S), fallbackModel: optional(S), ask: optional('number'),
+    }),
+    fields<Extract<Wire.Work, { kind: 'checkModel' }>>({ kind: { oneOf: ['checkModel'] }, id: S, model: S }),
   ],
 }
+
+const REASON = { oneOf: ['model-refused', 'api-error', 'empty-reply', 'timed-out', 'transcript-unreadable'] } as const
 
 const TURN = fields<Wire.TurnRef>({ id: S, request: optional(S) })
 
@@ -56,13 +61,27 @@ const SHAPES: Record<string, Shape> = {
     reason: optional(S),
   }),
   'call': fields<Wire.CallBody>({ action: { oneOf: ['start', 'stop', 'mute', 'unmute'] } }),
-  'context': fields<Wire.ContextBody>({ sessionId: S, summary: S }),
+  'context': fields<Wire.ContextBody>({
+    sessionId: S, summary: S,
+    failures: optional({
+      list: fields<Wire.SummaryFailure>({
+        reason: REASON, error: optional(S),
+      }),
+    }),
+    stats: optional(fields<Wire.SummaryStats>({
+      durationMs: 'number', transcriptChars: 'number', inputTokens: 'number', outputTokens: 'number',
+    })),
+    ask: optional('number'),
+  }),
   'error': fields<Wire.ErrorReply>({ error: S, code: optional({ oneOf: ['removed'] }) }),
-  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S), syncs: optional('boolean'), missed: optional('boolean') }),
+  'join': fields<Wire.JoinBody>({ sessionId: S, title: S, replaces: optional(S), owner: optional('boolean'), modVersion: optional(S), syncs: optional('boolean'), missed: optional('boolean'), writesSummaries: optional('boolean') }),
   'leave': fields<Wire.LeaveBody>({ sessionId: S }),
   'limits': fields<Wire.LimitsBody>({
     sessionId: S,
     windows: { list: fields<Wire.LimitWindowBody>({ kind: S, percentUsed: 'number', resetsAt: optional(S) }) },
+  }),
+  'model': fields<Wire.ModelCheckBody>({
+    sessionId: S, id: S, ok: 'boolean', reason: optional(REASON), error: optional(S),
   }),
   'next': fields<Wire.PollReply>({ status: STATUS, work: optional(WORK) }),
   'sync': fields<Wire.SyncBody>({
@@ -129,4 +148,10 @@ test('socketFollowsTheHomeFoundationUses', () => {
   assert.equal(socketPath('/Users/example', undefined), `/Users/example/${rel}`)
   assert.equal(socketPath('/Users/example', ''), `/Users/example/${rel}`)
   assert.equal(socketPath('/Users/example', '/tmp/lb'), `/tmp/lb/${rel}`)
+})
+
+/** The mod gives a summary up after the budget the app waits on: this file ties their two constants. */
+test('theSummaryBudgetIsTheApps', () => {
+  const budget = JSON.parse(readFileSync(`${import.meta.dirname}/../../../wire/summary-budget.json`, 'utf8'))
+  assert.equal(CONTEXT_TIMEOUT_MS, budget.summaryBudgetMs)
 })

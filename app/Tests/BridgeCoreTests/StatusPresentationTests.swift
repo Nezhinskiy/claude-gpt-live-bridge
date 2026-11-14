@@ -35,7 +35,9 @@ struct StatusPresentationTests {
       #expect(shown.headline == headline)
       #expect(shown.action == action)
       #expect(shown.muteAction == muteAction)
-      let badge: Badge = [.idle: .none, .working: .working, .approval: .approval][activity]!
+      let badge: Badge =
+        phase == .off && activity == .working
+        ? .none : [.idle: .none, .working: .working, .approval: .approval][activity]!
       #expect(shown.badge == badge, "\(phase) \(activity)")
       #expect(shown.tint == (activity == .approval ? .attention : tint), "\(phase) \(activity)")
       #expect(shown.badge != .problem)
@@ -80,6 +82,12 @@ struct StatusPresentationTests {
     #expect(shown.accessibilityLabel.contains(sentence))
   }
 
+  /// The menu bar stays still while the call is stopped (the table above), but the row still says so.
+  @Test func aStoppedCallsRowStillSaysClaudeWorks() {
+    #expect(
+      StatusPresentation(Self.status(.off, other: .working)).rows[1].detail == "Claude working")
+  }
+
   @Test func unheardOutranksWorkingNotApproval() {
     #expect(
       StatusPresentation(Self.status(.listening, other: .working, unheard: 2)).badge == .unheard)
@@ -95,6 +103,29 @@ struct StatusPresentationTests {
     #expect(rows.map(\.isTarget) == [true, false])
     let working = StatusPresentation(Self.status(.live, other: .working)).rows[1]
     #expect(working.detail == "Claude working")
+  }
+
+  /// The ring turns while the target's own summary is on its way and the call is on.
+  @Test func loadingContextShowsWhileTheTargetsSummaryIsInFlight() {
+    for phase in [CallPhase.listening, .connecting, .live] {
+      let shown = StatusPresentation(Self.status(phase), targetSummary: .loading)
+      #expect(shown.badge == .loadingContext, "\(phase)")
+    }
+    #expect(StatusPresentation(Self.status(.off), targetSummary: .loading).badge == .none)
+    #expect(StatusPresentation(Self.status(.live), targetSummary: .none).badge == .none)
+  }
+
+  @Test func loadingContextRanksAfterProblemAndApprovalBeforeUnheard() {
+    let loading = SummaryDisplay.loading
+    let problem = StatusPresentation(
+      Self.status(.listening, problem: "The line dropped.", unheard: 1), targetSummary: loading)
+    #expect(problem.badge == .problem)
+    let approval = StatusPresentation(
+      Self.status(.live, other: .approval, unheard: 1), targetSummary: loading)
+    #expect(approval.badge == .approval)
+    let unheard = StatusPresentation(
+      Self.status(.live, other: .working, unheard: 1), targetSummary: loading)
+    #expect(unheard.badge == .loadingContext)
   }
 
   /// Start is disabled until a session joins, and the line under it names the command.

@@ -2,10 +2,14 @@
 /// the bars' shape, this badge and the broken deck carry it.
 public enum Badge: Sendable, Equatable {
   case none
-  /// A session is working on a request: a turning ring.
+  /// A session is working on a request while the call is on: dots turning in depth. A stopped call
+  /// shows none, so the menu bar stays still; the session's row still says Claude is working.
   case working
   /// A session waits for the owner's approval: a pulsing diamond.
   case approval
+  /// The target's summary is on its way while the call is on: a three-quarter ring turning once
+  /// a second.
+  case loadingContext
   /// Results wait until the owner next speaks: a dot.
   case unheard
   /// The call cannot start or just stopped: the deck breaks at mid-span.
@@ -45,9 +49,10 @@ public struct StatusPresentation: Sendable, Equatable {
   /// What joins a Claude Code session.
   public static let joinCommand = "/live"
 
-  /// A problem outranks everything; then a session waiting for approval, results the owner has
-  /// not heard, and a session at work.
-  public init(_ s: StatusReply) {
+  /// A problem outranks everything; then a session waiting for approval, the target's summary on
+  /// its way during a call (`BridgeUpdate.targetSummary`), results the owner has not heard, and a
+  /// session at work during a call.
+  public init(_ s: StatusReply, targetSummary: SummaryDisplay = .none) {
     let activities = Set(s.sessions.map(\.activity))
     bars = s.call
     problem = s.problem
@@ -55,7 +60,9 @@ public struct StatusPresentation: Sendable, Equatable {
     badge =
       if s.problem != nil { .problem } else if activities.contains(.approval) {
         .approval
-      } else if s.unheard > 0 { .unheard } else if activities.contains(.working) {
+      } else if s.call != .off, targetSummary == .loading {
+        .loadingContext
+      } else if s.unheard > 0 { .unheard } else if activities.contains(.working) && s.call != .off {
         .working
       } else { .none }
     tint =
@@ -113,6 +120,7 @@ public struct StatusPresentation: Sendable, Equatable {
       case .none: nil
       case .working: "Claude working"
       case .approval: "approval needed"
+      case .loadingContext: "loading context"
       case .unheard: "\(unheard) unheard"
       case .problem: problem
       }

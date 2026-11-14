@@ -11,8 +11,8 @@ public struct Settings: Codable, Sendable, Equatable {
   /// session's first summary under `loadContextOnFirstCall`.
   public var pauseSyncWhileStopped: Bool
   /// A line that opens for a session the voice has no summary for asks for one, even under the
-  /// pause or a paused mark. That summary is written from the whole transcript, paused text
-  /// included.
+  /// pause or a paused mark. That summary is written from the transcript, paused text included; a
+  /// current mod leaves out tool output, thinking and reminders, but not text that quotes them.
   public var loadContextOnFirstCall: Bool
   /// Post a notification with the chime for a result waiting while the line is closed.
   public var notifyResults: Bool
@@ -23,14 +23,28 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The owner's own prompt for the voice, added after its rules (`VoicePrompt.composed`);
   /// empty adds nothing.
   public var prompt: String
+  /// Prefer TCP port 443 over UDP for the voice line's audio, for a connection that loses
+  /// packets (`AnswerSDP.preferringTCP`); each line reads it when it opens.
+  public var connectsOverTCP: Bool
   /// Check GitHub for a newer release once a day; nil leaves it to the build, on for a release
   /// build and off for one from source (`UpdatePolicy.checksAutomatically`).
   public var checkUpdatesAutomatically: Bool?
+  /// Debug mode: record the voice's network numbers during each call, to a local file
+  /// (`CallStats`). Off by default, a file from before it included.
+  public var debugMode: Bool
+  /// The line's timers in seconds (`CallMachine.Timeouts`), each read and written within
+  /// `Timeouts.range`.
+  public var silenceSeconds: Int
+  public var firstWordSeconds: Int
+  public var noiseSeconds: Int
+  /// The model that writes a session's summary (`SummaryModel`), at low effort; a value that is
+  /// not a model id reads as the default.
+  public var summaryModel = SummaryModel.default
 
   public init(
     voice: String? = nil, pauseSyncWhileStopped: Bool = false, loadContextOnFirstCall: Bool = true,
     notifyResults: Bool = true, confirmHandoffs: Bool = true, prompt: String = "",
-    checkUpdatesAutomatically: Bool? = nil
+    connectsOverTCP: Bool = false, checkUpdatesAutomatically: Bool? = nil, debugMode: Bool = false
   ) {
     self.voice = voice
     self.pauseSyncWhileStopped = pauseSyncWhileStopped
@@ -38,7 +52,17 @@ public struct Settings: Codable, Sendable, Equatable {
     self.notifyResults = notifyResults
     self.confirmHandoffs = confirmHandoffs
     self.prompt = prompt
+    self.connectsOverTCP = connectsOverTCP
     self.checkUpdatesAutomatically = checkUpdatesAutomatically
+    self.debugMode = debugMode
+    let timeouts = CallMachine.Timeouts()
+    silenceSeconds = timeouts.silence
+    firstWordSeconds = timeouts.firstWord
+    noiseSeconds = timeouts.noise
+  }
+
+  public var timeouts: CallMachine.Timeouts {
+    .init(silence: silenceSeconds, firstWord: firstWordSeconds, noise: noiseSeconds)
   }
 
   /// The key of the setting this one replaced.
@@ -62,8 +86,21 @@ public struct Settings: Codable, Sendable, Equatable {
     notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
     confirmHandoffs = try container.decodeIfPresent(Bool.self, forKey: .confirmHandoffs) ?? true
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
+    connectsOverTCP = try container.decodeIfPresent(Bool.self, forKey: .connectsOverTCP) ?? false
     checkUpdatesAutomatically = try container.decodeIfPresent(
       Bool.self, forKey: .checkUpdatesAutomatically)
+    debugMode = try container.decodeIfPresent(Bool.self, forKey: .debugMode) ?? false
+    let defaults = CallMachine.Timeouts()
+    func timeout(_ key: CodingKeys, _ fallback: Int) throws -> Int {
+      CallMachine.Timeouts.clamped(try container.decodeIfPresent(Int.self, forKey: key) ?? fallback)
+    }
+    silenceSeconds = try timeout(.silenceSeconds, defaults.silence)
+    firstWordSeconds = try timeout(.firstWordSeconds, defaults.firstWord)
+    noiseSeconds = try timeout(.noiseSeconds, defaults.noise)
+    // A value of any other type reads as the default too, not as a file to start over from.
+    summaryModel =
+      (try? container.decodeIfPresent(String.self, forKey: .summaryModel)).flatMap(
+        SummaryModel.accepted) ?? SummaryModel.default
   }
 }
 

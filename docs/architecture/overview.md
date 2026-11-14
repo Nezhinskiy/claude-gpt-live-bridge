@@ -35,7 +35,7 @@ flowchart LR
   Codex -- stdio --> CodexProc
   CodexProc -- signalling --> OpenAI
   Audio -- "WebRTC audio + data channel" --> OpenAI
-  Mod -- "HTTP/1.1, 1 poll per second" --> Server
+  Mod -- "HTTP/1.1, 1 poll per second, 5 for the target" --> Server
   Mod -- "prompt.submit" --> Claude
 ```
 
@@ -46,7 +46,7 @@ microphone or Claude:
   `connecting`, `live` (a realtime session is open) — and the effects of each event. It also keeps
   `isMuted`, orthogonal to the phase: while muted the microphone is released, speech is ignored, and
   a result from Claude still opens the line. Mute closes no line. It ends the owner's speech only if
-  they were speaking; then an open line's silence is counted from Mute (20 s), as if they had
+  they were speaking; then an open line's silence is counted from Mute, as if they had
   stopped speaking when they pressed it, and a line that was already quiet closes when it would have
   without Mute. A handoff whose answer is still awaited can still keep a line open, up to 120 s
   after the handoff, as without Mute. Stop and an audio failure reset it. It is pure; `Bridge` runs
@@ -140,8 +140,10 @@ reading into the menu's row and tooltip.
 
 **The mod** (`plugin/`) declares `/live`, joins the bridge under the session's title (the
 desktop's own, read from Claude Code's session registry, or the folder's name while it has none)
-and joins again when that title changes, polls it once a second, submits each voice request to
-the session as a prompt, and posts the turn's answer back. It tells voice turns from typed and
+and joins again when that title changes, polls it once a second (the target five times a second,
+call on or off, so a summary ask reaches it sooner; the title is still read once a second, and a
+poll in between writes the band only when what it draws changed), submits each voice request to the session
+as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
 origin. It posts every other main-loop turn to the app as synced lines (`POST /v1/sync`; a
 background turn inside the follow-up window posts its answer as an update instead): the
@@ -164,12 +166,15 @@ buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries 
 `· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own.
 A surface that has drawn no band for 3 s while the session is joined is asked for it again, and
 `/live` in a joined session asks every surface for it. Start makes the session the target and
-starts the call; the line the app opens then asks the target for its summary when the voice would
-lack part of the session (it has none, a turn did not arrive, the lines since the summary no
-longer all fit the seed, or the mod does not sync), unless the pause holds it back
-(`Bridge.pauseHoldsBackSummary`): the pause setting is on or the session is *paused*, and the session
-has a summary or **Load a session's context on its first call** is off. The mod writes it (none for a session with no prompt yet; the last one again, with
-no model call, until any main-loop turn completes, or `/clear`), with a
+starts the call. The target is asked for its summary when the voice would lack part of the
+session (it has none, a turn did not arrive, the lines since the summary no longer all fit the
+seed, or the mod does not sync), unless the pause holds it back (`Bridge.pauseHoldsBackSummary`):
+the pause setting is on or the session is *paused*, and the session has a summary or **Load a
+session's context on its first call** is off. A mod that joined with `writesSummaries` is asked at
+once, when the call starts and when the target changes during the call (from the menu, the band
+or the registry after a drop); an older mod is asked when a line opens, as before, so Start spends
+no fork on the session's own model before anyone speaks. The mod writes it (none for a session with no prompt yet; the last one again, with
+no model call, for an ask naming the same model, until any main-loop turn completes, or `/clear`), with a
 short note in the band while it goes. Talk here shows only while the call talks to another session,
 and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
 both install routes put it, with `open -g`, and falls back to `open -g -b <bundle id>`.
@@ -185,14 +190,15 @@ that both test suites parse.
 
 | Route | Body or reply |
 |---|---|
-| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`, `modVersion` from the mod's plugin.json, `syncs` (the mod posts sync lines) and `missed` (a turn did not arrive); an upsert that also refreshes liveness |
+| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`, `owner` (the owner typed `/live`, so the join brings back a session the owner removed), `modVersion` from the mod's plugin.json, `syncs` (the mod posts sync lines), `missed` (a turn did not arrive) and `writesSummaries` (the mod writes summaries with the model the app names); an upsert that also refreshes liveness |
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
-| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question (`forRequest` names the request the turn's answer now belongs to) or a context ask |
+| `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question (`forRequest` names the request the turn's answer now belongs to), a context ask, or a model check (`checkModel`: `id`, `model`), sent only to a session whose join said `writesSummaries` |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `turn` the main-loop turn it belongs to: `{ id, request? }`, `request` being the voice request the turn's answer belongs to; absent between turns and from a released mod |
 | `POST /v1/sync` | `sessionId`, `turn`, `kind` and `text`: a line of a main-loop turn. A voice turn posts its `start`, what is typed into it and the mod's lines; its answer goes by `/v1/answer`. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
 | `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
-| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. One the app asked for before the latest gap or forget is ignored; one nobody asked for cannot be dated and is taken, so it can clear a *paused* mark across a refused turn. That is an older mod's `/live context`, and from the mod since 0.4.2, which sends a summary only when asked, the reply to a second ask (a press or a line opening) that came after a poll took the first and before that summary landed, as that summary closed the ask |
+| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. A post that echoes an ask's number (a current app with a current mod) is taken only by the open ask with that number; one that finds no ask open is ignored. Without a number, from an older mod, one the app asked for before the latest gap or forget is ignored, also after a second ask, which joins the stale one; one nobody asked for cannot be dated and is taken, so it can clear a *paused* mark across a refused turn. That is an older mod's `/live context`, and from an older mod since 0.4.2, which sends a summary only when asked, the reply to a second ask (a press or a line opening) that came after a poll took the first and before that summary landed, as that summary closed the ask. A mod of this release that noted a gap the app has not heard of joins again with `missed` before it posts, and posts nothing while it cannot, so the app ignores a summary written across that gap as stale |
+| `POST /v1/model-check` | `sessionId`, `id`, `ok`, `reason?`, `error?`: the result of Settings' check of a custom summary model, which goes to the target if its mod writes summaries, else to the latest joined session whose mod does. Only a result under that session's id and the check's `id` is taken; the first poll with that session's id is handed the check, whether or not it is that session's mod ([SECURITY.md](../../SECURITY.md)). None within 20 s, or that session's drop, is no answer. The app writes its own sentence from `reason`, an `api-error` kind being shown only if the engine documents it |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
 Every reply carries the status: the phase, `isMuted`, the sessions with their labels (`Title · ab12` when
@@ -215,10 +221,10 @@ request is queued for a session, in any phase of the line, the app plays a short
 ([BR-001](../bugs/BR-001.md); [render-sound.mjs](../../scripts/render-sound.mjs) says what each part
 of the app's two sounds means). The line stays open for its result up to
 `CallMachine.resultWindowSeconds` (120 s) after the latest handoff, however silent it is (sound
-without words still closes it after 90 s). A result from a session handed a request in that window
+without words still closes it after the noise timeout). A result from a session handed a request in that window
 is given to the voice to say now (`thread/realtime/appendSpeech`, speakable text) once neither the
 owner (local voice detection) nor the voice is speaking; when either was, the bridge waits until
-both are silent and then a grace of 0.8 s. The window then ends and the 20 s silence rule closes the
+both are silent and then a grace of 0.8 s. The window then ends and the silence rule closes the
 line. A window that passes with no result closes the line once it is silent; when the result comes,
 it opens the line again, as below. A question or an approval notice of the session the open line is
 about goes the same way, whoever started the turn, and ends no wait for a result; another session's
@@ -255,18 +261,46 @@ sequenceDiagram
   Mod->>Bridge: POST /v1/answer ok
   Bridge->>Codex: appendSpeech "[RESULT] label: …" (once nobody is speaking)
   Codex-->>Owner: the result
-  Bridge->>Bridge: 20 s of silence (live → listening)
+  Bridge->>Bridge: silence (live → listening)
 ```
 
 ### Silent hang-up
 
-The realtime session is billed while open, so silence closes it. Voice detection keeps running
+The realtime session is billed while open, so silence closes it. How long each quiet lasts is the
+owner's: `CallMachine.Timeouts`, from Settings ([README](../../README.md#settings) has the
+defaults), read before each event. A timeout of 0 cancels the armed timer and arms none, except a
+first-word wait of 0, which waits the silence. A change in Settings arms a timer turned on at once
+when the line is quiet and none counts (`timeoutsChanged`); one already counting is not moved. Voice detection keeps running
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
-its context when the voice would lack part of the session (see the mod's Start above) and the pause does not hold it back (the same rule); the line does not wait for
-it, and a summary that comes while the line connects is added once it is connected, unless the
-line was seeded with the same one.
+its context when the voice would lack part of the session (see the mod's Start above) and the
+pause does not hold it back (the same rule); an ask already open is joined and handed to the mod
+again, with its number if it has one: the mod joins it to its send on its way, and one with none
+(it restarted, or the app lost its post) writes it again.
+
+**The wait.** A line, whether speech or a result opened it, waits for its session's summary
+(`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current
+ask with a number (asked at Start, at a target change during the call, by Load context or by this
+line; an ask is numbered when the session's mod said `writesSummaries`), and the session's wait is
+not spent this call. The wait sits
+after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
+`connecting`, which arms no silence timer, the voice line sends OpenAI nothing (the summary request
+is the one in flight), and the page queues what is said
+and plays it once the line connects. It ends at the post that answers the open ask, whatever it
+carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit,
+10 seconds from the ask, when the session drops or a gap makes the ask stale, or when the line is
+cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
+one, and a reconnect waits again for the same ask. An answer to the open, current ask with no
+summary, whether or not a line was waiting for it, or a line that waits until the limit, spends
+that session's wait for the rest of the call, so a summary that keeps failing holds at most one
+line; the next Start waits again. A line that comes after the limit, the ask still in flight,
+opens without waiting and spends nothing, so the next ask can still be waited for. That is no
+bound per call: a mod that answers each ask with text, however late, or whose gap makes each ask
+stale, is asked again by the next line, so every line of the call can wait, each up to the limit
+from its own ask. A summary that comes after the
+wait, or while a line that does not wait connects, is added once the line is connected, unless
+the line was seeded with the same one; with no line open, it is in the next seed.
 
 ```mermaid
 sequenceDiagram
@@ -276,8 +310,8 @@ sequenceDiagram
   participant Codex as codex + OpenAI
   Owner->>Page: stops talking
   Page->>Bridge: speechEnded
-  Bridge->>Bridge: arm the 20 s silence timer
-  Note over Bridge: speech, recognised words and the voice's own speech re-arm it (90 s while sound goes on)
+  Bridge->>Bridge: arm the silence timer
+  Note over Bridge: speech, recognised words and the voice's own speech re-arm it (the noise timeout while sound goes on)
   Bridge->>Bridge: silence elapsed (live → listening)
   Bridge->>Page: closePeer
   Bridge->>Codex: thread/realtime/stop
@@ -294,7 +328,7 @@ the conversation, and passes it with the delivery. The new realtime session is s
 target's conversation, starts without the pre-roll, as nobody spoke, and gets the line as context;
 the voice often says it unprompted, and sometimes says nothing ([ADR
 0001](../adr/0001-platform-findings.md) (n)). Until the owner or the voice speaks on such a line,
-its silence is `CallMachine.firstWordSeconds` (5 s) instead of 20 s, also after another line
+its silence is the first-word timeout instead of the silence, also after another line
 arrives; then the line closes, and the line chimes and waits as below. A voice that starts later is
 cut off. The mod's request that brought the line does not wait for the connect, and a question or
 approval the owner settles at the keyboard while its line still connects closes that line.

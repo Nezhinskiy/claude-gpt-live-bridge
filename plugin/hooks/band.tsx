@@ -13,9 +13,10 @@ export type BandActions = { start(): void; stop(): void; mute(): void; unmute():
 /** What the band and `/live` say before the app's first reply. */
 export const JOINING = 'LiveBridge: joining…'
 
-const CONTEXT_NOTE = { loading: 'Loading context…', sent: 'Context sent' } as const
+const CONTEXT_NOTE = { loading: 'Loading context…', sent: 'Context sent', failed: 'Context failed' } as const
 
-const PHASE: Record<CallPhase, [color: string, label: string]> = {
+/** A phase this band does not know, from a later app, draws as `connecting`. */
+const PHASE: Partial<Record<string, [color: string, label: string]>> & Record<CallPhase, [color: string, label: string]> = {
   off: ['inactive', 'Voice off'],
   listening: ['success', 'Listening'],
   connecting: ['warning', 'Connecting'],
@@ -39,7 +40,7 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, stat
   const space = e.surface === 'terminal' ? 1 : 'sm'
   const status = state.isOffline ? undefined : state.status
   const problem = state.problem ?? status?.problem
-  const [color, label] = PHASE[status?.call ?? 'off']
+  const [color, label] = PHASE[status?.call ?? 'off'] ?? PHASE.connecting
   const unheard = status !== undefined && status.unheard > 0 ? ` · ${status.unheard} unheard` : ''
   return (
     <Box flexDirection="column">

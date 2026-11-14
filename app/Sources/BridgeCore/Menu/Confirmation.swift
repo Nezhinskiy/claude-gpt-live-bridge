@@ -26,6 +26,16 @@ public struct Confirmation: Sendable, Equatable {
       confirm: "Remove")
   }
 
+  /// Settings' Connect over TCP changed while a line is connecting or open.
+  public static func reconnect(overTCP: Bool) -> Confirmation {
+    Confirmation(
+      title: "Reconnect the voice over \(overTCP ? "TCP" : "UDP")?",
+      message:
+        "The current voice line closes now and opens again over \(overTCP ? "TCP" : "UDP"). "
+        + "What the voice is saying is cut off.",
+      confirm: "Reconnect")
+  }
+
   /// Install, in a build from source (`build-app.sh --release`), of release `version`.
   public static func replaceSourceBuild(version: AppVersion) -> Confirmation {
     Confirmation(
@@ -36,4 +46,17 @@ public struct Confirmation: Sendable, Equatable {
         + "so macOS asks for the microphone again.",
       confirm: "Install")
   }
+
+  /// The command that removes the Claude Code mod, which Uninstall LiveBridge leaves to the owner.
+  public static let modUninstallCommand = "claude plugin uninstall \(Updater.modID)"
+
+  /// The menu's Uninstall LiveBridge.
+  public static let uninstall = Confirmation(
+    title: "Uninstall LiveBridge?",
+    message:
+      "A call open now ends, and every session leaves LiveBridge, so /live turns off in each. "
+      + "LiveBridge removes its login item and its microphone permission and quits, and the app "
+      + "and every file it keeps go to the Trash. The Claude Code mod stays: the command that "
+      + "removes it, \(modUninstallCommand), is copied for you to run in Terminal.",
+    confirm: "Uninstall")
 }

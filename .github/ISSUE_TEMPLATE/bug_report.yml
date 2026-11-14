@@ -76,6 +76,14 @@ body:
         The app's log for the last minutes, after you remove anything personal:
         `/usr/bin/log show --last 10m --info --predicate 'subsystem == "com.getlivebridge.livebridge"'`
       render: text
+  - type: textarea
+    id: call-stats
+    attributes:
+      label: Debug mode's numbers (optional)
+      description: |
+        If the voice broke up: turn on Debug mode (Settings > General, or Feedback & Support in
+        the menu), make a call until it breaks up again, then open Show Debug Files and attach that
+        call's CSV here. It holds the time and the network numbers, nothing else.
   - type: checkboxes
     id: checks
     attributes:

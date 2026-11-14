@@ -2,7 +2,7 @@ import AppKit
 import BridgeCore
 import SwiftUI
 
-/// Settings' last section (the spec's "What the owner sees"): the running version, Check for
+/// The General tab's section before Debug (the spec's "What the owner sees"): the running version, Check for
 /// update and its outcome or step, Install, the automatic check, and what the last update left.
 /// Only the copy in `/Applications` updates; any other says so instead of offering the controls.
 struct UpdateSection: View {

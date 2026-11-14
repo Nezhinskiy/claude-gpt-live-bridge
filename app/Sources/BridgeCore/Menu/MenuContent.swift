@@ -1,8 +1,8 @@
 import Foundation
 
 /// What the menu bar menu holds for one status, top to bottom, as a plain value: the call card,
-/// the sessions, the target's whole conversation, the minutes, an update to install, a star on
-/// GitHub, Settings and Quit. The app renders it
+/// the sessions, the target's whole conversation, the minutes, an update to install, Quick
+/// Settings, Settings, Feedback & Support and Quit. The app renders it
 /// into an `NSMenu`, the custom rows as hosted SwiftUI views and the rest as native items, so
 /// the menu has the system's own corners, material and shadow. Pure.
 public struct MenuContent: Sendable, Equatable {
@@ -13,6 +13,14 @@ public struct MenuContent: Sendable, Equatable {
   /// What a native item does.
   public enum Command: Sendable, Equatable {
     case copyJoinCommand, loadContext, newConversation, starOnGitHub, settings, quit
+    /// Opens the repository's bug report form (`Release.bugReportForm`).
+    case reportBug
+    /// Opens the project's website (`Release.website`).
+    case website
+    /// Opens debug mode's folder in the Finder.
+    case showDebugFiles
+    /// Asks, then moves the app and its files to the Trash and quits (`AppModel.uninstall`).
+    case uninstall
     /// Installs the release announced, this version.
     case installUpdate(AppVersion)
 
@@ -21,7 +29,45 @@ public struct MenuContent: Sendable, Equatable {
       switch self {
       case .settings: ","
       case .quit: "q"
-      case .copyJoinCommand, .loadContext, .newConversation, .starOnGitHub, .installUpdate: ""
+      case .copyJoinCommand, .loadContext, .newConversation, .starOnGitHub, .reportBug, .website,
+        .showDebugFiles, .uninstall, .installUpdate:
+        ""
+      }
+    }
+  }
+
+  /// A setting the menu shows as a checkmark item: the setting of the same name in Settings, not
+  /// a copy.
+  public enum Switch: Sendable, Equatable, CaseIterable {
+    case connectsOverTCP, confirmHandoffs, notifyResults, pauseSyncWhileStopped,
+      loadContextOnFirstCall, debugMode
+
+    /// Quick Settings' switches, in menu order; debug mode is in Feedback & Support.
+    public static let quickSettings: [Switch] = [
+      .connectsOverTCP, .confirmHandoffs, .notifyResults, .pauseSyncWhileStopped,
+      .loadContextOnFirstCall,
+    ]
+
+    /// The menu's words for it, Settings' own but for Debug Mode's title case.
+    public var title: String {
+      switch self {
+      case .connectsOverTCP: "Connect over TCP"
+      case .confirmHandoffs: "Play sounds for requests and answers"
+      case .notifyResults: "Notify when a result is waiting"
+      case .pauseSyncWhileStopped: "Pause sync while the call is stopped"
+      case .loadContextOnFirstCall: "Load a session's context on its first call"
+      case .debugMode: "Debug Mode"
+      }
+    }
+
+    public func isOn(in settings: Settings) -> Bool {
+      switch self {
+      case .connectsOverTCP: settings.connectsOverTCP
+      case .confirmHandoffs: settings.confirmHandoffs
+      case .notifyResults: settings.notifyResults
+      case .pauseSyncWhileStopped: settings.pauseSyncWhileStopped
+      case .loadContextOnFirstCall: settings.loadContextOnFirstCall
+      case .debugMode: settings.debugMode
       }
     }
   }
@@ -60,6 +106,8 @@ public struct MenuContent: Sendable, Equatable {
     /// A disabled native item that only informs.
     case note(String)
     case command(Command, title: String, isEnabled: Bool)
+    /// A native checkmark item: the switch, titled by it, checked while on.
+    case toggle(Switch, isOn: Bool)
     case submenu(String, isEnabled: Bool, items: [Item])
     /// A custom view: every line of the target's conversation, whole and wrapped, oldest
     /// first; it scrolls inside the menu and opens at the newest.
@@ -70,23 +118,18 @@ public struct MenuContent: Sendable, Equatable {
 
   public let items: [Item]
 
-  /// `problem` is the app's own or the bridge's; `update` is nil while there is no bridge.
-  /// `available` is a newer release found and not yet installed: the menu offers to install it.
+  /// `settings` are the app's, shown in Quick Settings with or without a bridge. `problem` is the
+  /// app's own or the bridge's; `update` is nil while there is no bridge. `available` is a newer
+  /// release found and not yet installed: the menu offers to install it. Only the copy in
+  /// `/Applications` (`isInstalledCopy`) can uninstall itself.
   public init(
-    update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
+    settings: Settings, update: BridgeUpdate?, problem: Problem?, contextLoad: ContextLoadState,
     available: AppVersion?, codexLimits: UsageLimits? = nil, claudeLimits: UsageLimits? = nil,
+    isInstalledCopy: Bool,
     now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
   ) {
-    let install: [Item] =
-      available.map {
-        [.command(.installUpdate($0), title: "Install LiveBridge \($0)…", isEnabled: true)]
-      } ?? []
-    let footer: [Item] =
-      install + [
-        .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
-        .command(.settings, title: "Settings…", isEnabled: true),
-        .command(.quit, title: "Quit LiveBridge", isEnabled: true),
-      ]
+    let footer = Self.foot(
+      settings: settings, available: available, isInstalledCopy: isInstalledCopy)
     let shown = update.map { StatusPresentation($0.status) }
     let hear =
       update?.status.call == .off
@@ -145,6 +188,36 @@ public struct MenuContent: Sendable, Equatable {
       + (limits.isEmpty ? [] : [.separator]) + [.note(Self.minutes(update)), .separator] + footer
   }
 
+  /// The menu's foot, the same with or without a bridge: an update to install, Quick Settings,
+  /// Settings, Feedback & Support and Quit.
+  private static func foot(
+    settings: Settings, available: AppVersion?, isInstalledCopy: Bool
+  ) -> [Item] {
+    let install: [Item] =
+      available.map {
+        [.command(.installUpdate($0), title: "Install LiveBridge \($0)…", isEnabled: true)]
+      } ?? []
+    let quick = Switch.quickSettings.map { Item.toggle($0, isOn: $0.isOn(in: settings)) }
+    let support: [Item] = [
+      .command(.reportBug, title: "Report a Bug…", isEnabled: true),
+      .command(.website, title: "LiveBridge Website", isEnabled: true),
+      .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
+      .separator,
+      .toggle(.debugMode, isOn: settings.debugMode),
+      .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+      .separator,
+      .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: isInstalledCopy),
+    ]
+    return install + [
+      .submenu("Quick Settings", isEnabled: true, items: quick),
+      .command(.settings, title: "Settings…", isEnabled: true),
+      .separator,
+      .submenu("Feedback & Support", isEnabled: true, items: support),
+      .separator,
+      .command(.quit, title: "Quit LiveBridge", isEnabled: true),
+    ]
+  }
+
   private static func minutes(_ update: BridgeUpdate) -> String {
     let call = Int(update.minutesThisCall.rounded())
     return "\(call) min this call · \(Int(update.status.minutesToday.rounded())) min today"
@@ -152,7 +225,7 @@ public struct MenuContent: Sendable, Equatable {
 
   /// The menu as plain lines, one per item; a submenu's items follow it, indented. For tests and
   /// logs: "---" is a separator, "#" a section header, "▸" a submenu, "(•)" the target, "|"
-  /// a line of the conversation.
+  /// a line of the conversation, "[x]" and "[ ]" a switch on and off.
   public var outline: [String] { Self.outline(items, indent: "") }
 
   private static func outline(_ items: [Item], indent: String) -> [String] {
@@ -170,6 +243,8 @@ public struct MenuContent: Sendable, Equatable {
       case .command(let command, let title, let isEnabled):
         let key = command.keyEquivalent.isEmpty ? "" : " ⌘" + command.keyEquivalent.uppercased()
         return [indent + title + (isEnabled ? "" : " (disabled)") + key]
+      case .toggle(let toggle, let isOn):
+        return [indent + (isOn ? "[x] " : "[ ] ") + toggle.title]
       case .submenu(let title, let isEnabled, let items):
         guard isEnabled else { return [indent + "\(title) (disabled)"] }
         return [indent + "\(title) ▸"] + outline(items, indent: indent + "  ")

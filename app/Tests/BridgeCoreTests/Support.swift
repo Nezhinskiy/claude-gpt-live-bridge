@@ -23,6 +23,33 @@ func eventually(_ condition: () async throws -> Bool) async rethrows -> Bool {
   return false
 }
 
+/// The task was still running at the bound `settle(_:within:)` gave it.
+struct StillRunning: Error, CustomStringConvertible {
+  let limit: Duration
+  var description: String { "The task was still running after \(limit)." }
+}
+
+/// Waits, in real time, up to `limit` for `task` to end, and throws its error or `StillRunning`.
+/// `await task.value` ignores cancellation, so a task left suspended would hold the test, and
+/// the whole run, past its time limit; this ends the test instead, and leaves the task behind.
+func settle<Failure: Error>(
+  _ task: Task<Void, Failure>, within limit: Duration = .seconds(5)
+) async throws {
+  let first = OSAllocatedUnfairLock<CheckedContinuation<Void, any Error>?>(initialState: nil)
+  try await withCheckedThrowingContinuation { done in
+    first.withLock { $0 = done }
+    let timer = Task {
+      guard (try? await Task.sleep(for: limit)) != nil else { return }
+      first.withLock { $0.take() }?.resume(throwing: StillRunning(limit: limit))
+    }
+    Task {
+      let result = await task.result
+      first.withLock { $0.take() }?.resume(with: result.mapError { $0 })
+      timer.cancel()
+    }
+  }
+}
+
 func temporaryDirectory() throws -> URL {
   let url = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
   try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

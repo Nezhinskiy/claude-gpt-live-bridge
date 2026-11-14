@@ -11,10 +11,11 @@ files, not this one. How to file, close and reference an entry:
 | [BR-001](bugs/BR-001.md) | high | codex | The voice says it is looking without handing the request off, so the request never reaches Claude | 2026-11-04 |
 | [BR-002](bugs/BR-002.md) | medium | app | A summary carries no date, so the app guesses which ask it answers | 2026-11-06 |
 
-## Partially fixed (0)
+## Partially fixed (1)
 
 | ID | Sev | Area | Title | Found |
 |---|---|---|---|---|
+| [BR-003](bugs/BR-003.md) | high | mod | A session resumed or just started answers its first summary with nothing, and nobody is told | 2026-11-12 |
 
 ## Rejected (0)
 

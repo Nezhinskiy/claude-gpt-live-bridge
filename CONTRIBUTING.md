@@ -14,6 +14,7 @@ says, not in an issue. Everyone taking part follows the [Code of Conduct](CODE_O
 | `app/` | The SwiftPM package: `BridgeCore` (pure logic, tested without codex, a microphone or Claude) and `LiveBridge` (the menu bar app and its invisible audio page). |
 | `plugin/` | The Claude Code mod `livebridge`. `hooks/register.tsx` is wiring only; the other `hooks/*.ts` modules are pure. |
 | `wire/fixtures/` | One JSON file per message between the mod and the app: the shared oracle both sides test against. |
+| `wire/summary-budget.json` | The time the mod allows a summary, which both sides test their constant against. |
 | `scripts/` | `check.sh` (every check CI runs but the floor run), `check-mod.sh` (the mod's engine-facing half), `check-floor.sh` (that half on the lowest Claude Code the README promises), `build-app.sh` (build, install, uninstall, package), `smoke.sh` (end to end). |
 | `docs/` | [Architecture](docs/architecture/overview.md) and [ADRs](docs/adr/); the rest is the stayfixed scaffold (below). |
 
@@ -52,9 +53,9 @@ redactor), with their tests in `app/Tests/BridgeCoreTests`.
 
 The Claude Code adapter is the mod in `plugin/`: `hooks/register.tsx` wires it to Claude Code's
 mod API (the `/live` command, `prompt.submit`, the band), `hooks/link.ts` talks to the app and
-runs the one-second poll, `hooks/prompt.ts` and `hooks/turns.ts` decide which turns answer a
-voice request and what each posts back, and `hooks/title.ts` reads the session's title from
-Claude Code's session registry. An adapter for another agent speaks the same wire: it joins, polls
+runs the poll (once a second, five times a second for the target), `hooks/prompt.ts` and
+`hooks/turns.ts` decide which turns answer a voice request and what each posts back, and
+`hooks/title.ts` reads the session's title from Claude Code's session registry. An adapter for another agent speaks the same wire: it joins, polls
 `GET /v1/next` and posts its answers, activity and context, on the routes listed under
 [the wire](docs/architecture/overview.md#the-wire).
 `app/Tests/Smoke/fake-session.mjs`, a plain Node script that plays a session for the smoke test,
@@ -115,6 +116,9 @@ home, and installs it in `.github/claude-code-floor` with `npm ci` from that fol
 pinned by hash. To change the floor, change that line, set the same version in that folder's
 `package.json` and run `npm install --package-lock-only` there; `check.sh` fails until every copy
 says the same.
+
+A pull request that changes only documents (`scripts/ci-documents-only.sh` lists them) skips both
+runs and counts as passed; a change to a comment in code does not. Every push to `main` runs them.
 
 The end-to-end smoke test drives the real codex and spends your ChatGPT plan's realtime voice;
 the header of `scripts/smoke.sh` says how much and what a pass is:
@@ -201,6 +205,38 @@ CFFIXED_USER_HOME=/tmp/lb scripts/build-app.sh --run   # keep its files out of y
 `claude --plugin-dir plugin` loads the mod from the working tree. The mod follows
 `CFFIXED_USER_HOME` to the socket as the app does, so `CFFIXED_USER_HOME=/tmp/lb claude
 --plugin-dir plugin` talks to the app started with the same variable.
+
+Every build, not only a debug one, logs a line at debug level in the category `summary` for each
+summary answered within two minutes of its ask: `askedFor`, the milliseconds the ask took;
+`stale`, whether the answer was stale (asked before a gap or a forget, or posted for an ask other
+than the open one, so it is ignored); `hadSummary`, whether it had text; `model`, the model's name
+(`custom` for an id you typed, `fork` for a summary the session's own fork wrote), the fallback's
+when the model asked for failed, and none when the transcript could not be read; `waited`, the
+milliseconds the line waited for it, when one did, from when that line began to wait (a reconnect
+keeps that start; Stop, Start and a change of target drop it); then, when the post carries them, its stats: `duration` in milliseconds, `transcriptChars`, `inputTokens` and
+`outputTokens`. A post for an ask other than the open one has no `askedFor` and no `model`: the app
+keeps only the open ask's record. It holds no summary text. Add `--debug` to the `log stream` command above and filter on `category == "summary"`.
+
+### Reading debug mode's numbers
+
+For when the voice breaks up: was it the network? Turn on **Debug mode** in Settings' General tab,
+or **Debug Mode** in the menu's **Feedback & Support**, in any build. While a line is open, it adds
+a row once a second to a CSV in `~/Library/Application Support/LiveBridge/debug/call-stats/`, one
+file per call; **Show Debug Files** opens the folder. It holds the time and numbers from WebKit's
+`getStats()` only: no audio, no transcript, no session names, and nothing leaves the Mac.
+
+Note the time of the glitch and find its row. `line` changes when the line reopens, and the
+counters restart with it. All columns but `jitter` are running totals, so compare a row with the
+one before, and ignore a line's first row, where concealment is only start-up.
+
+- `packetsLost` jumping at that moment points to the network.
+- `packetsDiscarded`, `jitter`, or `concealedSamples` minus `silentConcealedSamples` rising without
+  loss means audio arrived late or not at all: the network or the server, which these numbers
+  cannot separate.
+- `onTcp` is 1 while the line runs over TCP and 0 over UDP: with Settings' **Connect over TCP**
+  on, a 0 means the line fell back to UDP.
+- Clean numbers rule out delivery of the incoming audio. That leaves what the server generated and
+  the local audio output (Bluetooth, echo cancellation), which these numbers cannot separate either.
 
 ## Conventions
 

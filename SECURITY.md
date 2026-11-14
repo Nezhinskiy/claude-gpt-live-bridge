@@ -87,8 +87,31 @@ voices.
     (`[CLAUDE]`). They are saved and seed later calls the same way, and go to the open line when
     that session is the target. The app takes the label on the process's word;
   - join a session as one that missed a turn, or that does not sync, which makes the next line
-    that session opens ask it for a fresh summary (while the pause setting is on or the
-    session is marked paused, only one with no summary yet, below), and so makes it write one;
+    that session opens ask it for a fresh summary, and for a session whose mod writes summaries
+    also the next Start or target change to it during a call, before a line to it opens (while
+    the pause setting is on or the session is marked paused, only one with no summary yet,
+    below), and so makes it write one;
+  - join with `writesSummaries`, make itself the target and never answer the summary ask, which
+    holds what you say on the Mac, unsent, for up to 10 seconds from the ask while the line waits
+    for that summary. The line then opens without it, and no later line of that call waits for
+    that session id; joining again under a new id and making itself the target holds the next line
+    the same way. That bound is for a process that never answers, not one per call: one that
+    answers each ask, with any text, just before the limit, or that ends each wait by joining again
+    as one that missed a turn, is asked again by the next line, so it can hold every line of the
+    call, each for up to 10 seconds from that line's ask;
+  - take Settings' check of a custom **Summary model**, with the check's id, and post its
+    result. The check goes to the target if its mod writes summaries, else to the latest joined
+    session whose mod does, and the app takes a result only under that session's id and the
+    check's id. A process can be that session, by joining with `writesSummaries` and making
+    itself the target, or it can poll `GET /v1/next` with that session's id, which the status
+    names, without joining: a poll that comes before the mod's takes the check, and the mod never
+    sees it. Either way it can answer that any model works, and Settings saves that model. It
+    cannot change the id saved, which is the one you typed, and it must win that poll to answer a
+    check that went to a session it is not. Haiku 5.5 then writes a summary that model fails to
+    write, except when its request runs out of the time the mod allows a summary, as one to a
+    model whose requests hang does: then no model writes it, and the line opens without that
+    summary. No permission or data is reached. The check carries only the model's id, and the mod
+    asks that model only "Reply with OK.";
   - join with `replaces` set to a joined session's id, as the mod does after `/clear`, and so
     take over that session's place, its requests and its saved conversation;
   - post false usage limits for a joined session. The menu then shows them, with a `resetsAt` as
@@ -232,8 +255,15 @@ those shapes goes to OpenAI as typed, personal text included.
   does for a session marked paused after the setting is off again, with one exception. With **Load
   a session's context on its first call** on, which is the default unless the pause was on when you
   updated to it, a line that opens for a session with no summary asks for one, under the pause or
-  the mark. The pause does not hold that summary back: it is written from the whole transcript,
-  paused text included, goes to OpenAI, and clears the *paused* mark. Otherwise only **Load
+  the mark, and for a session whose mod writes summaries so do Start and a target change to it
+  during the call, before a line to it opens. The pause does not hold that summary back: it is
+  written from the session's transcript, paused text included, goes to OpenAI, and clears the
+  *paused* mark, so a Start and a Stop with nothing said can clear it. A current mod with a current
+  app leaves tool results, thinking and system reminders out of what the summary model reads, but
+  text that quotes them stays, as does anything pasted and every text block of a user message,
+  which holds the output of a `!` command typed in the session if Claude Code stores it as user
+  text, so this is a reduction, not a property; an
+  older app or mod sends the whole request. Otherwise only **Load
   context** loads one, and it carries the same text. An
   older mod's `/live context` does too; the last point below says what that can do.
   What the pause does not do:
@@ -274,14 +304,16 @@ those shapes goes to OpenAI as typed, personal text included.
     recorded. So may text typed as feedback at a permission dialog, which as far as the hooks show
     reaches none of them; that was not run.
   - A summary nobody asked for can reach past the pause and past a forget. From 0.4.2 the mod sends
-    a summary only when the app asks for one, but the app still takes one it did not ask for, as it
-    cannot date it (`Bridge.context`): mods update separately from the app, so a session on an older
+    a summary only when the app asks for one, but the app still takes one it did not ask for that
+    carries no ask's number, as it cannot date it (`Bridge.context`): mods update separately from the app, so a session on an older
     mod can send one with `/live context`. It takes no more than the pause on, the call off and
     typing during that command to clear the *paused* mark, and the paused text may be in that
     summary; one written across **New conversation** brings back what was forgotten
     ([BR-002](docs/bugs/BR-002.md)). This is accepted, as a 60 second window on an explicit command.
-    The current mod can land there too, for about a second: the reply to a second ask that came
-    after a poll took the first and before that summary landed finds no ask open.
+    An older mod since 0.4.2 can land there too, for about a second: the reply to a second ask that
+    came after a poll took the first and before that summary landed finds no ask open. A current
+    mod with a current app echoes the ask's number, and the app refuses a numbered summary that
+    finds no ask open, or another ask open.
 - **Ending what the voice carries.** The saved context and conversation go when you press **New
   conversation** with the session as the target, or remove it with ×, or when 20 sessions used since
   push them out (which also loses a paused mark); a load of a new summary replaces the old one for
@@ -295,8 +327,9 @@ those shapes goes to OpenAI as typed, personal text included.
   you join it again, since the mod's own joins are refused (`410`). **New conversation** and × keep
   the *paused* mark, so with **Load a session's context on its first call** off the next line asks
   for no summary of that transcript. With it on, or with the pause setting off and no pause mark, a session with no summary
-  does get one from the next line, written from the whole transcript, the text the session read
-  and any paused text included.
+  does get one from the next line, or, if its mod writes summaries, from the next Start or target
+  change to it during a call, written from the session's transcript (the reduction above),
+  any paused text included.
 - **A result from another session** is still spoken in whatever line is open, and the voice's
   reply to it stays in that line's conversation, so one session's text can still reach the
   conversation about another.
@@ -394,15 +427,23 @@ not otherwise reset the permission, so a prompt at another time is worth a secon
 ### What leaves the Mac
 
 The list of what goes to OpenAI, and when, is in the README's
-[Privacy](README.md#privacy) section. LiveBridge sends no audio or text while the line is
-closed: voice detection runs on the Mac. Codex itself keeps running between lines, and opening
+[Privacy](README.md#privacy) section. LiveBridge sends OpenAI no audio or text while the line
+is closed: voice detection runs on the Mac. Codex itself keeps running between lines, and opening
 Settings starts another codex to list the voices, and opening the menu starts a short-lived one
 that reads your Codex usage from OpenAI, also while the call is off; what codex sends on its own
 is codex's. Codex
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
-session sends its work to Anthropic as it always does. LiveBridge has no telemetry. The menu's
-**Star LiveBridge on GitHub** only opens the repository's page in your browser; the app sends
-nothing.
+session sends its work to Anthropic as it always does, and so does the summary the voice gets as
+context, also while the line is closed: a mod of this release, asked at Start, at a change of
+target, when a line opens or on **Load context**, sends the transcript, cut to 120,000
+characters, to the summary model through Claude Code, on your Claude usage; an older mod, asked
+when a line opens or on **Load context**, forks the session's own model over the whole request.
+Settings' check of a custom **Summary model** sends one short request the same way. LiveBridge has no telemetry. The menu's
+**Feedback & Support** links, **Report a Bug…**, **LiveBridge Website** and **Star LiveBridge on
+GitHub**, only open the repository's bug form, getlivebridge.com and the repository's page in your
+browser; the app sends nothing. Its other items stay on the Mac: **Debug Mode** writes the voice's
+network numbers to a local file ([Settings](README.md#settings)), and **Uninstall LiveBridge…**
+moves the app and its files to the Trash ([Uninstall](README.md#uninstall)).
 
 For updates, the app itself makes two kinds of request, and no others: the release check and the
 image download below. It also runs `gh` and `claude` for the requests listed below; what `gh`

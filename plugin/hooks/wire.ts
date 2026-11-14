@@ -1,6 +1,7 @@
 // The JSON messages between the mod and LiveBridge.app, mirroring
 // app/Sources/BridgeCore/Wire/Wire.swift (wire/fixtures holds an example of each). The routes:
-// `POST /v1/join|leave|answer|activity|context|sync|limits|target|call` and `GET /v1/next?sessionId=`,
+// `POST /v1/join|leave|answer|activity|context|sync|limits|target|call|model-check` and
+// `GET /v1/next?sessionId=`,
 // which answers a PollReply. Optional
 // fields are omitted when absent, never null. Non-2xx replies carry an ErrorReply: 400 schema,
 // 404 unknown session, 409 unknown or stale request id, 410 a session the owner removed (code
@@ -19,6 +20,12 @@ export function socketPath(home: string, fixedHome: string | undefined): string 
   return `${fixedHome || home}/${SOCKET_REL}`;
 }
 
+/**
+ * How long a summary may take: the models an ask names share it, and a fork is given up after it.
+ * The app's `SummaryAsks.Policy.modBudget` is the same, both tested against `wire/summary-budget.json`.
+ */
+export const CONTEXT_TIMEOUT_MS = 60_000;
+
 export type SessionId = string;
 export type RequestId = string;
 
@@ -30,12 +37,17 @@ export type VoiceRequest = { id: RequestId; brief: string; transcript: Utterance
 /**
  * `reply`: the owner's reply to the question Claude is waiting on. `forRequest` is the request
  * the turn's answer belongs to: the one in flight once this reply goes out. Absent from an
- * older app's reply.
+ * older app's reply. `context`: summarise the session; `model` is the model to write it with,
+ * absent from an older app, and `fallbackModel` the one tried once if `model` fails, absent when
+ * `model` is the app's default. `ask` is the ask's number, which the answer echoes; absent from an
+ * older app. `checkModel`: check that `model` answers, and post the result (`ModelCheckBody`) under
+ * the check's `id`; sent only to a mod that says `writesSummaries`.
  */
 export type Work =
   | ({ kind: 'request' } & VoiceRequest)
   | ({ kind: 'reply'; forRequest?: RequestId } & VoiceRequest)
-  | { kind: 'context' };
+  | { kind: 'context'; model?: string; fallbackModel?: string; ask?: number }
+  | { kind: 'checkModel'; id: string; model: string };
 
 /**
  * Joining again renames the session and refreshes its liveness. `replaces` is the id the
@@ -46,11 +58,13 @@ export type Work =
  * read it, and Settings then lists the session as on the old mod. `syncs: true` says this mod
  * posts its turns as sync lines (POST /v1/sync), so the app may rely on what it has recorded of
  * the session; absent, the app asks for a summary as before. `missed: true` says a turn of the
- * session did not arrive, so the voice's picture of it has a gap.
+ * session did not arrive, so the voice's picture of it has a gap. `writesSummaries: true` says this
+ * mod writes with the model an ask names and answers every context ask, with an empty summary
+ * when it has none.
  */
 export type JoinBody = {
   sessionId: SessionId; title: string; replaces?: SessionId; owner?: boolean; modVersion?: string;
-  syncs?: boolean; missed?: boolean;
+  syncs?: boolean; missed?: boolean; writesSummaries?: boolean;
 };
 /**
  * The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
@@ -82,7 +96,31 @@ export type SessionActivity = 'idle' | 'working' | 'approval';
  */
 export type ActivityBody =
   { sessionId: SessionId; state: SessionActivity; question?: string; text?: string; turn?: TurnRef };
-export type ContextBody = { sessionId: SessionId; summary: string };
+/**
+ * Why one attempt at a summary wrote nothing; `error`, with `api-error`, the engine's kind of error.
+ * `transcript-unreadable`: the session's transcript could not be read, so no model was asked.
+ */
+export type SummaryFailure = {
+  reason: 'model-refused' | 'api-error' | 'empty-reply' | 'timed-out' | 'transcript-unreadable'; error?: string;
+};
+/** The numbers of the attempt that wrote a summary with a named model; a fork sends none. */
+export type SummaryStats =
+  { durationMs: number; transcriptChars: number; inputTokens: number; outputTokens: number };
+/**
+ * `failures`: one per attempt that wrote nothing, in order; with a summary the fallback wrote it,
+ * with `""` none did. `stats`: of the attempt that wrote it. `ask`: the number of the ask it answers.
+ */
+export type ContextBody = {
+  sessionId: SessionId; summary: string; failures?: SummaryFailure[]; stats?: SummaryStats; ask?: number;
+};
+
+/**
+ * The result of the check `id`. `ok`: the model answered with text; otherwise `reason` says why not,
+ * and `error`, with `api-error`, the engine's kind of error.
+ */
+export type ModelCheckBody = {
+  sessionId: SessionId; id: string; ok: boolean; reason?: SummaryFailure['reason']; error?: string;
+};
 
 /**
  * One usage window as the engine reports it. The app takes `five_hour` as a window of five hours

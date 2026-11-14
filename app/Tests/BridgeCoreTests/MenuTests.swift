@@ -4,57 +4,25 @@ import Testing
 @testable import BridgeCore
 
 struct ContextLoadsTests {
-  let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
-  let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
   let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 
-  @Test func aPressIsPendingUntilItsContextArrives() {
-    var loads = ContextLoads()
-    #expect(loads.state(of: a, at: t0) == .ready)
-    loads.pressed(a, at: t0)
-    #expect(loads.state(of: a, at: t0 + 30) == .loading)
-    #expect(loads.state(of: b, at: t0 + 30) == .ready)  // per session
-    loads.arrived(a, at: t0 + 30)
-    #expect(loads.state(of: a, at: t0 + 32.9) == .loaded)
-    #expect(loads.state(of: a, at: t0 + 33) == .ready)
+  /// Whatever asked for it, Start, a target change, a line or a press: Load context waits.
+  @Test func anyAskInFlightShowsLoading() {
+    #expect(ContextLoads.state(.loading, at: t0) == .loading)
+    #expect(!ContextLoads.state(.loading, at: t0).isEnabled)
+    #expect(ContextLoads.state(.none, at: t0) == .ready)
   }
 
-  @Test func aPressGivesUpAfterSixtySeconds() {
-    var loads = ContextLoads()
-    loads.pressed(a, at: t0)
-    #expect(loads.state(of: a, at: t0 + 59.9) == .loading)
-    #expect(loads.state(of: a, at: t0 + 60) == .ready)
-    loads.arrived(a, at: t0 + 61)  // too late to count as the press's
-    #expect(loads.state(of: a, at: t0 + 61) == .ready)
+  @Test func aSummaryShowsAsLoadedForThreeSeconds() {
+    #expect(ContextLoads.state(.loaded(at: t0), at: t0 + 2.9) == .loaded)
+    #expect(ContextLoads.state(.loaded(at: t0), at: t0 + 3) == .ready)
   }
 
-  @Test func aContextNobodyPressedForShowsNothing() {
-    var loads = ContextLoads()
-    loads.arrived(a, at: t0)  // as when automatic context asks a new target for it
-    #expect(loads.state(of: a, at: t0) == .ready)
-  }
-
-  @Test func aSessionThatLeftIsForgotten() {
-    var loads = ContextLoads()
-    loads.pressed(a, at: t0)
-    loads.pressed(b, at: t0)
-    loads.keep(only: [b])
-    #expect(loads.state(of: a, at: t0) == .ready)
-    #expect(loads.state(of: b, at: t0) == .loading)
-    loads.arrived(a, at: t0 + 1)
-    #expect(loads.state(of: a, at: t0 + 1) == .ready)
-  }
-
-  @Test func theNextChangeIsTheEarliestDeadline() {
-    var loads = ContextLoads()
-    #expect(loads.nextChange(after: t0) == nil)
-    loads.pressed(a, at: t0)
-    loads.pressed(b, at: t0 + 10)
-    #expect(loads.nextChange(after: t0) == t0 + 60)
-    loads.arrived(b, at: t0 + 20)
-    #expect(loads.nextChange(after: t0 + 20) == t0 + 23)
-    #expect(loads.nextChange(after: t0 + 23) == t0 + 60)
-    #expect(loads.nextChange(after: t0 + 60) == nil)
+  @Test func theNextChangeIsTheEndOfLoaded() {
+    #expect(ContextLoads.nextChange(.none, after: t0) == nil)
+    #expect(ContextLoads.nextChange(.loading, after: t0) == nil)
+    #expect(ContextLoads.nextChange(.loaded(at: t0), after: t0) == t0 + 3)
+    #expect(ContextLoads.nextChange(.loaded(at: t0), after: t0 + 3) == nil)
   }
 }
 
@@ -83,11 +51,11 @@ struct MenuContentTests {
 
   static func menu(
     _ update: BridgeUpdate?, problem: Problem? = nil, load: ContextLoadState = .ready,
-    available: AppVersion? = nil
+    available: AppVersion? = nil, settings: Settings = Settings()
   ) -> MenuContent {
     MenuContent(
-      update: update, problem: problem ?? update?.problem, contextLoad: load,
-      available: available)
+      settings: settings, update: update, problem: problem ?? update?.problem, contextLoad: load,
+      available: available, isInstalledCopy: true)
   }
 
   static func line(_ speaker: Conversation.Line.Speaker, _ text: String) -> Conversation.Line {
@@ -138,8 +106,24 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
-        "Star LiveBridge on GitHub",
+        "Quick Settings ▸",
+        "  [ ] Connect over TCP",
+        "  [x] Play sounds for requests and answers",
+        "  [x] Notify when a result is waiting",
+        "  [ ] Pause sync while the call is stopped",
+        "  [x] Load a session's context on its first call",
         "Settings… ⌘,",
+        "---",
+        "Feedback & Support ▸",
+        "  Report a Bug…",
+        "  LiveBridge Website",
+        "  Star LiveBridge on GitHub",
+        "  ---",
+        "  [ ] Debug Mode",
+        "  Show Debug Files…",
+        "  ---",
+        "  Uninstall LiveBridge…",
+        "---",
         "Quit LiveBridge ⌘Q",
       ])
   }
@@ -195,8 +179,24 @@ struct MenuContentTests {
         "---",
         "4 min this call · 31 min today (disabled)",
         "---",
-        "Star LiveBridge on GitHub",
+        "Quick Settings ▸",
+        "  [ ] Connect over TCP",
+        "  [x] Play sounds for requests and answers",
+        "  [x] Notify when a result is waiting",
+        "  [ ] Pause sync while the call is stopped",
+        "  [x] Load a session's context on its first call",
         "Settings… ⌘,",
+        "---",
+        "Feedback & Support ▸",
+        "  Report a Bug…",
+        "  LiveBridge Website",
+        "  Star LiveBridge on GitHub",
+        "  ---",
+        "  [ ] Debug Mode",
+        "  Show Debug Files…",
+        "  ---",
+        "  Uninstall LiveBridge…",
+        "---",
         "Quit LiveBridge ⌘Q",
       ])
   }
@@ -272,8 +272,9 @@ struct MenuContentTests {
   @Test func withoutABridgeOnlyTheProblemAndTheFooterAreLeft() throws {
     let menu = Self.menu(nil, problem: .other("LiveBridge could not start its bridge: boom"))
     #expect(
-      menu.outline == [
-        "[call] Off", "---", "Star LiveBridge on GitHub", "Settings… ⌘,", "Quit LiveBridge ⌘Q",
+      menu.outline.filter { !$0.hasPrefix(" ") } == [
+        "[call] Off", "---", "Quick Settings ▸", "Settings… ⌘,", "---", "Feedback & Support ▸",
+        "---", "Quit LiveBridge ⌘Q",
       ])
     let card = try #require(Self.card(menu))
     #expect(card.problem == "LiveBridge could not start its bridge: boom")
@@ -281,6 +282,100 @@ struct MenuContentTests {
     #expect(Self.menu(nil).outline.first == "[call] Starting…")
   }
 
+  /// The menu's own lines, a submenu's items left out.
+  static func topLevel(_ menu: MenuContent) -> [String] {
+    menu.outline.filter { !$0.hasPrefix(" ") }
+  }
+
+  /// The items of the submenu titled `title`, nil if the menu has none.
+  static func submenu(_ title: String, in menu: MenuContent) -> [MenuContent.Item]? {
+    menu.items.lazy.compactMap { item -> [MenuContent.Item]? in
+      if case .submenu(title, _, let items) = item { items } else { nil }
+    }.first
+  }
+
+  static func switches(_ settings: Settings) -> [Bool]? {
+    submenu("Quick Settings", in: menu(status(sessions: 1), settings: settings))?.compactMap {
+      if case .toggle(_, let isOn) = $0 { isOn } else { nil }
+    }
+  }
+
+  @Test func theFootIsQuickSettingsSettingsFeedbackAndQuit() throws {
+    let foot = [
+      "Quick Settings ▸", "Settings… ⌘,", "---", "Feedback & Support ▸", "---",
+      "Quit LiveBridge ⌘Q",
+    ]
+    let lines = Self.topLevel(Self.menu(Self.status(sessions: 1)))
+    #expect(Array(lines.suffix(foot.count)) == foot)
+    let minutes = try #require(lines.firstIndex(of: "4 min this call · 31 min today (disabled)"))
+    #expect(lines[minutes + 1] == "---" && lines[minutes + 2] == "Quick Settings ▸")
+    #expect(!lines.contains("Star LiveBridge on GitHub"))
+    let offered = Self.topLevel(
+      Self.menu(Self.status(sessions: 1), available: AppVersion("0.1.3")))
+    #expect(Array(offered.suffix(foot.count + 1)) == ["Install LiveBridge 0.1.3…"] + foot)
+  }
+
+  @Test func quickSettingsShowEachSwitchAsSet() throws {
+    let items = try #require(
+      Self.submenu(
+        "Quick Settings",
+        in: Self.menu(
+          Self.status(sessions: 1),
+          settings: Settings(pauseSyncWhileStopped: true, connectsOverTCP: true))))
+    #expect(items == MenuContent.Switch.quickSettings.map { .toggle($0, isOn: true) })
+    // Each switch follows its own setting: flipping one flips only its item.
+    let flips: [MenuContent.Switch: Settings] = [
+      .connectsOverTCP: Settings(connectsOverTCP: true),
+      .confirmHandoffs: Settings(confirmHandoffs: false),
+      .notifyResults: Settings(notifyResults: false),
+      .pauseSyncWhileStopped: Settings(pauseSyncWhileStopped: true),
+      .loadContextOnFirstCall: Settings(loadContextOnFirstCall: false),
+    ]
+    let defaults = [false, true, true, false, true]
+    for (index, flipped) in MenuContent.Switch.quickSettings.enumerated() {
+      var expected = defaults
+      expected[index].toggle()
+      #expect(Self.switches(try #require(flips[flipped])) == expected, "\(flipped)")
+    }
+  }
+
+  /// The links, then debug mode as set and its files; Quick Settings does not repeat it.
+  @Test func feedbackAndSupportEndsWithUninstall() throws {
+    for on in [false, true] {
+      let menu = Self.menu(Self.status(sessions: 1), settings: Settings(debugMode: on))
+      #expect(
+        Self.submenu("Feedback & Support", in: menu) == [
+          .command(.reportBug, title: "Report a Bug…", isEnabled: true),
+          .command(.website, title: "LiveBridge Website", isEnabled: true),
+          .command(.starOnGitHub, title: "Star LiveBridge on GitHub", isEnabled: true),
+          .separator,
+          .toggle(.debugMode, isOn: on),
+          .command(.showDebugFiles, title: "Show Debug Files…", isEnabled: true),
+          .separator,
+          .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: true),
+        ])
+      let quick = try #require(Self.submenu("Quick Settings", in: menu))
+      #expect(quick.count == 5 && !quick.contains(.toggle(.debugMode, isOn: on)))
+    }
+  }
+
+  @Test func onlyTheInstalledCopyCanUninstall() throws {
+    for installed in [false, true] {
+      let menu = MenuContent(
+        settings: Settings(), update: Self.status(sessions: 1), problem: nil, contextLoad: .ready,
+        available: nil, isInstalledCopy: installed)
+      let support = try #require(Self.submenu("Feedback & Support", in: menu))
+      #expect(
+        support.last == .command(.uninstall, title: "Uninstall LiveBridge…", isEnabled: installed))
+    }
+  }
+
+  @Test func withoutABridgeQuickSettingsAreStillThere() throws {
+    let settings = Settings(connectsOverTCP: true)
+    let bridged = try #require(
+      Self.submenu("Quick Settings", in: Self.menu(Self.status(sessions: 1), settings: settings)))
+    #expect(Self.submenu("Quick Settings", in: Self.menu(nil, settings: settings)) == bridged)
+  }
 }
 
 struct LimitRowTests {
@@ -454,10 +549,10 @@ struct LimitRowTests {
 
   @Test func theMenuHoldsTheRowsAboveTheMinutes() {
     let menu = MenuContent(
-      update: MenuContentTests.status(sessions: 0), problem: nil, contextLoad: .ready,
-      available: nil, codexLimits: Self.limits(),
+      settings: Settings(), update: MenuContentTests.status(sessions: 0), problem: nil,
+      contextLoad: .ready, available: nil, codexLimits: Self.limits(),
       claudeLimits: Self.limits(five: nil, week: nil, blocked: true),
-      now: Self.now, calendar: Self.utc, locale: Self.gb)
+      isInstalledCopy: true, now: Self.now, calendar: Self.utc, locale: Self.gb)
     let lines = menu.outline
     let at = lines.firstIndex(of: "[limit] Codex — 7% of 5 h · 19% of week")
     #expect(at != nil)

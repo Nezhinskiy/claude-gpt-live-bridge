@@ -1,5 +1,5 @@
 // The JSON messages between the mod and the app: `POST /v1/join|leave|answer|activity|context|
-// sync|limits|target|call` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
+// sync|limits|target|call|model-check` with the bodies below, and `GET /v1/next?sessionId=` answering a `PollReply`.
 // `wire/fixtures` holds an example of each and `plugin/hooks/wire.ts` mirrors these types; a
 // change here changes both. Optional fields are omitted when absent, never `null`.
 
@@ -34,28 +34,45 @@ public struct VoiceRequest: Codable, Sendable, Equatable {
 
 /// Work for a session, tagged by `kind`: `{"kind":"request", <VoiceRequest>}`,
 /// `{"kind":"reply", <VoiceRequest>, "forRequest"}` (the owner's reply to the question Claude is
-/// waiting on; `forRequest` is the request its answer belongs to) or `{"kind":"context"}` (summarise the session for the
-/// voice).
+/// waiting on; `forRequest` is the request its answer belongs to) or
+/// `{"kind":"context","model"?,"fallbackModel"?,"ask"?}` (summarise the session for the voice) or
+/// `{"kind":"checkModel","id","model"}` (check that `model` answers; only to a mod that said
+/// `writesSummaries`).
 public enum Work: Sendable, Equatable {
   case request(VoiceRequest)
   /// `forRequest`: the request the turn's answer belongs to, the one in flight once this reply
   /// goes out. With none in flight, for a mod that does not sync and does not read it, the reply.
   case reply(VoiceRequest, forRequest: RequestID)
-  case context
+  /// `model`: the model to write the summary with; nil to an older mod, which forks. `fallbackModel`:
+  /// the default, tried once if `model` fails; nil when `model` is the default. `ask`: the ask's
+  /// number, counted app-wide, which the answer echoes; nil from an older app.
+  case context(model: String? = nil, fallbackModel: String? = nil, ask: Int? = nil)
+  /// `id`: the check's, which its result (`ModelCheckBody`) quotes.
+  case checkModel(id: String, model: String)
 }
 
 extension Work: Codable {
-  private enum Kind: String, Codable { case request, reply, context }
-  private enum CodingKeys: String, CodingKey { case kind, forRequest }
+  private enum Kind: String, Codable { case request, reply, context, checkModel }
+  private enum CodingKeys: String, CodingKey {
+    case kind, forRequest, model, fallbackModel, ask, id
+  }
 
   public init(from decoder: any Decoder) throws {
-    switch try decoder.container(keyedBy: CodingKeys.self).decode(Kind.self, forKey: .kind) {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    switch try container.decode(Kind.self, forKey: .kind) {
     case .request: self = .request(try VoiceRequest(from: decoder))
     case .reply:
-      let forRequest = try decoder.container(keyedBy: CodingKeys.self)
-        .decode(RequestID.self, forKey: .forRequest)
+      let forRequest = try container.decode(RequestID.self, forKey: .forRequest)
       self = .reply(try VoiceRequest(from: decoder), forRequest: forRequest)
-    case .context: self = .context
+    case .context:
+      self = .context(
+        model: try container.decodeIfPresent(String.self, forKey: .model),
+        fallbackModel: try container.decodeIfPresent(String.self, forKey: .fallbackModel),
+        ask: try container.decodeIfPresent(Int.self, forKey: .ask))
+    case .checkModel:
+      self = .checkModel(
+        id: try container.decode(String.self, forKey: .id),
+        model: try container.decode(String.self, forKey: .model))
     }
   }
 
@@ -69,8 +86,15 @@ extension Work: Codable {
       try container.encode(Kind.reply, forKey: .kind)
       try container.encode(forRequest, forKey: .forRequest)
       try request.encode(to: encoder)
-    case .context:
+    case .context(let model, let fallbackModel, let ask):
       try container.encode(Kind.context, forKey: .kind)
+      try container.encodeIfPresent(model, forKey: .model)
+      try container.encodeIfPresent(fallbackModel, forKey: .fallbackModel)
+      try container.encodeIfPresent(ask, forKey: .ask)
+    case .checkModel(let id, let model):
+      try container.encode(Kind.checkModel, forKey: .kind)
+      try container.encode(id, forKey: .id)
+      try container.encode(model, forKey: .model)
     }
   }
 }
@@ -91,6 +115,9 @@ public struct JoinBody: Codable, Sendable, Equatable {
   public var syncs: Bool?
   /// `true`: a turn of this session did not arrive, so the voice's picture of it has a gap.
   public var missed: Bool?
+  /// `true` from a mod that writes with the model an ask names and answers every context ask with
+  /// `POST /v1/context`, an empty summary when it has none; absent from one that forks.
+  public var writesSummaries: Bool?
 }
 
 /// The main-loop turn a line or an activity belongs to. `request`: the voice request the turn's
@@ -159,10 +186,69 @@ public struct ActivityBody: Codable, Sendable, Equatable {
   public var turn: TurnRef?
 }
 
-/// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`.
+/// Why one attempt at a summary wrote nothing. `error`: with `apiError`, the engine's kind of API
+/// error, which the app shows only if it is one the engine documents.
+public struct SummaryFailure: Codable, Sendable, Equatable {
+  public enum Reason: String, Codable, Sendable {
+    case modelRefused = "model-refused"
+    case apiError = "api-error"
+    case emptyReply = "empty-reply"
+    case timedOut = "timed-out"
+    /// The mod could not read the session's transcript, so no model was asked.
+    case transcriptUnreadable = "transcript-unreadable"
+    /// One this app does not know, as from a later mod.
+    case unknown
+
+    public init(from decoder: any Decoder) throws {
+      let text = try? decoder.singleValueContainer().decode(String.self)
+      self = text.flatMap(Self.init(rawValue:)) ?? .unknown
+    }
+  }
+  public var reason: Reason
+  public var error: String?
+}
+
+/// The numbers of the attempt that wrote a summary with a named model; a fork sends none.
+public struct SummaryStats: Codable, Sendable, Equatable {
+  public var durationMs: Int
+  public var transcriptChars: Int
+  public var inputTokens: Int
+  public var outputTokens: Int
+}
+
+/// `POST /v1/context`: the session's own summary, sent in reply to `Work.context`. `failures`: one
+/// per attempt that wrote nothing, in order; with a summary the fallback wrote it, with `""` none
+/// did. `stats`: of the attempt that wrote it. `ask`: the number of the ask it answers; absent from
+/// an older mod.
 public struct ContextBody: Codable, Sendable, Equatable {
   public var sessionId: SessionID
   public var summary: String
+  public var failures: [SummaryFailure]?
+  public var stats: SummaryStats?
+  public var ask: Int?
+}
+
+extension ContextBody {
+  /// `stats` serve the log alone, so ones the app cannot read are dropped, not the summary.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    sessionId = try container.decode(SessionID.self, forKey: .sessionId)
+    summary = try container.decode(String.self, forKey: .summary)
+    failures = try container.decodeIfPresent([SummaryFailure].self, forKey: .failures)
+    stats = try? container.decodeIfPresent(SummaryStats.self, forKey: .stats)
+    ask = try container.decodeIfPresent(Int.self, forKey: .ask)
+  }
+}
+
+/// `POST /v1/model-check`: the result of `Work.checkModel` `id`. `ok`: the model answered with
+/// text. Otherwise `reason` says why not, and `error`, with `apiError`, the engine's kind of API
+/// error, which the app shows only if it is one the engine documents.
+public struct ModelCheckBody: Codable, Sendable, Equatable {
+  public var sessionId: SessionID
+  public var id: String
+  public var ok: Bool
+  public var reason: SummaryFailure.Reason?
+  public var error: String?
 }
 
 /// One usage window as the mod reads it from Claude Code. The app takes `five_hour` as a window of

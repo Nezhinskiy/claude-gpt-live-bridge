@@ -10,6 +10,20 @@ struct PathsTests {
     try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as! Int
   }
 
+  @Test func uninstallTakesEveryFileTheAppKeeps() {
+    let library = URL(filePath: "/Users/example/Library")
+    let id = "com.getlivebridge.livebridge"
+    #expect(
+      Paths.uninstalled(library: library).map(\.path) == [
+        "/Users/example/Library/Application Support/LiveBridge",
+        "/Users/example/Library/Caches/\(id)",
+        "/Users/example/Library/WebKit/\(id)",
+        "/Users/example/Library/HTTPStorages/\(id)",
+        "/Users/example/Library/HTTPStorages/\(id).binarycookies",
+        "/Users/example/Library/Preferences/\(id).plist",
+      ])
+  }
+
   @Test func runDirIsOwnerOnly() throws {
     defer { try? FileManager.default.removeItem(at: base) }
     let run = try Paths.runDir(in: base)
@@ -37,6 +51,24 @@ struct PathsTests {
       at: base.appending(path: "LiveBridge"), withDestinationURL: elsewhere)
     #expect(try Paths.dataDir(in: base) == base.appending(path: "LiveBridge"))
     #expect(try permissions(elsewhere) == 0o700)
+  }
+
+  /// `build-app.sh --uninstall` removes the same files the menu's Uninstall moves to the Trash, so
+  /// a file the app starts to keep cannot be added to one route and missed by the other.
+  @Test func theScriptRemovesTheFilesTheMenuMoves() throws {
+    let script = try String(
+      contentsOf: URL(filePath: #filePath).deletingLastPathComponent()
+        .appending(path: "../../../scripts/build-app.sh").standardized, encoding: .utf8)
+    let body =
+      try #require(script.components(separatedBy: "uninstall() {").last)
+      .components(separatedBy: "\n}").first ?? ""
+    let removed = Set(body.matches(of: /"\$lib\/([^"]+)"/).map { String($0.1) })
+    let moved = Set(
+      Paths.uninstalled(library: URL(filePath: "/L")).map {
+        String($0.path.dropFirst("/L/".count))
+          .replacingOccurrences(of: Paths.bundleID, with: "$BUNDLE_ID")
+      })
+    #expect(removed == moved)
   }
 
   /// The notices, the log and System Settings' link use the bundle id the app ships with.

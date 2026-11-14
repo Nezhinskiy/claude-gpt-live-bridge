@@ -25,6 +25,10 @@ actor FakeVoice: RealtimeControlling {
     heldOpens = []
   }
 
+  /// The SDP answer each open gives.
+  var answer = "answer"
+  func setAnswer(_ sdp: String) { answer = sdp }
+
   func open(offerSDP: String, items: [InitialItem]) async throws -> String {
     if holdsOpen {
       holdsOpen = false
@@ -32,7 +36,7 @@ actor FakeVoice: RealtimeControlling {
     }
     if let failure { throw failure }
     opens.append(items)
-    return "answer"
+    return answer
   }
   func close() { closes += 1 }
   func addContext(_ text: String) { added.append(text) }
@@ -114,13 +118,30 @@ actor FakeAudio: AudioSide {
     offers.append(preroll)
     return "offer"
   }
+  /// The answers applied, in order.
+  var answers: [String] = []
   func applyAnswer(_ sdp: String) throws {
     if answerFails { throw CodexProblem.protocolMismatch("no session.started") }
     calls.append("applyAnswer")
+    answers.append(sdp)
     time.advance(by: .seconds(1))
   }
   func flushPreroll() { calls.append("flushPreroll") }
-  func closePeer() { calls.append("closePeer") }
+  /// While set, the next close waits for `releaseClose()`, as the page and codex take a moment.
+  var holdsClose = false
+  private var heldCloses: [CheckedContinuation<Void, Never>] = []
+  var closeWaiting: Int { heldCloses.count }
+  func holdClose() { holdsClose = true }
+  func releaseClose() {
+    for wait in heldCloses { wait.resume() }
+    heldCloses = []
+  }
+  func closePeer() async {
+    calls.append("closePeer")
+    guard holdsClose else { return }
+    holdsClose = false
+    await withCheckedContinuation { heldCloses.append($0) }
+  }
   func chime() { calls.append("chime") }
   /// While set, the next answer's sound waits for `releaseSound()`, as a hop to the main actor
   /// lets others in.
@@ -160,6 +181,14 @@ struct BridgeTests {
   let dir: URL
   /// Settings' pause, which a test may flip.
   let pause: OSAllocatedUnfairLock<Bool>
+  /// Settings' timers for the line, which a test may change.
+  let timeouts = OSAllocatedUnfairLock(initialState: CallMachine.Timeouts())
+  /// Settings' Connect over TCP, which a test may flip.
+  let tcp = OSAllocatedUnfairLock(initialState: false)
+  /// What the bridge reported about each summary ask it saw answered.
+  let timings = OSAllocatedUnfairLock(initialState: [SummaryTiming]())
+  /// Settings' summary model, which a test may change.
+  let summaryModel = OSAllocatedUnfairLock(initialState: SummaryModel.default)
   let a = SessionID(rawValue: "00000000-0000-0000-0000-000000000001")
   let b = SessionID(rawValue: "11111111-0000-0000-0000-000000000002")
 
@@ -174,6 +203,7 @@ struct BridgeTests {
     self.time = time
     let pause = OSAllocatedUnfairLock(initialState: pausesSync)
     self.pause = pause
+    let timings = timings
     self.dir = try dir ?? temporaryDirectory()
     registry = SessionRegistry(time: time)
     audio = FakeAudio(time: time)
@@ -182,8 +212,11 @@ struct BridgeTests {
       meter: UsageMeterStore(file: self.dir.appending(path: "usage.json"), time: time),
       continuityFile: self.dir.appending(path: "continuity.json"), time: time,
       notifier: notifier, notifies: notifies, confirmsWithSound: confirmsWithSound,
-      pausesSync: { pause.withLock { $0 } },
-      loadsContextOnFirstCall: { loadsContextOnFirstCall }, appVersion: appVersion)
+      pausesSync: { pause.withLock { $0 } }, timeouts: { [timeouts] in timeouts.withLock { $0 } },
+      loadsContextOnFirstCall: { loadsContextOnFirstCall },
+      connectsOverTCP: { [tcp] in tcp.withLock { $0 } },
+      summaryModel: { [summaryModel] in summaryModel.withLock { $0 } },
+      reportsSummary: { timing in timings.withLock { $0.append(timing) } }, appVersion: appVersion)
   }
 
   @discardableResult
@@ -195,13 +228,13 @@ struct BridgeTests {
 
   func join(
     _ id: SessionID, _ title: String, modVersion: String? = nil, owner: Bool? = nil,
-    syncs: Bool? = true, missed: Bool? = nil
+    syncs: Bool? = true, missed: Bool? = nil, writesSummaries: Bool? = nil
   ) async throws {
     try await post(
       "/v1/join",
       JoinBody(
         sessionId: id, title: title, owner: owner, modVersion: modVersion, syncs: syncs,
-        missed: missed))
+        missed: missed, writesSummaries: writesSummaries))
   }
 
   func setPause(_ on: Bool) { pause.withLock { $0 = on } }
@@ -251,6 +284,132 @@ struct BridgeTests {
     if await registry.target == nil { try? await join(a, "Alpha") }
     await bridge.perform(.start)
     await bridge.audioEvent(.speechStarted)
+  }
+
+  /// An answer with UDP and TCP candidates, as the media server gives.
+  static let candidates = AnswerSDPTests.answer([AnswerSDPTests.udp, AnswerSDPTests.tcp])
+
+  @Test func aLineOverUDPAppliesTheAnswerAsItCame() async throws {
+    let test = try BridgeTests()
+    await test.voice.setAnswer(Self.candidates)
+    await test.live()
+    #expect(await test.audio.answers == [Self.candidates])
+  }
+
+  @Test func aLineOverTCPAppliesTheAnswerPreferringTCP() async throws {
+    let test = try BridgeTests()
+    test.tcp.withLock { $0 = true }
+    await test.voice.setAnswer(Self.candidates)
+    await test.live()
+    #expect(await test.audio.answers == [AnswerSDP.preferringTCP(Self.candidates)])
+  }
+
+  /// The setting changed and the owner chose Reconnect: the open line closes and opens again at
+  /// once, over the new transport, without the pre-roll.
+  @Test func reconnectReopensTheOpenLineOverTheNewTransport() async throws {
+    let test = try BridgeTests()
+    await test.voice.setAnswer(Self.candidates)
+    await test.live()
+    await test.bridge.audioEvent(.speechEnded)
+    test.tcp.withLock { $0 = true }
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.audio.answers.count == 2 })
+    #expect(
+      await test.audio.answers == [Self.candidates, AnswerSDP.preferringTCP(Self.candidates)])
+    #expect(await test.voice.closes == 1)
+    #expect(await test.audio.offers == [true, false])
+    #expect(await test.bridge.status.call == .live)
+  }
+
+  /// A Stop while the reconnect closes the old line: no new line opens, and codex is not
+  /// launched again for a call that is over.
+  @Test func aStopDuringTheReconnectOpensNoLine() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    await test.audio.holdClose()
+    async let reconnect: Void = test.bridge.reconnect()
+    #expect(await eventually { await test.audio.closeWaiting == 1 })
+    await test.bridge.perform(.stop)
+    await test.audio.releaseClose()
+    _ = await reconnect
+    #expect(await test.bridge.status.call == .off)
+    #expect(await test.voice.opens.count == 1)
+  }
+
+  /// The same for a new target: its line opens when the owner speaks, not by itself.
+  @Test func aTargetChangeDuringTheReconnectOpensNoLine() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    try await test.join(test.b, "Beta")
+    await test.audio.holdClose()
+    async let reconnect: Void = test.bridge.reconnect()
+    #expect(await eventually { await test.audio.closeWaiting == 1 })
+    await test.bridge.setTarget(test.b)
+    await test.audio.releaseClose()
+    _ = await reconnect
+    #expect(await test.bridge.status.call == .listening)
+    #expect(await test.voice.opens.count == 1)
+  }
+
+  /// A second reconnect while the first still closes the old line: the second one's line is the
+  /// only one, so the first, once its close ends with that line still opening, opens none beside
+  /// it.
+  @Test func aSecondReconnectDuringTheFirstOpensOneLine() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    await test.audio.holdClose()
+    async let first: Void = test.bridge.reconnect()
+    #expect(await eventually { await test.audio.closeWaiting == 1 })
+    await test.voice.holdOpen()
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.voice.openWaiting == 1 })
+    await test.audio.releaseClose()
+    _ = await first
+    await test.voice.releaseOpen()
+    #expect(await eventually { await test.audio.answers.count == 2 })
+    try await Task.sleep(for: .milliseconds(100))  // a line opened beside it would be there by now
+    #expect(await test.voice.opens.count == 2)
+    #expect(await test.bridge.status.call == .live)
+  }
+
+  /// A reconnect while the line is still opening replaces that attempt: one line, one answer.
+  @Test func aReconnectDuringAnOpenOpensOneLine() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.voice.holdOpen()
+    async let speech: Void = test.bridge.audioEvent(.speechStarted)
+    #expect(await eventually { await test.voice.openWaiting == 1 })
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.bridge.status.call == .live })
+    await test.voice.releaseOpen()
+    _ = await speech
+    #expect(await test.audio.answers.count == 1)
+    #expect(await test.bridge.status.call == .live)
+  }
+
+  /// What the cut-off line was saying gets no final text: it does not join the new line's words.
+  @Test func aReconnectDropsTheCutOffWords() async throws {
+    let test = try BridgeTests()
+    await test.live()
+    test.voice.emit(.assistantSpeaking(" The build is half"))
+    #expect(await eventually { await test.lines() == ["Voice: The build is half"] })
+    await test.bridge.reconnect()
+    #expect(await eventually { await test.audio.answers.count == 2 })
+    test.voice.emit(.assistantSpeaking(" Hello again"))
+    #expect(await eventually { await test.lines() == ["Voice: Hello again"] })
+  }
+
+  /// With no line open the next line takes the setting by itself: nothing opens.
+  @Test func reconnectWithNoLineOpensNone() async throws {
+    let test = try BridgeTests()
+    try await test.join(test.a, "Alpha")
+    await test.bridge.perform(.start)
+    await test.bridge.reconnect()
+    await test.bridge.perform(.stop)
+    await test.bridge.reconnect()
+    #expect(await test.voice.opens.isEmpty)
+    #expect(await test.audio.offers.isEmpty)
   }
 
   @Test func muteReachesTheAudioSide() async throws {
@@ -463,7 +622,7 @@ struct BridgeTests {
     #expect(await bridge.status.call == .live)
     let closes = await voice.closes
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.closes == closes)
     #expect(await bridge.status.call == .live)
     #expect(await audio.calls.filter { $0 == "applyAnswer" }.count == 1)
@@ -522,18 +681,42 @@ struct BridgeTests {
     try await post("/v1/target", TargetBody(sessionId: b))
     _ = try await registry.poll(b)  // a fresh target may already owe a summary
     await bridge.loadContext()
-    #expect(try await registry.poll(b) == .context)
+    #expect(try await registry.poll(b) == .context())
     #expect(try await registry.poll(a) == nil)
+  }
+
+  /// The menu shows the press at once: the bridge publishes the ask it made.
+  @Test func aPressPublishesItsAsk() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    var updates = bridge.updates.makeAsyncIterator()
+    await bridge.loadContext()
+    #expect(await updates.next()?.targetSummary == .loading)
+  }
+
+  /// The menu and the glyph show the target's summary alone: another session's on its way is not.
+  @Test func anotherSessionsAskIsNotTheTargets() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    await bridge.loadContext()
+    await bridge.setTarget(b)
+    #expect(await bridge.current.targetSummary == .none)
   }
 
   /// A session's summary is announced to the menu, which stops waiting for it; one from a
   /// session that never joined is not.
   @Test func arrivingContextIsAnnounced() async throws {
     try await join(a, "Alpha")
-    var arrivals = bridge.contextArrivals.makeAsyncIterator()
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Not joined."))
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
-    #expect(await arrivals.next() == a)
+    #expect(await bridge.current.targetSummary == .loaded(at: time.now))
+  }
+
+  /// An empty answer is announced as one, so the menu's press ends without saying it loaded.
+  @Test func anEmptyAnswerIsAnnouncedAsEmpty() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: ""))
+    #expect(await bridge.current.targetSummary == .none)
   }
 
   @Test func theMenuSetsTheTarget() async throws {
@@ -845,7 +1028,7 @@ struct BridgeTests {
     await bridge.perform(.stop)
     let opens = await voice.opens.count
     await audio.releaseSound()
-    try await answering.value
+    try await settle(answering)
     #expect(await bridge.status.call == .off)
     try await Task.sleep(for: .milliseconds(100))  // a line opened late would be there by now
     #expect(await voice.opens.count == opens)
@@ -895,7 +1078,7 @@ struct BridgeTests {
     let notice = "[APPROVAL] Alpha: Claude is waiting for your approval"
     #expect(await eventually { await voice.spoken == [notice] })
     #expect(await eventually { time.sleepers >= 5 })  // sweep, 3 silence timers, window
-    for _ in 0...CallMachine.silenceSeconds {
+    for _ in 0...CallMachine.Timeouts().silence {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined
     }
@@ -934,7 +1117,7 @@ struct BridgeTests {
     for second in 1..<CallMachine.resultWindowSeconds {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined
-      if second == CallMachine.silenceSeconds + 1 { #expect(await bridge.status.call == .live) }
+      if second == CallMachine.Timeouts().silence + 1 { #expect(await bridge.status.call == .live) }
     }
     #expect(await bridge.status.call == .live)
     time.advance(by: .seconds(1))
@@ -1140,7 +1323,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await bridge.status.call == .off)
     #expect(await bridge.status.problem?.contains("No.") == true)
   }
@@ -1241,7 +1424,7 @@ struct BridgeTests {
     try await test.post("/v1/context", ContextBody(sessionId: a, summary: "Old."))
     await test.live()
     await test.bridge.loadContext()
-    #expect(try await test.registry.poll(a) == .context)
+    #expect(try await test.registry.poll(a) == .context())
     await test.bridge.perform(.stop)
     try await test.sync(a, turn: "turn-2", "Private thing.")
     try await test.post("/v1/context", ContextBody(sessionId: a, summary: "From before."))
@@ -1250,12 +1433,247 @@ struct BridgeTests {
     #expect(await test.bridge.current.context == "[CONTEXT] Alpha: Old.")
   }
 
+  @Test func aSummaryReportsHowLongItsAskTook() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    time.advance(by: .seconds(7))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    let reported = timings.withLock { $0 }
+    #expect(reported.count == 1)
+    #expect(reported.first?.askedFor == 7)
+    #expect(reported.first?.stale == false)
+    #expect(reported.first?.hadSummary == true)
+  }
+
+  @Test func aSummaryNobodyAskedForReportsNothing() async throws {
+    try await join(a, "Alpha")
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
+    #expect(timings.withLock { $0.isEmpty })
+  }
+
+  @Test func aBlankSummaryIsReportedAsHavingNone() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: " "))
+    let reported = timings.withLock { $0 }
+    #expect(reported.count == 1)
+    #expect(reported.first?.hadSummary == false)
+  }
+
+  @Test func aStaleAnswerIsReportedAsStale() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    await bridge.newConversation()
+    time.advance(by: .seconds(3))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    let timing = try #require(timings.withLock { $0.first })
+    #expect(timing.stale)
+    #expect(timing.askedFor == 3)
+  }
+
+  // MARK: The summary model
+
+  @Test func anAskNamesTheModelAndTheDefault() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    #expect(
+      try await registry.poll(a)
+        == .context(model: "claude-opus-5-5", fallbackModel: "claude-haiku-5-5", ask: 1))
+    let recorded = SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)
+    #expect(recorded?.model == "claude-opus-5-5")
+    #expect(recorded?.fallbackModel == "claude-haiku-5-5")
+  }
+
+  @Test func theDefaultHasNoFallback() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: "claude-haiku-5-5", ask: 1))
+  }
+
+  /// A mod that forks ignores a model, so it is asked as before.
+  @Test func anOlderModGetsAPlainAsk() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context())
+  }
+
+  /// Only an answer to an ask that named a model says which model wrote it.
+  @Test func anOlderModsAnswerLeavesTheReportAlone() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let refused = [SummaryFailure(reason: .modelRefused, error: nil)]
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", failures: refused))
+    let report = SummaryReport(
+      asked: "claude-opus-5-5", fallback: "claude-haiku-5-5", failures: refused, wrote: true)
+    #expect(await bridge.lastSummary == report)
+    try await join(b, "Beta")
+    await bridge.setTarget(b)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
+    #expect(await bridge.lastSummary == report)
+  }
+
+  /// Settings' line stays until a model is tried again: an answer no model was asked for leaves it.
+  @Test func theFailureLineStaysThroughAnAnswerNoModelWrote() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let failed = [
+      SummaryFailure(reason: .modelRefused, error: nil),
+      SummaryFailure(reason: .timedOut, error: nil),
+    ]
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", failures: failed, ask: 1))
+    let line = "The voice got no new summary: Opus 5.5 was refused, then Haiku 5.5 ran out of time."
+    #expect(await bridge.lastSummary?.line == line)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 2))
+    #expect(await bridge.lastSummary?.line == line)
+  }
+
+  /// A reason from a later mod, or a number that is not whole, does not lose the summary; the
+  /// reason is a failure in the app's own words.
+  @Test func aPostWithAFieldTheAppCannotReadIsTaken() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let body = """
+      {"sessionId":"\(a.rawValue)","summary":"Alpha's work.","ask":1,
+      "failures":[{"reason":"a-later-reason"}],
+      "stats":{"durationMs":4000.5,"transcriptChars":1,"inputTokens":1,"outputTokens":1}}
+      """
+    _ = await bridge.handle(
+      HTTPRequest(method: "POST", path: "/v1/context", query: [:], body: Data(body.utf8)))
+    #expect(await bridge.current.context == summary)
+    #expect(await bridge.lastSummary?.line == "The last summary used Haiku 5.5: Opus 5.5 failed.")
+  }
+
+  /// The log names the model asked for, or the fallback when that one failed, with the post's numbers.
+  @Test func theLogNamesTheAskedModel() async throws {
+    summaryModel.withLock { $0 = "claude-opus-5-5" }
+    try await join(a, "Alpha", writesSummaries: true)
+    let stats = SummaryStats(
+      durationMs: 4_000, transcriptChars: 90_000, inputTokens: 25_000, outputTokens: 400)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "One.", stats: stats))
+    await bridge.loadContext()
+    try await post(
+      "/v1/context",
+      ContextBody(
+        sessionId: a, summary: "Two.", failures: [SummaryFailure(reason: .apiError, error: nil)]))
+    let reported = timings.withLock { $0 }
+    #expect(reported.map(\.model) == ["claude-opus-5-5", "claude-haiku-5-5"])
+    #expect(reported.first?.stats == stats)
+  }
+
+  /// No model was tried on a transcript that could not be read, so the log names none.
+  @Test func anUnreadableTranscriptLogsNoModel() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let unreadable = [SummaryFailure(reason: .transcriptUnreadable, error: nil)]
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "", failures: unreadable, ask: 1))
+    let timing = try #require(timings.withLock { $0.last })
+    #expect(!SummaryLog.line(timing).contains("model="))
+  }
+
+  // MARK: The ask's number
+
+  /// A post for another ask is logged with its own facts: not the open ask's time or model.
+  @Test func aPostForAnotherAskLogsOnlyItsOwnFacts() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await join(a, "Alpha", missed: true, writesSummaries: true)
+    await bridge.loadContext()
+    let stats = SummaryStats(durationMs: 1, transcriptChars: 2, inputTokens: 3, outputTokens: 4)
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "From before.", stats: stats, ask: 1))
+    let timing = try #require(timings.withLock { $0.last })
+    #expect(timing.askedFor == nil && timing.model == nil)
+    #expect(timing.stats == stats && timing.stale)
+  }
+
+  /// A post that repeats an answered ask's number is ignored, and logged as nothing.
+  @Test func aRepeatedAnswerIsNotLogged() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(timings.withLock { $0.count } == 1)
+  }
+
+  /// A post that a gap made stale carries the old number, so it cannot take the fresh ask.
+  @Test func aStalePostDoesNotAnswerTheFreshAsk() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+    try await join(a, "Alpha", missed: true, writesSummaries: true)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "From before.", ask: 1))
+    #expect(await bridge.current.context == nil)
+    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)?.number == 2)
+    #expect(timings.withLock { $0.last?.stale } == true)
+    #expect(await bridge.lastSummary == nil)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
+    #expect(await bridge.current.context == summary)
+  }
+
+  /// A joined ask goes to the mod again with its number, so a mod that lost the send writes it.
+  @Test func aJoinedAskIsHandedAgainWithItsNumber() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    _ = try await registry.poll(a)  // taken by a mod that then dies
+    try await join(a, "Alpha", writesSummaries: true)
+    try await pass(5, polling: a)
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+  }
+
+  /// An answer that closes the ask, empty or stale, is kept, so a restart does not open it again.
+  @Test func anAnswerThatClosesTheAskIsSaved() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now) == nil)
+    await bridge.loadContext()
+    await bridge.newConversation()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "From before.", ask: 2))
+    #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now) == nil)
+  }
+
+  /// A joined ask changes no stored ask, so the conversation file is not written again.
+  @Test func aJoinedAskWritesNothing() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    let file = dir.appending(path: "continuity.json")
+    let written = try FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber]
+    await bridge.loadContext()
+    let after = try FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber]
+    #expect(after as? Int == written as? Int)
+  }
+
+  /// An older mod echoes no number and joins a second ask to the send on its way, so the stale
+  /// ask stays open and its post is still refused.
+  @Test func anOlderModsPostAfterAForgetAndASecondAskIsRefused() async throws {
+    try await join(a, "Alpha")
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context())
+    await bridge.newConversation()
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
+    #expect(await bridge.current.context == nil)
+  }
+
   /// A summary on its way when the owner presses New conversation does not bring back what was
   /// just forgotten.
   @Test func aSummaryAskedForBeforeNewConversationIsIgnored() async throws {
     try await join(a, "Alpha")
     await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context)
+    #expect(try await registry.poll(a) == .context())
     await bridge.newConversation()
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
     #expect(await bridge.current.context == nil)
@@ -1265,12 +1683,11 @@ struct BridgeTests {
   @Test func anIgnoredSummaryIsNotAnnounced() async throws {
     try await join(a, "Alpha")
     try await join(b, "Beta")
-    var arrivals = bridge.contextArrivals.makeAsyncIterator()
     await bridge.loadContext()
     await bridge.newConversation()
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
-    #expect(await arrivals.next() == b)
+    #expect(await bridge.current.targetSummary == .none)
   }
 
   /// The context line is shown exactly as the voice gets it, also after the app restarts.
@@ -1294,6 +1711,246 @@ struct BridgeTests {
   /// The same app data after the app restarted: a fresh bridge and registry.
   func restart() throws -> BridgeTests { try BridgeTests(dir: dir, time: time) }
 
+  // MARK: The line waits for its context
+
+  /// Alpha joined on a mod that writes summaries, and the call started, which asked it at once.
+  func startWriting() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.perform(.start)
+  }
+
+  /// Speech opens the line, which waits for the summary asked for at `asked`.
+  func speakAndWait(asked: Date) async -> Task<Void, Never> {
+    let opening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { time.deadlines.contains(asked + SummaryAsks.Policy.waitLimit) })
+    return opening
+  }
+
+  /// The clock `seconds` on, one at a time, `id` polling as a live mod does.
+  func pass(_ seconds: Int, polling id: SessionID) async throws {
+    for _ in 0..<seconds {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(id)
+    }
+  }
+
+  @Test func startAsksAtOnceForAWritingMod() async throws {
+    try await startWriting()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+  }
+
+  /// An older mod forks on the session's own model, so Start spends nothing on it; its line asks
+  /// as before and does not wait.
+  @Test func anOlderModIsAskedWithItsLineAndNotWaitedFor() async throws {
+    try await join(a, "Alpha")
+    await bridge.perform(.start)
+    #expect(try await registry.poll(a) == nil)
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.count == 1)
+    #expect(try await registry.poll(a) == .context())
+  }
+
+  @Test func theLineOpensAfterTheSummaryWithItInTheSeed() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    #expect(await voice.opens.isEmpty)
+    #expect(await bridge.status.call == .connecting)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await settle(opening)
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  @Test func theLimitOpensTheLineWithoutIt() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryAsks.Policy.waitLimit) - 1, polling: a)
+    #expect(await voice.opens.isEmpty)
+    try await pass(1, polling: a)
+    try await settle(opening)
+    #expect(await voice.opens == [[]])
+  }
+
+  /// A summary after the limit is still the open ask's answer: it reaches the open line.
+  @Test func aLateSummaryReachesTheOpenLine() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryAsks.Policy.waitLimit), polling: a)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await voice.added == [summary])
+  }
+
+  /// A line that waited out the limit spends the wait: the next line, for a new ask, opens at once.
+  @Test func theLimitIsNotWaitedForAgainThisCall() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryAsks.Policy.waitLimit), polling: a)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    await bridge.loadContext()
+    Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.opens.count == 2 })
+  }
+
+  /// A result that would open the line waits for the summary as speech does.
+  @Test func aResultWaitsLikeSpeech() async throws {
+    try await startWriting()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await sync(a, "Fix the build.")
+    let asked = time.now
+    await bridge.loadContext()
+    try await answer(request(1), from: a)
+    #expect(await eventually { time.deadlines.contains(asked + SummaryAsks.Policy.waitLimit) })
+    #expect(await voice.opens.isEmpty)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Newer work.", ask: 2))
+    #expect(await eventually { await voice.opens.count == 1 })
+    #expect(await voice.opens.first?.first?.text == "[CONTEXT] Alpha: Newer work.")
+  }
+
+  /// A change wakes the waiting line to look again, and the answer lands at once, while it looks:
+  /// it still opens the line.
+  @Test func anAnswerJustAfterAWakeOpensTheLine() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    await bridge.loadContext()  // joins ask 1, and its change wakes the line
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await settle(opening)
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  @Test func stopDuringTheWaitOpensNothing() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    await bridge.perform(.stop)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await voice.opens.isEmpty)
+    #expect(await bridge.status.call == .off)
+  }
+
+  /// Stop ends the logged wait too: an answer after it counts no line's wait.
+  @Test func stopEndsTheLoggedWait() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(3, polling: a)
+    await bridge.perform(.stop)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(timings.withLock { $0.last?.waited } == nil)
+  }
+
+  /// The waiting line closes, the new target is asked at once, and the old summary is stored
+  /// when it lands.
+  @Test func aTargetChangeEndsTheWaitAndAsksTheNew() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let asked = time.now
+    await bridge.perform(.start)
+    let opening = await speakAndWait(asked: asked)
+    await bridge.setTarget(b)
+    try await settle(opening)
+    #expect(await bridge.status.call == .listening)
+    #expect(await voice.opens.isEmpty)
+    #expect(try await registry.poll(b) == .context(model: SummaryModel.default, ask: 2))
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(try saved()[a].context == summary)
+  }
+
+  /// The registry makes another session the target when the target stops polling: that is a
+  /// target change too.
+  @Test func aRetargetAfterADropAsksTheNewTarget() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let joined = time.now
+    await bridge.perform(.start)
+    time.advance(by: .milliseconds(4_900))
+    #expect(await eventually { time.deadlines.contains { $0 > joined + 5 } })  // swept, asleep
+    _ = try await registry.poll(b)
+    time.advance(by: .seconds(1))  // Alpha has not polled for 5 s
+    #expect(
+      try await eventually {
+        try await registry.poll(b) == .context(model: SummaryModel.default, ask: 2)
+      })
+    #expect(await registry.target == b)
+  }
+
+  /// The line reopens over the new transport and waits again, for the same ask.
+  @Test func aReconnectDuringTheWaitWaitsForTheSameAsk() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    await bridge.reconnect()
+    try await settle(opening)
+    #expect(await eventually { await audio.offers.count == 2 })
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
+    #expect(await voice.opens.isEmpty)
+    #expect(await bridge.status.call == .connecting)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(await eventually { await voice.opens.count == 1 })
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  /// A summary written before a gap is ignored, and the line still waits for the fresh one.
+  @Test func aPostForAnOlderAskDoesNotEndTheWait() async throws {
+    try await startWriting()
+    try await join(a, "Alpha", missed: true, writesSummaries: true)
+    let asked = time.now
+    let opening = await speakAndWait(asked: asked)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "From before.", ask: 1))
+    try await Task.sleep(for: .milliseconds(100))  // a line opened by it would be there by now
+    #expect(await voice.opens.isEmpty)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
+    try await settle(opening)
+    #expect(await voice.opens.first?.first?.text == summary)
+  }
+
+  @Test func aNewCallWaitsAgainForASessionThatFailed() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+    try await settle(opening)
+    await bridge.perform(.stop)
+    let again = time.now
+    await bridge.perform(.start)
+    let reopening = await speakAndWait(asked: again)
+    #expect(await voice.opens.count == 1)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
+    try await settle(reopening)
+    #expect(await voice.opens.last?.first?.text == summary)
+  }
+
+  /// A target change back and forth ends the first wait for the log too: `waited` counts only the
+  /// line that got the summary.
+  @Test func aTargetChangeStartsTheLoggedWaitAgain() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let asked = time.now
+    await bridge.perform(.start)
+    let opening = await speakAndWait(asked: asked)
+    try await pass(2, polling: a)
+    await bridge.setTarget(b)
+    try await settle(opening)
+    await bridge.setTarget(a)
+    let deadline = asked + SummaryAsks.Policy.waitLimit
+    let asleep = time.deadlines.count { $0 == deadline }  // the first line's, woken or not
+    let reopening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { time.deadlines.count { $0 == deadline } > asleep })
+    try await pass(2, polling: a)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await settle(reopening)
+    #expect(timings.withLock { $0.last?.waited } == 2)
+  }
+
   // MARK: Context when a line opens
 
   let summary = "[CONTEXT] Alpha: Alpha's work."
@@ -1316,7 +1973,7 @@ struct BridgeTests {
   @Test func aLineWithNoContextAsksForASummary() async throws {
     let test = try BridgeTests()
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
     #expect(try await test.registry.poll(test.a) == nil)
   }
 
@@ -1328,7 +1985,7 @@ struct BridgeTests {
     test.voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await test.bridge.status.call == .listening })
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
   }
 
   /// The line after a target switch asks the new target, and the old target is not asked.
@@ -1341,7 +1998,7 @@ struct BridgeTests {
     await test.bridge.setTarget(test.b)
     #expect(try await test.registry.poll(test.b) == nil)  // switching asks for nothing
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.b) == .context)
+    #expect(try await test.registry.poll(test.b) == .context())
     #expect(try await test.registry.poll(test.a) == nil)
   }
 
@@ -1359,7 +2016,7 @@ struct BridgeTests {
     try await post("/v1/context", context())
     try await join(a, "Alpha", missed: true)
     await live()
-    #expect(try await registry.poll(a) == .context)
+    #expect(try await registry.poll(a) == .context())
   }
 
   /// A paused mark outlasts the setting: the owner decides with Load context. Also with no
@@ -1386,7 +2043,7 @@ struct BridgeTests {
     await test.live()
     #expect(try await test.registry.poll(test.a) == nil)
     await test.bridge.loadContext()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
   }
 
   /// The menu's Load context follows `needsContext`, for each cause and for a current voice.
@@ -1520,12 +2177,12 @@ struct BridgeTests {
     try await join(a, "Alpha", syncs: nil)
     try await post("/v1/context", context())
     await live()
-    #expect(try await registry.poll(a) == .context)
+    #expect(try await registry.poll(a) == .context())
     try await post("/v1/context", context())
     voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await bridge.status.call == .listening })
     await bridge.audioEvent(.speechStarted)
-    #expect(try await registry.poll(a) == .context)
+    #expect(try await registry.poll(a) == .context())
   }
 
   /// A summary the same as the stored one still means the voice is current again.
@@ -1560,7 +2217,7 @@ struct BridgeTests {
     try await post("/v1/context", context())
     #expect(await voice.added.isEmpty)
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added == [summary])
   }
 
@@ -1580,7 +2237,7 @@ struct BridgeTests {
     #expect(await eventually { await voices.waiting == 1 })
     try await test.post("/v1/context", test.context())
     await voices.finishLaunch()
-    await opening.value
+    try await settle(opening)
     let second = try #require(await voices.made.last)
     #expect(await second.opens.last?.map(\.text).contains(test.summary) == true)
     #expect(await second.added.isEmpty)
@@ -1596,7 +2253,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added.isEmpty)
   }
 
@@ -2054,7 +2711,7 @@ struct BridgeTests {
     try await test.post(
       "/v1/join", JoinBody(sessionId: new, title: "Alpha", replaces: test.a, syncs: true))
     await test.voice.releaseOpen()
-    await opened.value
+    try await settle(opened)
     #expect(await eventually { await test.bridge.status.call == .live })
     #expect(await test.voice.added.contains { $0.contains("Held summary") })
   }
@@ -2320,13 +2977,58 @@ struct BridgeTests {
     #expect(await eventually { await lines() == ["Voice: Option B"] })
   }
 
+  /// The silence is read from Settings each time it is counted, so a change made on an open line
+  /// holds from the owner's next words.
+  @Test func aLineClosesAfterTheSilenceSet() async throws {
+    await live()
+    #expect(await eventually { await bridge.status.call == .live })
+    timeouts.withLock { $0.silence = 7 }
+    await bridge.audioEvent(.speechEnded)
+    let closing = time.now + 7
+    #expect(await eventually { time.deadlines.contains(closing) })
+    time.advance(by: .seconds(6))
+    _ = try await registry.poll(a)  // the session stays joined
+    #expect(await bridge.status.call == .live)
+    time.advance(by: .seconds(1))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
+  /// A silence turned back on while the line is quiet starts counting from the change.
+  @Test func aSilenceTurnedOnClosesAQuietLine() async throws {
+    timeouts.withLock { $0.silence = 0 }
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    #expect(await eventually { await bridge.status.call == .live })
+    timeouts.withLock { $0.silence = 7 }
+    await bridge.timeoutsChanged()
+    let closing = time.now + 7
+    #expect(await eventually { time.deadlines.contains(closing) })
+    time.advance(by: .seconds(7))
+    #expect(await eventually { await bridge.status.call == .listening })
+  }
+
+  /// With the silence at 0, quiet never closes the line.
+  @Test func aSilenceOfZeroKeepsTheLineOpen() async throws {
+    timeouts.withLock { $0.silence = 0 }
+    await live()
+    await bridge.audioEvent(.speechEnded)
+    #expect(await eventually { await bridge.status.call == .live })
+    try await Task.sleep(for: .milliseconds(50))  // a silence timer, if any, is armed by now
+    for _ in 0...CallMachine.Timeouts.range.upperBound {
+      time.advance(by: .seconds(1))
+      _ = try await registry.poll(a)
+    }
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await bridge.status.call == .live)
+  }
+
   /// The owner's words trail their voice, so they say nothing about whether the owner still
   /// speaks: the line hangs up when it would have without them.
   @Test func theOwnersWordsDoNotMoveTheSilenceHangUp() async throws {
     await live()
     await bridge.audioEvent(.speechEnded)
     #expect(await eventually { time.sleepers >= 3 })  // sweep, 2 silence timers
-    for _ in 1..<CallMachine.silenceSeconds {
+    for _ in 1..<CallMachine.Timeouts().silence {
       time.advance(by: .seconds(1))
       _ = try await registry.poll(a)  // the session stays joined
     }
@@ -2519,7 +3221,7 @@ struct BridgeTests {
     let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
     try await post("/v1/join", JoinBody(sessionId: cleared, title: "Alpha", replaces: a))
     await audio.releaseOffer()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
   }
 
@@ -2559,7 +3261,7 @@ struct BridgeTests {
     #expect(await eventually { await voices.waiting == 1 })
     try await test.sync(test.a, "Fix the build.")
     await voices.finishLaunch()
-    await opening.value
+    try await settle(opening)
     let second = try #require(await voices.made.last)
     #expect(await second.opens.last?.map(\.text) == ["[TYPED] Alpha: Fix the build."])
     #expect(await second.added.isEmpty)
@@ -2574,7 +3276,7 @@ struct BridgeTests {
     #expect(await eventually { await voice.openWaiting == 1 })
     try await sync(a, "Fix the build.")
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await voice.added == ["[TYPED] Alpha: Fix the build."])
     #expect(await voice.opens.last?.isEmpty == true)
   }
@@ -2709,7 +3411,7 @@ struct BridgeTests {
   @Test func theFirstLineUnderThePauseAsksForContext() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
   }
 
   @Test func aPausedSessionWithNoSummaryAsksForContext() async throws {
@@ -2718,7 +3420,7 @@ struct BridgeTests {
     try await test.sync(test.a, "Private thing.")
     #expect(try test.saved()[test.a].outOfSync == .paused)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
   }
 
   /// A mark outlasts the pause setting: the first summary goes over the mark on its own.
@@ -2728,7 +3430,7 @@ struct BridgeTests {
     try await test.sync(test.a, "Private thing.")
     test.setPause(false)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
   }
 
   @Test func withTheSettingOffTheFirstLineUnderThePauseAsksForNothing() async throws {
@@ -2772,7 +3474,7 @@ struct BridgeTests {
   @Test func afterTheFirstSummaryThePauseWorksAsBefore() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
     try await test.post("/v1/context", test.context())
     #expect(try test.saved()[test.a].outOfSync == nil)
     await test.bridge.perform(.stop)
@@ -2787,7 +3489,7 @@ struct BridgeTests {
   @Test func aFirstSummaryOvertakenByPausedTypingIsIgnored() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
     await test.bridge.perform(.stop)
     try await test.sync(test.a, "Private thing.")
     try await test.post("/v1/context", test.context())
@@ -2804,7 +3506,7 @@ struct BridgeTests {
     await test.bridge.newConversation()
     #expect(try test.saved()[test.a].outOfSync == .paused)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
   }
 
   @Test func aLineForANewTargetUnderThePauseAsksThatTarget() async throws {
@@ -2817,24 +3519,24 @@ struct BridgeTests {
     await test.bridge.setTarget(test.b)
     #expect(await eventually { await test.bridge.status.call == .listening })
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.b) == .context)
+    #expect(try await test.registry.poll(test.b) == .context())
   }
 
   /// A first ask that brought nothing is asked again by the next line.
   @Test func aReopenedLineWithStillNoSummaryAsksAgain() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
     test.voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await test.bridge.status.call == .listening })
     await test.bridge.audioEvent(.speechStarted)
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
   }
 
   @Test func aReopenedLineAfterTheFirstSummaryAsksForNothing() async throws {
     let test = try BridgeTests(pausesSync: true, loadsContextOnFirstCall: true)
     await test.live()
-    #expect(try await test.registry.poll(test.a) == .context)
+    #expect(try await test.registry.poll(test.a) == .context())
     try await test.post("/v1/context", test.context())
     test.voice.emit(.closed(.other("The voice session closed (example).")))
     #expect(await eventually { await test.bridge.status.call == .listening })
@@ -3072,7 +3774,7 @@ struct BridgeTests {
     try await sync(a, "Rename the folder.")
     await bridge.audioEvent(.lineError(code: "usage_check_failed", message: "No."))
     await voice.releaseOpen()
-    await opening.value
+    try await settle(opening)
     #expect(await bridge.status.call == .off)
     await live()
     #expect(await seeded("[TYPED] Alpha: Rename the folder.") == 1)
@@ -3487,5 +4189,119 @@ struct BridgeTests {
     #expect(lines.count == 2)
     #expect(lines.first?.hasPrefix("Weekly window resets ") == true)
     #expect(lines.last?.hasPrefix("Read at ") == true)
+  }
+
+  // MARK: Checking a custom summary model
+
+  /// Polls `session` until it is handed a model check, and returns the check's id.
+  func checkHanded(to session: SessionID) async throws -> String {
+    for _ in 0..<200 {
+      if case .checkModel(let id, _) = try await registry.poll(session) { return id }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    throw StillRunning(limit: .seconds(2))
+  }
+
+  /// Starts Settings' check of `claude-x-1`. Settle the task: it fails the test unless the check
+  /// ends with `expected`, and a check that never ends fails it within `settle`'s bound.
+  func check(endsWith expected: ModelCheckResult) -> Task<Void, Never> {
+    Task { #expect(await bridge.checkModel("claude-x-1") == expected) }
+  }
+
+  func checkResult(
+    from session: SessionID, _ id: String, ok: Bool = false,
+    _ reason: SummaryFailure.Reason? = .modelRefused, _ kind: String? = nil
+  ) async throws {
+    try await post(
+      "/v1/model-check",
+      ModelCheckBody(
+        sessionId: session, id: id, ok: ok, reason: ok ? nil : reason, error: kind))
+  }
+
+  @Test func noSessionThatCanCheck() async throws {
+    try await join(a, "Alpha")
+    #expect(await bridge.checkModel("claude-x-1") == .noSession)
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  @Test func theTargetChecksFirst() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let checking = check(endsWith: .works)
+    let id = try await checkHanded(to: a)
+    #expect(try await registry.poll(b) == nil)
+    try await checkResult(from: a, id, ok: true)
+    try await settle(checking)
+  }
+
+  /// A target on an older mod cannot check: the session that joined last and can, does.
+  @Test func elseTheNewestSessionThatCanChecks() async throws {
+    let c = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await join(a, "Alpha")
+    try await join(b, "Beta", writesSummaries: true)
+    try await join(c, "Gamma", writesSummaries: true)
+    let checking = check(endsWith: .works)
+    let id = try await checkHanded(to: c)
+    #expect(try await registry.poll(b) == nil)
+    try await checkResult(from: c, id, ok: true)
+    try await settle(checking)
+  }
+
+  @Test func aResultFromAnotherSessionIsIgnored() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let checking = check(endsWith: .refused(.modelRefused, kind: nil))
+    let id = try await checkHanded(to: a)
+    try await checkResult(from: b, id, ok: true)
+    try await checkResult(from: a, "another check", ok: true)
+    try await checkResult(from: a, id)
+    try await settle(checking)
+  }
+
+  @Test func noAnswerIn20Seconds() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let asked = time.now
+    let checking = check(endsWith: .noAnswer)
+    _ = try await checkHanded(to: a)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    time.advance(by: .seconds(20))
+    try await settle(checking)
+  }
+
+  /// A check that ended before its session polled, here by a newer check that went to another
+  /// session, is not handed over and run for nothing.
+  @Test func aCheckThatEndedIsNotHandedOut() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    try await join(b, "Beta", writesSummaries: true)
+    let asked = time.now
+    let older = check(endsWith: .noAnswer)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    await bridge.setTarget(b)
+    _ = check(endsWith: .works)
+    try await settle(older)
+    let handed = try await registry.poll(a)
+    #expect(handed == nil)
+  }
+
+  /// `/clear` before the session polls: the new id is handed the check, and its result counts.
+  @Test func aCheckFollowsTheSessionsNewID() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let asked = time.now
+    let checking = check(endsWith: .works)
+    #expect(await eventually { time.deadlines.contains(asked + 20) })
+    let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+    try await post(
+      "/v1/join",
+      JoinBody(sessionId: cleared, title: "Alpha", replaces: a, writesSummaries: true))
+    try await checkResult(from: cleared, try await checkHanded(to: cleared), ok: true)
+    try await settle(checking)
+  }
+
+  @Test func theSessionLeavingGivesNoAnswer() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    let checking = check(endsWith: .noAnswer)
+    _ = try await checkHanded(to: a)
+    try await post("/v1/leave", LeaveBody(sessionId: a))
+    try await settle(checking)
   }
 }

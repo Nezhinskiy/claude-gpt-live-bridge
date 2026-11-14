@@ -47,10 +47,10 @@ test('aFailedPostMeansAMissedJoin', async ($, on) => {
   world.joined.delete(ID)
   world.isAppUp = true
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true, missed: true }])
   world.joined.delete(ID)
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true }])
 })
 
 test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
@@ -63,7 +63,7 @@ test('anAppThatRestartedIsToldOfTheLineItLost', async ($, on) => {
   world.syncStatus = 404
   await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'Renamed.' })
   await world.clock.advance(1000)
-  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, missed: true }])
+  expect(world.take('join')).toEqual([{ sessionId: ID, title: 'Example session', syncs: true, writesSummaries: true, missed: true }])
 })
 
 /** The voice never hears of the question or the prompt, so its picture of the turn has a hole. */
@@ -138,5 +138,24 @@ test('anInstalledAppIsOpenedByItsPath', async ($, on) => {
   expect(world.launches).toEqual([['open', '-g', '/Applications/LiveBridge.app']])
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await band.find({ type: 'Text', text: /menu bar/ })).toBeUndefined()
+  await band.unmount()
+})
+
+/** The target's fast polls stop at the first failed one: the band says offline when it always did. */
+test('aTargetSaysOfflineAfterTenSecondsAsBefore', async ($, on) => {
+  const world = fakeWorld(on)
+  world.status = {
+    call: 'listening', unheard: 0, minutesToday: 0, isMuted: false,
+    sessions: [{ sessionId: ID, label: 'Example session', activity: 'idle', isTarget: true }],
+  }
+  await liveOn($)
+  await world.clock.advance(1000)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  world.isAppUp = false
+  await world.clock.advance(10_000)
+  expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeUndefined()
+  expect(world.launches).toHaveLength(2)
+  await world.clock.advance(1000)
+  expect(await band.find({ type: 'Text', text: /bridge offline/ })).toBeDefined()
   await band.unmount()
 })

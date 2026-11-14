@@ -5,7 +5,8 @@ import Observation
 /// The menu bar glyph, "Span": nine bars standing on a bridge deck whose heights trace one span
 /// of a suspension bridge (two tall towers, the main cable sagging between them, short side
 /// spans). The bars double as a level meter and move per call phase; a badge between the towers
-/// shows sessions at work, an approval, or unheard results, and a broken deck shows a problem.
+/// shows sessions at work, an approval, the target's context loading, or unheard results, and a
+/// broken deck shows a problem.
 /// Drawn as a 24 × 18 pt template image, so the menu bar tints it for light and dark.
 enum SpanGlyph {
   static let size = NSSize(width: 24, height: 18)
@@ -44,8 +45,9 @@ enum SpanGlyph {
     }
   }
 
-  /// One frame; `t` turns the working ring and pulses the approval diamond.
-  static func image(heights: [CGFloat], badge: Badge, faded: Bool, t: Double) -> NSImage {
+  /// One frame; `t` runs the working dots, turns the loading ring and pulses the approval diamond,
+  /// and nil is the still frame used when motion is reduced.
+  static func image(heights: [CGFloat], badge: Badge, faded: Bool, t: Double?) -> NSImage {
     let image = NSImage(size: size, flipped: true) { _ in
       NSColor.black.withAlphaComponent(faded ? 0.5 : 1).setFill()
       let broken = badge == .problem
@@ -71,10 +73,21 @@ enum SpanGlyph {
     return image
   }
 
-  private static func drawBadge(_ badge: Badge, t: Double) {
+  private static func drawBadge(_ badge: Badge, t: Double?) {
+    let still = t == nil
+    let t = t ?? 0
     switch badge {
     case .none: break
-    case .working:  // a three-quarter ring that turns once a second
+    case .working:  // dots turning in depth, gathering and opening again: Claude thinking
+      for dot in orbit(t: still ? nil : t) {
+        NSColor.black.withAlphaComponent(dot.alpha).setFill()
+        NSBezierPath(
+          ovalIn: NSRect(
+            x: dot.x - dot.radius, y: dot.y - dot.radius, width: 2 * dot.radius,
+            height: 2 * dot.radius)
+        ).fill()
+      }
+    case .loadingContext:  // a three-quarter ring that turns once a second
       let ring = NSBezierPath()
       let turn = t.truncatingRemainder(dividingBy: 1) * 360
       ring.appendArc(
@@ -105,6 +118,41 @@ enum SpanGlyph {
       NSBezierPath(ovalIn: NSRect(x: 10.8, y: 13.7, width: 2.4, height: 2.4)).fill()
     }
   }
+
+  /// The working badge's dots at `t`, farthest first, on a 4.8 s cycle: three turn on a ring
+  /// lying almost flat, gather into one, open as four turning the other way on a ring stood
+  /// almost upright, gather, and open as three again. Seen in perspective, a nearer dot is larger
+  /// and darker. nil is the still frame, three dots.
+  private static func orbit(t: Double?) -> [(x: Double, y: Double, radius: Double, alpha: Double)] {
+    let cycle = (t ?? 0.8).truncatingRemainder(dividingBy: 4.8)
+    let (count, spread): (Int, Double) =
+      switch cycle {
+      case ..<1.6: (3, 1)
+      case ..<2.0: (3, ease(1 - (cycle - 1.6) / 0.4))
+      case ..<2.4: (4, ease((cycle - 2.0) / 0.4))
+      case ..<4.0: (4, 1)
+      case ..<4.4: (4, ease(1 - (cycle - 4.0) / 0.4))
+      default: (3, ease((cycle - 4.4) / 0.4))
+      }
+    let turn = 2 * .pi * (t ?? 0.3) / 1.6
+    let tilt = 0.55  // the ring leans back, so it is seen in depth
+    let (roll, direction) = count == 3 ? (0.15, 1.0) : (1.25, -1.0)
+    let ring = 3.4 * spread
+    let eye = 8.0  // the viewer's distance from the ring's centre
+    return (0..<count).map { i in
+      let angle = direction * turn + Double(i) * 2 * .pi / Double(count)
+      let (flat, depth) = (ring * cos(angle), ring * sin(angle))  // depth > 0 is nearer
+      let (up, z) = (depth * sin(tilt), depth * cos(tilt))
+      let (x, y) = (flat * cos(roll) - up * sin(roll), flat * sin(roll) + up * cos(roll))
+      let scale = eye / (eye - z)
+      let near = ring > 0 ? (z + ring) / (2 * ring) : 1
+      let size = 1.15 + 0.6 * (1 - spread)  // gathered, the dots become one larger dot
+      return (12 + x * scale, 4.6 + 0.75 * y * scale, size * scale, 0.45 + 0.55 * near)
+    }.sorted { $0.radius < $1.radius }
+  }
+
+  /// 0 to 1, slow at both ends.
+  private static func ease(_ x: Double) -> Double { 0.5 - 0.5 * cos(.pi * x) }
 }
 
 /// Keeps the menu bar image current: still frames for still states, 12 frames a second while
@@ -113,7 +161,7 @@ enum SpanGlyph {
 @MainActor @Observable
 final class StatusGlyph {
   private(set) var image = SpanGlyph.image(
-    heights: SpanGlyph.off, badge: .none, faded: true, t: 0)
+    heights: SpanGlyph.off, badge: .none, faded: true, t: nil)
   @ObservationIgnored private var phase = CallPhase.off
   @ObservationIgnored private var badge = Badge.none
   @ObservationIgnored private var level = 0.0
@@ -126,7 +174,7 @@ final class StatusGlyph {
     self.level = 0.6 * self.level + 0.4 * level  // a little smoothing between level messages
     let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     let moves =
-      !reduce && badge != .problem && (phase != .off || [.working, .approval].contains(badge))
+      !reduce && badge != .problem && (phase != .off || badge == .approval)
     if moves, timer == nil {
       let timer = Timer(timeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
         MainActor.assumeIsolated { self?.draw(still: false) }
@@ -143,6 +191,7 @@ final class StatusGlyph {
   private func draw(still: Bool) {
     let t = Date().timeIntervalSince(started)
     let heights = SpanGlyph.heights(phase, t: still ? nil : t, level: level)
-    image = SpanGlyph.image(heights: heights, badge: badge, faded: phase == .off, t: still ? 0 : t)
+    image = SpanGlyph.image(
+      heights: heights, badge: badge, faded: phase == .off, t: still ? nil : t)
   }
 }

@@ -412,6 +412,44 @@ struct CallMachineTests {
       "targetChangeWhileConnectingCloses", connecting, .conversationChanged, .listening,
       [.closeRealtime]),
     row("targetChangeWhileListeningChangesNothing", [.start], .conversationChanged, .listening, []),
+    // a new transport: the line is opened again in one step, and the call's state stays
+    row(
+      "reconnectReopensTheOpenLine", live + [deliver(a)], .reconnect, .connecting,
+      [.reopenRealtime(preroll: false)], pending: [a]),
+    row(
+      "reconnectWhileTheOwnerSpeaksKeepsThePreroll", connecting, .reconnect, .connecting,
+      [.reopenRealtime(preroll: true)]),
+    row("reconnectWhileListeningChangesNothing", [.start], .reconnect, .listening, []),
+    row("reconnectWhileOffChangesNothing", [], .reconnect, .off, []),
+    row(
+      "aLineReconnectedForTheOwnerWaitsTheUsualSilence", live + [.reconnect], .connected, .live,
+      [.problem(nil), .flushPreroll, arm]),
+    row(
+      "aLineReconnectedBeforeItsFirstWordStillWaitsForIt", [.start, opening(result), .reconnect],
+      .connected, .live, [.problem(nil), .flushPreroll, .addContext(result), firstWord],
+      pending: [result]),
+    // the handoff's result is still awaited on the new line: silence does not close it
+    row(
+      "aReconnectedLineKeepsWaitingForTheResult",
+      waiting + [.reconnect, .connected], .silenceElapsed, .live, []),
+    row(
+      "aReconnectedLineSpeaksTheAwaitedResult", waiting + [.reconnect, .connected], fromAlpha,
+      .live, [.confirmAnswer, .speak(result), arm], pending: [result]),
+    // the result window ending while the line reconnects still ends the wait
+    row(
+      "theResultWindowEndsWhileReconnecting",
+      waiting + [.reconnect, .resultWindowElapsed, .connected], .silenceElapsed, .listening,
+      [.closeRealtime]),
+    // with the silence already due, the window ending mid-reconnect lets the new line open;
+    // its own silence closes it
+    row(
+      "theResultWindowEndingWhileReconnectingClosesNothing",
+      waiting + [.silenceElapsed, .reconnect], .resultWindowElapsed, .connecting, []),
+    // the cut-off reply never finishes, so it holds back no result on the new line
+    row(
+      "aReplyCutOffByAReconnectDoesNotHoldTheResult",
+      waiting + [.assistantSpeaking, .reconnect, .connected], fromAlpha, .live,
+      [.confirmAnswer, .speak(result), arm], pending: [result]),
   ]
 
   @Test(arguments: table) func transition(_ row: Transition) {
@@ -420,6 +458,81 @@ struct CallMachineTests {
     #expect(machine.handle(row.event) == row.effects)
     #expect(machine.phase == row.phase)
     #expect(machine.pending == row.pending)
+  }
+
+  /// The effects of the last of `events`, on a machine with `timeouts`.
+  func last(_ events: [CallEvent], _ timeouts: CallMachine.Timeouts) -> [CallEffect] {
+    var machine = CallMachine()
+    machine.timeouts = timeouts
+    for event in events.dropLast() { _ = machine.handle(event) }
+    return machine.handle(events.last!)
+  }
+
+  static let set = CallMachine.Timeouts(silence: 45, firstWord: 7, noise: 33)
+
+  @Test func theSilenceIsTheSetting() {
+    #expect(last(Self.live, Self.set).contains(.armSilenceTimer(seconds: 45)))
+  }
+
+  @Test func aLineAResultOpenedWaitsTheSettingForAFirstWord() {
+    let opened = [.start, Self.opening(Self.result), .connected]
+    #expect(last(opened, Self.set).contains(.armSilenceTimer(seconds: 7)))
+  }
+
+  @Test func soundWithoutWordsIsCappedByTheSetting() {
+    #expect(last(Self.connecting + [.connected], Self.set).contains(.armSilenceTimer(seconds: 33)))
+  }
+
+  /// A first-word wait of 0 waits as long as the ordinary silence, so a line a result opened while
+  /// the owner is away never stays open for good unless the silence is off too.
+  @Test func aFirstWordWaitOfZeroWaitsTheSilence() {
+    let opened = [.start, Self.opening(Self.result), .connected]
+    let timeouts = CallMachine.Timeouts(silence: 20, firstWord: 0)
+    #expect(last(opened, timeouts).contains(.armSilenceTimer(seconds: 20)))
+  }
+
+  /// A timer turned on while an open line is quiet and nothing counts starts at once.
+  @Test func aTimerTurnedOnOnAQuietLineStarts() {
+    var machine = CallMachine()
+    machine.timeouts = .init(silence: 0)
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 30)
+    #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 30)])
+  }
+
+  /// A timer a change started follows the next changes, as a Stepper passes 1, 2, 3 on its way:
+  /// it never closes the line at a value the owner went past, and back at 0 it stops.
+  @Test func aTimerStillBeingSetFollowsTheSetting() {
+    var machine = CallMachine()
+    machine.timeouts = .init(silence: 0)
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 1)
+    #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 1)])
+    machine.timeouts = .init(silence: 20)
+    #expect(machine.handle(.timeoutsChanged) == [.armSilenceTimer(seconds: 20)])
+    machine.timeouts = .init(silence: 0)
+    #expect(machine.handle(.timeoutsChanged) == [.cancelSilenceTimer])
+  }
+
+  /// A change never moves a timer already counting.
+  @Test func aChangeLeavesATimerThatCounts() {
+    var machine = CallMachine()
+    for event in Self.live { _ = machine.handle(event) }
+    machine.timeouts = .init(silence: 30)
+    #expect(machine.handle(.timeoutsChanged) == [])
+  }
+
+  /// 0 switches a timer off: the one armed before is cancelled, and none takes its place.
+  @Test(
+    arguments: [
+      (live, CallMachine.Timeouts(silence: 0)),
+      ([.start, opening(result), .connected], CallMachine.Timeouts(silence: 0, firstWord: 0)),
+      (connecting + [.connected], CallMachine.Timeouts(noise: 0)),
+    ] as [([CallEvent], CallMachine.Timeouts)])
+  func zeroSwitchesATimerOff(_ events: [CallEvent], _ timeouts: CallMachine.Timeouts) {
+    let effects = last(events, timeouts)
+    #expect(effects.contains(.cancelSilenceTimer))
+    #expect(!effects.contains { if case .armSilenceTimer = $0 { true } else { false } })
   }
 
   /// After `/clear` the line waits for the session under its new id, and its unheard results
@@ -461,6 +574,14 @@ struct CallMachineTests {
       _ = machine.handle(event)
     }
     #expect(machine.withdraw { $0 == Self.asking } == [])
+    #expect(machine.phase == .connecting)
+  }
+
+  /// A reconnect is not a line a result opened: withdrawing nothing leaves it connecting.
+  @Test func withdrawingKeepsAReconnectedLine() {
+    var machine = CallMachine()
+    for event in Self.live + [.reconnect] { _ = machine.handle(event) }
+    #expect(machine.withdraw { _ in false } == [])
     #expect(machine.phase == .connecting)
   }
 

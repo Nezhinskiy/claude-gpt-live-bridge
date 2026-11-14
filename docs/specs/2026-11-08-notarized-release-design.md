@@ -1,6 +1,6 @@
 # Notarized release
 
-Status: written 2026-11-08; the workflow half is proven only by the first tag that runs it
+Status: delivered in 0.5.0, whose tag ran the workflow; written 2026-11-08
 ([What only the first tag proves](#what-only-the-first-tag-proves)).
 
 ## Why

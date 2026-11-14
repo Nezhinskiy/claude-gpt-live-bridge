@@ -11,7 +11,8 @@ the status section at most 50 lines); detail lives in the documents it links to.
 
 - `app/`: the SwiftPM package. `BridgeCore` holds every rule and is tested without codex, a
   microphone or Claude; `LiveBridge` is the menu bar app and its hidden audio page.
-- `plugin/`: the mod. `hooks/register.tsx` is the wiring; the other `hooks/*.ts` modules are pure.
+- `plugin/`: the mod. `hooks/register.tsx` is the wiring; the other `hooks/*.ts` modules are pure,
+  but for `context.ts`, which calls the engine.
 - `wire/fixtures/`: one JSON example of every message between the mod and the app.
 - `scripts/`: `check.sh`, `check-mod.sh`, `check-floor.sh`, `smoke.sh`, `build-app.sh`,
   `notarize.sh`.
@@ -48,7 +49,7 @@ the status section at most 50 lines); detail lives in the documents it links to.
 
 ## Current status
 
-- 0.5.0 is the latest release. Its open items are the README's
+- 0.6.0 is the latest release. Its open items are the README's
   [known limitations](README.md#known-limitations).
 <!-- stayfixed:harness:begin -->
 ## stayfixed

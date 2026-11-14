@@ -37,7 +37,7 @@ responde Claude, así que puedes alternar entre hablar y escribir.
 
 *El texto en inglés es el canónico ([README.md](../../README.md)); esta traducción puede ir por detrás.*
 
-**Una conversación, no un dictado.** GPT-Live escucha mientras habla: interrúmpelo y se detiene para oírte; piensa en voz alta y puede soltar un breve «ajá». **Dejas de pagar por el silencio:** OpenAI cobra la voz por minuto, así que tras 20 segundos de silencio la línea se cierra y se abre de nuevo cuando hablas, con la conversación donde la dejaste ([Facturación](#facturación-bajo-control-por-diseño)).
+**Una conversación, no un dictado.** GPT-Live escucha mientras habla: interrúmpelo y se detiene para oírte; piensa en voz alta y puede soltar un breve «ajá». **Dejas de pagar por el silencio:** OpenAI cobra la voz por minuto, así que tras un rato de silencio que fijas en [Ajustes](#ajustes) la línea se cierra y se abre de nuevo cuando hablas, con la conversación donde la dejaste ([Facturación](#facturación-bajo-control-por-diseño)).
 
 <p align="center"><img src="../assets/readme-demo.gif" alt="Hablando con una sesión de Claude Code a través de LiveBridge" width="100%"></p>
 
@@ -217,6 +217,18 @@ permitirlo.
 
 ### Desinstalación
 
+En la copia de `/Applications`, **Feedback & Support ▸ Uninstall LiveBridge…**, en el menú,
+pregunta primero y mueve la app a la Papelera; si no puede, lo dice y no cambia nada más. Luego termina la llamada abierta y cada sesión deja LiveBridge, como con la ×
+del menú, así que `/live` se apaga en ella en vez de volver a abrir LiveBridge; LiveBridge quita
+el inicio de sesión y el permiso del micrófono y se cierra, y una vez cerrado, los archivos que
+guarda (los de abajo) van a una carpeta de la Papelera, hasta que la vacíes. Deja
+el mod de Claude Code y copia el comando que lo quita, `claude plugin uninstall livebridge@livebridge`,
+para que lo ejecutes en Terminal. Una sesión que no estaba abierta entonces puede volver a
+buscar LiveBridge cuando se abra; quitar el mod lo termina.
+
+¿Lo instalaste con Homebrew? `brew uninstall --cask getlivebridge/tap/livebridge` quita la app y el registro de Homebrew;
+los pasos de abajo siguen siendo para los archivos que guarda la app.
+
 Desde un clon, `scripts/build-app.sh --uninstall` elimina `/Applications/LiveBridge.app`, sea cual
 sea la forma en que se instaló, su elemento de inicio de sesión y todos los archivos que conserva, e
 imprime los dos comandos que deja de tu mano: `tccutil reset Microphone com.getlivebridge.livebridge`
@@ -234,7 +246,7 @@ tccutil reset Microphone com.getlivebridge.livebridge
 claude plugin uninstall livebridge@livebridge
 ```
 
-Ninguna de las dos formas elimina una copia llamada `/Applications/.LiveBridge-update-….app`, que
+Ninguna de estas formas elimina una copia llamada `/Applications/.LiveBridge-update-….app`, que
 puede dejar una actualización interrumpida a mitad de la instalación. La aplicación elimina esas
 copias en su siguiente arranque; tras desinstalar, bórrala a mano si existe.
 
@@ -264,14 +276,24 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **El Start de la banda** convierte su sesión en el destino e inicia la llamada; la línea que abre
   recibe la conversación de la sesión, y carga además un resumen cuando a la voz le faltaría parte
   de ella (mira **Load context** abajo), pero con **Pause sync** activado o tras una pausa solo si aún no tiene ninguno
-  ([detalles](../../docs/architecture/overview.md#components)). Mientras la llamada habla con otra sesión,
+  ([detalles](../../docs/architecture/overview.md#components)). Con un mod de esta versión, el resumen
+  se pide al pulsar Start y al cambiar el destino durante la llamada, y la línea lo espera antes de
+  conectar, como mucho 10 segundos desde la petición: lo que digas mientras tanto se guarda en el Mac
+  y llega a la voz al abrirse la línea. Stop o un cambio de destino durante la espera descartan lo
+  guardado, y también una reconexión tras cambiar **Connect over TCP**, que guarda como mucho los
+  últimos 2 segundos para la línea que vuelve a abrirse. Mientras la llamada habla con otra sesión,
   la banda muestra **Talk here**. Si la banda no aparece en una sesión unida, `/live` la
   recupera.
 - **El menú de la barra de menús** contiene la llamada, las sesiones unidas (haz clic en una para
   convertirla en el destino), **Load context**, la **Conversation** del destino tal como la
   conserva LiveBridge (con una línea **Task** por cada petición que la voz pasó a Claude y una línea **Loaded context** donde se cargó un resumen), los
-  límites de uso, los minutos, **Star LiveBridge on GitHub** (abre la página del repositorio),
-  **Settings…** y **Quit LiveBridge**. Durante una llamada, **Conversation** muestra tus palabras y
+  límites de uso, los minutos, **Quick Settings** (elementos con marca de verificación para
+  **Connect over TCP**, **Play sounds for requests and answers**, **Notify when a result is waiting**, **Pause sync while the call is stopped** y **Load a session's context on its first call**),
+  **Settings…**, **Feedback & Support** (**Report a Bug…** abre el formulario de informe de errores
+  del repositorio, **LiveBridge Website** abre getlivebridge.com, **Star LiveBridge on GitHub** abre
+  la página del repositorio, y luego **Debug Mode** y **Show Debug Files…**, el interruptor y la
+  carpeta del [modo de depuración](#ajustes), y **Uninstall LiveBridge…** ([Desinstalación](#desinstalación))) y **Quit LiveBridge**. Quick Settings está ahí incluso cuando el menú
+  muestra solo la llamada. Durante una llamada, **Conversation** muestra tus palabras y
   las de la voz a medida que codex las transcribe, así que las tuyas pueden aparecer un momento después
   de decirlas y las de la voz un momento antes de oírlas. Cuando cada frase termina, su texto final
   las sustituye. Solo se conserva el texto final: las palabras que aún lo esperan cuando se cierra la
@@ -293,7 +315,9 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   conversación larga lo supera), la sesión estuvo en pausa y tiene resumen, o su mod no sincroniza. En otro caso el
   elemento dice **Context up to date** y está deshabilitado, porque la voz ya tiene la conversación.
   Sin línea abierta, cuando la siguiente línea va a cargar el resumen y no falta nada más, dice **Context loads with the line** y está deshabilitado, porque
-  la siguiente línea lo pide sola. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
+  la siguiente línea lo pide sola. Mientras un resumen del destino está en camino, lo haya pedido
+  quien sea, dice **Loading context…** y está deshabilitado, como mucho los 60 segundos que el mod le da (con un mod anterior sigue en **Load context**); uno que llega muestra **Context loaded**
+  un momento, y una respuesta vacía vuelve a **Load context**. Un resumen no lleva fecha, así que uno puede ignorarse con el elemento aún habilitado
   ([BR-002](../../docs/bugs/BR-002.md)).
 - **New conversation…** borra la conversación del destino y su contexto cargado, y la × de una
   sesión la elimina y borra la suya; ambas preguntan antes. La voz empieza de cero la próxima vez
@@ -301,40 +325,19 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   **Stop** los borra. Las preguntas de Claude en espera siguen otras reglas
   ([detalles](../../SECURITY.md#residual-risk-by-design)). Con **Load a session's context on its first call** activado, o con **Pause sync** desactivado y la sesión sin
   pausa, la siguiente línea carga por sí sola un resumen de la misma transcripción de la sesión, que
-  incluye lo que la sesión leyó; para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
+  incluye el texto de la conversación (una app y un mod de esta versión dejan fuera la salida de las herramientas, el razonamiento y los recordatorios, pero no el texto que los cita, y uno anterior envía la petición entera); para evitarlo, haz `/clear` en la sesión antes y luego pulsa **New
   conversation**. `/live` en una sesión eliminada la une de nuevo.
 
 ### Ajustes
 
-**Settings…** abre la ventana Settings de LiveBridge:
+**Settings…** abre la ventana Settings de LiveBridge, en cuatro pestañas en su barra de
+herramientas.
+**Quick Settings**, en el menú, reúne cinco de sus interruptores ([el menú](#la-banda-y-el-menú)):
+cada elemento es el propio ajuste, así que un cambio en un sitio se ve al instante en el otro, y
+pregunta lo mismo que el interruptor de aquí.
+**General** reúne las notificaciones, el inicio de sesión, las actualizaciones y el modo de
+depuración:
 
-- **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir la
-  ventana, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
-- **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
-  hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
-  prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
-- **Pause sync while the call is stopped** (desactivado por defecto): por defecto, lo que escribes
-  en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
-  la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
-  sale del Mac hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI, activa
-  el ajuste, desactiva el siguiente si la sesión puede no tener resumen aún, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
-  registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
-  resumen por sí sola, ni tampoco después de una pausa, salvo para una sesión sin resumen (el ajuste
-  siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
-  pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
-  nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
-  de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
-  [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
-- **Load a session's context on its first call** (activado por defecto; desactivado si **Pause sync** estaba activado al actualizar):
-  una línea que se abre para una sesión de la que la voz no tiene resumen lo pide aunque **Pause
-  sync** esté activado o la sesión esté en pausa, también en un chat antiguo o tras **New
-  conversation**. Ese resumen se escribe a partir de toda la transcripción, así que lleva lo que
-  pausaste, y va a OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
-  Desactivado, bajo la pausa solo **Load context** carga un resumen.
-- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
-  la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
-  de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
-  resultado en espera suena de todos modos.
 - **Notify when a result is waiting** (activado por defecto): junto con el timbre para un resultado
   que espera mientras la línea está cerrada, una notificación de macOS nombra la sesión ("Alpha has
   a new result — speak to hear it"), nunca el resultado en sí. Al hacer clic en ella se abre el
@@ -342,6 +345,77 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
 - **Open at login** (desactivado por defecto).
 - **Updates**: la versión en uso, **Check for update**, **Check for updates automatically** y lo
   que hizo la última actualización ([Actualización](#actualización)).
+- **Debug mode** (desactivado por defecto): durante una llamada, una fila por segundo con los
+  números de red de la voz (paquetes perdidos y descartados, jitter, muestras ocultadas, si la línea
+  va por TCP), un CSV por llamada, en `~/Library/Application Support/LiveBridge/debug/call-stats/`;
+  ni audio, ni transcripción, ni nombres de sesión. Activado durante una llamada, registra la línea
+  abierta desde ese momento; desactivado, se detiene al instante, y los archivos quedan hasta que
+  los borres. **Show Debug Files** abre la carpeta. En el menú es **Debug Mode**, en **Feedback &
+  Support** ([cómo leer los números](../../CONTRIBUTING.md#reading-debug-modes-numbers)).
+
+**Voice** reúne lo que oyes durante una llamada:
+
+- **Voice**: una de las voces en tiempo real que ofrece tu codex, que codex enumera al abrir esta
+  pestaña, o **Codex default**. Se oye a partir de la próxima vez que se abre la línea.
+- **Prompt** (vacío por defecto): tus propias instrucciones para la voz, como "Háblame en español",
+  hasta 2000 caracteres. Se añaden después de las reglas propias de LiveBridge para la voz, que
+  prevalecen donde ambas discrepan, y se aplican a partir de la próxima vez que se abre la línea.
+- **Play sounds for requests and answers** (activado por defecto): un sonido breve por cada petición que
+  la voz pasa a Claude ([por qué](#limitaciones-conocidas)) y por cada respuesta, fallo o pregunta
+  de Claude que llega a una línea abierta o abriéndose mientras nadie habla. El aviso de un
+  resultado en espera suena de todos modos.
+
+**Line** reúne cuánto sigue abierta la línea en silencio y cómo se conecta:
+
+- **Silence before the line closes** (20 segundos por defecto), **Wait for a first word on a line
+  a result opened** (5 segundos) y **Sound without words before the line closes** (90 segundos):
+  cuánto tiempo mantiene abierta la línea cada tipo de silencio, de 0 a 300 segundos. 0 desactiva
+  el silencio o el sonido sin palabras, y una espera de primera palabra en 0 dura lo mismo que el
+  silencio. Con los tres en 0, el silencio nunca cierra la línea: sigue abierta, facturada todo ese
+  tiempo ([Facturación](#facturación-bajo-control-por-diseño)), hasta que pulsas Stop, cambias el
+  destino u OpenAI la cierra. Un silencio corto cierra la línea dentro de las pausas normales, y cada
+  reapertura tarda unos segundos antes de que la voz responda, así que Settings avisa de 1 a 9
+  segundos; lo mismo hace con el sonido sin palabras, pues tu habla cuenta como tal hasta que se
+  reconoce, y de 1 a 3 segundos para la primera palabra, ya que la voz suele empezar unos 2 segundos
+  después de que la línea se conecta. Un temporizador que activas empieza enseguida en una línea
+  abierta en silencio; uno que ya cuenta conserva su tiempo.
+- **Connect over TCP** (desactivado por defecto): si la voz se corta con una conexión mala,
+  actívalo. La línea prefiere entonces la ruta TCP que ofrece el servidor de medios (el puerto 443
+  en las respuestas vistas) a UDP, y aún puede volver a UDP. En una conexión con pérdidas eso puede
+  convertir los cortes en pausas breves entre frases ([hasta dónde está probado](#limitaciones-conocidas)).
+  Una línea abierta cuando lo cambias se cierra y se vuelve a abrir en el acto, tras confirmarlo; lo
+  que la voz estaba diciendo se corta, y un resultado que la línea esperaba llega igualmente a la
+  nueva.
+
+**Context** reúne cómo llegan tus sesiones a la voz:
+
+- **Pause sync while the call is stopped** (desactivado por defecto): por defecto, lo que escribes
+  en una sesión unida y la respuesta final de Claude se guardan en la conversación de esa sesión con
+  la voz aunque la llamada esté detenida, y la voz los tiene cuando se abre la siguiente línea. Nada
+  de ello llega a OpenAI hasta que se abre una línea. Para un texto que no quieres que llegue a OpenAI, activa
+  el ajuste, desactiva el siguiente si la sesión puede no tener resumen aún, pulsa Stop y escribe después: nada de lo que escribes con la llamada detenida se
+  registra, y la sesión queda marcada como en pausa. Mientras está activado, ninguna línea carga un
+  resumen por sí sola, ni tampoco después de una pausa, salvo para una sesión sin resumen (el ajuste
+  siguiente); si no, solo lo hace **Load context**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste. Escribir en un turno que ejecuta una petición por voz hace fallar su respuesta, sin que
+  nada de ella se registre ni se diga. No elimina nada ya registrado, y las respuestas posteriores
+  de Claude pueden repetir el texto en pausa; qué hace y qué no hace lo explica
+  [SECURITY.md](../../SECURITY.md#residual-risk-by-design).
+- **Load a session's context on its first call** (activado por defecto; desactivado si **Pause sync** estaba activado al actualizar):
+  Start, un cambio de destino durante la llamada o una línea que se abre, para una sesión de la que
+  la voz no tiene resumen, lo pide aunque **Pause sync** esté activado o la sesión esté en pausa,
+  también en un chat antiguo o tras **New conversation**. Ese resumen se escribe a partir de la transcripción, así que lleva lo que pausaste, y va a
+  OpenAI. Cuando la sesión ya tiene resumen, la pausa rige lo que sigue.
+  Desactivado, bajo la pausa solo **Load context** carga un resumen.
+- **Summary model** (Haiku 5.5 por defecto, también al actualizar; o Sonnet 5.5, Opus 5.5 o **Custom…**): el
+  modelo que escribe el resumen que la voz recibe como contexto, siempre con esfuerzo bajo, a cargo
+  de tu uso de Claude. Si otro modelo falla, lo escribe Haiku 5.5, salvo que a ese modelo se le acabara el tiempo. Una línea debajo dice cuándo el
+  último resumen vino de Haiku 5.5, o de ningún modelo, y por qué. Una sesión con un mod anterior a
+  este ajuste lo ignora y escribe con el modelo propio de la sesión. **Custom…** toma un id de
+  modelo y **Check and save**, que hace que una sesión unida envíe a ese modelo una petición corta
+  ("Reply with OK.") a cargo de tu uso de Claude, y guarda el id solo si responde; si no, el motivo
+  aparece junto al campo y la elección anterior sigue. Necesita una sesión con un mod de esta
+  versión y habla por el Claude Code de esa sesión: otra sesión puede diferir, y un id guardado no
+  se vuelve a comprobar.
 
 ### Qué hace la voz
 
@@ -398,12 +472,12 @@ permiso:
   Mientras está silenciado, LiveBridge no tiene el micrófono, y el indicador de micrófono de macOS lo muestra.
 - Cuando empiezas a hablar, se abre la línea. Los 2 segundos anteriores a que empezaras se
   conservan y se envían primero, para que no se pierdan tus primeras palabras.
-- La línea se cierra tras 20 segundos de silencio. El sonido sin palabras (música, una tele) la
-  cierra tras 90 segundos.
+- La línea se cierra tras un rato de silencio, y el sonido sin palabras (música, una tele) la cierra
+  tras un rato propio. [Ajustes](#ajustes) fija cada uno; en 0, ese no la cierra.
 - Cuando la voz pasa una petición a Claude (un traspaso), la línea permanece abierta hasta 2 minutos
   después de ese traspaso, facturada como cualquier línea abierta, y la respuesta de Claude pasa a
   la voz para que la diga cuando nadie esté hablando. Un traspaso posterior reinicia los 2 minutos;
-  un intercambio que no envía nada a Claude se cierra tras los 20 segundos habituales de silencio.
+  un intercambio que no envía nada a Claude se cierra tras el silencio habitual.
 - La respuesta de Claude a una petición que le diste a la sesión con la que hablas, una pregunta que
   Claude te hace en ella o una solicitud de permiso que espera vuelve a abrir la línea si llega con
   la línea cerrada, y se da a la voz para que la diga, con el coste de cualquier línea abierta. Todo
@@ -477,6 +551,9 @@ la sesión en tiempo real de codex:
   pausa no la toca, así que un título escrito a partir de texto en pausa sale en cada línea;
 - la oferta WebRTC, que enumera las direcciones de red local del Mac como candidatas de conexión.
 
+Con **Connect over TCP** activado, el audio sigue yendo al servidor de medios de OpenAI, y puede ir
+por TCP (el puerto 443 en las respuestas vistas) en lugar de UDP.
+
 Los resultados, las preguntas, las actualizaciones, los resúmenes y las líneas de los turnos escritos pasan antes por un redactor de
 formatos de credenciales conocidos (claves privadas, JWT, tokens de API comunes, contraseñas en
 URL, campos del tipo `password=`). Es una lista de patrones, no una garantía: todo lo demás que escribes sale tal cual.
@@ -509,7 +586,10 @@ salvo que actives **Pause sync**) y la última línea de contexto cargada desde 
 ([cómo se guarda](../../SECURITY.md#residual-risk-by-design)). Las líneas de una sesión desaparecen cuando
 pulsas **New conversation** con ella como destino o la eliminas con la ×. Una sesión que se ha ido
 las conserva hasta que 20 sesiones usadas después las desplazan; para borrarlas antes, ejecuta
-`/live` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](../../SECURITY.md#residual-risk-by-design)).
+`/live` en ella de nuevo y pulsa **New conversation**. La desinstalación las elimina todas; Uninstall LiveBridge, en el menú, las mueve a la
+Papelera, y desaparecen cuando la vacías. El mod guarda una instantánea propia en el almacén de plugins de Claude Code ([qué contiene](../../SECURITY.md#residual-risk-by-design)).
+**Debug mode**, desactivado por defecto, escribe los números de red de la voz durante una llamada
+en un archivo de esa carpeta, y nada más ([Ajustes](#ajustes)).
 
 [SECURITY.md](../../SECURITY.md) contiene el modelo de amenazas: en resumen, todo lo que tu micrófono
 pueda oír puede convertirse en una petición que Claude ejecuta con el propio modo de permisos de la
@@ -517,6 +597,11 @@ sesión.
 
 ## Limitaciones conocidas
 
+- **Connect over TCP** prefiere TCP pero no lo impone, y nada muestra durante la llamada qué transporte tomó
+  una línea, así que una línea que volvió a UDP aún puede cortarse. La ruta se midió una vez, en
+  una compilación de depuración que quitaba los candidatos UDP (ningún audio perdido en 10
+  minutos); la forma que se distribuye, bajar su prioridad, eligió TCP una vez. El modo de
+  depuración registra el transporte (`onTcp`) ([CONTRIBUTING.md](../../CONTRIBUTING.md#reading-debug-modes-numbers)).
 - A veces la voz dice que está mirando ("On it", "Looking now") sin pasar la petición, así que a
   Claude no le llega nada: más o menos una petición de cada cinco con la regla tal como se escribió
   primero, y 0 de 20 con la regla actual, muy pocas para distinguirlo de la suerte
@@ -546,10 +631,10 @@ sesión.
   pasar a la voz con tus siguientes palabras, o suena un timbre cuando se cierra la línea.
 - Cuando la respuesta de Claude vuelve a abrir la línea, la voz puede quedarse callada: ocurrió en 4
   de 14 ejecuciones medidas, una muestra pequeña ([ADR 0001
-  (n)](../../docs/adr/0001-platform-findings.md)). La línea se cierra entonces 5 segundos después de
-  conectarse, y la respuesta suena con un timbre y queda en espera, como abajo. Cuando la voz habló,
-  empezó en unos 2 segundos tras la conexión; una voz que empezara después de esos 5 segundos queda
-  cortada.
+  (n)](../../docs/adr/0001-platform-findings.md)). La línea se cierra entonces cuando
+  termina su espera de una primera palabra ([Ajustes](#ajustes)), y la respuesta suena con un timbre y
+  queda en espera, como abajo. Cuando la voz habló, empezó en unos 2 segundos tras la conexión; una
+  voz que empezara después de esa espera queda cortada.
 - Cuando tus siguientes palabras reabren la línea, a veces la voz responde solo a ellas y no dice el
   resultado en espera. El resultado no se pierde: sigue esperando, suena un timbre y publica una
   notificación cuando se cierra la línea, y vuelve a pasar a la voz la próxima vez que se abre la
@@ -567,6 +652,18 @@ sesión.
   agente y presumiblemente Remote Control) no se registra en la conversación de la voz como palabras
   tuyas, aunque sí la respuesta de Claude, y no rechaza un turno en curso bajo la pausa
   ([SECURITY.md](../../SECURITY.md#what-session-text-can-do) dice qué prompts cuentan como tuyos).
+- Donde el proveedor de Claude Code (Bedrock, Vertex o Foundry) no ofrece el modelo elegido en
+  **Summary model**, o la organización no lo permite, ese modelo falla y Haiku 5.5 escribe el
+  resumen; donde tampoco ofrece Haiku 5.5, la voz no recibe resumen, y Settings lo dice. Antes de
+  este ajuste lo escribía el modelo propio de la sesión, que funciona dondequiera que funcione la
+  sesión. Que un id fijo se resuelva en esos proveedores viene de la documentación de Claude Code y
+  no se ha probado.
+- Un resumen que falla no se recuerda: mientras la sesión aún necesita uno, Start, un cambio de
+  destino y cada línea que se abre lo vuelven a pedir, y el mod envía otra vez la misma
+  transcripción, hasta 120 000 caracteres, que puede facturarse cada vez aunque la respuesta llegue
+  vacía o demasiado tarde. Si **Context failed** sigue en la banda de la sesión, activa
+  **Pause sync** y deja desactivado
+  **Load a session's context on its first call**.
 - Una sesión que sigue con un mod anterior a esta versión, hasta que se reinicie, no se sincroniza:
   carga un resumen como una sesión a la que le faltan turnos, y ninguna pausa rechaza sus líneas
   ([qué más cambia](../../CHANGELOG.md)).
@@ -588,7 +685,7 @@ sesión.
   solicitud de permiso esperando. El guardián integrado de Claude Code se carga en un equipo con
   ajustes administrados y en una sesión iniciada con un plan Team o Enterprise, y ahí los hooks de
   permisos del mod no se ejecutan. La solicitud sigue apareciendo en Claude Code y sigue
-  esperándote, pero la voz no dice nada de ella y la barra de menús muestra a Claude trabajando,
+  esperándote, pero la voz no dice nada de ella y el menú muestra a Claude trabajando,
   así que mira Claude Code si una respuesta parece tardar. `/plugin` nombra los hooks, y las
   versiones recientes de Claude Code también imprimen una línea que dice que un hook se omitió.
   Las preguntas de Claude siguen llegando a la voz. Los hooks se

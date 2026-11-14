@@ -39,6 +39,16 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.pauseSyncWhileStopped)
   }
 
+  /// UDP by default, an older file included; the choice is kept.
+  @Test func tcpIsOffUntilTurnedOn() throws {
+    #expect(!Settings().connectsOverTCP)
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    try Data(#"{"voice":"marin"}"#.utf8).write(to: file)
+    #expect(!SettingsStore(file: file).current.connectsOverTCP)
+    SettingsStore(file: file).update { $0.connectsOverTCP = true }
+    #expect(SettingsStore(file: file).current.connectsOverTCP)
+  }
+
   @Test func aFreshInstallLoadsContextOnTheFirstCall() {
     #expect(Settings().loadContextOnFirstCall)
   }
@@ -82,6 +92,44 @@ struct SettingsStoreTests {
     try Data(#"{"pauseSyncWhileStopped":true}"#.utf8).write(to: file)
     SettingsStore(file: file).update { $0.loadContextOnFirstCall = true }
     #expect(SettingsStore(file: file).current.loadContextOnFirstCall)
+  }
+
+  /// A 0.5.x file has no summary model: it gets the default, on an update too.
+  @Test func aFileFromBeforeItGetsHaiku() throws {
+    #expect(try decoded(#"{"voice":"marin"}"#).summaryModel == "claude-haiku-5-5")
+  }
+
+  @Test func aBadStoredValueGetsHaiku() throws {
+    #expect(try decoded(#"{"summaryModel":"x;rm -rf"}"#).summaryModel == "claude-haiku-5-5")
+    #expect(try decoded(#"{"summaryModel":"claude-opus-5-5"}"#).summaryModel == "claude-opus-5-5")
+    let notText = try decoded(#"{"voice":"marin","summaryModel":5}"#)
+    #expect(notText.summaryModel == "claude-haiku-5-5")
+    #expect(notText.voice == "marin")
+  }
+
+  @Test func theLineKeepsTodaysTimersByDefault() {
+    #expect(Settings().timeouts == CallMachine.Timeouts(silence: 20, firstWord: 5, noise: 90))
+  }
+
+  @Test func aFileFromBeforeTheTimersKeepsTodaysTimers() throws {
+    #expect(try decoded(#"{"voice":"marin"}"#).timeouts == Settings().timeouts)
+  }
+
+  @Test func theLinesTimersAreKeptAcrossRestarts() throws {
+    let file = try temporaryDirectory().appending(path: "settings.json")
+    SettingsStore(file: file).update {
+      $0.silenceSeconds = 7
+      $0.firstWordSeconds = 8
+      $0.noiseSeconds = 9
+    }
+    #expect(SettingsStore(file: file).current.timeouts == .init(silence: 7, firstWord: 8, noise: 9))
+  }
+
+  /// A hand-edited timer outside 0 to 300 reads as the nearer end.
+  @Test func aTimerOutOfRangeReadsAsTheNearerEnd() throws {
+    let settings = try decoded(#"{"silenceSeconds":-5,"noiseSeconds":9999}"#)
+    #expect(settings.silenceSeconds == 0)
+    #expect(settings.noiseSeconds == 300)
   }
 
   @Test func changesAreKeptAcrossRestarts() throws {
@@ -139,6 +187,30 @@ struct SettingsStoreTests {
     #expect(SettingsStore(file: file).current.checkUpdatesAutomatically == nil)
     SettingsStore(file: file).update { $0.checkUpdatesAutomatically = false }
     #expect(SettingsStore(file: file).current.checkUpdatesAutomatically == false)
+  }
+
+  /// A file written before debug mode, which has every other setting and no `debugMode`: debug
+  /// mode stays off and the rest reads as written.
+  @Test func debugModeIsOffInAFileFromBeforeIt() throws {
+    let settings = try decoded(
+      #"{"voice":"marin","pauseSyncWhileStopped":true,"loadContextOnFirstCall":false,"#
+        + #""notifyResults":false,"confirmHandoffs":false,"prompt":"Hi.","connectsOverTCP":true,"#
+        + #""checkUpdatesAutomatically":false,"silenceSeconds":7,"firstWordSeconds":8,"#
+        + #""noiseSeconds":9}"#)
+    var expected = Settings(
+      voice: "marin", pauseSyncWhileStopped: true, loadContextOnFirstCall: false,
+      notifyResults: false, confirmHandoffs: false, prompt: "Hi.", connectsOverTCP: true,
+      checkUpdatesAutomatically: false)
+    expected.silenceSeconds = 7
+    expected.firstWordSeconds = 8
+    expected.noiseSeconds = 9
+    #expect(settings == expected)
+    #expect(!settings.debugMode)
+  }
+
+  @Test func debugModeRoundTrips() throws {
+    let on = Settings(debugMode: true)
+    #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(on)) == on)
   }
 
   /// The Settings window follows the store: a change is observed where it was read.

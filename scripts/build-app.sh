@@ -242,6 +242,7 @@ package_dmg() {
 
 # Removes exactly these paths; the microphone permission is macOS's, so its reset is printed.
 uninstall() {
+  # The app, then the files Paths.uninstalled lists, which the menu's Uninstall moves to the Trash.
   if [ -x "$INSTALLED/Contents/MacOS/LiveBridge" ]; then
     quit "$INSTALLED"
     "$INSTALLED/Contents/MacOS/LiveBridge" --unregister-login-item || true

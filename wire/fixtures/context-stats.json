@@ -1,0 +1,11 @@
+{
+  "ask": 3,
+  "sessionId": "00000000-0000-0000-0000-000000000001",
+  "stats": {
+    "durationMs": 6400,
+    "inputTokens": 13105,
+    "outputTokens": 412,
+    "transcriptChars": 48210
+  },
+  "summary": "Goal: tidy the example project. State: tests pass. Open question: none."
+}
