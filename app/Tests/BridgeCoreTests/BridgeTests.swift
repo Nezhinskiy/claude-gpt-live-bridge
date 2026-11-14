@@ -1633,6 +1633,16 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 1))
   }
 
+  /// An answer closes its ask for the mod too: a joined ask it has not polled yet is taken back.
+  @Test func anAnsweredAskIsNotHandedAgain() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    _ = try await registry.poll(a)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    #expect(try await registry.poll(a) == nil)
+  }
+
   /// An answer that closes the ask, empty or stale, is kept, so a restart does not open it again.
   @Test func anAnswerThatClosesTheAskIsSaved() async throws {
     try await join(a, "Alpha", writesSummaries: true)

@@ -914,17 +914,20 @@ public actor Bridge: Router {
           askedFor: nil, stale: true, hadSummary: wrote, model: nil, stats: body.stats))
     case .closedAsk, .unasked: break
     }
-    guard answer.isTaken else { return }
     let line =
-      wrote
+      answer.isTaken && wrote
       ? AnswerShaper.line(
         .context, label: row.label, body: body.summary, limit: Self.maxContext, session: id)
       : nil
-    guard let line else { return }
-    let isNew = line.text != continuity[id].context
-    continuity.setContext(line.text, for: id)
-    save()
-    guard isNew, lineSession == id else { return }
+    let isNew = line.map { $0.text != continuity[id].context } ?? false
+    if let line {
+      continuity.setContext(line.text, for: id)
+      save()
+    }
+    // The closed ask is taken back from a mod that has not polled it, after the summary is stored:
+    // a line woken meanwhile is seeded with it.
+    if let closed = answer.closed { await registry.withdrawContext(of: id, ask: closed.number) }
+    guard let line, isNew, lineSession == id else { return }
     switch machine.phase {
     case .live: try? await realtime?.addContext(line.text)
     case .connecting: heldContext = line

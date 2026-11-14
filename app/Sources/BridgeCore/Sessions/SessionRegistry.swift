@@ -216,6 +216,11 @@ public actor SessionRegistry {
     sessions[id]?.wantsContext = .context(model: model, fallbackModel: fallbackModel, ask: ask)
   }
 
+  /// Takes ask `ask` back from the session if it has not polled it yet: the ask is answered.
+  public func withdrawContext(of id: SessionID, ask: Int?) {
+    if case .context(_, _, ask) = sessions[id]?.wantsContext { sessions[id]?.wantsContext = nil }
+  }
+
   /// The session a model check goes to: the target if its mod writes summaries, else the most
   /// recently joined one whose mod does; nil when none does.
   public func sessionThatChecks() -> SessionID? {

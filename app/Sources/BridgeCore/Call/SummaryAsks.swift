@@ -25,6 +25,14 @@ enum SummaryAnswer: Equatable {
     case .stale, .otherAsk, .closedAsk: false
     }
   }
+
+  /// The open ask it closed, taken or stale.
+  var closed: SummaryAsks.Ask? {
+    switch self {
+    case .taken(let ask, _), .stale(let ask, _): ask
+    case .otherAsk, .closedAsk, .unasked: nil
+    }
+  }
 }
 
 /// Every rule about summary asks: which ask is open and its number, which post answers it, how long
