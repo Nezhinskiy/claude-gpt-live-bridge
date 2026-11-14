@@ -1,5 +1,7 @@
 // The app asks for this session's context (the line it opens does): the summary, once per change,
-// never for a new session, and with a short note in the band while it goes.
+// never for a new session, and with a short note in the band while it goes. A send's own rules
+// (the kept summary, joining, crossing) are tested in unit/summaries.unit.ts; these check the
+// wiring and context.ts.
 import { expect, test } from 'claude-code/testing'
 import type { Engine, TestBody } from 'claude-code/testing'
 
@@ -63,10 +65,11 @@ test('startAsksNoContextItself', async ($, on) => {
 })
 
 test('theAppsAskPostsThisSessionsSummary', async ($, on) => {
+  // An older app names no model: the session's own model forks.
   const world = await joined($, on)
   await appAsks(world)
   expect(world.take('context')).toEqual([SUMMARY])
-  expect(world.forks).toBe(1)
+  expect([world.forks, world.completes.length]).toEqual([1, 0])
 })
 
 test('theBandHasNoLoadContextButton', async ($, on) => {
@@ -78,34 +81,6 @@ test('theBandHasNoLoadContextButton', async ($, on) => {
     await band.unmount()
   }
   expect(world.forks).toBe(0)
-})
-
-test('aNewSessionHasNoContextToLoad', async ($, on) => {
-  const world = await joined($, on)
-  world.turns = 0
-  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  await appAsks(world)
-  expect(world.take('context')).toEqual([])
-  expect(world.forks).toBe(0)
-  expect(await note(band)).toBeUndefined()
-  await band.unmount()
-})
-
-test('askingAgainWithNoNewTurnAsksTheModelForNothing', async ($, on) => {
-  const world = await joined($, on)
-  await appAsks(world)
-  expect(world.take('context')).toEqual([SUMMARY])
-  // The summary the model wrote still holds, so it is sent as it was (the app may have erased it
-  // with New conversation) and the model is not asked again.
-  await appAsks(world)
-  expect(world.take('context')).toEqual([SUMMARY])
-  expect(world.forks).toBe(1)
-  // A turn completes: the next ask gets a new summary.
-  await typedTurn($, 't1', 'Renamed.')
-  world.summary = 'Goal: tidy the example project. The helper is renamed.'
-  await appAsks(world)
-  expect(world.take('context')).toEqual([{ sessionId: ID, summary: world.summary }])
-  expect(world.forks).toBe(2)
 })
 
 test('theBandSaysLoadingThenSent', async ($, on) => {
@@ -125,54 +100,6 @@ test('theBandSaysLoadingThenSent', async ($, on) => {
     expect(await note(band)).toBeUndefined()
     await band.unmount()
   }
-})
-
-test('aSummaryThatNeverComesStopsLoadingAfterAMinute', async ($, on) => {
-  const world = await joined($, on)
-  world.forkMs = 10 * 60_000
-  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  await appAsks(world)
-  expect(await note(band)).toBe('Loading context…')
-  // The minute keeps its own timer, so the app holds its reply to the poll meanwhile: the clock
-  // crosses the minute with one held poll instead of sixty, each a round trip a loaded machine
-  // slows.
-  let release = () => {}
-  world.holdNext = new Promise<void>(resolve => { release = resolve })
-  await world.clock.advance(59_999)
-  expect(await note(band)).toBe('Loading context…')
-  await world.clock.advance(1)
-  release()
-  world.holdNext = null
-  expect(await note(band)).toBeUndefined()
-  expect(world.logs.some(line => line.includes('could not summarise'))).toBe(true)
-  // The next ask tries again instead of waiting on the lost one.
-  world.forkMs = 0
-  await appAsks(world)
-  expect(world.forks).toBe(2)
-  expect(world.take('context')).toEqual([SUMMARY])
-  await band.unmount()
-})
-
-test('aFailedSummaryClearsTheNoteAndSaysSo', async ($, on) => {
-  const world = await joined($, on)
-  world.forkFails = 'api-error'
-  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  await appAsks(world)
-  expect(world.take('context')).toEqual([])
-  expect(await note(band)).toBeUndefined()
-  expect(world.logs.some(line => line.includes('could not summarise'))).toBe(true)
-  await band.unmount()
-})
-
-test('twoAsksAtOnceShareOneSummary', async ($, on) => {
-  // The app asks again while the first summary is being written: one summary serves both.
-  const world = await joined($, on)
-  world.forkMs = 5000
-  await appAsks(world)
-  await appAsks(world)
-  await world.clock.advance(4800)  // the first summary is done 5 s after its ask
-  expect(world.take('context')).toEqual([SUMMARY])
-  expect(world.forks).toBe(1)
 })
 
 test('everyCompletedTurnStalesTheSummary', async ($, on) => {
@@ -216,34 +143,6 @@ test('aTurnLostAtTheNextStartStalesTheSummary', async ($, on) => {
   await world.clock.advance(1000)
   await appAsks(world)
   expect(world.forks).toBe(2)
-})
-
-/** Only the mod knows the gap came while the summary was written. */
-test('aSummaryWrittenAcrossAGapIsNotPosted', async ($, on) => {
-  const world = await joined($, on)
-  world.forkMs = 5000
-  await appAsks(world)
-  expect(world.forks).toBe(1)
-  world.syncStatus = 503
-  await $.turn.start({ text: 'Count the files', turnId: 't1' })
-  world.syncStatus = 200
-  await world.clock.advance(5000)
-  expect(world.logs.some(line => line.includes('could not summarise'))).toBe(true)
-  expect(world.take('context')).toEqual([])
-})
-
-/** A gap ends a send under way, and only that: the note of one already sent still comes down. */
-test('aGapAfterASummaryWasSentLeavesItsNoteToGo', async ($, on) => {
-  const world = await joined($, on)
-  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  await appAsks(world)
-  expect(await note(band)).toBe('Context sent')
-  world.syncStatus = 503
-  await $.turn.start({ text: 'Count the files', turnId: 't1' })
-  world.syncStatus = 200
-  await world.clock.advance(3000)
-  expect(await note(band)).toBeUndefined()
-  await band.unmount()
 })
 
 test('clearMakesTheContextSummariseAgain', async ($, on) => {
@@ -331,16 +230,6 @@ test('noFallbackWhenTheModelIsTheDefault', async ($, on) => {
   expect(world.completes.map(one => one.model)).toEqual([HAIKU])
 })
 
-test('bothFailingGivesNoTextAndTwoFailures', async ($, on) => {
-  const world = await joined($, on)
-  world.completeFails = { [OPUS]: 'refused', [HAIKU]: 'empty-reply' }
-  await appAsks(world, NAMED)
-  expect(world.take('context')).toEqual([
-    { ...SUMMARY, summary: '', failures: [{ reason: 'model-refused' }, { reason: 'empty-reply' }] },
-  ])
-  expect(world.completes.map(one => one.model)).toEqual([OPUS, HAIKU])
-})
-
 // An app that names a model is answered at every exit, so it never waits on an ask the mod dropped.
 
 const saidNoSummary = (world: ReturnType<typeof fakeWorld>) => world.logs.some(line => line.includes('could not summarise'))
@@ -348,13 +237,9 @@ const saidNoSummary = (world: ReturnType<typeof fakeWorld>) => world.logs.some(l
 test('noTurnsPostsEmptyWithoutFailures', async ($, on) => {
   const world = await joined($, on)
   world.turns = 0
-  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await appAsks(world, NAMED)
   expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '' }])
   expect(world.completes).toEqual([])
-  expect(await note(band)).toBeUndefined()
-  expect(saidNoSummary(world)).toBe(false)
-  await band.unmount()
 })
 
 test('bothModelsFailingPostsEmptyWithTwoFailures', async ($, on) => {
@@ -365,6 +250,7 @@ test('bothModelsFailingPostsEmptyWithTwoFailures', async ($, on) => {
   expect(world.take('context')).toEqual([
     { ...SUMMARY, summary: '', failures: [{ reason: 'api-error', error: 'overloaded' }, { reason: 'empty-reply' }] },
   ])
+  expect(world.completes.map(one => one.model)).toEqual([OPUS, HAIKU])
   expect(saidNoSummary(world)).toBe(true)
   expect(await note(band)).toBe('Context failed')
   await band.unmount()
@@ -388,18 +274,6 @@ test('theDeadlinePostsTimedOut', async ($, on) => {
   ])
   expect(world.completes.map(one => one.timeoutMs)).toEqual([MINUTE, MINUTE - 50_000])
   expect(saidNoSummary(world)).toBe(true)
-})
-
-test('aGapDuringTheWriteStillPosts', async ($, on) => {
-  // The app asked before the gap, so it ignores this answer as stale; it is an answer all the same.
-  const world = await joined($, on)
-  world.completeMs = 5000
-  await appAsks(world, NAMED)
-  world.syncStatus = 503
-  await $.turn.start({ text: 'Count the files', turnId: 't1' })
-  world.syncStatus = 200
-  await world.clock.advance(5000)
-  expect(world.take('context')).toEqual([expect.objectContaining(SUMMARY)])
 })
 
 test('aGapThePollHasNotSaidIsSaidBeforeThePost', async ($, on) => {
@@ -472,106 +346,6 @@ test('aThrowBuildingTheTranscriptIsAnUnreadableTranscript', async ($, on) => {
   expect(world.take('context')).toEqual([{ ...SUMMARY, summary: '', failures: [{ reason: 'transcript-unreadable' }] }])
   expect(world.completes).toEqual([])
   expect(world.logs.filter(line => line.includes(error!))).toHaveLength(1)
-})
-
-test('anAskAfterAGapDoesNotJoinTheDoomedSend', async ($, on) => {
-  const world = await joined($, on)
-  world.completeMs = 5000
-  await appAsks(world, NAMED)
-  world.syncStatus = 503
-  await $.turn.start({ text: 'Count the files', turnId: 't1' })
-  world.syncStatus = 200
-  await appAsks(world, NAMED)
-  expect(world.completes).toHaveLength(2)
-  await world.clock.advance(5000)
-  expect(world.take('context')).toHaveLength(2)
-})
-
-test('anAskWithoutAModelIsAsBefore', async ($, on) => {
-  // An older app: the session's own model forks, and nothing is posted when there is nothing to fork.
-  const world = await joined($, on)
-  await appAsks(world)
-  expect(world.take('context')).toEqual([SUMMARY])
-  expect([world.forks, world.completes.length]).toEqual([1, 0])
-  await typedTurn($, 't1', 'Renamed.')
-  world.forkFails = 'nothing-to-fork'
-  await appAsks(world)
-  expect(world.take('context')).toEqual([])
-})
-
-test('anAskAsAForkTimesOutStartsItsOwnSend', async ($, on) => {
-  // An older app asks again while the timed-out fork's note comes down: that send is over, not joined.
-  let release = () => {}
-  const held = new Promise<void>(resolve => { release = resolve })
-  let forks = () => 0
-  on('state.set', async (_, e, next) => {
-    if (forks() === 1 && !('context' in (e.value ?? {}))) await held  // the time-out's write
-    return next(e)
-  })
-  const world = await joined($, on)
-  world.forkMs = 2 * MINUTE
-  forks = () => world.forks
-  await appAsks(world)
-  await world.clock.advance(MINUTE)
-  await appAsks(world)
-  release()
-  await world.clock.advance(200)
-  expect(world.forks).toBe(2)
-})
-
-test('aCachedFallbackSummaryKeepsItsFailures', async ($, on) => {
-  const world = await joined($, on)
-  world.completeFails = { [OPUS]: 'refused' }
-  await appAsks(world, NAMED)
-  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, failures: [{ reason: 'model-refused' }] })])
-  // No turn since: the same model asked again gets what was written, and why, with no model call.
-  await appAsks(world, NAMED)
-  expect(world.take('context')).toEqual([{ ...SUMMARY, failures: [{ reason: 'model-refused' }] }])
-  expect(world.completes.map(one => one.model)).toEqual([OPUS, HAIKU])
-})
-
-test('theSummaryEchoesItsAsk', async ($, on) => {
-  const world = await joined($, on)
-  await appAsks(world, { ...NAMED, ask: 7 })
-  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 7 })])
-  // A replay of the kept summary answers the ask that asked for it.
-  await appAsks(world, { ...NAMED, ask: 8 })
-  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 8 })])
-  expect(world.completes.map(one => one.model)).toEqual([OPUS])
-})
-
-test('anAskWithTheSendsNumberJoinsIt', async ($, on) => {
-  // The app hands an open ask again with its number: the send on its way answers both, once.
-  const world = await joined($, on)
-  world.completeMs = 5000
-  await appAsks(world, { ...NAMED, ask: 1 })
-  await appAsks(world, { ...NAMED, ask: 1 })
-  await world.clock.advance(5000)
-  expect(world.take('context')).toEqual([expect.objectContaining({ ...SUMMARY, ask: 1 })])
-  expect(world.completes).toHaveLength(1)
-})
-
-test('aFailingSendItsJoinedAskSharesSaysSoOnce', async ($, on) => {
-  const world = await joined($, on)
-  world.completeMs = 5000
-  world.completeFails = { [OPUS]: 'api-error', [HAIKU]: 'api-error' }
-  await appAsks(world, { ...NAMED, ask: 1 })
-  await appAsks(world, { ...NAMED, ask: 1 })
-  await world.clock.advance(MINUTE)
-  expect(world.logs.filter(line => line.includes('could not summarise'))).toHaveLength(1)
-})
-
-test('aSendANewerAskReplacedIsNoFailure', async ($, on) => {
-  // The app numbered the second ask as another, after a gap or a forget: each send answers its own.
-  const world = await joined($, on)
-  world.completeMs = 5000
-  await appAsks(world, { ...NAMED, ask: 1 })
-  await appAsks(world, { ...NAMED, ask: 2 })
-  await world.clock.advance(5000)
-  expect(world.take('context')).toEqual([
-    expect.objectContaining({ ...SUMMARY, ask: 1 }), expect.objectContaining({ ...SUMMARY, ask: 2 }),
-  ])
-  expect(saidNoSummary(world)).toBe(false)
 })
 
 test('aJoinSaysItWritesSummaries', async ($, on) => {
