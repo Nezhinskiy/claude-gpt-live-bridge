@@ -68,39 +68,34 @@ public struct Settings: Codable, Sendable, Equatable {
   /// The key of the setting this one replaced.
   private enum LegacyKeys: String, CodingKey { case autoContext }
 
-  /// A field the file lacks keeps its default, and one it no longer has (`model`) is ignored.
-  /// An old `autoContext: false`, the owner's choice to load summaries by hand, becomes the
-  /// pause when the file does not say. A file from before `loadContextOnFirstCall` leaves it off
-  /// under the pause: that owner chose context only from the menu, and an update must not widen it.
+  /// A field the file lacks keeps its default, and one it no longer has (`model`) is ignored; a
+  /// field of the wrong type, a hand edit's `7.5` or `"20"`, keeps its default too, not the whole
+  /// file, which the next change would write over. An old `autoContext: false`, the owner's
+  /// choice to load summaries by hand, becomes the pause when the file does not say. A file from
+  /// before `loadContextOnFirstCall` leaves it off under the pause: that owner chose context only
+  /// from the menu, and an update must not widen it.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    voice = try container.decodeIfPresent(String.self, forKey: .voice)
-    let optedOut =
-      try decoder.container(keyedBy: LegacyKeys.self)
-      .decodeIfPresent(Bool.self, forKey: .autoContext) == false
-    pauseSyncWhileStopped =
-      try container.decodeIfPresent(Bool.self, forKey: .pauseSyncWhileStopped) ?? optedOut
-    loadContextOnFirstCall =
-      try container.decodeIfPresent(Bool.self, forKey: .loadContextOnFirstCall)
-      ?? !pauseSyncWhileStopped
-    notifyResults = try container.decodeIfPresent(Bool.self, forKey: .notifyResults) ?? true
-    confirmHandoffs = try container.decodeIfPresent(Bool.self, forKey: .confirmHandoffs) ?? true
-    prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
-    connectsOverTCP = try container.decodeIfPresent(Bool.self, forKey: .connectsOverTCP) ?? false
-    checkUpdatesAutomatically = try container.decodeIfPresent(
-      Bool.self, forKey: .checkUpdatesAutomatically)
-    debugMode = try container.decodeIfPresent(Bool.self, forKey: .debugMode) ?? false
-    let defaults = CallMachine.Timeouts()
-    func timeout(_ key: CodingKeys, _ fallback: Int) throws -> Int {
-      CallMachine.Timeouts.clamped(try container.decodeIfPresent(Int.self, forKey: key) ?? fallback)
+    func read<Value: Decodable>(_ key: CodingKeys) -> Value? {
+      try? container.decodeIfPresent(Value.self, forKey: key)
     }
-    silenceSeconds = try timeout(.silenceSeconds, defaults.silence)
-    firstWordSeconds = try timeout(.firstWordSeconds, defaults.firstWord)
-    noiseSeconds = try timeout(.noiseSeconds, defaults.noise)
-    // A value of any other type reads as the default too, not as a file to start over from.
-    summaryModel =
-      (try? container.decodeIfPresent(String.self, forKey: .summaryModel)).flatMap(
-        SummaryModel.accepted) ?? SummaryModel.default
+    voice = read(.voice)
+    let optedOut =
+      (try? decoder.container(keyedBy: LegacyKeys.self)
+        .decodeIfPresent(Bool.self, forKey: .autoContext)) == false
+    pauseSyncWhileStopped = read(.pauseSyncWhileStopped) ?? optedOut
+    loadContextOnFirstCall = read(.loadContextOnFirstCall) ?? !pauseSyncWhileStopped
+    notifyResults = read(.notifyResults) ?? true
+    confirmHandoffs = read(.confirmHandoffs) ?? true
+    prompt = read(.prompt) ?? ""
+    connectsOverTCP = read(.connectsOverTCP) ?? false
+    checkUpdatesAutomatically = read(.checkUpdatesAutomatically)
+    debugMode = read(.debugMode) ?? false
+    let defaults = CallMachine.Timeouts()
+    silenceSeconds = CallMachine.Timeouts.clamped(read(.silenceSeconds) ?? defaults.silence)
+    firstWordSeconds = CallMachine.Timeouts.clamped(read(.firstWordSeconds) ?? defaults.firstWord)
+    noiseSeconds = CallMachine.Timeouts.clamped(read(.noiseSeconds) ?? defaults.noise)
+    summaryModel = read(.summaryModel).flatMap(SummaryModel.accepted) ?? SummaryModel.default
   }
 }
 

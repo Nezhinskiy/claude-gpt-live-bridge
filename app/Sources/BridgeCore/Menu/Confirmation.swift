@@ -59,4 +59,18 @@ public struct Confirmation: Sendable, Equatable {
       + "and every file it keeps go to the Trash. The Claude Code mod stays: the command that "
       + "removes it, \(modUninstallCommand), is copied for you to run in Terminal.",
     confirm: "Uninstall")
+
+  /// What Uninstall LiveBridge says when the app cannot move itself to the Trash, after `reason`,
+  /// the error's own words. `loginItemRestored` is whether the login item it removed first is
+  /// back, or there was none: only then has nothing changed.
+  public static func cannotTrash(reason: String, loginItemRestored: Bool) -> String {
+    let changed =
+      loginItemRestored
+      ? "Nothing was changed."
+      : "LiveBridge stays where it is, but its login item could not be restored, so it no longer "
+        + "opens at login. To restore it, turn on General > Open at login in LiveBridge's "
+        + "Settings, or add LiveBridge in System Settings > General > Login Items."
+    return
+      "\(reason) \(changed) The README's Uninstall section shows how to remove LiveBridge by hand."
+  }
 }

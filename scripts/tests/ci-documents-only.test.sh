@@ -91,13 +91,24 @@ git mv app/a.swift docs/a.swift
 expect 'a file moved out of the code' no
 expect 'an empty change' no
 
-# The workflow asks this script and acts only on its yes: a failed or missing answer runs the check.
+# The workflow asks this script and acts only on its yes: any other answer runs the check.
+# GitHub counts a job its own condition skipped as passed, so the check job always runs and decides
+# inside: on a pull request it fails unless `changes` succeeded, it fails a cancelled run, and it
+# skips every other step, the suite's, for a documents-only change.
 workflow="$root/.github/workflows/ci.yml"
-job=$(sed -n '/^  check:/,/^    steps:/p' "$workflow")
-for line in "needs: changes" \
-  "if: \${{ !cancelled() && needs.changes.outputs.documents-only != 'true' }}"; do
-  printf '%s\n' "$job" | grep -qF "$line" || problem "ci.yml's check job must have: $line"
+job=$(sed -n '/^  check:/,$p' "$workflow")
+for line in "    needs: changes" "    if: \${{ always() }}" \
+  "      ANSWER: \${{ github.event_name == 'pull_request' && needs.changes.result || 'success' }}" \
+  "      SUITE: \${{ needs.changes.outputs.documents-only != 'true' }}" \
+  'run: test "$ANSWER" = success' "        if: \${{ cancelled() }}"; do
+  printf '%s\n' "$job" | grep -qF -- "$line" || problem "ci.yml's check job must have: $line"
 done
+[ "$(printf '%s\n' "$job" | grep -c '^    if:' || true)" = 1 ] ||
+  problem "ci.yml's check job must have no condition but always()"
+steps=$(printf '%s\n' "$job" | grep -c '^      - ' || true)
+gated=$(printf '%s\n' "$job" | grep -cxF "        if: env.SUITE == 'true'" || true)
+[ "$gated" = $((steps - 2)) ] ||
+  problem "ci.yml's check job must skip each step but the answer's and the cancel's for documents only"
 grep -qF 'if sh scripts/ci-documents-only.sh HEAD^1 HEAD; then' "$workflow" ||
   problem "ci.yml must ask scripts/ci-documents-only.sh about the pull request's own change"
 

@@ -8,6 +8,13 @@ All notable changes to this project are listed here. The format follows
 
 ### Fixed
 
+- A setting of the wrong type in `settings.json`, such as a hand-edited `"silenceSeconds": 7.5`
+  or `"20"`, no longer resets every setting: that one takes its default, and the voice, the
+  prompt and the rest are kept.
+- **Uninstall LiveBridge…** no longer says "Nothing was changed" when it cannot move the app to the
+  Trash and macOS does not let it put back the login item it removed first: it says the login item
+  could not be restored, and that **Open at login** in Settings or System Settings ▸ General ▸
+  Login Items turns it on again.
 - A session whose transcript the mod cannot turn into text now reports the summary as failed with
   **transcript-unreadable**, and logs the error in the session, instead of failing with no reason.
 - A summary still being written when you run `/clear` is stale, as one a gap crossed is: the band

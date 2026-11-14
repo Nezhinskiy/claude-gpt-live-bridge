@@ -157,7 +157,7 @@ LiveBridge 只在你点击 **Install** 时更新应用及其模组，从不自�
 
 ### 卸载
 
-在 `/Applications` 中的副本里，菜单中的 **Feedback & Support ▸ Uninstall LiveBridge…** 会先询问，然后把应用移到废纸篓；如果无法移动，它会说明并且不做任何其他更改。然后结束正在进行的通话，每个会话都会离开 LiveBridge（与菜单中的 × 相同），因此其中的 `/live` 会关闭，而不会再次打开 LiveBridge；LiveBridge 移除登录项和麦克风权限后退出，退出之后，它保存的文件（见下文）会移到废纸篓中的一个文件夹，直到你清倒废纸篓。它不会移除 Claude Code 模组，而是复制移除模组的命令 `claude plugin uninstall livebridge@livebridge`，供你在终端中运行。当时未打开的会话在再次打开时可能仍会寻找 LiveBridge；移除模组即可停止。
+在 `/Applications` 中的副本里，菜单中的 **Feedback & Support ▸ Uninstall LiveBridge…** 会先询问，然后把应用移到废纸篓；如果无法移动，它会说明并且不做任何其他更改；如果 macOS 不允许它把先前移除的登录项放回去，它也会说明，并告诉你如何重新打开 **Open at login**。然后结束正在进行的通话，每个会话都会离开 LiveBridge（与菜单中的 × 相同），因此其中的 `/live` 会关闭，而不会再次打开 LiveBridge；LiveBridge 移除登录项和麦克风权限后退出，退出之后，它保存的文件（见下文）会移到废纸篓中的一个文件夹，直到你清倒废纸篓。它不会移除 Claude Code 模组，而是复制移除模组的命令 `claude plugin uninstall livebridge@livebridge`，供你在终端中运行。当时未打开的会话在再次打开时可能仍会寻找 LiveBridge；移除模组即可停止。
 
 用 Homebrew 安装的？`brew uninstall --cask getlivebridge/tap/livebridge` 会移除应用及 Homebrew 中的记录；下面的步骤仍适用于应用保存的文件。
 
