@@ -256,6 +256,22 @@ test('bothModelsFailingPostsEmptyWithTwoFailures', async ($, on) => {
   await band.unmount()
 })
 
+test('aSendAGapCrossedTriesNoFallback', async ($, on) => {
+  // Its answer is stale, so a second model would write for nothing; the ask is answered all the same.
+  const world = await joined($, on)
+  world.completeMs = 5000
+  world.completeFails = { [OPUS]: 'api-error' }
+  await appAsks(world, { ...NAMED, ask: 1 })
+  world.syncStatus = 503
+  await $.turn.start({ text: 'Count the files', turnId: 't1' })
+  world.syncStatus = 200
+  await world.clock.advance(5000)
+  expect(world.completes.map(one => one.model)).toEqual([OPUS])
+  expect(world.take('context')).toEqual([
+    { ...SUMMARY, summary: '', failures: [{ reason: 'api-error', error: 'overloaded' }], ask: 1 },
+  ])
+})
+
 test('theDeadlinePostsTimedOut', async ($, on) => {
   // The first model fails late; the fallback gets only what is left of the minute, then the ask is answered.
   const world = await joined($, on)

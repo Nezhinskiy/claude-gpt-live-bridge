@@ -17,8 +17,11 @@ export type ContextNote = 'loading' | 'sent' | 'failed' | undefined
 export type SendPort = {
   /** Whether the session has had a prompt: a new one has nothing to summarise. */
   hasTurns(): Promise<boolean>
-  /** `summarize`: it rejects only for an older app's ask, whose fork wrote none. */
-  write(ask: ContextAsk): Promise<Summary>
+  /**
+   * `summarize`: it rejects only for an older app's ask, whose fork wrote none. `isCrossed` says
+   * whether the send went stale, so it tries no fallback for nothing.
+   */
+  write(ask: ContextAsk, isCrossed: () => boolean): Promise<Summary>
   /** Posts an answer; true when the app took it. */
   post(body: Omit<ContextBody, 'sessionId'>): Promise<boolean>
   note(note: ContextNote): Promise<unknown>
@@ -139,7 +142,7 @@ export class SummarySends {
   /** The summary kept for the ask's model, else what it writes, kept if nothing made it stale meanwhile. */
   async #summary(ask: ContextAsk, send: Send, port: SendPort): Promise<Summary> {
     if (this.#kept !== null && this.#kept.model === ask.model) return this.#kept
-    const written = await port.write(ask)
+    const written = await port.write(ask, () => send.isCrossed)
     const { text, failures } = written
     if (text !== '' && !send.isCrossed && send.epoch === this.#epoch) this.#kept = { model: ask.model, text, failures }
     return written

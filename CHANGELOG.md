@@ -12,6 +12,8 @@ All notable changes to this project are listed here. The format follows
   **transcript-unreadable**, and logs the error in the session, instead of failing with no reason.
 - A summary still being written when you run `/clear` is stale, as one a gap crossed is: the band
   no longer says **Context sent** for it, and an older app no longer gets the old conversation's.
+- A summary that went stale while its first model failed (a gap, or `/clear`) no longer asks the
+  fallback model for one nobody will use.
 
 ## [0.6.0]
 

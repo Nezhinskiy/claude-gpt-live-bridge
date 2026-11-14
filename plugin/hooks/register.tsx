@@ -393,7 +393,8 @@ function sendPort($: EngineInterface): SendPort {
   return {
     hasTurns: () => hasTurns($),
     // The models share the minute: each call's own time limit is what is left of it.
-    write: async ask => summarize($, ask, (await $.clock.now()) + CONTEXT_TIMEOUT_MS),
+    write: async (ask, isCrossed) =>
+      summarize($, ask, (await $.clock.now()) + CONTEXT_TIMEOUT_MS, isCrossed),
     post: body => postContext($, body),
     note: context => showContext($, context),
     after: (ms, fn) => $.clock.after(ms, fn),
