@@ -71,6 +71,14 @@ struct PathsTests {
     #expect(removed == moved)
   }
 
+  /// `build-app.sh --uninstall` names the command Uninstall LiveBridge copies for the mod.
+  @Test func theScriptRemovesTheModAsTheMenuSays() throws {
+    let script = try String(
+      contentsOf: URL(filePath: #filePath).deletingLastPathComponent()
+        .appending(path: "../../../scripts/build-app.sh").standardized, encoding: .utf8)
+    #expect(script.contains(Confirmation.modUninstallCommand))
+  }
+
   /// The notices, the log and System Settings' link use the bundle id the app ships with.
   @Test func theBundleIDIsTheAppsOwn() throws {
     let plist = URL(filePath: #filePath).deletingLastPathComponent()

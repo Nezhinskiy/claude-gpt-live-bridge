@@ -10,6 +10,11 @@ struct ModelCheckTests {
         id: "00000000-0000-0000-0000-00000000000c", ok: false, reason: reason, error: kind))
   }
 
+  /// Each kind that may clear is one the engine documents, so the check can be told it.
+  @Test func whatMayClearIsAKnownKind() {
+    #expect(ModelCheckResult.mayClear.isSubset(of: SummaryReport.knownErrors))
+  }
+
   /// An error that may clear on its own says nothing of the model: it is busy, not refused.
   @Test func aRateLimitIsBusy() {
     for kind in ["rate_limit", "overloaded", "server_error"] {

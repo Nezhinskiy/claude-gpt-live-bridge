@@ -29,7 +29,9 @@ public enum ModelCheckResult: Sendable, Equatable {
   public var message: String? {
     switch self {
     case .works: nil
-    case .noSession: "No session can check this model. Run /live in a session and save again."
+    case .noSession:
+      "No session can check this model. Run \(StatusPresentation.joinCommand) in a session and "
+        + "save again."
     case .noAnswer: "The check got no answer."
     case .busy: "Claude is busy; try again."
     case .refused(let reason, let kind):
