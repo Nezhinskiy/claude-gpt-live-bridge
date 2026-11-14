@@ -309,7 +309,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   llamada y **Mute**; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier
   proceso que se ejecute como tú puede quitarlo
   ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
-- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen y **Pause sync** impide que la siguiente línea lo cargue,
+- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen y **Pause sync** impide que la siguiente línea lo cargue o el último pedido falló (hasta el siguiente turno de la sesión o el siguiente Start),
   un turno no llegó, una pregunta o un aviso de permiso no llegó a la aplicación, hubo turnos con el
   mod apagado, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
   conversación larga lo supera), la sesión estuvo en pausa y tiene resumen, o su mod no sincroniza. En otro caso el
@@ -658,12 +658,6 @@ sesión.
   este ajuste lo escribía el modelo propio de la sesión, que funciona dondequiera que funcione la
   sesión. Que un id fijo se resuelva en esos proveedores viene de la documentación de Claude Code y
   no se ha probado.
-- Un resumen que falla no se recuerda: mientras la sesión aún necesita uno, Start, un cambio de
-  destino y cada línea que se abre lo vuelven a pedir, y el mod envía otra vez la misma
-  transcripción, hasta 120 000 caracteres, que puede facturarse cada vez aunque la respuesta llegue
-  vacía o demasiado tarde. Si **Context failed** sigue en la banda de la sesión, activa
-  **Pause sync** y deja desactivado
-  **Load a session's context on its first call**.
 - Una sesión que sigue con un mod anterior a esta versión, hasta que se reinicie, no se sincroniza:
   carga un resumen como una sesión a la que le faltan turnos, y ninguna pausa rechaza sus líneas
   ([qué más cambia](../../CHANGELOG.md)).

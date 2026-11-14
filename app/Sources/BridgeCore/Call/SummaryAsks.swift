@@ -25,11 +25,20 @@ enum SummaryAnswer: Equatable {
     case .stale, .otherAsk, .closedAsk: false
     }
   }
+
+  /// The open ask it closed, taken or stale.
+  var closed: SummaryAsks.Ask? {
+    switch self {
+    case .taken(let ask, _), .stale(let ask, _): ask
+    case .otherAsk, .closedAsk, .unasked: nil
+    }
+  }
 }
 
 /// Every rule about summary asks: which ask is open and its number, which post answers it, how long
-/// a line waits for it, and what the menu shows. The asks are kept in `Continuity`, so they outlive
-/// a restart; the waits and what was loaded are in memory. Pure: the caller passes the time.
+/// a line waits for it, when a session is asked by itself, and what the menu shows. The asks are
+/// kept in `Continuity`, so they outlive a restart; the waits, the hold-offs and what was loaded
+/// are in memory. Pure: the caller passes the time.
 struct SummaryAsks: Sendable {
   typealias Ask = Conversation.SummaryAsk
 
@@ -64,6 +73,17 @@ struct SummaryAsks: Sendable {
   private var wait: (session: SessionID, number: Int, began: Date, ended: Date?)?
   /// When each session's last summary with text was taken.
   private var lastLoaded: [SessionID: Date] = [:]
+  /// The sessions whose last numbered ask was answered with no summary and a failure. Each ask
+  /// may send the transcript to a model again, so none goes to them by itself (`asksByItself`)
+  /// until a turn of theirs arrives, the next Start, or a summary with text, which only a press
+  /// can ask for then. An empty answer that names no failure had nothing to summarise.
+  private var heldOff: Set<SessionID> = []
+
+  /// Whether an ask nobody pressed for, from Start, a target change or a line, goes to `id`.
+  func asksByItself(_ id: SessionID) -> Bool { !heldOff.contains(id) }
+
+  /// A turn of `id` arrived: its transcript changed, so it is asked by itself again.
+  mutating func turnArrived(in id: SessionID) { heldOff.remove(id) }
 
   /// The ask of `id` that can still be answered at `now`, without taking it.
   func openAsk(of id: SessionID, in continuity: Continuity, at now: Date) -> Ask? {
@@ -112,10 +132,11 @@ struct SummaryAsks: Sendable {
   /// The line stopped waiting before the answer came.
   mutating func endWait(at now: Date) { if wait?.ended == nil { wait?.ended = now } }
 
-  /// The call started or stopped: every session may be waited for again, and no earlier wait is
-  /// logged.
+  /// The call started or stopped: every session may be waited for and asked by itself again, and
+  /// no earlier wait is logged.
   mutating func callStartedOrStopped() {
     spent = []
+    heldOff = []
     wait = nil
   }
 
@@ -123,10 +144,13 @@ struct SummaryAsks: Sendable {
   mutating func targetChanged() { wait = nil }
 
   /// A summary post from `id`, with the ask's `number` if the mod echoes one; `wrote` is false for
-  /// an empty one. A post for another ask leaves the open ask open; any other closes it. An empty
-  /// answer to the open, current ask spends the session's wait for the call.
+  /// an empty one, and `failed` true for one that names a failure. A post for another ask leaves
+  /// the open ask open; any other closes it. An empty answer to the open, current ask spends the
+  /// session's wait for the call and, if the ask is numbered and the answer failed, holds off the
+  /// session's asks by itself; one with text ends that.
   mutating func answer(
-    _ id: SessionID, number: Int?, wrote: Bool, in continuity: inout Continuity, at now: Date
+    _ id: SessionID, number: Int?, wrote: Bool, failed: Bool = false,
+    in continuity: inout Continuity, at now: Date
   ) -> SummaryAnswer {
     let open = openAsk(of: id, in: continuity, at: now)
     let isOtherAsk = number != nil && open?.number != number
@@ -142,7 +166,12 @@ struct SummaryAsks: Sendable {
       self.wait = nil
     }
     if open.isStale { return .stale(open, waited: waited) }
-    if !wrote { spent.insert(id) }
+    if wrote {
+      heldOff.remove(id)
+    } else {
+      spent.insert(id)
+      if open.number != nil, failed { heldOff.insert(id) }
+    }
     lastLoaded[id] = wrote ? now : nil
     return .taken(open, waited: waited)
   }
@@ -156,6 +185,15 @@ struct SummaryAsks: Sendable {
       return .loading
     }
     return lastLoaded[id].map { .loaded(at: $0) } ?? .none
+  }
+
+  /// `/clear` gave session `old` the id `new`: its spent wait, its hold-off, its wait for the log
+  /// and what was loaded go with it.
+  mutating func rename(_ old: SessionID, to new: SessionID) {
+    if spent.remove(old) != nil { spent.insert(new) }
+    if heldOff.remove(old) != nil { heldOff.insert(new) }
+    if wait?.session == old { wait?.session = new }
+    if let loaded = lastLoaded.removeValue(forKey: old) { lastLoaded[new] = loaded }
   }
 
   /// Forgets what was loaded for the sessions not in `ids`: they left or were removed.

@@ -173,7 +173,12 @@ starts the call. The target is asked for its summary when the voice would lack p
 session (it has none, a turn did not arrive, the lines since the summary no longer all fit the
 seed, or the mod does not sync), unless the pause holds it back (`Bridge.pauseHoldsBackSummary`):
 the pause setting is on or the session is *paused*, and the session has a summary or **Load a
-session's context on its first call** is off. A mod that joined with `writesSummaries` is asked at
+session's context on its first call** is off, or the session's last numbered ask was answered with
+no summary and a failure (`SummaryAsks.asksByItself`): each ask may send the transcript to the
+model again, so until a turn of it arrives (a sync line the app records, the answer to a voice
+request, or a join that says a turn was missed) or the next Start, only Load context asks it. An
+empty answer that names no failure had nothing to summarise and holds nothing off. A
+mod that joined with `writesSummaries` is asked at
 once, when the call starts and when the target changes during the call (from the menu, the band
 or the registry after a drop); an older mod is asked when a line opens, as before, so Start spends
 no fork on the session's own model before anyone speaks. The mod writes it (none for a session with no prompt yet; the last one again, with
@@ -277,10 +282,11 @@ when the line is quiet and none counts (`timeoutsChanged`); one already counting
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
 target's conversation. Every line the app opens, a reopened one included, also asks the target for
-its context when the voice would lack part of the session (see the mod's Start above) and the
-pause does not hold it back (the same rule); an ask already open is joined and handed to the mod
+its context when the voice would lack part of the session and neither the pause nor a summary
+that failed holds the ask back (the same rules as the mod's Start above); an ask already open is joined and handed to the mod
 again, with its number if it has one: the mod joins it to its send on its way, and one with none
-(it restarted, or the app lost its post) writes it again.
+(it restarted, or the app lost its post) writes it again. The answer that closes the ask takes it
+back from a mod that has not polled it yet.
 
 **The wait.** A line, whether speech or a result opened it, waits for its session's summary
 (`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current
@@ -297,7 +303,9 @@ cancelled: Stop opens nothing, a target change closes the waiting line as it clo
 one, and a reconnect waits again for the same ask. An answer to the open, current ask with no
 summary, whether or not a line was waiting for it, or a line that waits until the limit, spends
 that session's wait for the rest of the call, so a summary that keeps failing holds at most one
-line; the next Start waits again. A line that comes after the limit, the ask still in flight,
+line; the next Start waits again. `/clear`, which gives the session a new id, is no change of
+target, and the new id keeps the spent wait, the hold-off after a summary that failed and what
+was loaded. A line that comes after the limit, the ask still in flight,
 opens without waiting and spends nothing, so the next ask can still be waited for. That is no
 bound per call: a mod that answers each ask with text, however late, or whose gap makes each ask
 stale, is asked again by the next line, so every line of the call can wait, each up to the limit

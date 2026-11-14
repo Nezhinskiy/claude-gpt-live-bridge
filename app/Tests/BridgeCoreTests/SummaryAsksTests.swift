@@ -245,6 +245,97 @@ struct SummaryAsksTests {
         == .taken(ask, waited: 2))
   }
 
+  // MARK: After a summary that failed
+
+  /// Asks `a` for a summary at `at` and answers the ask, with a summary or none; `failed`: the
+  /// answer names a failure.
+  func askAndAnswer(
+    _ asks: inout SummaryAsks, _ continuity: inout Continuity, at: Date, model: String? = nil,
+    wrote: Bool, failed: Bool = false
+  ) {
+    let ask = asks.ask(a, in: &continuity, at: at, model: model, fallback: nil).ask
+    _ = asks.answer(
+      a, number: ask.number, wrote: wrote, failed: failed, in: &continuity, at: at + 1)
+  }
+
+  /// A failed answer to a numbered ask holds off the session's own asks.
+  @Test func aFailedAnswerHoldsOffTheSessionsAsks() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false, failed: true)
+    #expect(!asks.asksByItself(a))
+    #expect(asks.asksByItself(b))
+  }
+
+  /// An empty answer that names no failure had nothing to summarise and called no model.
+  @Test func anEmptyAnswerWithNoFailureHoldsNothingOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false)
+    #expect(asks.asksByItself(a))
+  }
+
+  /// An older mod posts nothing when it fails, so its empty answer holds nothing off.
+  @Test func anOlderModsEmptyAnswerHoldsNothingOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, wrote: false, failed: true)
+    #expect(asks.asksByItself(a))
+  }
+
+  @Test func aTurnEndsTheHoldOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false, failed: true)
+    asks.turnArrived(in: a)
+    #expect(asks.asksByItself(a))
+  }
+
+  @Test func aNewCallEndsTheHoldOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false, failed: true)
+    asks.callStartedOrStopped()
+    #expect(asks.asksByItself(a))
+  }
+
+  /// A press asks all the same; a summary it brings ends the hold-off.
+  @Test func aSummaryEndsTheHoldOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false, failed: true)
+    askAndAnswer(&asks, &continuity, at: t0 + 2, model: haiku, wrote: true)
+    #expect(asks.asksByItself(a))
+  }
+
+  // MARK: /clear
+
+  /// `/clear` gives the session a new id: the wait it spent and what was loaded follow it.
+  @Test func aSpentWaitAndWhatWasLoadedFollowTheNewID() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    let first = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
+    let limit = t0 + SummaryAsks.Policy.waitLimit
+    _ = asks.wait(a, in: continuity, at: t0)
+    _ = asks.wait(a, in: continuity, at: limit)
+    _ = asks.answer(a, number: first.number, wrote: true, in: &continuity, at: limit + 1)
+    continuity.move(a, to: b)
+    asks.rename(a, to: b)
+    #expect(asks.display(of: b, in: continuity, at: limit + 1) == .loaded(at: limit + 1))
+    asks.ask(b, in: &continuity, at: limit + 2, model: haiku, fallback: nil)
+    #expect(asks.wait(b, in: continuity, at: limit + 2) == nil)
+  }
+
+  @Test func aHoldOffFollowsTheNewID() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false, failed: true)
+    continuity.move(a, to: b)
+    asks.rename(a, to: b)
+    #expect(!asks.asksByItself(b))
+    #expect(asks.asksByItself(a))
+  }
+
   // MARK: What the menu shows
 
   /// Whatever asked for it, the summary is on its way until its answer, per session.
