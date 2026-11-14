@@ -1992,6 +1992,14 @@ struct BridgeTests {
     #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
   }
 
+  /// A join that says a turn was missed says the transcript changed too.
+  @Test func aMissedTurnAfterAFailedSummaryLetsTheLineAsk() async throws {
+    try await failSummary()
+    try await join(a, "Alpha", missed: true, writesSummaries: true)
+    await bridge.audioEvent(.speechStarted)
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
+  }
+
   /// The next line asks for nothing, so the menu offers the press.
   @Test func aFailedSummaryOffersThePress() async throws {
     try await failSummary()

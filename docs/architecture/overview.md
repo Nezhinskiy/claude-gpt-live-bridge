@@ -172,7 +172,8 @@ seed, or the mod does not sync), unless the pause holds it back (`Bridge.pauseHo
 the pause setting is on or the session is *paused*, and the session has a summary or **Load a
 session's context on its first call** is off, or the session's last numbered ask was answered with
 no summary (`SummaryAsks.asksByItself`): each ask sends the transcript to the model again, so until
-a turn of it arrives (a sync line the app records) or the next Start, only Load context asks it. A
+a turn of it arrives (a sync line the app records, or a join that says a turn was missed) or the
+next Start, only Load context asks it. A
 mod that joined with `writesSummaries` is asked at
 once, when the call starts and when the target changes during the call (from the menu, the band
 or the registry after a drop); an older mod is asked when a line opens, as before, so Start spends

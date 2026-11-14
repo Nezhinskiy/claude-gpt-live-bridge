@@ -383,6 +383,7 @@ public actor Bridge: Router {
         }
         if body.missed == true {
           continuity.markMissed(body.sessionId, asPaused: pausesSync())
+          summaries.turnArrived(in: body.sessionId)  // a turn ran, so the transcript changed
           save()
         }
         if problem == .noSession { problem = nil }

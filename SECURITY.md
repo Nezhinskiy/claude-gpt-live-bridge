@@ -91,7 +91,7 @@ voices.
     also the next Start or target change to it during a call, before a line to it opens (while
     the pause setting is on or the session is marked paused, only one with no summary yet,
     below; after it answers a numbered ask with no summary, only once the app records a sync line
-    of that session, or at the next Start), and so makes it write one;
+    of that session or a join of it as missed, or at the next Start), and so makes it write one;
   - join with `writesSummaries`, make itself the target and never answer the summary ask, which
     holds what you say on the Mac, unsent, for up to 10 seconds from the ask while the line waits
     for that summary. The line then opens without it, and no later line of that call waits for
