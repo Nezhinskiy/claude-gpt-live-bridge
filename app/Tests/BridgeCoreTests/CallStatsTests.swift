@@ -171,6 +171,34 @@ struct CallStatsLogTests {
     #expect(try lines(two).count == 2)
   }
 
+  @Test func twoCallsInOneSecondKeepBothFiles() throws {
+    defer { try? FileManager.default.removeItem(at: base) }
+    let log = log()
+    let one = try #require(try log.record(["line": 1], at: first))
+    log.endCall()
+    let two = try #require(try log.record(["line": 2], at: first))
+    #expect(one != two)
+    #expect(try lines(one).count == 2)
+    #expect(try lines(two).count == 2)
+  }
+
+  /// A folder that cannot be made fails the call's first sample only; the next call tries again.
+  @Test func aFolderThatCannotBeMadeIsReportedOnceACall() throws {
+    struct NoFolder: Error {}
+    var asked = 0
+    let log = CallStatsLog(
+      directory: {
+        asked += 1
+        throw NoFolder()
+      }, timeZone: utc)
+    log.set(on: true)
+    #expect(throws: NoFolder.self) { try log.record(["line": 1], at: first) }
+    #expect(try log.record(["line": 1], at: second) == nil)
+    #expect(asked == 1)
+    log.endCall()
+    #expect(throws: NoFolder.self) { try log.record(["line": 1], at: second) }
+  }
+
   @Test func aDroppedSampleOpensNoFile() throws {
     defer { try? FileManager.default.removeItem(at: base) }
     #expect(try log().record("not a sample", at: first) == nil)

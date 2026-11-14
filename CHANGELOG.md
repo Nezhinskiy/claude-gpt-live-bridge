@@ -40,6 +40,8 @@ All notable changes to this project are listed here. The format follows
   no longer says **Context sent** for it, and an older app no longer gets the old conversation's.
 - A summary that went stale while its first model failed (a gap, or `/clear`) no longer asks the
   fallback model for one nobody will use.
+- Debug mode no longer overwrites a call's CSV with the next call's when both start in the same
+  second: the second file's name ends in `-2`.
 
 ## [0.6.0]
 

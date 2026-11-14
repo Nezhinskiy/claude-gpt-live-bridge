@@ -123,12 +123,15 @@ public enum CallStats {
 
 /// Debug mode's files: one per call, made by the call's first sample while debug mode is on, so
 /// a call whose line never opened, or one with debug mode off, leaves none. `directory` makes the
-/// folder; it is asked for each new file, so a folder deleted between calls is made again.
+/// folder; it is asked for each new file, so a folder deleted between calls is made again. A file
+/// that cannot be opened fails that sample alone, and the call records nothing more.
 public final class CallStatsLog {
   private let directory: () throws -> URL
   private let timeZone: TimeZone
   private var file: FileHandle?
   private var isOn = false
+  /// This call's file could not be opened.
+  private var cannotOpen = false
 
   public init(directory: @escaping () throws -> URL, timeZone: TimeZone = .current) {
     self.directory = directory
@@ -144,23 +147,48 @@ public final class CallStatsLog {
 
   /// Adds the sample; returns the file when this sample opened it.
   public func record(_ body: Any, at date: Date) throws -> URL? {
-    guard isOn, let row = CallStats.row(body, at: date, timeZone: timeZone) else { return nil }
+    guard isOn, !cannotOpen, let row = CallStats.row(body, at: date, timeZone: timeZone) else {
+      return nil
+    }
     var opened: URL?
     if file == nil {
-      let url = try directory().appending(path: CallStats.fileName(at: date, timeZone: timeZone))
-      try Data((CallStats.header + "\n").utf8).write(to: url)
-      let handle = try FileHandle(forWritingTo: url)
-      try handle.seekToEnd()
-      file = handle
-      opened = url
+      do {
+        let url = try newFile(at: date)
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+        file = handle
+        opened = url
+      } catch {
+        cannotOpen = true
+        throw error
+      }
     }
     try file?.write(contentsOf: Data((row + "\n").utf8))
     return opened
+  }
+
+  /// A new file with its header, named after its first sample's second; a call that opens one in
+  /// a second another file already has gets `-2`, then `-3`, so it overwrites none.
+  private func newFile(at date: Date) throws -> URL {
+    let folder = try directory()
+    let name = CallStats.fileName(at: date, timeZone: timeZone)
+    var copy = 1
+    while true {
+      let url = folder.appending(
+        path: copy == 1 ? name : name.replacingOccurrences(of: ".csv", with: "-\(copy).csv"))
+      do {
+        try Data((CallStats.header + "\n").utf8).write(to: url, options: .withoutOverwriting)
+        return url
+      } catch CocoaError.fileWriteFileExists {
+        copy += 1
+      }
+    }
   }
 
   /// The next sample starts a new file.
   public func endCall() {
     try? file?.close()
     file = nil
+    cannotOpen = false
   }
 }
