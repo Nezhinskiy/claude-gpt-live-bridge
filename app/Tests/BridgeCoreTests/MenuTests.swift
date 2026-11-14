@@ -370,6 +370,16 @@ struct MenuContentTests {
     }
   }
 
+  /// An app that cannot move to the Trash says nothing was changed only when the login item it
+  /// removed first is back; otherwise it says where to turn it on again.
+  @Test func aFailedUninstallSaysNothingChangedOnlyWithTheLoginItemBack() {
+    let restored = Confirmation.cannotTrash(reason: "Denied.", loginItemRestored: true)
+    #expect(restored.contains("Nothing was changed"))
+    let lost = Confirmation.cannotTrash(reason: "Denied.", loginItemRestored: false)
+    #expect(!lost.contains("Nothing was changed"))
+    #expect(lost.contains("Open at login") && lost.contains("Login Items"))
+  }
+
   @Test func withoutABridgeQuickSettingsAreStillThere() throws {
     let settings = Settings(connectsOverTCP: true)
     let bridged = try #require(

@@ -132,6 +132,18 @@ struct SettingsStoreTests {
     #expect(settings.noiseSeconds == 300)
   }
 
+  /// A hand-edited value of the wrong type reads as that setting's default, and the file's other
+  /// settings are kept: the next change writes them back instead of the defaults.
+  @Test func aWrongTypedSettingKeepsTheRest() throws {
+    let settings = try decoded(
+      #"{"voice":"cedar","prompt":"Speak with me in Spanish.","silenceSeconds":7.5,"#
+        + #""noiseSeconds":"20","notifyResults":"no"}"#)
+    #expect(settings.voice == "cedar")
+    #expect(settings.prompt == "Speak with me in Spanish.")
+    #expect(settings.timeouts == Settings().timeouts)
+    #expect(settings.notifyResults)
+  }
+
   @Test func changesAreKeptAcrossRestarts() throws {
     let file = try temporaryDirectory().appending(path: "settings.json")
     SettingsStore(file: file).update {
