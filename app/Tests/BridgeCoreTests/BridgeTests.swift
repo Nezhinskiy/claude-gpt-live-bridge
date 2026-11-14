@@ -2057,6 +2057,23 @@ struct BridgeTests {
     #expect(try await registry.poll(cleared) == nil)
   }
 
+  /// The waiting line keeps waiting, from the same start, for the ask under the new id, and is
+  /// seeded with its summary without a second wait.
+  @Test func aClearDuringTheWaitKeepsTheWait() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(3, polling: a)
+    try await clear()
+    #expect(await voice.opens.isEmpty)
+    try await post(
+      "/v1/context", ContextBody(sessionId: cleared, summary: "Alpha's work.", ask: 1))
+    try await settle(opening)  // the clock stands still: no second wait
+    #expect(await voice.opens.count == 1)
+    #expect(await voice.opens.first?.first?.text == summary)
+    #expect(timings.withLock { $0.last?.waited } == 3)
+  }
+
   /// The wait the session spent this call stays spent under its new id.
   @Test func aClearKeepsASpentWait() async throws {
     let asked = time.now
