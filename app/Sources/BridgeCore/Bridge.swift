@@ -30,7 +30,7 @@ public actor Bridge: Router {
   /// Settings' summary model, read at each ask.
   private let summaryModel: @Sendable () -> String
   /// What came of the last summary asked for with a model.
-  public private(set) var lastSummary: SummaryReport?
+  private var lastSummary: SummaryReport?
   /// Settings' model check in flight: its id, the session it went to, who waits on it, and the task
   /// that hands it over and ends it after `checkSeconds`.
   private var modelCheck:
@@ -96,9 +96,9 @@ public actor Bridge: Router {
     pausesSync: @escaping @Sendable () -> Bool = { false },
     timeouts: @escaping @Sendable () -> CallMachine.Timeouts,
     loadsContextOnFirstCall: @escaping @Sendable () -> Bool,
-    connectsOverTCP: @escaping @Sendable () -> Bool = { false },
-    summaryModel: @escaping @Sendable () -> String = { SummaryModel.default },
-    reportsSummary: @escaping @Sendable (SummaryTiming) -> Void = { _ in }, appVersion: AppVersion?
+    connectsOverTCP: @escaping @Sendable () -> Bool,
+    summaryModel: @escaping @Sendable () -> String,
+    reportsSummary: @escaping @Sendable (SummaryTiming) -> Void, appVersion: AppVersion?
   ) {
     self.reportsSummary = reportsSummary
     self.summaryModel = summaryModel
@@ -253,15 +253,14 @@ public actor Bridge: Router {
   /// Settings' check of a custom summary model, run by a joined session's mod: the target if its
   /// mod writes summaries, else the most recently joined one whose mod does. The result is taken
   /// only from that session, under the check's id; 20 s without one, or the session's drop, is
-  /// `noAnswer`. A newer check ends the one before it. It takes the poller's word: a process
-  /// that polls as that session before its mod does can say any model works (SECURITY.md).
+  /// `noAnswer`. It takes the poller's word: a process that polls as that session before its mod
+  /// does can say any model works (SECURITY.md). One check runs at a time: Settings disables its
+  /// button while one does, and a check started during another would leave the first unanswered.
   public func checkModel(_ model: String) async -> ModelCheckResult {
     guard let session = await registry.sessionThatChecks() else { return .noSession }
     let id = UUID().uuidString
     return await withCheckedContinuation { done in
-      let older = endCheck(.noAnswer)
       let timer = Task { [registry, time] in
-        if let older { await registry.withdrawCheck(older) }
         // the check may have ended since, and its session may have a new id after /clear
         guard let check = self.modelCheck, check.id == id else { return }
         await registry.requestCheck(for: check.session, check: id, model: model)
@@ -275,17 +274,11 @@ public actor Bridge: Router {
   /// Ends the check in flight with `result`, if it is check `id` or no id is given, and takes it
   /// back from a session that has not polled it yet.
   private func finishCheck(_ result: ModelCheckResult, of id: String? = nil) async {
-    guard let ended = endCheck(result, of: id) else { return }
-    await registry.withdrawCheck(ended)
-  }
-
-  /// Ends the check as `finishCheck` does but leaves it with its session; returns the ended id.
-  private func endCheck(_ result: ModelCheckResult, of id: String? = nil) -> String? {
-    guard let check = modelCheck, id == nil || id == check.id else { return nil }
+    guard let check = modelCheck, id == nil || id == check.id else { return }
     modelCheck = nil
     check.timer.cancel()
     check.done.resume(returning: result)
-    return check.id
+    await registry.withdrawCheck(check.id)
   }
 
   /// `POST /v1/model-check`: the result of the check in flight, from the session it went to.

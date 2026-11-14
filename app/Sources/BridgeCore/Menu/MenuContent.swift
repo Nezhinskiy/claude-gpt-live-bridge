@@ -38,7 +38,7 @@ public struct MenuContent: Sendable, Equatable {
 
   /// A setting the menu shows as a checkmark item: the setting of the same name in Settings, not
   /// a copy.
-  public enum Switch: Sendable, Equatable, CaseIterable {
+  public enum Switch: Sendable, Equatable {
     case connectsOverTCP, confirmHandoffs, notifyResults, pauseSyncWhileStopped,
       loadContextOnFirstCall, debugMode
 

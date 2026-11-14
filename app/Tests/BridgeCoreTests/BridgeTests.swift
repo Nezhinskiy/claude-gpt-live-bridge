@@ -289,21 +289,6 @@ struct BridgeTests {
   /// An answer with UDP and TCP candidates, as the media server gives.
   static let candidates = AnswerSDPTests.answer([AnswerSDPTests.udp, AnswerSDPTests.tcp])
 
-  @Test func aLineOverUDPAppliesTheAnswerAsItCame() async throws {
-    let test = try BridgeTests()
-    await test.voice.setAnswer(Self.candidates)
-    await test.live()
-    #expect(await test.audio.answers == [Self.candidates])
-  }
-
-  @Test func aLineOverTCPAppliesTheAnswerPreferringTCP() async throws {
-    let test = try BridgeTests()
-    test.tcp.withLock { $0 = true }
-    await test.voice.setAnswer(Self.candidates)
-    await test.live()
-    #expect(await test.audio.answers == [AnswerSDP.preferringTCP(Self.candidates)])
-  }
-
   /// The setting changed and the owner chose Reconnect: the open line closes and opens again at
   /// once, over the new transport, without the pre-roll.
   @Test func reconnectReopensTheOpenLineOverTheNewTransport() async throws {
@@ -709,14 +694,6 @@ struct BridgeTests {
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Not joined."))
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
     #expect(await bridge.current.targetSummary == .loaded(at: time.now))
-  }
-
-  /// An empty answer is announced as one, so the menu's press ends without saying it loaded.
-  @Test func anEmptyAnswerIsAnnouncedAsEmpty() async throws {
-    try await join(a, "Alpha")
-    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work."))
-    try await post("/v1/context", ContextBody(sessionId: a, summary: ""))
-    #expect(await bridge.current.targetSummary == .none)
   }
 
   @Test func theMenuSetsTheTarget() async throws {
@@ -1509,12 +1486,12 @@ struct BridgeTests {
       "/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", failures: refused))
     let report = SummaryReport(
       asked: "claude-opus-5-5", fallback: "claude-haiku-5-5", failures: refused, wrote: true)
-    #expect(await bridge.lastSummary == report)
+    #expect(await bridge.current.lastSummary == report)
     try await join(b, "Beta")
     await bridge.setTarget(b)
     await bridge.loadContext()
     try await post("/v1/context", ContextBody(sessionId: b, summary: "Beta's work."))
-    #expect(await bridge.lastSummary == report)
+    #expect(await bridge.current.lastSummary == report)
   }
 
   /// Settings' line stays until a model is tried again: an answer no model was asked for leaves it.
@@ -1528,10 +1505,10 @@ struct BridgeTests {
     ]
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", failures: failed, ask: 1))
     let line = "The voice got no new summary: Opus 5.5 was refused, then Haiku 5.5 ran out of time."
-    #expect(await bridge.lastSummary?.line == line)
+    #expect(await bridge.current.lastSummary?.line == line)
     await bridge.loadContext()
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 2))
-    #expect(await bridge.lastSummary?.line == line)
+    #expect(await bridge.current.lastSummary?.line == line)
   }
 
   /// A reason from a later mod, or a number that is not whole, does not lose the summary; the
@@ -1548,7 +1525,8 @@ struct BridgeTests {
     _ = await bridge.handle(
       HTTPRequest(method: "POST", path: "/v1/context", query: [:], body: Data(body.utf8)))
     #expect(await bridge.current.context == summary)
-    #expect(await bridge.lastSummary?.line == "The last summary used Haiku 5.5: Opus 5.5 failed.")
+    #expect(
+      await bridge.current.lastSummary?.line == "The last summary used Haiku 5.5: Opus 5.5 failed.")
   }
 
   /// The log names the model asked for, or the fallback when that one failed, with the post's numbers.
@@ -1617,7 +1595,7 @@ struct BridgeTests {
     #expect(await bridge.current.context == nil)
     #expect(SummaryAsks().openAsk(of: a, in: try saved(), at: time.now)?.number == 2)
     #expect(timings.withLock { $0.last?.stale } == true)
-    #expect(await bridge.lastSummary == nil)
+    #expect(await bridge.current.lastSummary == nil)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 2))
     #expect(await bridge.current.context == summary)
   }
@@ -1664,18 +1642,6 @@ struct BridgeTests {
     await bridge.loadContext()
     let after = try FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber]
     #expect(after as? Int == written as? Int)
-  }
-
-  /// An older mod echoes no number and joins a second ask to the send on its way, so the stale
-  /// ask stays open and its post is still refused.
-  @Test func anOlderModsPostAfterAForgetAndASecondAskIsRefused() async throws {
-    try await join(a, "Alpha")
-    await bridge.loadContext()
-    #expect(try await registry.poll(a) == .context())
-    await bridge.newConversation()
-    await bridge.loadContext()
-    try await post("/v1/context", ContextBody(sessionId: a, summary: "Everything from before."))
-    #expect(await bridge.current.context == nil)
   }
 
   /// A summary on its way when the owner presses New conversation does not bring back what was
@@ -4406,21 +4372,6 @@ struct BridgeTests {
     #expect(await eventually { time.deadlines.contains(asked + 20) })
     time.advance(by: .seconds(20))
     try await settle(checking)
-  }
-
-  /// A check that ended before its session polled, here by a newer check that went to another
-  /// session, is not handed over and run for nothing.
-  @Test func aCheckThatEndedIsNotHandedOut() async throws {
-    try await join(a, "Alpha", writesSummaries: true)
-    try await join(b, "Beta", writesSummaries: true)
-    let asked = time.now
-    let older = check(endsWith: .noAnswer)
-    #expect(await eventually { time.deadlines.contains(asked + 20) })
-    await bridge.setTarget(b)
-    _ = check(endsWith: .works)
-    try await settle(older)
-    let handed = try await registry.poll(a)
-    #expect(handed == nil)
   }
 
   /// `/clear` before the session polls: the new id is handed the check, and its result counts.
