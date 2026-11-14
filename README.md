@@ -235,9 +235,9 @@ call stops with a sentence that says where to allow it.
 ### Uninstall
 
 In the copy in `/Applications`, the menu's **Feedback & Support ▸ Uninstall LiveBridge…** asks
-first, then moves the app to the Trash; if it cannot, it says so and changes nothing else, and if
-macOS does not let it put back the login item it removed first, it says that too, and how to turn
-**Open at login** on again. Then a call open ends and every session leaves LiveBridge, as the
+first, then moves the app to the Trash; if it cannot, it says so, leaves the app where it is and
+puts back any login item it removed first, and if macOS does not let it put that login item back,
+it says that too, and how to turn **Open at login** on again. Then a call open ends and every session leaves LiveBridge, as the
 menu's × does, so `/live`
 turns off in each instead of opening LiveBridge again; LiveBridge removes its login item and
 microphone permission and quits, and once it has quit, the files it keeps (listed below) go to a

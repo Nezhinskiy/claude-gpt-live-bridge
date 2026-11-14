@@ -218,7 +218,7 @@ permitirlo.
 ### Desinstalación
 
 En la copia de `/Applications`, **Feedback & Support ▸ Uninstall LiveBridge…**, en el menú,
-pregunta primero y mueve la app a la Papelera; si no puede, lo dice y no cambia nada más, y si macOS no le deja volver a poner el inicio de sesión que quitó antes, también lo dice, y cómo volver a activar **Open at login**. Luego termina la llamada abierta y cada sesión deja LiveBridge, como con la ×
+pregunta primero y mueve la app a la Papelera; si no puede, lo dice, deja la app donde está y vuelve a poner el inicio de sesión que haya quitado antes, y si macOS no le deja volver a ponerlo, también lo dice, y cómo volver a activar **Open at login**. Luego termina la llamada abierta y cada sesión deja LiveBridge, como con la ×
 del menú, así que `/live` se apaga en ella en vez de volver a abrir LiveBridge; LiveBridge quita
 el inicio de sesión y el permiso del micrófono y se cierra, y una vez cerrado, los archivos que
 guarda (los de abajo) van a una carpeta de la Papelera, hasta que la vacíes. Deja
