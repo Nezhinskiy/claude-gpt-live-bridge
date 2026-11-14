@@ -235,9 +235,9 @@ call stops with a sentence that says where to allow it.
 ### Uninstall
 
 In the copy in `/Applications`, the menu's **Feedback & Support ▸ Uninstall LiveBridge…** asks
-first, then moves the app to the Trash; if it cannot, it says so and changes nothing else, and if
-macOS does not let it put back the login item it removed first, it says that too, and how to turn
-**Open at login** on again. Then a call open ends and every session leaves LiveBridge, as the
+first, then moves the app to the Trash; if it cannot, it says so, leaves the app where it is and
+puts back any login item it removed first, and if macOS does not let it put that login item back,
+it says that too, and how to turn **Open at login** on again. Then a call open ends and every session leaves LiveBridge, as the
 menu's × does, so `/live`
 turns off in each instead of opening LiveBridge again; LiveBridge removes its login item and
 microphone permission and quits, and once it has quit, the files it keeps (listed below) go to a
@@ -296,9 +296,9 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **The band's Start** makes its session the target and starts the call; the line it opens is seeded
   with the session's conversation, and loads a summary of the session as well when the voice would
   lack part of it (see **Load context** below), but while **Pause sync** is on or after a
-  pause only when it has none yet ([details](docs/architecture/overview.md#components)). With a mod of this
+  pause only when it has none yet ([details](docs/architecture/overview.md#when-the-app-asks)). With a mod of this
   release the summary is asked for at Start and when the target changes during the call, and the
-  line waits for it before it connects, at most 10 seconds from the ask: what you say meanwhile is
+  line waits for it before it connects, for at most [the wait's limit](docs/architecture/overview.md#its-time): what you say meanwhile is
   held on the Mac and played to the voice once the line opens. Stop or a target change during the
   wait drops what was held, and so does a reconnect after **Connect over TCP** changes, which keeps
   at most the last 2 seconds for the line that opens again. While the call talks to another
@@ -336,7 +336,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   reads **Context up to date** and is disabled, because the voice already has the conversation. With
   no line open, when the next line will load the summary and nothing else is missing, it reads **Context loads with the line** and is disabled, because
   the next line asks for one by itself. While a summary of the target is on its way, whatever asked
-  for it, the item reads **Loading context…** and is disabled, for at most the 60 seconds the mod allows it (on an older mod it stays **Load context**); one that arrives shows **Context
+  for it, the item reads **Loading context…** and is disabled, for at most the time the mod allows it ([how long](docs/architecture/overview.md#its-time); on an older mod it stays **Load context**); one that arrives shows **Context
   loaded** for a moment, and an empty answer goes back to **Load context**. A summary carries no date, so one can be ignored while the item stays enabled
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×

@@ -35,7 +35,7 @@ flowchart LR
   Codex -- stdio --> CodexProc
   CodexProc -- signalling --> OpenAI
   Audio -- "WebRTC audio + data channel" --> OpenAI
-  Mod -- "HTTP/1.1, 1 poll per second, 5 for the target" --> Server
+  Mod -- "HTTP/1.1, 1 poll per second, 5 for the target during a call" --> Server
   Mod -- "prompt.submit" --> Claude
 ```
 
@@ -143,8 +143,8 @@ desktop's own, read from Claude Code's session registry, or the folder's name wh
 and joins again when that title changes, polls it once a second (the target five times a second
 while its last poll said the call is on, so a summary ask during a call reaches it sooner; with the
 call off it polls once a second too and learns that a call began only from its next poll, so
-Start's ask reaches it up to 0.8 s later than in 0.6.0, well within the line's 10-second wait for
-the summary ([handoff](#handoff)), and so do a **Load context** press and a model check; the title is still read once a second, and a
+Start's ask reaches it up to 0.8 s later than in 0.6.0, well within the line's
+[wait for the summary](#the-wait), and so do a **Load context** press and a model check; the title is still read once a second, and a
 poll in between writes the band only when what it draws changed), submits each voice request to the session
 as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
@@ -169,21 +169,9 @@ buttons Start/Stop (Mute/Unmute beside Stop, drawn only when the status carries 
 `· muted` marker beside the phase) and Talk here, with the problem sentence on a row of its own.
 A surface that has drawn no band for 3 s while the session is joined is asked for it again, and
 `/live` in a joined session asks every surface for it. Start makes the session the target and
-starts the call. The target is asked for its summary when the voice would lack part of the
-session (it has none, a turn did not arrive, the lines since the summary no longer all fit the
-seed, or the mod does not sync), unless the pause holds it back (`Bridge.pauseHoldsBackSummary`):
-the pause setting is on or the session is *paused*, and the session has a summary or **Load a
-session's context on its first call** is off, or the session's last numbered ask was answered with
-no summary and a failure (`SummaryAsks.asksByItself`): each ask may send the transcript to the
-model again, so until a turn of it arrives (a sync line the app records, the answer to a voice
-request, or a join that says a turn was missed) or the next Start, only Load context asks it. An
-empty answer that names no failure had nothing to summarise and holds nothing off. A
-mod that joined with `writesSummaries` is asked at
-once, when the call starts and when the target changes during the call (from the menu, the band
-or the registry after a drop); an older mod is asked when a line opens, as before, so Start spends
-no fork on the session's own model before anyone speaks. The mod writes it (none for a session with no prompt yet; the last one again, with
-no model call, for an ask naming the same model, until any main-loop turn completes, or `/clear`), with a
-short note in the band while it goes. Talk here shows only while the call talks to another session,
+starts the call. The mod writes the target's summary when the app asks for it
+([the summary](#the-summary)), with a short note in the band while it goes. Talk here shows only
+while the call talks to another session,
 and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
 both install routes put it, with `open -g`, and falls back to `open -g -b <bundle id>`.
 
@@ -205,7 +193,7 @@ that both test suites parse.
 | `POST /v1/activity` | `idle`, `working` or `approval`; `question` with `approval` is what Claude asks the owner in a main-loop turn (none: a permission prompt), `text` what Claude wrote in the step that pauses, `turn` the main-loop turn it belongs to: `{ id, request? }`, `request` being the voice request the turn's answer belongs to; absent between turns and from a released mod |
 | `POST /v1/sync` | `sessionId`, `turn`, `kind` and `text`: a line of a main-loop turn. A voice turn posts its `start`, what is typed into it and the mod's lines; its answer goes by `/v1/answer`. `kind`: `start` takes the turn's decision and has no `text`; `typed` is the owner's words and alone refuses a turn; `answer` is Claude's final answer; `report` is the mod's own line |
 | `POST /v1/limits` | `sessionId`, `windows`: Claude's usage windows as one joined session read them, each `kind`, `percentUsed` and `resetsAt?`; from a session the app does not know it is ignored |
-| `POST /v1/context` | the session's summary; the app redacts it and cuts the whole `[CONTEXT] label: …` line to 1,500 characters. A post that echoes an ask's number (a current app with a current mod) is taken only by the open ask with that number; one that finds no ask open is ignored. Without a number, from an older mod, one the app asked for before the latest gap or forget is ignored, also after a second ask, which joins the stale one; one nobody asked for cannot be dated and is taken, so it can clear a *paused* mark across a refused turn. That is an older mod's `/live context`, and from an older mod since 0.4.2, which sends a summary only when asked, the reply to a second ask (a press or a line opening) that came after a poll took the first and before that summary landed, as that summary closed the ask. A mod of this release that noted a gap the app has not heard of joins again with `missed` before it posts, and posts nothing while it cannot, so the app ignores a summary written across that gap as stale |
+| `POST /v1/context` | the session's summary, which the app redacts and cuts ([the summary](#what-the-model-reads)). A post that echoes an ask's number (a current app with a current mod) is taken only by the open ask with that number; one that finds no ask open is ignored. Without a number, from an older mod, one the app asked for before the latest gap or forget is ignored, also after a second ask, which joins the stale one; one nobody asked for cannot be dated and is taken, so it can clear a *paused* mark across a refused turn. That is an older mod's `/live context`, and from an older mod since 0.4.2, which sends a summary only when asked, the reply to a second ask (a press or a line opening) that came after a poll took the first and before that summary landed, as that summary closed the ask. A mod of this release that noted a gap the app has not heard of joins again with `missed` before it posts, and posts nothing while it cannot, so the app ignores a summary written across that gap as stale |
 | `POST /v1/model-check` | `sessionId`, `id`, `ok`, `reason?`, `error?`: the result of Settings' check of a custom summary model, which goes to the target if its mod writes summaries, else to the latest joined session whose mod does. Only a result under that session's id and the check's `id` is taken; the first poll with that session's id is handed the check, whether or not it is that session's mod ([SECURITY.md](../../SECURITY.md)). None within 20 s, or that session's drop, is no answer. The app writes its own sentence from `reason`, an `api-error` kind being shown only if the engine documents it |
 | `POST /v1/target`, `POST /v1/call` | make this session the target; Start, Stop, Mute or Unmute (`mute` and `unmute` are idempotent) |
 
@@ -219,6 +207,135 @@ joins it again (`/live`, the only join that sends `"owner": true`) every call fr
 its own automatic joins included, answers `410` with `"code": "removed"`. The mod then turns itself off
 for that session and logs "Removed from LiveBridge. /live joins again." instead of joining
 again, as it does after a `404` (the app restarted).
+
+## The summary
+
+The voice's context for a session is a summary of its transcript, which the app asks the
+session's mod for and the mod writes on the side. This is its contract; the README and
+SECURITY.md link here, and the [design](../specs/2026-11-09-summary-model-design.md) says why each
+choice was made.
+
+### Who writes it
+
+- **The model:** Settings' **Summary model** (`Settings.summaryModel`), Haiku 5.5
+  (`claude-haiku-5-5`, `SummaryModel.default`) unless the owner picks Sonnet 5.5, Opus 5.5 or a
+  custom id that passed its check. The app names it on each ask (`Work.context.model`), so the
+  default lives in the app alone.
+- **The fallback:** when the model asked is not the default, the ask also names the default
+  (`fallbackModel`, `Bridge.askForContext`). The mod (`summarize` in `plugin/hooks/context.ts`)
+  tries the model once, then the fallback once with the same transcript, unless the first ran out
+  of time or the send went stale meanwhile. When every model tried fails (the default, whether it
+  was asked or was the fallback), no model writes the summary, and the mod answers with an empty one that names each failure
+  (`ContextBody.failures`).
+- **Always low effort:** `effort: 'low'` is a constant in the mod, not on the wire. The model gets
+  no tools and at most 4,096 output tokens.
+- **An older side:** a mod that did not join with `writesSummaries`, or an ask from an app that
+  names no model, forks the session's own model over its last request (`$.model.fork`) instead, at
+  the session's own effort.
+
+### What the model reads
+
+`transcriptText` (`plugin/hooks/transcript.ts`) builds the text from `$.session.messages({ as:
+'api' })`, which puts the last compaction's summary in place of what it replaced:
+
+- each message's role and text blocks, with `<system-reminder>` text removed, and an assistant's
+  tool uses as their names alone: no tool results, thinking or images. Text that quotes them stays,
+  as does anything pasted, so this is a reduction, not a property
+  ([SECURITY.md](../../SECURITY.md#residual-risk-by-design));
+- a message longer than 6,000 characters (`MESSAGE_CAP`) keeps its start and end around a marker;
+- at most 120,000 characters in all (`transcriptText`'s budget): the first user message, at most
+  4,000 characters (`FIRST_CAP`), for the goal, then the newest messages backwards until the
+  budget is spent, with a marker saying how many were left out.
+
+The mod sends the reply whole; the app redacts it and then cuts the whole `[CONTEXT] label: …` line
+to 1,500 characters (`Bridge.maxContext`), so no cut shortens a secret past what the redaction
+matches. A transcript that cannot be read fails as `transcript-unreadable` before any model is
+asked; a session with no prompt yet, or with no text, gets an empty summary that names no failure.
+
+### Its time
+
+- **60 s for the mod** (`CONTEXT_TIMEOUT_MS` in `plugin/hooks/wire.ts` and
+  `SummaryAsks.Policy.modBudget` in the app, both tested against `wire/summary-budget.json`),
+  counted from when the mod takes the ask. The model and the fallback share it: each request's
+  `timeoutMs` is what is left. The menu shows **Loading context…** for a numbered ask until it is
+  answered or 60 s from the ask pass (`SummaryAsks.display`). The app keeps an ask answerable for
+  twice that (`Policy.answerable`), as an older mod may never answer.
+- **10 s for a line,** from the ask (`SummaryAsks.Policy.waitLimit`): a line that
+  [waits](#the-wait) for the summary opens without it then.
+
+### When the app asks
+
+The app asks a session for its summary when the voice would lack part of the session
+(`Bridge.needsContext`: it has none, a turn did not arrive, the lines since the summary no longer
+all fit the seed, the session is *paused*, or the mod does not sync), unless the pause holds it back
+(`Bridge.pauseHoldsBackSummary`: the pause setting is on or the session is *paused*, and the
+session has a summary or **Load a session's context on its first call** is off) or the session is
+held off after a failure (below). It asks:
+
+- **at Start and at a target change during the call** (from the menu, the band or the registry
+  after a drop), at once, if the target's mod joined with `writesSummaries` (`Bridge.askAhead`); an
+  older mod is not asked then, so Start spends no fork on the session's own model before anyone
+  speaks;
+- **when a line opens**, a reopened one included, for the target, whatever its mod
+  (`Bridge.openLine`);
+- **on Load context**, a press, which asks even a session held off.
+
+An ask already open is joined and handed to the mod again, with its number if it has one: the mod
+joins it to its send on its way, and one with none (it restarted, or the app lost its post) writes
+it again. The answer that closes the ask takes it back from a mod that has not polled it yet.
+
+**The hold-off after a failure.** A session whose last numbered ask was answered with no summary
+and a failure is not asked by itself (`SummaryAsks.asksByItself`): each ask may send the transcript
+to the model again, so until a turn of it arrives (a sync line the app records, the answer to a
+voice request, or a join that says a turn was missed), the call starts or stops, or a summary with
+text lands, only Load context asks it. An empty answer that names no failure had nothing to
+summarise and holds nothing off. `/clear`, which gives the session a new id, keeps the hold-off
+(`SummaryAsks.rename`).
+
+### A numbered ask
+
+An ask that names a model, which goes only to a mod that joined with `writesSummaries`, carries a
+number (`Work.context.ask`), and the mod echoes it on its answer (`ContextBody.ask`). Numbers only
+grow (`Continuity.asksMade`) and outlive a restart: a new ask, or one that replaces a stale or
+unnumbered ask, takes the next; a second ask that joins the open, current one keeps its number. The
+app takes a post only for the open ask with that number ([the wire](#the-wire)). Only a numbered
+ask makes a line wait, shows **Loading context…**, or starts the hold-off. An ask to an older mod
+has no number, and its answer is matched by its time ([BR-002](../bugs/BR-002.md)).
+
+The mod's side is `SummarySends` (`plugin/hooks/summaries.ts`). It keeps the last summary a model
+wrote and gives it again, with no model call, to an ask naming the same model, until a main-loop
+turn completes, a gap (a turn did not reach the app) or `/clear`. An ask with the number of the send
+on its way joins it and gets what that send writes. A gap or `/clear` crosses the send on its way:
+it tries no fallback. After a gap its post is one the app ignores as stale, since the join that
+says the gap marks the ask stale; after `/clear` the app takes it, as `/clear` carries the open
+ask and the voice's conversation to the new id.
+
+### The wait
+
+A line, whether speech or a result opened it, waits for its session's summary
+(`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current,
+[numbered](#a-numbered-ask) ask, whatever [asked](#when-the-app-asks) it, and the session's wait is
+not spent this call. The wait sits
+after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
+`connecting`, which arms no silence timer, the voice line sends OpenAI nothing (the summary request
+is the one in flight), and the page queues what is said
+and plays it once the line connects. It ends at the post that answers the open ask, whatever it
+carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit
+([its time](#its-time)), when the session drops or a gap makes the
+ask stale, or when the line is
+cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
+one, and a reconnect waits again for the same ask. An answer to the open, current ask with no
+summary, whether or not a line was waiting for it, or a line that waits until the limit, spends
+that session's wait for the rest of the call, so a summary that keeps failing holds at most one
+line; the next Start waits again. `/clear`, which gives the session a new id, is no change of
+target, and the new id keeps the spent wait, the hold-off after a summary that failed and what
+was loaded. A line that comes after the limit, the ask still in flight,
+opens without waiting and spends nothing, so the next ask can still be waited for. That is no
+bound per call: a mod that answers each ask with text, however late, or whose gap makes each ask
+stale, is asked again by the next line, so every line of the call can wait, each up to the limit
+from its own ask. A summary that comes after the
+wait, or while a line that does not wait connects, is added once the line is connected, unless
+the line was seeded with the same one; with no line open, it is in the next seed.
 
 ## Flows
 
@@ -281,37 +398,8 @@ first-word wait of 0, which waits the silence. A change in Settings arms a timer
 when the line is quiet and none counts (`timeoutsChanged`); one already counting is not moved. Voice detection keeps running
 on the Mac, and the next speech opens a new session seeded with the target's conversation so
 far. A new target closes an open line the same way, so the next speech opens it with the new
-target's conversation. Every line the app opens, a reopened one included, also asks the target for
-its context when the voice would lack part of the session and neither the pause nor a summary
-that failed holds the ask back (the same rules as the mod's Start above); an ask already open is joined and handed to the mod
-again, with its number if it has one: the mod joins it to its send on its way, and one with none
-(it restarted, or the app lost its post) writes it again. The answer that closes the ask takes it
-back from a mod that has not polled it yet.
-
-**The wait.** A line, whether speech or a result opened it, waits for its session's summary
-(`SummaryAsks.wait`, called from `Bridge.waitForSummary`) while that session has an open, current
-ask with a number (asked at Start, at a target change during the call, by Load context or by this
-line; an ask is numbered when the session's mod said `writesSummaries`), and the session's wait is
-not spent this call. The wait sits
-after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
-`connecting`, which arms no silence timer, the voice line sends OpenAI nothing (the summary request
-is the one in flight), and the page queues what is said
-and plays it once the line connects. It ends at the post that answers the open ask, whatever it
-carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit,
-10 seconds from the ask, when the session drops or a gap makes the ask stale, or when the line is
-cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
-one, and a reconnect waits again for the same ask. An answer to the open, current ask with no
-summary, whether or not a line was waiting for it, or a line that waits until the limit, spends
-that session's wait for the rest of the call, so a summary that keeps failing holds at most one
-line; the next Start waits again. `/clear`, which gives the session a new id, is no change of
-target, and the new id keeps the spent wait, the hold-off after a summary that failed and what
-was loaded. A line that comes after the limit, the ask still in flight,
-opens without waiting and spends nothing, so the next ask can still be waited for. That is no
-bound per call: a mod that answers each ask with text, however late, or whose gap makes each ask
-stale, is asked again by the next line, so every line of the call can wait, each up to the limit
-from its own ask. A summary that comes after the
-wait, or while a line that does not wait connects, is added once the line is connected, unless
-the line was seeded with the same one; with no line open, it is in the next seed.
+target's conversation. Every line the app opens, a reopened one included, may also ask the target
+for its summary and wait for it before it connects ([the summary](#the-summary)).
 
 ```mermaid
 sequenceDiagram

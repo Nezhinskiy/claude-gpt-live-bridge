@@ -6,6 +6,9 @@ Status: delivered in 0.6.0; approved 2026-11-12, when the owner chose it over a 
 `review/pr74-summary-model-spec`) and the owner's answers to it. Only the `working` glyph is built;
 the plan is [`docs/plans/2026-11-12-summary-model.md`](../plans/2026-11-12-summary-model.md).
 
+The current contract is [the summary](../architecture/overview.md#the-summary) in the
+architecture overview (2026-11-14); where the two differ, the overview holds.
+
 ## Why
 
 When a line opens, the app asks the target session for a summary and connects without waiting
@@ -273,7 +276,7 @@ hold:
 1. Its session has a summary ask in flight: asked at Start, at a target change, by Load context, or
    by this line (`pauseHoldsBackSummary` and `needsContext` decide an ask, unchanged).
 2. That ask has a number, which it has when the session's mod said `writesSummaries` at the ask.
-3. In this call the session's wait is not spent ([what spends it](../architecture/overview.md#silent-hang-up)),
+3. In this call the session's wait is not spent ([what spends it](../architecture/overview.md#the-wait)),
    so a persistent failure does not hold every line.
 
 It ends at the first `POST /v1/context` from that session that answers the open ask, whatever it
