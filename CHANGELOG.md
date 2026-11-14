@@ -13,7 +13,9 @@ All notable changes to this project are listed here. The format follows
   again until a turn of it arrives or the next Start, so a long call no longer sends the same
   transcript, up to 120,000 characters, to the summary model at every line. **Load context**
   still asks, and the menu offers it then. An ask already answered is no longer handed to the mod
-  again.
+  again. `/clear` during a call no longer asks the session ahead as if the target had changed, nor
+  lets a line wait for the summary again when the call had spent that wait, and **Context loaded**
+  survives it.
 
 ## [0.6.0]
 

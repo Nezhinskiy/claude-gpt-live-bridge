@@ -298,7 +298,9 @@ cancelled: Stop opens nothing, a target change closes the waiting line as it clo
 one, and a reconnect waits again for the same ask. An answer to the open, current ask with no
 summary, whether or not a line was waiting for it, or a line that waits until the limit, spends
 that session's wait for the rest of the call, so a summary that keeps failing holds at most one
-line; the next Start waits again. A line that comes after the limit, the ask still in flight,
+line; the next Start waits again. `/clear`, which gives the session a new id, is no change of
+target, and the new id keeps the spent wait, the hold-off after a summary that failed and what
+was loaded. A line that comes after the limit, the ask still in flight,
 opens without waiting and spends nothing, so the next ask can still be waited for. That is no
 bound per call: a mod that answers each ask with text, however late, or whose gap makes each ask
 stale, is asked again by the next line, so every line of the call can wait, each up to the limit

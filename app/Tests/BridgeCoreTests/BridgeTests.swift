@@ -1998,6 +1998,52 @@ struct BridgeTests {
     #expect(await bridge.current.contextNeed == .load)
   }
 
+  // MARK: Summary asks across /clear
+
+  let cleared = SessionID(rawValue: "22222222-0000-0000-0000-000000000003")
+
+  /// `/clear` in Alpha: the same session joins under a new id.
+  func clear(missed: Bool? = nil) async throws {
+    try await post(
+      "/v1/join",
+      JoinBody(
+        sessionId: cleared, title: "Alpha", replaces: a, syncs: true, missed: missed,
+        writesSummaries: true))
+  }
+
+  @Test func aClearKeepsWhatWasLoaded() async throws {
+    try await join(a, "Alpha", writesSummaries: true)
+    await bridge.loadContext()
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await clear()
+    #expect(await bridge.current.targetSummary == .loaded(at: time.now))
+  }
+
+  /// The target is the same session: nothing is asked ahead for it again.
+  @Test func aClearDuringTheCallIsNoTargetChange() async throws {
+    try await startWriting()
+    _ = try await registry.poll(a)
+    try await clear()
+    #expect(try await registry.poll(cleared) == nil)
+  }
+
+  /// The wait the session spent this call stays spent under its new id.
+  @Test func aClearKeepsASpentWait() async throws {
+    let asked = time.now
+    try await startWriting()
+    let opening = await speakAndWait(asked: asked)
+    try await pass(Int(SummaryAsks.Policy.waitLimit), polling: a)
+    try await settle(opening)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "Alpha's work.", ask: 1))
+    try await clear(missed: true)
+    voice.emit(.closed(.other("The voice session closed (example).")))
+    #expect(await eventually { await bridge.status.call == .listening })
+    let reopening = Task { await bridge.audioEvent(.speechStarted) }
+    #expect(await eventually { await voice.opens.count == 2 })
+    time.advance(by: .seconds(SummaryAsks.Policy.waitLimit))  // frees a line that waits
+    try await settle(reopening)
+  }
+
   // MARK: Context when a line opens
 
   let summary = "[CONTEXT] Alpha: Alpha's work."

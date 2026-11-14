@@ -95,11 +95,12 @@ voices.
   - join with `writesSummaries`, make itself the target and never answer the summary ask, which
     holds what you say on the Mac, unsent, for up to 10 seconds from the ask while the line waits
     for that summary. The line then opens without it, and no later line of that call waits for
-    that session id; joining again under a new id and making itself the target holds the next line
-    the same way. That bound is for a process that never answers, not one per call: one that
-    answers each ask, with any text, just before the limit, or that ends each wait by joining again
-    as one that missed a turn, is asked again by the next line, so it can hold every line of the
-    call, each for up to 10 seconds from that line's ask;
+    that session id; joining again under a new id that does not replace it (as `/clear`'s does)
+    and making itself the target holds the next line the same way. That bound is for a process
+    that never answers, not one per call: one that answers each ask, with any text, just before
+    the limit, or that ends each wait by joining again as one that missed a turn, is asked again
+    by the next line, so it can hold every line of the call, each for up to 10 seconds from that
+    line's ask;
   - take Settings' check of a custom **Summary model**, with the check's id, and post its
     result. The check goes to the target if its mod writes summaries, else to the latest joined
     session whose mod does, and the app takes a result only under that session's id and the

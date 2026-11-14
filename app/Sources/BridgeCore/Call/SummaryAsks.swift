@@ -184,6 +184,15 @@ struct SummaryAsks: Sendable {
     return lastLoaded[id].map { .loaded(at: $0) } ?? .none
   }
 
+  /// `/clear` gave session `old` the id `new`: its spent wait, its hold-off, its wait for the log
+  /// and what was loaded go with it.
+  mutating func rename(_ old: SessionID, to new: SessionID) {
+    if spent.remove(old) != nil { spent.insert(new) }
+    if heldOff.remove(old) != nil { heldOff.insert(new) }
+    if wait?.session == old { wait?.session = new }
+    if let loaded = lastLoaded.removeValue(forKey: old) { lastLoaded[new] = loaded }
+  }
+
   /// Forgets what was loaded for the sessions not in `ids`: they left or were removed.
   mutating func keep(only ids: Set<SessionID>) {
     lastLoaded = lastLoaded.filter { ids.contains($0.key) }

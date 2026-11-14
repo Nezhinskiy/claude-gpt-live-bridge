@@ -298,6 +298,34 @@ struct SummaryAsksTests {
     #expect(asks.asksByItself(a))
   }
 
+  // MARK: /clear
+
+  /// `/clear` gives the session a new id: the wait it spent and what was loaded follow it.
+  @Test func aSpentWaitAndWhatWasLoadedFollowTheNewID() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    let first = asks.ask(a, in: &continuity, at: t0, model: haiku, fallback: nil).ask
+    let limit = t0 + SummaryAsks.Policy.waitLimit
+    _ = asks.wait(a, in: continuity, at: t0)
+    _ = asks.wait(a, in: continuity, at: limit)
+    _ = asks.answer(a, number: first.number, wrote: true, in: &continuity, at: limit + 1)
+    continuity.move(a, to: b)
+    asks.rename(a, to: b)
+    #expect(asks.display(of: b, in: continuity, at: limit + 1) == .loaded(at: limit + 1))
+    asks.ask(b, in: &continuity, at: limit + 2, model: haiku, fallback: nil)
+    #expect(asks.wait(b, in: continuity, at: limit + 2) == nil)
+  }
+
+  @Test func aHoldOffFollowsTheNewID() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false)
+    continuity.move(a, to: b)
+    asks.rename(a, to: b)
+    #expect(!asks.asksByItself(b))
+    #expect(asks.asksByItself(a))
+  }
+
   // MARK: What the menu shows
 
   /// Whatever asked for it, the summary is on its way until its answer, per session.

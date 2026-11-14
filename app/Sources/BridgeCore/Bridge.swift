@@ -371,7 +371,9 @@ public actor Bridge: Router {
         try await registry.join(body)
         if let old = body.replaces, replaced {  // after /clear: the same session, a new id
           continuity.move(old, to: body.sessionId)
+          summaries.rename(old, to: body.sessionId)
           machine.rename(old, to: body.sessionId)
+          if callTarget == old { callTarget = body.sessionId }  // no target change
           if modelCheck?.session == old { modelCheck?.session = body.sessionId }
           if lineSession == old {
             lineSession = body.sessionId
