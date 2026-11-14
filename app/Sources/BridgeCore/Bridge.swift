@@ -882,7 +882,7 @@ public actor Bridge: Router {
   /// it is and kept in the session's conversation, unless `SummaryAsks.answer` ignores it: one
   /// asked for before the latest gap or forget would clear a mark it does not cover, or bring back
   /// what was forgotten. An empty one keeps the stored line and closes the ask: a mod that writes
-  /// summaries sends one when it has none. The answer to an ask that named a model, if a model was tried, is `lastSummary`.
+  /// summaries sends one when it has none. The answer to an ask that named a model is `lastSummary` when it wrote a summary or names a failure.
   /// A line waiting for the summary (`waitForSummary`) is seeded with it; a live line about that
   /// session gets it at once, and one still connecting gets it when connected; it does not hold
   /// the line open. A summary equal to the stored one is not
@@ -906,7 +906,7 @@ public actor Bridge: Router {
           askedFor: now.timeIntervalSince(ask.at), stale: !answer.isTaken, hadSummary: wrote,
           model: report?.writer, stats: body.stats, waited: waited,
           triedNoModel: report?.triedAModel == false))
-      // An answer on which no model was tried leaves Settings' line as it was.
+      // An answer that wrote nothing and names no failure leaves Settings' line as it was.
       if answer.isTaken, let report, wrote || !failures.isEmpty { lastSummary = report }
     case .otherAsk:
       reportsSummary(

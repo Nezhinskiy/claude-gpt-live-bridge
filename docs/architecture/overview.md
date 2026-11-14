@@ -174,7 +174,7 @@ session's context on its first call** is off. A mod that joined with `writesSumm
 once, when the call starts and when the target changes during the call (from the menu, the band
 or the registry after a drop); an older mod is asked when a line opens, as before, so Start spends
 no fork on the session's own model before anyone speaks. The mod writes it (none for a session with no prompt yet; the last one again, with
-no model call, until any main-loop turn completes, or `/clear`), with a
+no model call, for an ask naming the same model, until any main-loop turn completes, or `/clear`), with a
 short note in the band while it goes. Talk here shows only while the call talks to another session,
 and moves it here. When the socket does not answer, it opens `/Applications/LiveBridge.app`, where
 both install routes put it, with `open -g`, and falls back to `open -g -b <bundle id>`.
@@ -190,7 +190,7 @@ that both test suites parse.
 
 | Route | Body or reply |
 |---|---|
-| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`, `modVersion` from the mod's plugin.json, `syncs` (the mod posts sync lines) and `missed` (a turn did not arrive); an upsert that also refreshes liveness |
+| `POST /v1/join` | `sessionId`, `title`, `replaces` after `/clear`, `owner` (the owner typed `/live`, so the join brings back a session the owner removed), `modVersion` from the mod's plugin.json, `syncs` (the mod posts sync lines), `missed` (a turn did not arrive) and `writesSummaries` (the mod writes summaries with the model the app names); an upsert that also refreshes liveness |
 | `POST /v1/leave` | `sessionId`; a request it leaves open fails |
 | `GET /v1/next?sessionId=` | the status and at most one piece of work: a request, a reply to Claude's question (`forRequest` names the request the turn's answer now belongs to), a context ask, or a model check (`checkModel`: `id`, `model`), sent only to a session whose join said `writesSummaries` |
 | `POST /v1/answer` | `id`, `status` (`ok`, `failed`, `question`, `update`), `text`, `reason` |
@@ -285,7 +285,8 @@ ask with a number (asked at Start, at a target change during the call, by Load c
 line; an ask is numbered when the session's mod said `writesSummaries`), and the session's wait is
 not spent this call. The wait sits
 after `makeOffer` and before the seed is built and `voice.open` is called: the phase stays
-`connecting`, which arms no silence timer, nothing leaves the Mac, and the page queues what is said
+`connecting`, which arms no silence timer, the voice line sends OpenAI nothing (the summary request
+is the one in flight), and the page queues what is said
 and plays it once the line connects. It ends at the post that answers the open ask, whatever it
 carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit,
 10 seconds from the ask, when the session drops or a gap makes the ask stale, or when the line is

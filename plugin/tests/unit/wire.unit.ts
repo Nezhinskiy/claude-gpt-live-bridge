@@ -150,7 +150,7 @@ test('socketFollowsTheHomeFoundationUses', () => {
   assert.equal(socketPath('/Users/example', '/tmp/lb'), `/tmp/lb/${rel}`)
 })
 
-/** The mod gives a summary up after the budget the app waits on: both read it from one file. */
+/** The mod gives a summary up after the budget the app waits on: this file ties their two constants. */
 test('theSummaryBudgetIsTheApps', () => {
   const budget = JSON.parse(readFileSync(`${import.meta.dirname}/../../../wire/summary-budget.json`, 'utf8'))
   assert.equal(CONTEXT_TIMEOUT_MS, budget.summaryBudgetMs)

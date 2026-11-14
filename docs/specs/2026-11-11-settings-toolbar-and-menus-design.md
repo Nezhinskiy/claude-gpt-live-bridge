@@ -1,6 +1,6 @@
 # Settings in a toolbar, Quick Settings, Feedback & Support, and a debug mode
 
-Status: approved, 2026-11-11; the plan is
+Status: delivered in 0.6.0; approved 2026-11-11; the plan is
 [`plans/2026-11-11-settings-toolbar-and-menus.md`](../plans/2026-11-11-settings-toolbar-and-menus.md).
 
 ## Why

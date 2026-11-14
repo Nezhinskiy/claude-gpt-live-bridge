@@ -133,7 +133,7 @@
       </div>
       <div>
         <dt>You stop paying for silence</dt>
-        <dd>OpenAI prices voice by the minute, and on its API silence counts too. So LiveBridge closes the line after a stretch of quiet (20 seconds unless you set it from 0 to 300 in Settings) and opens it again when you speak, with the conversation where you left it. While nobody is talking, voice detection runs on your Mac and nothing is sent. After a handoff the line waits up to 2 minutes for Claude’s answer, and the menu shows your minutes and your Codex and Claude usage. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#billing-aware-by-design">Billing</a> section has the timings.</dd>
+        <dd>OpenAI prices voice by the minute, and on its API silence counts too. So LiveBridge closes the line after a stretch of quiet (20 seconds unless you set it from 0 to 300 in Settings) and opens it again when you speak, with the conversation where you left it. Once the line has closed, voice detection runs on your Mac and no audio is sent until the line opens again. After a handoff the line waits up to 2 minutes for Claude’s answer, and the menu shows your minutes and your Codex and Claude usage. The README’s <a href="https://github.com/getLiveBridge/LiveBridge#billing-aware-by-design">Billing</a> section has the timings.</dd>
       </div>
       <div>
         <dt>Free, open, no telemetry</dt>
@@ -141,7 +141,7 @@
       </div>
       <div>
         <dt>Every session, spoken or typed</dt>
-        <dd>Join several sessions and pick the one to talk to from the menu; another session’s result that arrives while the line is closed chimes and waits until you next speak. Each Claude Code session has its own conversation with the voice, carried across Stop and Start. What you type in a joined session and Claude’s final answers go into it too, so you can switch between speaking and typing. Nothing leaves your Mac until a line opens, and a setting pauses this while the call is stopped.</dd>
+        <dd>Join several sessions and pick the one to talk to from the menu; another session’s result that arrives while the line is closed chimes and waits until you next speak. Each Claude Code session has its own conversation with the voice, carried across Stop and Start. What you type in a joined session and Claude’s final answers go into it too, so you can switch between speaking and typing. None of it reaches OpenAI until a line opens, and a setting pauses this while the call is stopped.</dd>
       </div>
       <div>
         <dt>Your Claude keeps its permissions</dt>

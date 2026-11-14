@@ -45,7 +45,7 @@ public enum Work: Sendable, Equatable {
   case reply(VoiceRequest, forRequest: RequestID)
   /// `model`: the model to write the summary with; nil to an older mod, which forks. `fallbackModel`:
   /// the default, tried once if `model` fails; nil when `model` is the default. `ask`: the ask's
-  /// number in its session, which the answer echoes; nil from an older app.
+  /// number, counted app-wide, which the answer echoes; nil from an older app.
   case context(model: String? = nil, fallbackModel: String? = nil, ask: Int? = nil)
   /// `id`: the check's, which its result (`ModelCheckBody`) quotes.
   case checkModel(id: String, model: String)
