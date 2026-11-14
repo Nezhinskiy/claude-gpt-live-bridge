@@ -324,7 +324,7 @@ parlez.
   micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
   lever ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** n'est activé que lorsqu'il manque à la voix une partie de la cible : pas de
-  résumé et **Pause sync** empêche la ligne suivante d'en charger un, un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
+  résumé et **Pause sync** empêche la ligne suivante d'en charger un ou le dernier demandé est revenu vide (jusqu'au prochain tour de la session ou au prochain Start), un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
   voix peut porter (une longue conversation le dépasse), la session a été mise en pause et a un résumé, ou son mod
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
@@ -692,12 +692,6 @@ session.
   Settings indique. Avant ce réglage, le modèle de la session l'écrivait, ce qui marche partout où
   la session marche. Qu'un id fixé soit résolu chez ces fournisseurs vient de la documentation de
   Claude Code et n'a pas été essayé.
-- Un résumé qui échoue n'est pas retenu : tant que la session en a encore besoin, Start, un
-  changement de cible et chaque ligne qui s'ouvre en redemandent un, et le mod renvoie la même
-  transcription, jusqu'à 120 000 caractères, ce qui peut être facturé à chaque fois même si la
-  réponse revient vide ou trop tard. Si **Context failed** reste sur la bande de la session,
-  activez **Pause sync** et laissez
-  **Load a session's context on its first call** désactivé.
 - Une session encore sur un mod antérieur à cette version, jusqu'à son redémarrage, n'est pas
   synchronisée : elle charge un résumé comme une session à laquelle il manque des tours, et aucune
   pause ne refuse ses lignes ([ce qui change d'autre](../../CHANGELOG.md)).

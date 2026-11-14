@@ -245,6 +245,59 @@ struct SummaryAsksTests {
         == .taken(ask, waited: 2))
   }
 
+  // MARK: After a summary that failed
+
+  /// Asks `a` for a summary at `at` and answers the ask, with a summary or none.
+  func askAndAnswer(
+    _ asks: inout SummaryAsks, _ continuity: inout Continuity, at: Date, model: String? = nil,
+    wrote: Bool
+  ) {
+    let ask = asks.ask(a, in: &continuity, at: at, model: model, fallback: nil).ask
+    _ = asks.answer(a, number: ask.number, wrote: wrote, in: &continuity, at: at + 1)
+  }
+
+  /// An empty answer to a numbered ask, with failures or none, holds off the session's own asks.
+  @Test func anEmptyAnswerHoldsOffTheSessionsAsks() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false)
+    #expect(!asks.asksByItself(a))
+    #expect(asks.asksByItself(b))
+  }
+
+  /// An older mod posts nothing when it fails, so its empty answer holds nothing off.
+  @Test func anOlderModsEmptyAnswerHoldsNothingOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, wrote: false)
+    #expect(asks.asksByItself(a))
+  }
+
+  @Test func aTurnEndsTheHoldOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false)
+    asks.turnArrived(in: a)
+    #expect(asks.asksByItself(a))
+  }
+
+  @Test func aNewCallEndsTheHoldOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false)
+    asks.callStartedOrStopped()
+    #expect(asks.asksByItself(a))
+  }
+
+  /// A press asks all the same; a summary it brings ends the hold-off.
+  @Test func aSummaryEndsTheHoldOff() {
+    var continuity = Continuity()
+    var asks = SummaryAsks()
+    askAndAnswer(&asks, &continuity, at: t0, model: haiku, wrote: false)
+    askAndAnswer(&asks, &continuity, at: t0 + 2, model: haiku, wrote: true)
+    #expect(asks.asksByItself(a))
+  }
+
   // MARK: What the menu shows
 
   /// Whatever asked for it, the summary is on its way until its answer, per session.

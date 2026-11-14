@@ -211,10 +211,11 @@ public actor Bridge: Router {
   public var hasOpenRequests: Bool { get async { await registry.hasOpenRequests } }
 
   /// Asks the target session for its context summary; it arrives as `POST /v1/context`. The
-  /// menu shows the ask in flight at once.
+  /// menu shows the ask in flight at once. A press asks even a session held off after a summary
+  /// that failed (`SummaryAsks.asksByItself`).
   public func loadContext() async {
     guard let target = await registry.target else { return }
-    await askForContext(of: target)
+    await askForContext(of: target, pressed: true)
     await changed()
   }
 
@@ -226,14 +227,16 @@ public actor Bridge: Router {
     guard await registry.writesSummaries(id), !pauseHoldsBackSummary(of: id),
       await needsContext(id)
     else { return }
-    await askForContext(of: id)
+    await askForContext(of: id, pressed: false)
   }
 
   /// A mod that writes summaries is told the model and, unless it is the default, the default to
   /// fall back on; one that forks is asked as before. An ask that joins the open one goes to the
   /// mod again with its number: the mod joins it to the send on its way, and a mod that has none
   /// (it restarted, or the app lost its post) writes it, so a lost answer is asked for again.
-  private func askForContext(of id: SessionID) async {
+  /// Only a press asks a session held off after a summary that failed.
+  private func askForContext(of id: SessionID, pressed: Bool) async {
+    guard pressed || summaries.asksByItself(id) else { return }
     var model: String?
     var fallback: String?
     if await registry.writesSummaries(id) {
@@ -519,15 +522,16 @@ public actor Bridge: Router {
   }
 
   /// What the menu says of it: a session whose next line asks for the one thing missing is
-  /// offered no press, unless a line is already open, whose ask may have brought nothing. A paused
-  /// mark is no gap: all it costs the voice is the summary that line then brings.
+  /// offered no press, unless a line is already open, whose ask may have brought nothing, or the
+  /// session is held off after a summary that failed, so its line asks nothing. A paused mark is no
+  /// gap: all it costs the voice is the summary that line then brings.
   private func contextNeed(_ id: SessionID) async -> ContextNeed {
     guard await needsContext(id) else { return .none }
     let conversation = continuity[id]
     let hasGap = conversation.outOfSync == .missed || conversation.isOverSeed
     let syncs = await registry.syncs(id)
-    return !hasGap && syncs && !pauseHoldsBackSummary(of: id) && !lineIsOpen(for: id)
-      ? .withTheLine : .load
+    let lineAsks = !pauseHoldsBackSummary(of: id) && summaries.asksByItself(id)
+    return !hasGap && syncs && lineAsks && !lineIsOpen(for: id) ? .withTheLine : .load
   }
 
   /// Starts the attempt that opens the line, in the same turn as the machine's decision to open.
@@ -557,7 +561,7 @@ public actor Bridge: Router {
     lineSession = session
     lineKnowsSession = true
     if let session, !pauseHoldsBackSummary(of: session), await needsContext(session) {
-      await askForContext(of: session)
+      await askForContext(of: session, pressed: false)
     }
     do {
       let voice = try await controller()
@@ -961,8 +965,9 @@ public actor Bridge: Router {
   }
 
   /// Keeps a line of a turn in its session's conversation, as the owner's if it is typed; the open
-  /// line about that session is given it at once, as context. False, and nothing saved, when it
-  /// has nothing to say.
+  /// line about that session is given it at once, as context. The session's transcript changed, so
+  /// a summary that failed is asked for by itself again. False, and nothing saved, when it has
+  /// nothing to say.
   @discardableResult
   private func addSynced(_ text: String, kind: SyncKind, of row: SessionRow) async -> Bool {
     let id = row.sessionId
@@ -970,6 +975,7 @@ public actor Bridge: Router {
       return false
     }
     record(line.kind == .typed ? .owner : .claude, line.text, in: id)
+    summaries.turnArrived(in: id)
     if lineKnowsSession, lineSession == id { await send(.synced(line)) }
     return true
   }

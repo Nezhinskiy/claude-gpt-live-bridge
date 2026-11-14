@@ -1961,6 +1961,43 @@ struct BridgeTests {
     #expect(timings.withLock { $0.last?.waited } == 2)
   }
 
+  // MARK: After a summary that failed
+
+  /// The call started on Alpha, whose mod took the ask and answered it with no summary.
+  func failSummary() async throws {
+    try await startWriting()
+    _ = try await registry.poll(a)
+    try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+  }
+
+  /// Each ask sends the transcript to a model again, so the line asks nothing by itself.
+  @Test func aLineAfterAFailedSummaryAsksForNothing() async throws {
+    try await failSummary()
+    await bridge.audioEvent(.speechStarted)
+    #expect(await voice.opens.count == 1)
+    #expect(try await registry.poll(a) == nil)
+  }
+
+  @Test func aPressAfterAFailedSummaryAsksAgain() async throws {
+    try await failSummary()
+    await bridge.loadContext()
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
+  }
+
+  /// A turn changes the transcript, so the next line asks again.
+  @Test func aTurnAfterAFailedSummaryLetsTheLineAsk() async throws {
+    try await failSummary()
+    try await sync(a, "Next step.")
+    await bridge.audioEvent(.speechStarted)
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
+  }
+
+  /// The next line asks for nothing, so the menu offers the press.
+  @Test func aFailedSummaryOffersThePress() async throws {
+    try await failSummary()
+    #expect(await bridge.current.contextNeed == .load)
+  }
+
   // MARK: Context when a line opens
 
   let summary = "[CONTEXT] Alpha: Alpha's work."

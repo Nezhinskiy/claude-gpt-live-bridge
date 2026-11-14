@@ -4,6 +4,17 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- A summary that fails is no longer asked for again by itself. After an ask the mod answers with
+  no summary, neither a change of target during the call nor a line that opens asks that session
+  again until a turn of it arrives or the next Start, so a long call no longer sends the same
+  transcript, up to 120,000 characters, to the summary model at every line. **Load context**
+  still asks, and the menu offers it then. An ask already answered is no longer handed to the mod
+  again.
+
 ## [0.6.0]
 
 ### Added
