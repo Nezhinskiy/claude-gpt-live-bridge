@@ -745,4 +745,6 @@ like any open line: the connect, the voice's words and the silence before it clo
 spoke it started 0.7 to 2.0 s after the connect, and in the 3 of them without a cue, as in use, 0.7
 to 1.4 s. Until the owner or the voice speaks on the line, its silence is
 `CallMachine.firstWordSeconds` (5 s) instead of 20 s, also after another line arrives; then it
-closes and chimes, and a voice that would have started later is cut off.
+closes and chimes, and a voice that would have started later is cut off. Noted on 2026-11-14: since 0.6.0
+these waits are the owner's, `CallMachine.Timeouts` from Settings (`firstWord` 5 s and `silence` 20 s
+by default), and `CallMachine.firstWordSeconds` is gone.
