@@ -159,6 +159,17 @@ test('clearMakesTheContextSummariseAgain', async ($, on) => {
   expect(world.take('context')).toEqual([SUMMARY, { ...SUMMARY, sessionId: cleared }])
 })
 
+test('aClearDuringAWriteDropsAnOlderAppsSummary', async ($, on) => {
+  // The fork summarises the old transcript, so the session's new id does not get it.
+  const world = await joined($, on)
+  world.forkMs = 5000
+  await appAsks(world)
+  await $.session.end({ reason: 'clear', sessionId: ID, resume: { sessionId: ID } as never })
+  world.sessionId = '00000000-0000-0000-0000-000000000002'
+  await world.clock.advance(5000)  // the poll rejoins under the new id while the fork writes
+  expect(world.take('context')).toEqual([])
+})
+
 test('nothingToForkIsNoFailure', async ($, on) => {
   // The engine answers an outage as a resolved api-error, which is a failure, not an empty session.
   const world = await joined($, on)
