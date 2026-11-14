@@ -364,6 +364,15 @@ test('aThrowBuildingTheTranscriptIsAnUnreadableTranscript', async ($, on) => {
   expect(world.logs.filter(line => line.includes(error!))).toHaveLength(1)
 })
 
+test('aThrowAfterTheModelWroteKeepsItsSummary', async ($, on) => {
+  // The call was made and paid for: the summary goes without its numbers, not as an unreadable transcript.
+  const world = await joined($, on)
+  world.completeFails = { [OPUS]: 'no-usage' }
+  await appAsks(world, NAMED)
+  expect(world.take('context')).toEqual([SUMMARY])
+  expect(world.completes.map(one => one.model)).toEqual([OPUS])
+})
+
 test('aJoinSaysItWritesSummaries', async ($, on) => {
   const world = fakeWorld(on)
   await liveOn($)
