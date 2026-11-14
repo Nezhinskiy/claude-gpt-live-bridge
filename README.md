@@ -296,7 +296,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
 - **The band's Start** makes its session the target and starts the call; the line it opens is seeded
   with the session's conversation, and loads a summary of the session as well when the voice would
   lack part of it (see **Load context** below), but while **Pause sync** is on or after a
-  pause only when it has none yet ([details](docs/architecture/overview.md#components)). With a mod of this
+  pause only when it has none yet ([details](docs/architecture/overview.md#when-the-app-asks)). With a mod of this
   release the summary is asked for at Start and when the target changes during the call, and the
   line waits for it before it connects, at most 10 seconds from the ask: what you say meanwhile is
   held on the Mac and played to the voice once the line opens. Stop or a target change during the
@@ -336,7 +336,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   reads **Context up to date** and is disabled, because the voice already has the conversation. With
   no line open, when the next line will load the summary and nothing else is missing, it reads **Context loads with the line** and is disabled, because
   the next line asks for one by itself. While a summary of the target is on its way, whatever asked
-  for it, the item reads **Loading context…** and is disabled, for at most the 60 seconds the mod allows it (on an older mod it stays **Load context**); one that arrives shows **Context
+  for it, the item reads **Loading context…** and is disabled, for at most the time the mod allows it ([how long](docs/architecture/overview.md#its-time); on an older mod it stays **Load context**); one that arrives shows **Context
   loaded** for a moment, and an empty answer goes back to **Load context**. A summary carries no date, so one can be ignored while the item stays enabled
   ([BR-002](docs/bugs/BR-002.md)).
 - **New conversation…** erases the target's conversation and its loaded context, and a session's ×

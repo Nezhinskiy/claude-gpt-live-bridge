@@ -290,7 +290,7 @@ parlez.
 - **Le Start de la bande** fait de sa session la cible et démarre l'appel ; la ligne qu'il ouvre
   reçoit la conversation de la session, et charge en plus un résumé quand il manquerait à la voix
   une partie d'elle (voir **Load context** ci-dessous), mais avec **Pause sync** activé ou
-  après une pause seulement si elle n'en a pas encore ([détails](../../docs/architecture/overview.md#components)). Avec un mod de cette version, le
+  après une pause seulement si elle n'en a pas encore ([détails](../../docs/architecture/overview.md#when-the-app-asks)). Avec un mod de cette version, le
   résumé est demandé au Start et au changement de cible pendant l'appel, et la ligne l'attend avant
   de se connecter, 10 secondes au plus depuis la demande : ce que vous dites entre-temps est gardé
   sur le Mac et joué à la voix quand la ligne s'ouvre. Stop ou un changement de cible pendant
@@ -330,7 +330,7 @@ parlez.
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a
   déjà la conversation. Sans ligne ouverte, quand la ligne suivante va charger le résumé et que rien d'autre ne manque, il affiche **Context loads with the
   line** et est désactivé, car la prochaine ligne le demande d'elle-même. Tant qu'un résumé de la
-  cible est en route, quoi qui l'ait demandé, il affiche **Loading context…** et est désactivé, au plus les 60 secondes que le mod lui accorde (avec un mod plus ancien, il reste sur **Load context**) ; un
+  cible est en route, quoi qui l'ait demandé, il affiche **Loading context…** et est désactivé, au plus le temps que le mod lui accorde ([combien](../../docs/architecture/overview.md#its-time) ; avec un mod plus ancien, il reste sur **Load context**) ; un
   résumé qui arrive affiche **Context loaded** un instant, et une réponse vide revient à **Load
   context**. Un résumé ne porte pas de date : il peut être ignoré alors que l'élément
   reste activé ([BR-002](../../docs/bugs/BR-002.md)).

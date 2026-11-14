@@ -265,7 +265,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
 - **band का Start** अपने session को target बनाता है और call शुरू करता है; जो line वह खोलता है उसे
   session की conversation मिलती है, और सारांश वह तब भी load करती है जब voice के पास session का कुछ
   हिस्सा न होता (नीचे **Load context** देखें), पर **Pause sync** चालू रहते या pause के बाद सिर्फ़ तब जब उसका सारांश अभी न हो
-  ([विवरण](../../docs/architecture/overview.md#components))। इस release के mod के साथ सारांश Start पर और
+  ([विवरण](../../docs/architecture/overview.md#when-the-app-asks))। इस release के mod के साथ सारांश Start पर और
   call के दौरान target बदलने पर माँगा जाता है, और line जुड़ने से पहले उसका इंतज़ार करती है, माँगने से
   अधिकतम 10 सेकंड: इस बीच आप जो कहते हैं वह Mac पर रखा जाता है और line खुलने पर voice तक पहुँचता
   है। इंतज़ार के दौरान Stop या target बदलना रखी हुई बात को हटा देता है, और **Connect over TCP**
@@ -301,7 +301,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   जाती है), session paused रहा है और उसका सारांश है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
   date** दिखाता है और बंद रहता है, क्योंकि voice के पास conversation पहले से है। अगर कोई line खुली न हो, अगली line सारांश load करेगी और बाकी कुछ नहीं छूटा है, तो यह
   **Context loads with the line** दिखाता है और बंद रहता है, क्योंकि अगली line उसे खुद माँगती है। जब target का सारांश
-  रास्ते में हो, उसे किसी ने भी माँगा हो, item **Loading context…** दिखाता है और बंद रहता है, ज़्यादा से ज़्यादा उन 60 सेकंड तक जो mod उसे देता है (पुराने mod पर वह **Load context** ही रहता है); आया हुआ
+  रास्ते में हो, उसे किसी ने भी माँगा हो, item **Loading context…** दिखाता है और बंद रहता है, ज़्यादा से ज़्यादा उतने समय तक जितना mod उसे देता है ([कितना](../../docs/architecture/overview.md#its-time); पुराने mod पर वह **Load context** ही रहता है); आया हुआ
   सारांश कुछ पल **Context loaded** दिखाता है, और खाली जवाब वापस **Load context** पर ले आता है। सारांश पर कोई तारीख
   नहीं होती, इसलिए वह अनदेखा हो सकता है जबकि item चालू रहता है ([BR-002](../../docs/bugs/BR-002.md))।
 - **New conversation…** target की conversation और उसका loaded context मिटा देता है, और किसी session

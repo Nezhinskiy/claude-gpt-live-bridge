@@ -86,13 +86,11 @@ voices.
   - post sync lines for any joined session, labelled as typed by you (`[TYPED]`) or as Claude's
     (`[CLAUDE]`). They are saved and seed later calls the same way, and go to the open line when
     that session is the target. The app takes the label on the process's word;
-  - join a session as one that missed a turn, or that does not sync, which makes the next line
-    that session opens ask it for a fresh summary, and for a session whose mod writes summaries
-    also the next Start or target change to it during a call, before a line to it opens (while
-    the pause setting is on or the session is marked paused, only one with no summary yet,
-    below; after it answers a numbered ask with no summary and a failure, only once the app
-    records a sync line, a voice request's answer or a join as missed of that session, or at the
-    next Start), and so makes it write one;
+  - join a session as one that missed a turn, or that does not sync, which makes the app ask that
+    session for a fresh summary by itself, at the times
+    [the architecture overview](docs/architecture/overview.md#when-the-app-asks) lists and under
+    the pause as below (a join as missed also ends the hold-off after a summary that failed), and
+    so makes it write one;
   - join with `writesSummaries`, make itself the target and never answer the summary ask, which
     holds what you say on the Mac, unsent, for up to 10 seconds from the ask while the line waits
     for that summary. The line then opens without it, and no later line of that call waits for
@@ -437,10 +435,10 @@ that reads your Codex usage from OpenAI, also while the call is off; what codex 
 is codex's. Codex
 talks to OpenAI with your ChatGPT login; LiveBridge never reads codex's credentials. The Claude
 session sends its work to Anthropic as it always does, and so does the summary the voice gets as
-context, also while the line is closed: a mod of this release, asked at Start, at a change of
-target, when a line opens or on **Load context**, sends the transcript, cut to 120,000
-characters, to the summary model through Claude Code, on your Claude usage; an older mod, asked
-when a line opens or on **Load context**, forks the session's own model over the whole request.
+context, also while the line is closed: whenever the app asks for a summary, a mod of this
+release sends the session's transcript, trimmed, to the summary model through Claude Code, on your
+Claude usage, and an older mod forks the session's own model over the whole request
+([when it asks, and what is trimmed](docs/architecture/overview.md#the-summary)).
 Settings' check of a custom **Summary model** sends one short request the same way. LiveBridge has no telemetry. The menu's
 **Feedback & Support** links, **Report a Bug…**, **LiveBridge Website** and **Star LiveBridge on
 GitHub**, only open the repository's bug form, getlivebridge.com and the repository's page in your
