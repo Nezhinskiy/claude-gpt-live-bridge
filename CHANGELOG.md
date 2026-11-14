@@ -4,6 +4,13 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- A session whose transcript the mod cannot turn into text now reports the summary as failed with
+  **transcript-unreadable**, and logs the error in the session, instead of failing with no reason.
+
 ## [0.6.0]
 
 ### Added
