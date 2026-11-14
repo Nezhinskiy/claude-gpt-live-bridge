@@ -35,7 +35,7 @@ flowchart LR
   Codex -- stdio --> CodexProc
   CodexProc -- signalling --> OpenAI
   Audio -- "WebRTC audio + data channel" --> OpenAI
-  Mod -- "HTTP/1.1, 1 poll per second, 5 for the target" --> Server
+  Mod -- "HTTP/1.1, 1 poll per second, 5 for the target during a call" --> Server
   Mod -- "prompt.submit" --> Claude
 ```
 
@@ -143,8 +143,8 @@ desktop's own, read from Claude Code's session registry, or the folder's name wh
 and joins again when that title changes, polls it once a second (the target five times a second
 while its last poll said the call is on, so a summary ask during a call reaches it sooner; with the
 call off it polls once a second too and learns that a call began only from its next poll, so
-Start's ask reaches it up to 0.8 s later than in 0.6.0, well within the line's 10-second wait for
-the summary ([handoff](#handoff)), and so do a **Load context** press and a model check; the title is still read once a second, and a
+Start's ask reaches it up to 0.8 s later than in 0.6.0, well within the line's
+[wait for the summary](#the-wait), and so do a **Load context** press and a model check; the title is still read once a second, and a
 poll in between writes the band only when what it draws changed), submits each voice request to the session
 as a prompt, and posts the turn's answer back. It tells voice turns from typed and
 background ones by the request marker on the prompt's last line and by the `prompt.submit`
@@ -260,7 +260,8 @@ asked; a session with no prompt yet, or with no text, gets an empty summary that
   `timeoutMs` is what is left. The menu shows **Loading context…** for a numbered ask until it is
   answered or 60 s from the ask pass (`SummaryAsks.display`). The app keeps an ask answerable for
   twice that (`Policy.answerable`), as an older mod may never answer.
-- **10 s for a line**, from the ask ([the wait](#the-wait)).
+- **10 s for a line,** from the ask (`SummaryAsks.Policy.waitLimit`): a line that
+  [waits](#the-wait) for the summary opens without it then.
 
 ### When the app asks
 
@@ -317,8 +318,8 @@ after `makeOffer` and before the seed is built and `voice.open` is called: the p
 `connecting`, which arms no silence timer, the voice line sends OpenAI nothing (the summary request
 is the one in flight), and the page queues what is said
 and plays it once the line connects. It ends at the post that answers the open ask, whatever it
-carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit,
-10 seconds from the ask (`SummaryAsks.Policy.waitLimit`), when the session drops or a gap makes the
+carries (a post for an older ask, which `Bridge.context` ignores, does not end it), at the limit
+([its time](#its-time)), when the session drops or a gap makes the
 ask stale, or when the line is
 cancelled: Stop opens nothing, a target change closes the waiting line as it closes a connecting
 one, and a reconnect waits again for the same ask. An answer to the open, current ask with no

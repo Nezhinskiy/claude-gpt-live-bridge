@@ -292,7 +292,7 @@ parlez.
   une partie d'elle (voir **Load context** ci-dessous), mais avec **Pause sync** activé ou
   après une pause seulement si elle n'en a pas encore ([détails](../../docs/architecture/overview.md#when-the-app-asks)). Avec un mod de cette version, le
   résumé est demandé au Start et au changement de cible pendant l'appel, et la ligne l'attend avant
-  de se connecter, 10 secondes au plus depuis la demande : ce que vous dites entre-temps est gardé
+  de se connecter, au plus [la limite de l'attente](../../docs/architecture/overview.md#its-time) : ce que vous dites entre-temps est gardé
   sur le Mac et joué à la voix quand la ligne s'ouvre. Stop ou un changement de cible pendant
   l'attente jette ce qui était gardé, de même qu'une reconnexion après un changement de **Connect
   over TCP**, qui garde au plus les 2 dernières secondes pour la ligne rouverte. Tant que l'appel parle à
