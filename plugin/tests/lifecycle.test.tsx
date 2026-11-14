@@ -685,12 +685,17 @@ const asTarget = (isTarget: boolean): StatusReply => ({
   ],
 })
 
-/** The summary ask reaches the target on its poll, so the target polls every 200 ms. */
-test('theTargetPollsFiveTimesASecond', async ($, on) => {
+/** The target polls every 200 ms only while the call is on, and learns that it began from a poll. */
+test('theTargetPollsFiveTimesASecondOnlyWhileTheCallIsOn', async ($, on) => {
   const world = fakeWorld(on)
-  world.status = asTarget(true)
+  world.status = { ...asTarget(true), call: 'off' }
   await liveOn($)
   await world.clock.advance(1000)  // the first poll says this session is the target
+  world.take('next')
+  await world.clock.advance(1000)
+  expect(world.take('next')).toHaveLength(1)
+  world.status = asTarget(true)
+  await world.clock.advance(1000)  // the next poll says the call is on
   world.take('next')
   await world.clock.advance(1000)
   expect(world.take('next')).toHaveLength(5)
