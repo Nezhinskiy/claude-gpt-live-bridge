@@ -393,7 +393,11 @@ public actor Bridge: Router {
       case ("POST", "/v1/answer"):
         let body = try req.decodeBody(AnswerBody.self)
         switch try await registry.complete(body) {
-        case .delivery(let delivery): await deliver(delivery)
+        case .delivery(let delivery):
+          // A voice turn ran to its answer, so the transcript changed (`.superseded` too, through
+          // `addSynced`); a question, an update or a failure may not have ended a turn.
+          if delivery.status == .ok { summaries.turnArrived(in: body.sessionId) }
+          await deliver(delivery)
         case .superseded: await keepSuperseded(body)
         case .dropped: break
         }
@@ -901,7 +905,8 @@ public actor Bridge: Router {
     let wrote = !body.summary.allSatisfy(\.isWhitespace)
     let failures = body.failures ?? []
     // The waiting line looks again at the `changed()` after every post, this one ignored or not.
-    let answer = summaries.answer(id, number: body.ask, wrote: wrote, in: &continuity, at: now)
+    let answer = summaries.answer(
+      id, number: body.ask, wrote: wrote, failed: !failures.isEmpty, in: &continuity, at: now)
     switch answer {
     case .taken(let ask, let waited), .stale(let ask, let waited):
       save()  // the ask is closed, also for the app after a restart

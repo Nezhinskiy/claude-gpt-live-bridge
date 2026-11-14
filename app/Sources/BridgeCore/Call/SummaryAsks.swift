@@ -73,9 +73,10 @@ struct SummaryAsks: Sendable {
   private var wait: (session: SessionID, number: Int, began: Date, ended: Date?)?
   /// When each session's last summary with text was taken.
   private var lastLoaded: [SessionID: Date] = [:]
-  /// The sessions whose last numbered ask was answered with no summary. Each ask sends the
-  /// transcript to a model again, so none goes to them by itself (`asksByItself`) until a turn of
-  /// theirs arrives, the next Start, or a summary with text, which only a press can ask for then.
+  /// The sessions whose last numbered ask was answered with no summary and a failure. Each ask
+  /// may send the transcript to a model again, so none goes to them by itself (`asksByItself`)
+  /// until a turn of theirs arrives, the next Start, or a summary with text, which only a press
+  /// can ask for then. An empty answer that names no failure had nothing to summarise.
   private var heldOff: Set<SessionID> = []
 
   /// Whether an ask nobody pressed for, from Start, a target change or a line, goes to `id`.
@@ -143,11 +144,13 @@ struct SummaryAsks: Sendable {
   mutating func targetChanged() { wait = nil }
 
   /// A summary post from `id`, with the ask's `number` if the mod echoes one; `wrote` is false for
-  /// an empty one. A post for another ask leaves the open ask open; any other closes it. An empty
-  /// answer to the open, current ask spends the session's wait for the call and, if the ask is
-  /// numbered, holds off the session's asks by itself; one with text ends that.
+  /// an empty one, and `failed` true for one that names a failure. A post for another ask leaves
+  /// the open ask open; any other closes it. An empty answer to the open, current ask spends the
+  /// session's wait for the call and, if the ask is numbered and the answer failed, holds off the
+  /// session's asks by itself; one with text ends that.
   mutating func answer(
-    _ id: SessionID, number: Int?, wrote: Bool, in continuity: inout Continuity, at now: Date
+    _ id: SessionID, number: Int?, wrote: Bool, failed: Bool = false,
+    in continuity: inout Continuity, at now: Date
   ) -> SummaryAnswer {
     let open = openAsk(of: id, in: continuity, at: now)
     let isOtherAsk = number != nil && open?.number != number
@@ -167,7 +170,7 @@ struct SummaryAsks: Sendable {
       heldOff.remove(id)
     } else {
       spent.insert(id)
-      if open.number != nil { heldOff.insert(id) }
+      if open.number != nil, failed { heldOff.insert(id) }
     }
     lastLoaded[id] = wrote ? now : nil
     return .taken(open, waited: waited)

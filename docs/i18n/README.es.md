@@ -309,7 +309,7 @@ Pulsa **Start**, en la banda situada sobre el prompt o en el menú de la barra d
   llamada y **Mute**; el siguiente **Start** empieza sin silenciar. Mute no es un cerrojo: cualquier
   proceso que se ejecute como tú puede quitarlo
   ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
-- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen y **Pause sync** impide que la siguiente línea lo cargue o el último pedido volvió vacío (hasta el siguiente turno de la sesión o el siguiente Start),
+- **Load context** solo está habilitado cuando a la voz le falta parte del destino: no hay resumen y **Pause sync** impide que la siguiente línea lo cargue o el último pedido falló (hasta el siguiente turno de la sesión o el siguiente Start),
   un turno no llegó, una pregunta o un aviso de permiso no llegó a la aplicación, hubo turnos con el
   mod apagado, las líneas desde el resumen ya no caben en lo que la voz puede llevar (una
   conversación larga lo supera), la sesión estuvo en pausa y tiene resumen, o su mod no sincroniza. En otro caso el

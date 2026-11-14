@@ -1963,11 +1963,33 @@ struct BridgeTests {
 
   // MARK: After a summary that failed
 
-  /// The call started on Alpha, whose mod took the ask and answered it with no summary.
+  /// The call started on Alpha, whose mod took the ask and answered it with no summary and a
+  /// failure.
   func failSummary() async throws {
     try await startWriting()
     _ = try await registry.poll(a)
+    let failures = [SummaryFailure(reason: .apiError, error: nil)]
+    try await post(
+      "/v1/context", ContextBody(sessionId: a, summary: "", failures: failures, ask: 1))
+  }
+
+  /// A fresh session has nothing to summarise, so no model was called: once the owner works by
+  /// voice, the next line asks by itself.
+  @Test func aFreshSessionWorkedByVoiceIsAskedByItsLine() async throws {
+    try await startWriting()
+    _ = try await registry.poll(a)
     try await post("/v1/context", ContextBody(sessionId: a, summary: "", ask: 1))
+    try await answer(request(1), from: a)
+    await bridge.audioEvent(.speechStarted)
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
+  }
+
+  /// A voice turn changes the transcript, as a typed one does.
+  @Test func aVoiceAnswerAfterAFailedSummaryLetsTheLineAsk() async throws {
+    try await failSummary()
+    try await answer(request(1), from: a)
+    await bridge.audioEvent(.speechStarted)
+    #expect(try await registry.poll(a) == .context(model: SummaryModel.default, ask: 2))
   }
 
   /// Each ask sends the transcript to a model again, so the line asks nothing by itself.

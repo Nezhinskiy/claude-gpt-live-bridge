@@ -295,7 +295,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू
   होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
   ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge))।
-- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है और **Pause sync** अगली line को उसे load करने से रोकता है या पिछली बार माँगा गया सारांश खाली लौटा (session के अगले turn या अगले Start तक),
+- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है और **Pause sync** अगली line को उसे load करने से रोकता है या पिछली बार माँगा गया सारांश विफल रहा (session के अगले turn या अगले Start तक),
   कोई turn नहीं पहुँचा, कोई सवाल या permission notice app तक नहीं पहुँचा, mod बंद रहते turns चले,
   सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे बढ़
   जाती है), session paused रहा है और उसका सारांश है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to

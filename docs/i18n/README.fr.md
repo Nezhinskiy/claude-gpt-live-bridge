@@ -324,7 +324,7 @@ parlez.
   micro actif. Mute n'est pas un verrou : tout processus qui s'exécute sous votre compte peut le
   lever ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** n'est activé que lorsqu'il manque à la voix une partie de la cible : pas de
-  résumé et **Pause sync** empêche la ligne suivante d'en charger un ou le dernier demandé est revenu vide (jusqu'au prochain tour de la session ou au prochain Start), un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
+  résumé et **Pause sync** empêche la ligne suivante d'en charger un ou le dernier demandé a échoué (jusqu'au prochain tour de la session ou au prochain Start), un tour non arrivé, une question ou un avis de permission non parvenu à l'application, des
   tours passés mod éteint, des lignes depuis le résumé qui ne tiennent plus toutes dans ce que la
   voix peut porter (une longue conversation le dépasse), la session a été mise en pause et a un résumé, ou son mod
   ne synchronise pas. Sinon l'élément affiche **Context up to date** et est désactivé, car la voix a

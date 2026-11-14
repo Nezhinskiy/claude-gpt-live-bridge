@@ -329,7 +329,7 @@ Press **Start**, in the band above the prompt or in the menu bar menu, and talk.
   not a lock: any process running as you can unmute
   ([SECURITY.md](SECURITY.md#who-can-drive-the-bridge)).
 - **Load context** is enabled only when the voice lacks part of the target: it has no summary
-  and **Pause sync** stops the next line loading one or the last one asked for came back empty
+  and **Pause sync** stops the next line loading one or the last one asked for failed
   (until the session's next turn or the next Start), a turn did not arrive, a question or permission notice did not reach the app, turns ran while the
   mod was off, the lines since the summary no longer all fit what the voice can carry (a long
   conversation outgrows that), the session was paused and has a summary, or its mod does not sync. Otherwise the item

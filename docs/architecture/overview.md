@@ -171,9 +171,10 @@ session (it has none, a turn did not arrive, the lines since the summary no long
 seed, or the mod does not sync), unless the pause holds it back (`Bridge.pauseHoldsBackSummary`):
 the pause setting is on or the session is *paused*, and the session has a summary or **Load a
 session's context on its first call** is off, or the session's last numbered ask was answered with
-no summary (`SummaryAsks.asksByItself`): each ask sends the transcript to the model again, so until
-a turn of it arrives (a sync line the app records, or a join that says a turn was missed) or the
-next Start, only Load context asks it. A
+no summary and a failure (`SummaryAsks.asksByItself`): each ask may send the transcript to the
+model again, so until a turn of it arrives (a sync line the app records, the answer to a voice
+request, or a join that says a turn was missed) or the next Start, only Load context asks it. An
+empty answer that names no failure had nothing to summarise and holds nothing off. A
 mod that joined with `writesSummaries` is asked at
 once, when the call starts and when the target changes during the call (from the menu, the band
 or the registry after a drop); an older mod is asked when a line opens, as before, so Start spends
