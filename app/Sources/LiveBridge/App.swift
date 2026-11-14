@@ -397,10 +397,12 @@ final class AppModel {
 
   /// The menu's Uninstall LiveBridge, in the copy in `/Applications`: once confirmed, the app
   /// removes its login item and moves itself to the Trash first; if it cannot move, the login
-  /// item comes back and it says so, changing nothing else. Then it ends a call and removes every
-  /// joined session, as the menu's × does, so its mod turns off instead of opening LiveBridge
-  /// again; removes the microphone permission, copies the mod's uninstall command, and quits,
-  /// leaving `UninstallScript` to move the files it keeps to the Trash once the process is gone.
+  /// item comes back and it says so, changing nothing else; if the login item does not come back,
+  /// it says that and where to turn it on (`Confirmation.cannotTrash`). Then it ends a call and
+  /// removes every joined session, as the menu's × does, so its mod turns off instead of opening
+  /// LiveBridge again; removes the microphone permission, copies the mod's uninstall command, and
+  /// quits, leaving `UninstallScript` to move the files it keeps to the Trash once the process is
+  /// gone.
   func uninstall() {
     guard isInstalledCopy, Confirm.ask(.uninstall) else { return }
     // The login item goes while the bundle it names is still in place, and comes back if the
@@ -413,9 +415,8 @@ final class AppModel {
       if wasAtLogin { try? LoginItem.set(true) }
       let alert = NSAlert()
       alert.messageText = "LiveBridge could not move itself to the Trash"
-      alert.informativeText =
-        "\(error.localizedDescription) Nothing was changed. The README's Uninstall section "
-        + "shows how to remove LiveBridge by hand."
+      alert.informativeText = Confirmation.cannotTrash(
+        reason: error.localizedDescription, loginItemRestored: !wasAtLogin || LoginItem.isEnabled)
       NSApp.activate()
       alert.runModal()
       return
