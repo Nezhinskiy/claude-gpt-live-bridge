@@ -295,7 +295,7 @@ setting है, जो LiveBridge की [सेटिंग्स](#सेट�
   के साथ ख़त्म हो जाती है। **Stop** call और mute दोनों ख़त्म करता है; अगला **Start** unmuted शुरू
   होता है। Mute कोई ताला नहीं है: आपके user के रूप में चल रहा कोई भी process उसे हटा सकता है
   ([SECURITY.md](../../SECURITY.md#who-can-drive-the-bridge))।
-- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है और **Pause sync** अगली line को उसे load करने से रोकता है,
+- **Load context** तभी चालू होता है जब voice के पास target का कुछ हिस्सा नहीं है: सारांश नहीं है और **Pause sync** अगली line को उसे load करने से रोकता है या पिछली बार माँगा गया सारांश विफल रहा (session के अगले turn या अगले Start तक),
   कोई turn नहीं पहुँचा, कोई सवाल या permission notice app तक नहीं पहुँचा, mod बंद रहते turns चले,
   सारांश के बाद की पंक्तियाँ अब voice की क्षमता में पूरी नहीं समातीं (लंबी conversation इससे बढ़
   जाती है), session paused रहा है और उसका सारांश है, या उसका mod sync नहीं करता। नहीं तो यह item **Context up to
@@ -627,11 +627,6 @@ Uninstall करने से वे सब हट जाती हैं; menu 
   भी नहीं मिलता, voice को सारांश नहीं मिलता, जो Settings बताती है। इस setting से पहले session का अपना model
   उसे लिखता था, जो हर उस जगह काम करता है जहाँ session करता है। pinned id का इन providers पर resolve होना
   Claude Code के documentation से लिया गया है और चलाकर नहीं देखा गया।
-- विफल हुआ सारांश याद नहीं रखा जाता: जब तक session को अब भी सारांश चाहिए, Start, target बदलना और
-  खुलने वाली हर line उसे फिर माँगती है, और mod वही transcript, अधिकतम 120,000 अक्षर, फिर भेजता है,
-  जो हर बार billed हो सकता है, चाहे जवाब खाली लौटे या बहुत देर से। अगर session के band पर
-  **Context failed** बना रहे, तो **Pause sync** चालू
-  करें और **Load a session's context on its first call** बंद रहने दें।
 - जो session अब भी इस release से पहले के mod पर है, वह restart होने तक sync नहीं होता: वह turns छूटे
   session की तरह सारांश load करता है, और कोई pause उसकी पंक्तियों को अस्वीकार नहीं करता ([और क्या
   अलग है](../../CHANGELOG.md))।

@@ -23,6 +23,14 @@ All notable changes to this project are listed here. The format follows
   Trash and macOS does not let it put back the login item it removed first: it says the login item
   could not be restored, and that **Open at login** in Settings or System Settings ▸ General ▸
   Login Items turns it on again.
+- A summary that fails is no longer asked for again by itself. After an ask the mod answers with
+  no summary and a failure, neither a change of target during the call nor a line that opens asks
+  that session again until a turn of it arrives, typed or by voice, or the next Start, so a long
+  call no longer sends the same transcript, up to 120,000 characters, to the summary model at
+  every line. **Load context** still asks, and the menu offers it then. An ask already answered is no longer handed to the mod
+  again. `/clear` during a call no longer asks the session ahead as if the target had changed, nor
+  lets a line wait for the summary again when the call had spent that wait, and **Context loaded**
+  survives it.
 - A session whose transcript the mod cannot turn into text now reports the summary as failed with
   **transcript-unreadable**, before any model is asked, and logs the error in the session, instead
   of failing with no reason.

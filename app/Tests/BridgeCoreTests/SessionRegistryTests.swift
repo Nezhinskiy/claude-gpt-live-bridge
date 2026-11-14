@@ -442,6 +442,17 @@ struct SessionRegistryTests {
     #expect(try await registry.poll(a) == nil)
   }
 
+  /// An answered ask is taken back; another ask, a newer one, stays for the next poll.
+  @Test func onlyTheAnsweredAskIsTakenBack() async throws {
+    await join(a)
+    await registry.requestContext(for: a, ask: 2)
+    await registry.withdrawContext(of: a, ask: 1)
+    #expect(try await registry.poll(a) == .context(ask: 2))
+    await registry.requestContext(for: a, ask: 2)
+    await registry.withdrawContext(of: a, ask: 2)
+    #expect(try await registry.poll(a) == nil)
+  }
+
   @Test func activityShowsInRows() async {
     await join(a)
     await registry.setActivity(ActivityBody(sessionId: a, state: .approval))
