@@ -228,7 +228,7 @@ s'arrête avec une phrase qui indique où l'accorder.
 
 Dans la copie de `/Applications`, **Feedback & Support ▸ Uninstall LiveBridge…**, dans le menu,
 demande d'abord, puis met l'app dans la Corbeille ; s'il ne le peut pas, il le dit et ne change
-rien d'autre. Puis l'appel ouvert prend fin et chaque session quitte LiveBridge, comme avec
+rien d'autre, et si macOS ne lui permet pas de remettre l'ouverture à la connexion qu'il avait retirée d'abord, il le dit aussi, et comment réactiver **Open at login**. Puis l'appel ouvert prend fin et chaque session quitte LiveBridge, comme avec
 le × du menu, donc `/live` s'y éteint au lieu de rouvrir LiveBridge ; LiveBridge retire
 l'ouverture à la connexion et l'autorisation du micro et quitte, et une fois qu'il a quitté,
 les fichiers qu'il garde (ceux ci-dessous) vont dans un dossier de la Corbeille, jusqu'à ce que vous la vidiez. Il laisse le mod Claude Code et copie la commande qui
