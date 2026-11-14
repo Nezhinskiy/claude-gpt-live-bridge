@@ -12,6 +12,16 @@ struct SummaryModelTests {
     #expect(SummaryModel.accepted("x;rm") == nil)
   }
 
+  @Test func onlyAListedIDIsListed() {
+    #expect(SummaryModel.listed.allSatisfy { SummaryModel.isListed($0.id) })
+    #expect(!SummaryModel.isListed("claude-x-1"))
+  }
+
+  /// Settings' caption names the fallback, which is the default, by its listed name.
+  @Test func theDefaultIsListed() {
+    #expect(SummaryModel.isListed(SummaryModel.default))
+  }
+
   private func report(
     _ asked: String, fallback: String? = "claude-haiku-5-5", _ failures: [SummaryFailure],
     wrote: Bool

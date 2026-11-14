@@ -9,6 +9,11 @@ public enum SummaryModel {
     ("claude-opus-5-5", "Opus 5.5"),
   ]
 
+  /// Whether `id` is one of `listed`, which Settings' picker shows by name.
+  public static func isListed(_ id: String) -> Bool {
+    listed.contains { $0.id == id }
+  }
+
   /// The listed name of `id`, else "Custom model".
   public static func name(_ id: String) -> String {
     listed.first { $0.id == id }?.name ?? "Custom model"

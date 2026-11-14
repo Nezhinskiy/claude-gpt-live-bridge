@@ -40,8 +40,7 @@ public enum SummaryLog {
   public static func line(_ timing: SummaryTiming) -> String {
     let model: String
     if let id = timing.model {
-      model =
-        SummaryModel.listed.contains { $0.id == id } ? "\"\(SummaryModel.name(id))\"" : "custom"
+      model = SummaryModel.isListed(id) ? "\"\(SummaryModel.name(id))\"" : "custom"
     } else {
       model = "fork"
     }

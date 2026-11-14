@@ -491,6 +491,18 @@ struct CallMachineTests {
     #expect(last(opened, timeouts).contains(.armSilenceTimer(seconds: 20)))
   }
 
+  /// Settings warns of a timer that is on but short enough to cut the owner off; off is no warning.
+  @Test func aTimerOnButShortIsWarnedOf() {
+    let timers: [CallMachine.Timeouts.Timer] = [.silence, .firstWord, .noise]
+    let short = CallMachine.Timeouts(silence: 9, firstWord: 3, noise: 9)
+    let long = CallMachine.Timeouts(silence: 10, firstWord: 4, noise: 10)
+    let off = CallMachine.Timeouts(silence: 0, firstWord: 0, noise: 0)
+    #expect(timers.map { short.isShort($0) } == [true, true, true])
+    #expect(timers.map { long.isShort($0) } == [false, false, false])
+    #expect(timers.map { off.isShort($0) } == [false, false, false])
+    #expect(CallMachine.Timeouts(silence: 1, firstWord: 1, noise: 1).isShort(.firstWord))
+  }
+
   /// A timer turned on while an open line is quiet and nothing counts starts at once.
   @Test func aTimerTurnedOnOnAQuietLineStarts() {
     var machine = CallMachine()

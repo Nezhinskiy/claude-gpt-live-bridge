@@ -188,6 +188,19 @@ public struct CallMachine: Sendable {
     /// What Settings offers.
     public static let range = 0...300
 
+    public enum Timer: Sendable { case silence, firstWord, noise }
+
+    /// Settings warns of `timer` while it is on but short enough to cut the owner off: under an
+    /// ordinary pause for the silence and the sound without words, and within a second of the
+    /// voice's usual start, about 2 s after the line connects, for a first word.
+    public func isShort(_ timer: Timer) -> Bool {
+      switch timer {
+      case .silence: (1...9).contains(silence)
+      case .firstWord: (1...3).contains(firstWord)
+      case .noise: (1...9).contains(noise)
+      }
+    }
+
     /// `seconds` as Settings keeps it: the nearer end of `range` when outside it.
     public static func clamped(_ seconds: Int) -> Int {
       min(max(seconds, range.lowerBound), range.upperBound)
