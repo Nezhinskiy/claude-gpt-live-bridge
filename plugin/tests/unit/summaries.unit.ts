@@ -203,6 +203,18 @@ test('aForkCrossedByAGapIsNotPosted', async () => {
   assert.deepEqual([world.posts, world.failed], [[], 1])
 })
 
+test('aClearCrossesTheSendOnItsWay', async () => {
+  // The old transcript's summary is not posted for the new one.
+  const world = session()
+  world.hold()
+  const first = world.ask()
+  await settle()
+  world.sends.end('clear')
+  world.release()
+  await first
+  assert.deepEqual([world.posts, world.failed], [[], 1])
+})
+
 test('aNamedSendCrossedByAGapStillPostsItsAnswer', async () => {
   // The app asked before the gap, so it ignores this answer as stale; it is an answer all the same.
   const world = session()

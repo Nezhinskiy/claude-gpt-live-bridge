@@ -55,12 +55,12 @@ export class SummarySends {
 
   /**
    * What ends a summary's use: a main-loop turn completed, a gap (a turn did not reach the app), or
-   * `/clear`. The kept summary goes; a gap also crosses the send on its way.
+   * `/clear`. The kept summary goes; a gap or `/clear` also crosses the send on its way.
    */
   end(cause: 'turn' | 'gap' | 'clear'): void {
     this.#epoch += 1
     this.#kept = null
-    if (cause === 'gap' && this.#sending !== null) this.#sending.isCrossed = true
+    if (cause !== 'turn' && this.#sending !== null) this.#sending.isCrossed = true
   }
 
   /**
